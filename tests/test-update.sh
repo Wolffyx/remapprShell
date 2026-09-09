@@ -14,6 +14,11 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$HOME/.local/bin"
 
+# Names come from branding.json like everywhere else; the slug lint fails the
+# build if one is written literally, and it caught this file.
+source "$SOURCE_REPO/scripts/lib/log.sh"
+REPO_ROOT="$SOURCE_REPO" source "$SOURCE_REPO/scripts/lib/brand.sh"
+
 pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
@@ -39,9 +44,9 @@ rc=$?
 
 check "version advanced"            "$(cat "$INSTALLED/VERSION")" "0.9.9"
 check "new source content arrived"  "$(grep -c 'added by the newer version' "$INSTALLED/shell/core/Obj.qml")" "1"
-check "a restore point was taken"   "$(ls -1 "$XDG_STATE_HOME/remappr-shell-snapshots" 2>/dev/null | wc -l)" "1"
-check "update state recorded"       "$([ -f "$XDG_STATE_HOME/remappr-shell/update-state.json" ] && echo yes)" "yes"
-check "installed into the sandbox"  "$([ -e "$XDG_CONFIG_HOME/quickshell/remappr-shell" ] && echo yes)" "yes"
+check "a restore point was taken"   "$(ls -1 "$XDG_STATE_HOME/$SLUG-snapshots" 2>/dev/null | wc -l)" "1"
+check "update state recorded"       "$([ -f "$STATE_DIR/update-state.json" ] && echo yes)" "yes"
+check "installed into the sandbox"  "$([ -e "$QS_CONFIG_DIR" ] && echo yes)" "yes"
 
 echo "== rollback =="
 "$INSTALLED/scripts/update.sh" --rollback >>"$SANDBOX/out" 2>&1

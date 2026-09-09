@@ -8,7 +8,6 @@ pragma Singleton
 // defaults or values in the schema, and both age badly.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
 

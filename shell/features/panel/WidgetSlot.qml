@@ -81,7 +81,7 @@ Item {
         id: popout
 
         readonly property bool wanted: !!root.widget?.popout && !!root.widget?.popoutVisible
-        readonly property Item contentItem: content.item as Item
+        readonly property Item popoutContent: content.item as Item
         readonly property bool atTop: root.bar?.position === "top"
 
         // Where this slot sits along the panel, in screen coordinates. The
@@ -99,6 +99,9 @@ Item {
 
         // Kept on screen: a popout under a button near the right edge would
         // otherwise run off it.
+        //
+        // qmllint cannot resolve `margins` on a panel window and warns about
+        // it; the property is real and works at runtime.
         margins.left: Math.max(0, Math.min(popout.slotX, (popout.screen?.width ?? 0) - popout.implicitWidth - 8))
         margins.top: popout.atTop ? (root.bar?.thickness ?? 0) + 4 : 0
         margins.bottom: popout.atTop ? 0 : (root.bar?.thickness ?? 0) + 4
@@ -110,8 +113,8 @@ Item {
 
         color: "transparent"
 
-        implicitWidth: popout.contentItem?.implicitWidth ?? 1
-        implicitHeight: popout.contentItem?.implicitHeight ?? 1
+        implicitWidth: popout.popoutContent?.implicitWidth ?? 1
+        implicitHeight: popout.popoutContent?.implicitHeight ?? 1
 
         Rectangle {
             anchors.fill: parent
@@ -126,7 +129,7 @@ Item {
             // works; a popout opened from a keybinding has nothing to click,
             // which is why the panel forwards its keys here too.
             focus: true
-            Keys.forwardTo: popout.contentItem ? [popout.contentItem] : []
+            Keys.forwardTo: popout.popoutContent ? [popout.popoutContent] : []
 
             Loader {
                 id: content

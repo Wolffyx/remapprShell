@@ -47,7 +47,7 @@ PanelWindow {
     // not steal focus from the window the user is working in.
     focusable: true
 
-    property Item openPopoutContent: null
+    property Item openPopout: null
 
     Rectangle {
         anchors.fill: parent
@@ -58,7 +58,7 @@ PanelWindow {
         // makes "click the launcher, then type" work. Keys attaches to an
         // Item, never to a window, so it lives here rather than on the panel.
         focus: true
-        Keys.forwardTo: root.openPopoutContent ? [root.openPopoutContent] : []
+        Keys.forwardTo: root.openPopout ? [root.openPopout] : []
 
         // Three zones. Left and right hug their edges; middle is centred on the
         // panel itself, not on the space left over between the other two, so a
