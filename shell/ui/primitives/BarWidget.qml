@@ -16,7 +16,8 @@ Item {
 
     // ---- injected by the host -----------------------------------------
 
-    // The hosting panel: position, orientation, thickness, scale.
+    // The hosting panel. Exposes exactly three things: `position`
+    // ("top"/"bottom"/"left"/"right"), `horizontal`, and `thickness`.
     required property var bar
 
     // This widget's own configuration: its manifest defaults merged with the
@@ -29,8 +30,10 @@ Item {
 
     // ---- capabilities, overridden by the widget ------------------------
 
-    readonly property bool wantsHover: false
-    readonly property bool wantsWheel: false
+    // Not readonly: a widget declares its capabilities by assigning these, and
+    // a readonly property in the base type cannot be overridden.
+    property bool wantsHover: false
+    property bool wantsWheel: false
 
     // Shown when the widget is activated. Null means the widget has no popout.
     property Component popout: null

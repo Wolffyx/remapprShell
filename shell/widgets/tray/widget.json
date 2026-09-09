@@ -1,0 +1,18 @@
+{
+    "id": "tray",
+    "apiVersion": 1,
+    "name": "System tray",
+    "description": "StatusNotifierItem icons from running applications.",
+    "icon": "preferences-system-tray",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.systemtray" }
+    },
+    "config": {
+        "iconSize": { "type": "int", "default": 18, "min": 12, "max": 48, "label": "Icon size" },
+        "hidden": { "type": "list", "default": [], "label": "Hidden items",
+                    "description": "StatusNotifierItem ids to leave out." }
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "id": "power",
+    "apiVersion": 1,
+    "name": "Session",
+    "description": "Opens Plasma's own logout and shutdown prompt.",
+    "icon": "system-shutdown",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.lock_logout" }
+    },
+    "config": {
+        "action": {
+            "type": "enum",
+            "values": ["promptAll", "promptLogout", "promptReboot", "promptShutDown"],
+            "default": "promptAll",
+            "label": "Action"
+        }
+    }
+}

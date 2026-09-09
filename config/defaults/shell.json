@@ -1,17 +1,19 @@
 {
     "schemaVersion": 1,
+
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",
         "thickness": 40
     },
+
     "bar": {
         "entries": [
-            {
-                "id": "clock",
-                "zone": "middle",
-                "enabled": true
-            }
+            { "id": "workspaces",  "zone": "left",   "enabled": true },
+            { "id": "clock",       "zone": "middle", "enabled": true },
+            { "id": "tray",        "zone": "right",  "enabled": true },
+            { "id": "power",       "zone": "right",  "enabled": true },
+            { "id": "showdesktop", "zone": "right",  "enabled": true }
         ]
     }
 }

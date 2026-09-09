@@ -4,6 +4,7 @@
 import QtQuick
 import Quickshell
 import qs.ui.primitives
+import qs.domain.theme
 
 BarWidget {
     id: root
@@ -27,17 +28,15 @@ BarWidget {
         anchors.centerIn: parent
         spacing: 8
 
-        Text {
+        PanelText {
             anchors.verticalCenter: parent.verticalCenter
-            color: "white"
-            font.pixelSize: 13
             text: Qt.formatDateTime(root.clock.date, root.timeFormat)
         }
 
-        Text {
+        PanelText {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.showDate
-            color: Qt.rgba(1, 1, 1, 0.65)
+            color: PlasmaColors.foregroundInactive
             font.pixelSize: 12
             text: Qt.formatDateTime(root.clock.date, root.dateFormat)
         }

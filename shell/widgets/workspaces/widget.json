@@ -1,0 +1,17 @@
+{
+    "id": "workspaces",
+    "apiVersion": 1,
+    "name": "Virtual desktops",
+    "description": "Switches between KWin virtual desktops.",
+    "icon": "virtual-desktops",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.pager" }
+    },
+    "config": {
+        "showNames": { "type": "bool", "default": false, "label": "Show desktop names" },
+        "scrollToSwitch": { "type": "bool", "default": true, "label": "Switch by scrolling" }
+    }
+}

@@ -7,6 +7,7 @@ import QtQuick
 import Quickshell
 import qs.core
 import qs.features.panel.model
+import qs.domain.theme
 
 PanelWindow {
     id: root
@@ -14,8 +15,12 @@ PanelWindow {
     required property var modelData
     screen: modelData
 
+    // The `bar` half of the widget contract: what a widget is allowed to know
+    // about its host. Kept deliberately small -- a widget that needs more than
+    // this is usually reaching for something that belongs in the panel.
     readonly property string position: PanelModel.position
     readonly property bool horizontal: PanelModel.horizontal
+    readonly property int thickness: PanelModel.thickness
 
     anchors {
         top: root.position !== "bottom"
@@ -35,7 +40,7 @@ PanelWindow {
 
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.55)
+        color: PlasmaColors.panelBackground
 
         // Three zones. Left and right hug their edges; middle is centred on the
         // panel itself, not on the space left over between the other two, so a
