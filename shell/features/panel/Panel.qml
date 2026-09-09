@@ -21,6 +21,7 @@ PanelWindow {
     readonly property string position: PanelModel.position
     readonly property bool horizontal: PanelModel.horizontal
     readonly property int thickness: PanelModel.thickness
+    readonly property var screenObject: root.screen
 
     anchors {
         top: root.position !== "bottom"

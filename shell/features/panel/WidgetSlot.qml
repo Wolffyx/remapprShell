@@ -66,26 +66,49 @@ Item {
         onClicked: event => root.widget?.handleActivate(event.button)
     }
 
-    // A widget that declares a popout gets a window for it, anchored to itself.
-    // The widget supplies the contents and never touches window placement --
+    // A widget that declares a popout gets a window for it, positioned under
+    // itself. The widget supplies the contents and never touches placement --
     // which is what lets a plugin have a popout without knowing where on the
-    // panel it will end up, or which edge the panel is on.
-    PopupWindow {
+    // panel it sits or which edge the panel is on.
+    //
+    // A layer surface rather than an xdg popup, deliberately. Wayland only
+    // grants a popup the keyboard if its parent surface has already received
+    // input, so a popup-based launcher can be focused by clicking the button
+    // but never by a keybinding or `rmpr launcher` -- the panel has had no
+    // input in that case, and the grab is refused. A layer surface asks for
+    // keyboard focus directly and works either way.
+    PanelWindow {
         id: popout
 
         readonly property bool wanted: !!root.widget?.popout && !!root.widget?.popoutVisible
+        readonly property Item contentItem: content.item as Item
+        readonly property bool atTop: root.bar?.position === "top"
 
-        anchor.window: root.QsWindow.window
-        anchor.rect.x: root.mapToItem(null, 0, 0).x
-        anchor.rect.y: root.mapToItem(null, 0, 0).y
-        anchor.rect.width: root.width
-        anchor.rect.height: root.height
-        anchor.edges: root.bar?.position === "top" ? Edges.Bottom : Edges.Top
+        // Where this slot sits along the panel, in screen coordinates. The
+        // panel spans the screen, so a position within it is a position on it.
+        readonly property real slotX: root.mapToItem(null, 0, 0).x
 
         visible: popout.wanted
-        grabFocus: root.widget?.popoutGrabsFocus ?? false
+        screen: root.bar?.screenObject ?? null
+
+        anchors {
+            top: popout.atTop
+            bottom: !popout.atTop
+            left: true
+        }
+
+        // Kept on screen: a popout under a button near the right edge would
+        // otherwise run off it.
+        margins.left: Math.max(0, Math.min(popout.slotX, (popout.screen?.width ?? 0) - popout.implicitWidth - 8))
+        margins.top: popout.atTop ? (root.bar?.thickness ?? 0) + 4 : 0
+        margins.bottom: popout.atTop ? 0 : (root.bar?.thickness ?? 0) + 4
+
+        // The panel already reserves its strip; this must not reserve another.
+        exclusionMode: ExclusionMode.Ignore
+        aboveWindows: true
+        focusable: root.widget?.popoutGrabsFocus ?? false
+
         color: "transparent"
-        readonly property Item contentItem: content.item as Item
         implicitWidth: popout.contentItem?.implicitWidth ?? 1
         implicitHeight: popout.contentItem?.implicitHeight ?? 1
 

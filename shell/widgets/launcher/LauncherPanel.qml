@@ -23,11 +23,16 @@ Item {
     implicitWidth: 380
     implicitHeight: layout.implicitHeight + 16
 
-    Component.onCompleted: search.forceActiveFocus()
+    // The window this lives in has to accept focus before anything inside it
+    // can hold it, and this component is built before the surface is mapped --
+    // so asking for focus in Component.onCompleted alone is too early and the
+    // request is silently dropped. callLater runs after the window exists.
+    focus: true
+    Component.onCompleted: Qt.callLater(() => search.forceActiveFocus())
 
-    // Clicking away closes it. Without this the popout survives losing focus
-    // and has to be dismissed from the button it was opened with.
-    onActiveFocusChanged: if (!activeFocus && root.provider.visible) root.provider.close()
+    // Typing anywhere in the popout goes to the search field, so a click on a
+    // result row does not leave the keyboard pointing at nothing.
+    Keys.forwardTo: [search]
 
     Rectangle {
         anchors.fill: parent
@@ -44,6 +49,7 @@ Item {
 
             TextField {
                 id: search
+                focus: true
                 width: parent.width
                 placeholderText: "Search applications"
                 color: PlasmaColors.foreground
