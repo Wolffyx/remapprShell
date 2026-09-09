@@ -1,0 +1,29 @@
+[Unit]
+Description=@DISPLAY_NAME@
+Documentation=@REPO_FETCH@
+PartOf=graphical-session.target
+After=graphical-session.target
+
+# The shell is a Wayland client and cannot start without a compositor.
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@BIN_DIR@/@SESSION_BIN@
+
+# A crash should not leave the user with no panel. RestartSec is short because
+# the failure that matters -- a widget bringing the shell down at boot -- is
+# detected by the shell's own quarantine, not by giving up here.
+Restart=on-failure
+RestartSec=2s
+
+# But a shell that cannot start at all must stop trying, rather than spinning
+# and filling the journal.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+Slice=session.slice
+TimeoutStopSec=5s
+
+[Install]
+WantedBy=graphical-session.target

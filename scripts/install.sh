@@ -86,6 +86,9 @@ install_template() {
     local src=$1 dest=$2
     remove_dest "$dest" || return 0
     render_template "$src" "$dest"
+    # Templates default to executable because most of them are scripts; a
+    # systemd unit must not be.
+    case "$dest" in *.service) chmod 644 "$dest" ;; esac
     log_info "  gen   $dest"
 }
 
@@ -113,6 +116,12 @@ while IFS='|' read -r kind src dest; do
             esac ;;
     esac
 done < <(manifest_entries)
+
+# systemd caches unit files; without this the unit is invisible until the next
+# login, and `rmpr start` fails with a confusing "unit not found".
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user daemon-reload 2>/dev/null || true
+fi
 
 if [ "$MODE" != uninstall ]; then
     case ":$PATH:" in

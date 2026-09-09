@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 # Installs and activates the look-and-feel package, reversibly.
 #
-#   apply    install the package, activate it, write the defaults
-#   revert   put every key back and remove the package
-#   status   what is active, and what would be undone
+#   apply [--appearance]   install the package and activate it
+#   revert                 put every key back and remove the package
+#   status                 what is active, and what would be undone
+#
+# A plain apply installs the package and activates it -- which is what makes
+# our OSD, splash and logout screens take effect -- and touches nothing else.
+#
+# --appearance additionally writes the colour scheme, icon theme, widget style
+# and window decoration from the package's `defaults` file. That is opt-in
+# because those are the settings a user is most likely to have deliberately
+# chosen: overwriting a dynamic colour scheme with a static one, uninvited, is
+# exactly the kind of surprise this project is meant not to spring. It is
+# ledgered like everything else, so `revert` puts it all back either way.
 #
 # Keys are written individually through the ledger rather than with
 # `lookandfeeltool --apply`. lookandfeeltool overwrites the colour scheme, icon
@@ -72,13 +82,28 @@ apply_defaults() {
 cmd=${1:-status}
 [ $# -gt 0 ] && shift
 
+WITH_APPEARANCE=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --appearance) WITH_APPEARANCE=1 ;;
+        *) die "unknown option: $1" ;;
+    esac
+    shift
+done
+
 case "$cmd" in
     apply)
         # A restore point before the first write outside our own directories.
         snapshot_create "before-theme" >/dev/null || die "could not take a restore point; refusing to apply"
 
         install_package || die "package installation failed; nothing was activated"
-        apply_defaults   || die "could not write the defaults; run '$ALIAS theme revert'"
+
+        if [ "$WITH_APPEARANCE" = 1 ]; then
+            apply_defaults || die "could not write the defaults; run '$ALIAS theme revert'"
+        else
+            log_info "leaving colour scheme, icons and widget style alone"
+            log_info "  (pass --appearance to apply those too)"
+        fi
 
         # Activating the package is what makes our OSD, splash and logout QML
         # take effect. It is a single key, and it is ledgered like the rest.

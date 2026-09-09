@@ -35,8 +35,18 @@ before=$(mktemp -d)
 cp -a "$XDG_CONFIG_HOME/." "$before/"
 before_sums=$(cd "$XDG_CONFIG_HOME" && find . -type f | sort | xargs sha256sum)
 
-echo "== apply =="
+echo "== apply (default: package only) =="
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
+
+check "look and feel active"        "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+check "icon theme left alone"       "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "user-icons"
+
+"$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
+check "back to the user scheme"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+
+echo "== apply --appearance =="
+"$REPO_ROOT/scripts/theme.sh" apply --appearance >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
 
 check "package installed"     "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/metadata.json" ] && echo yes)" "yes"
 check "our OSD shipped"       "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml" ] && echo yes)" "yes"

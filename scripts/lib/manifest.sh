@@ -18,6 +18,7 @@ dir|config|$DATA_DIR/config
 template|bin/session.sh.in|$BIN_DIR/$SESSION_BIN
 template|bin/ctl.sh.in|$BIN_DIR/$CTL_BIN
 symlink|$CTL_BIN|$BIN_DIR/$ALIAS
+template|share/systemd/service.in|$SYSTEMD_USER_DIR/$SYSTEMD_UNIT
 ENTRIES
 }
 
