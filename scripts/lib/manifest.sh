@@ -16,6 +16,8 @@ manifest_entries() {
 dir|shell|$QS_CONFIG_DIR
 dir|config|$DATA_DIR/config
 template|bin/session.sh.in|$BIN_DIR/$SESSION_BIN
+template|bin/ctl.sh.in|$BIN_DIR/$CTL_BIN
+symlink|$CTL_BIN|$BIN_DIR/$ALIAS
 ENTRIES
 }
 

@@ -72,6 +72,16 @@ install_dir() {
     fi
 }
 
+# A relative symlink, so the alias keeps working if the whole bin directory
+# moves.
+install_symlink() {
+    local target=$1 dest=$2
+    remove_dest "$dest" || return 0
+    mkdir -p "$(dirname "$dest")"
+    ln -s "$target" "$dest"
+    log_info "  link  $dest -> $target"
+}
+
 install_template() {
     local src=$1 dest=$2
     remove_dest "$dest" || return 0
@@ -94,10 +104,11 @@ while IFS='|' read -r kind src dest; do
     case "$MODE" in
         uninstall) remove_dest "$dest" || failed=1 ;;
         *)
-            [ -e "$REPO_ROOT/$src" ] || die "manifest references missing source: $src"
+            [ "$kind" = symlink ] || [ -e "$REPO_ROOT/$src" ] || die "manifest references missing source: $src"
             case "$kind" in
                 dir)      install_dir      "$REPO_ROOT/$src" "$dest" || failed=1 ;;
                 template) install_template "$REPO_ROOT/$src" "$dest" || failed=1 ;;
+                symlink)  install_symlink  "$src" "$dest" || failed=1 ;;
                 *) die "unknown manifest kind: $kind" ;;
             esac ;;
     esac

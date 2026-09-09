@@ -20,3 +20,7 @@ trap 'rm -rf "$IMPORT_ROOT"' EXIT
 ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 
 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
+
+# Shell-level tests. These run against a throwaway HOME, never the caller's.
+log_step "snapshot/restore tests"
+"$REPO_ROOT/tests/test-snapshot.sh"

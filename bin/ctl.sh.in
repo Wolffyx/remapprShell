@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# @DISPLAY_NAME@ control.
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link  (or scripts/install.sh)
+set -euo pipefail
+
+REPO_ROOT="@REPO_ROOT@"
+
+usage() {
+    cat <<USAGE
+@DISPLAY_NAME@ @VERSION@
+
+usage: @ALIAS@ <command> [options]
+
+  preflight [--suggest-snapshots]   check this machine, report what may change
+  snapshot [label]                  take a restore point now
+  restore [--preinstall|--list]     put KDE back the way it was
+  status                            is the shell installed and running?
+  log [-f]                          show the shell's journal
+  start | stop | restart            control the user service
+  version                           print the version
+
+Anything not listed here is not implemented yet.
+USAGE
+}
+
+require_repo() {
+    [ -d "$REPO_ROOT/scripts" ] || {
+        echo "error: the source tree is missing at $REPO_ROOT" >&2
+        echo "       reinstall, or run the scripts from a checkout" >&2
+        exit 1
+    }
+}
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+    preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
+    restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
+
+    snapshot)
+        require_repo
+        # shellcheck source=/dev/null
+        source "$REPO_ROOT/scripts/lib/log.sh"
+        source "$REPO_ROOT/scripts/lib/brand.sh"
+        source "$REPO_ROOT/scripts/lib/protected.sh"
+        source "$REPO_ROOT/scripts/lib/snapshot.sh"
+        snapshot_create "${1:-manual}" >/dev/null
+        ;;
+
+    status)
+        printf 'installed:  '
+        [ -e "@QS_CONFIG_DIR@" ] && echo "yes (@QS_CONFIG_DIR@)" || echo "no"
+        printf 'running:    '
+        pgrep -f "quickshell/@SLUG@" >/dev/null 2>&1 && echo "yes" || echo "no"
+        printf 'service:    '
+        systemctl --user is-active "@SYSTEMD_UNIT@" 2>/dev/null || true
+        printf 'config:     %s\n' "@CONFIG_DIR@"
+        printf 'state:      %s\n' "@STATE_DIR@"
+        ;;
+
+    log)     exec journalctl --user -u "@SYSTEMD_UNIT@" "$@" ;;
+    start)   exec systemctl --user start "@SYSTEMD_UNIT@" ;;
+    stop)    exec systemctl --user stop "@SYSTEMD_UNIT@" ;;
+    restart) exec systemctl --user restart "@SYSTEMD_UNIT@" ;;
+
+    version) echo "@DISPLAY_NAME@ @VERSION@" ;;
+    help|-h|--help) usage ;;
+    *) echo "unknown command: $cmd" >&2; echo >&2; usage >&2; exit 1 ;;
+esac
