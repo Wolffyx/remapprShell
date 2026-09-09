@@ -31,9 +31,11 @@ ShellRoot {
 
         function toggle(): void { LauncherService.toggle("apps"); }
         function open(): void { LauncherService.open("apps"); }
+        function search(): void { LauncherService.toggle("search"); }
         function close(): void { LauncherService.close(); }
         function query(text: string): void { LauncherService.openWithQuery(text); }
-        function provider(): string { return LauncherService.active.providerId; }
+        function provider(): string { return LauncherService.appsProvider.providerId; }
+        function searchProvider(): string { return LauncherService.searchProvider.providerId; }
     }
 
     Component.onCompleted: {

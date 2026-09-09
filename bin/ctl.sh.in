@@ -40,13 +40,17 @@ case "$cmd" in
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
 
+    # Both talk to the running shell rather than reimplementing the choice, so
+    # a keybinding and the panel button always open the same thing.
     launcher)
-        # Talks to the running shell rather than reimplementing the choice, so
-        # a keybinding and the panel button always open the same thing.
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher toggle
+        ;;
+
+    search)
         if [ $# -gt 0 ]; then
             exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher query "$*"
         fi
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher toggle
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher search
         ;;
 
     snapshot)  require_repo; exec "$REPO_ROOT/scripts/snapshot.sh" "$@" ;;

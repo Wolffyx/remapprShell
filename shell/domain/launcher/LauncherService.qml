@@ -5,6 +5,15 @@ pragma Singleton
 // The panel button, any keybinding and `rmpr launcher` all call open() here,
 // so a provider can be swapped in configuration without touching anything that
 // triggers a launcher.
+//
+// Opening the application menu and searching are different acts and get
+// different providers. On KDE the start button should give you Kickoff and
+// Meta+Space should give you KRunner; treating both as one "launcher" choice
+// means one of them is always wrong. So there are two settings, and `mode`
+// decides which applies:
+//
+//   apps            the start menu       launcher.provider
+//   search, run     type-to-find         launcher.searchProvider
 
 import QtQuick
 import qs.core
@@ -14,7 +23,8 @@ import qs.domain.launcher.providers
 QtObject {
     id: root
 
-    readonly property string configured: ConfigStore.value("launcher.provider", "auto")
+    readonly property string configuredApps: ConfigStore.value("launcher.provider", "auto")
+    readonly property string configuredSearch: ConfigStore.value("launcher.searchProvider", "auto")
 
     readonly property BuiltinProvider builtin: BuiltinProvider {}
 
@@ -47,23 +57,24 @@ QtObject {
 
     readonly property var availableProviders: root.providers.filter(p => p.available)
 
-    // Preference order when nothing is configured. The built-in is last on
-    // purpose: on a KDE desktop, KRunner and Kickoff are what the user already
-    // knows, and this shell exists to work with them rather than replace them.
-    readonly property var autoOrder: ["krunner", "kickoff", "builtin"]
+    // Preference when nothing is configured. Kickoff first for the menu,
+    // KRunner first for search: those are KDE's own, and this shell exists to
+    // work with them rather than replace them. The built-in is the fallback
+    // for a machine where neither is present.
+    readonly property var autoOrderApps: ["kickoff", "builtin", "krunner"]
+    readonly property var autoOrderSearch: ["krunner", "builtin", "kickoff"]
 
-    readonly property Provider active: {
-        if (root.configured !== "auto") {
-            const chosen = root.providers.find(p => p.providerId === root.configured);
+    function _resolve(configured, order, what) {
+        if (configured !== "auto") {
+            const chosen = root.providers.find(p => p.providerId === configured);
             if (chosen && chosen.available)
                 return chosen;
             if (chosen)
-                Log.warn("launcher", `provider '${root.configured}' is not available here; falling back`);
+                Log.warn("launcher", `${what} provider '${configured}' is not available here; falling back`);
             else
-                Log.warn("launcher", `no launcher provider named '${root.configured}'; falling back`);
+                Log.warn("launcher", `no launcher provider named '${configured}'; falling back`);
         }
-
-        for (const id of root.autoOrder) {
+        for (const id of order) {
             const p = root.providers.find(q => q.providerId === id && q.available);
             if (p)
                 return p;
@@ -71,13 +82,39 @@ QtObject {
         return root.builtin;
     }
 
+    readonly property Provider appsProvider: root._resolve(root.configuredApps, root.autoOrderApps, "menu")
+    readonly property Provider searchProvider: root._resolve(root.configuredSearch, root.autoOrderSearch, "search")
+
+    function providerFor(mode) {
+        return mode === "search" || mode === "run" ? root.searchProvider : root.appsProvider;
+    }
+
+    // What the panel button opens, and therefore what may own a popout.
+    readonly property Provider active: root.appsProvider
+
     // Which launcher will actually open is a decision made from configuration
     // and availability, so it is reported once rather than left to be guessed
     // from behaviour.
-    onActiveChanged: Log.info("launcher", `using '${root.active.providerId}' (configured: ${root.configured}; available: ${root.availableProviders.map(p => p.providerId).join(", ") || "none"})`)
+    onAppsProviderChanged: Log.info("launcher", `menu: '${root.appsProvider.providerId}' (configured: ${root.configuredApps}; available: ${root.availableProviders.map(p => p.providerId).join(", ") || "none"})`)
+    onSearchProviderChanged: Log.info("launcher", `search: '${root.searchProvider.providerId}' (configured: ${root.configuredSearch})`)
 
-    function open(mode) { root.active.open(mode ?? "apps"); }
-    function openWithQuery(q) { root.active.openWithQuery(q); }
-    function close() { root.active.close(); }
-    function toggle(mode) { root.active.toggle(mode); }
+    function open(mode) {
+        const m = mode ?? "apps";
+        root.providerFor(m).open(m);
+    }
+
+    // A query is a search by definition, so it always goes to the search
+    // provider regardless of which mode the caller thought it was in.
+    function openWithQuery(q) { root.searchProvider.openWithQuery(q); }
+
+    function close() {
+        root.appsProvider.close();
+        if (root.searchProvider !== root.appsProvider)
+            root.searchProvider.close();
+    }
+
+    function toggle(mode) {
+        const m = mode ?? "apps";
+        root.providerFor(m).toggle(m);
+    }
 }
