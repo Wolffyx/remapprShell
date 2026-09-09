@@ -23,6 +23,28 @@ QtObject {
 
     readonly property bool horizontal: root.position === "top" || root.position === "bottom"
 
+    // Per-output values. A panel reads these rather than the ones above, so a
+    // monitor override reaches the panel it describes; the globals remain for
+    // anything not drawn per screen.
+    function positionFor(name) { return ConfigStore.valueFor(name, "panel.position", "bottom"); }
+    function thicknessFor(name) { return ConfigStore.valueFor(name, "panel.thickness", 40); }
+    function horizontalFor(name) {
+        const p = root.positionFor(name);
+        return p === "top" || p === "bottom";
+    }
+    function entriesForScreen(name, zone) {
+        const entries = ConfigStore.valueFor(name, "bar.entries", []) ?? [];
+        return entries.filter(e => {
+            if (!e || e.enabled === false)
+                return false;
+            if (!e.zone) {
+                Log.warn("panel", `entry '${e.id ?? "?"}' has no zone; ignoring it`);
+                return false;
+            }
+            return e.zone === zone;
+        });
+    }
+
     // The raw ordered list from config. Order within a zone is significant, so
     // it is preserved exactly as written rather than sorted.
     readonly property var entries: ConfigStore.value("bar.entries", [])

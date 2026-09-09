@@ -43,6 +43,7 @@ case "$cmd" in
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;
     update)    require_repo; exec "$REPO_ROOT/scripts/update.sh" "$@" ;;
+    profile)   require_repo; exec "$REPO_ROOT/scripts/profile.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 

@@ -105,6 +105,13 @@
             "page": "widgets"
         },
         {
+            "id": "profiles",
+            "label": "Profiles",
+            "icon": "preferences-desktop-display",
+            "description": "Separate configurations you can switch between, and per-monitor overrides within each.",
+            "page": "profiles"
+        },
+        {
             "id": "snapshots",
             "label": "Restore points",
             "icon": "document-save",

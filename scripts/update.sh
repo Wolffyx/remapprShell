@@ -47,7 +47,18 @@ config_get() {
 
 [ -n "$CHANNEL" ]      || CHANNEL=$(config_get '.update.channel' 'main')
 [ -n "$LOCAL_SOURCE" ] || LOCAL_SOURCE=$(config_get '.update.localSource' '')
-REMOTE=$(config_get '.update.remote' "$REPO_FETCH")
+# Where to update from, most specific first:
+#
+#   1. update.remote in the configuration
+#   2. the checkout's own origin -- a clone should update from where it came
+#      from, and this is also the only URL guaranteed to work for a private
+#      repository, since branding.json carries the public HTTPS one
+#   3. the URL in branding.json
+REMOTE=$(config_get '.update.remote' '')
+if [ -z "$REMOTE" ] && git -C "$REPO_ROOT" remote get-url origin >/dev/null 2>&1; then
+    REMOTE=$(git -C "$REPO_ROOT" remote get-url origin)
+fi
+[ -n "$REMOTE" ] || REMOTE=$REPO_FETCH
 
 STATE_FILE="$STATE_DIR/update-state.json"
 

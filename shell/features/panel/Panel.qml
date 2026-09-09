@@ -18,9 +18,10 @@ PanelWindow {
     // The `bar` half of the widget contract: what a widget is allowed to know
     // about its host. Kept deliberately small -- a widget that needs more than
     // this is usually reaching for something that belongs in the panel.
-    readonly property string position: PanelModel.position
-    readonly property bool horizontal: PanelModel.horizontal
-    readonly property int thickness: PanelModel.thickness
+    readonly property string screenName: root.modelData.name
+    readonly property string position: PanelModel.positionFor(root.screenName)
+    readonly property bool horizontal: PanelModel.horizontalFor(root.screenName)
+    readonly property int thickness: PanelModel.thicknessFor(root.screenName)
     readonly property var screenObject: root.screen
 
     anchors {

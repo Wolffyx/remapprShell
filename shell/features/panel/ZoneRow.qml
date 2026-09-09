@@ -33,7 +33,7 @@ Item {
         horizontalItemAlignment: Grid.AlignHCenter
 
         Repeater {
-            model: PanelModel.entriesFor(root.zone)
+            model: PanelModel.entriesForScreen(root.screenName, root.zone)
 
             WidgetSlot {
                 required property var modelData

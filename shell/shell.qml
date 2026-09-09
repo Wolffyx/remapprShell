@@ -18,6 +18,9 @@ ShellRoot {
 
     // One panel per screen. Variants rebuilds the set on monitor hotplug, so
     // nothing here has to watch for display changes.
+    // Per-output overrides, one watcher per connected screen.
+    MonitorConfigLoader {}
+
     Variants {
         model: Quickshell.screens
 

@@ -4,7 +4,8 @@ pragma Singleton
 //
 //   1 defaults   shipped, complete, read-only
 //   2 profile    the user's file -- a SPARSE delta against the defaults
-//   3 runtime    in-memory only, never persisted
+//   3 monitor    a per-output delta on top of the profile
+//   4 runtime    in-memory only, never persisted
 //
 // `merged` is the union, recomputed whenever any layer changes. Reading config
 // anywhere in the shell means binding to `merged` (or `value()`), so a file
@@ -25,13 +26,58 @@ QtObject {
 
     // ---- state --------------------------------------------------------
 
-    readonly property string profile: "default"
+    // The active profile. Switching is one atomic write to a tiny file, so it
+    // never risks the profile itself.
+    property string profile: "default"
+
+    // Per-output overrides, keyed by output name. A panel on a 4K monitor and
+    // one on a laptop screen rarely want the same thickness, and forcing a
+    // single value on both is the sort of thing that makes people stop using
+    // multiple monitors properly.
+    property var monitorData: ({})
 
     property var defaults: ({})
     property var profileData: ({})
     property var runtime: ({})
 
     readonly property var merged: Obj.deepMerge(root.defaults, root.profileData, root.runtime)
+
+    // The configuration as it applies to one output. Everything drawn per
+    // screen reads through this rather than `merged`, so a per-monitor override
+    // reaches the thing it describes.
+    function forScreen(name) {
+        const overlay = root.monitorData[name];
+        if (!overlay)
+            return root.merged;
+        return Obj.deepMerge(root.merged, overlay);
+    }
+
+    function valueFor(name, path, fallback) {
+        return Obj.get(root.forScreen(name), path, fallback);
+    }
+
+    // Writes a per-monitor override. Kept sparse against the profile, not the
+    // defaults: an override exists to differ from what this profile already
+    // says, and recording a value equal to it would freeze it.
+    function setForScreen(name, path, value) {
+        if (!root.writable) {
+            root.writeBlocked(root.lastError);
+            return false;
+        }
+        const current = Obj.get(root.merged, path, undefined);
+        const overlay = root.monitorData[name] ?? {};
+        const next = Obj.deepEqual(value, current) ? Obj.unset(overlay, path)
+                                                   : Obj.set(overlay, path, value);
+        root.monitorData = Object.assign({}, root.monitorData, { [name]: next });
+        root._monitorWrites[name] = true;
+        root._monitorTimer.restart();
+        root.changed();
+        return true;
+    }
+
+    function isOverriddenForScreen(name, path) {
+        return Obj.has(root.monitorData[name] ?? {}, path);
+    }
 
     readonly property bool defaultsLoaded: Object.keys(root.defaults).length > 0
 
@@ -122,6 +168,31 @@ QtObject {
         onTriggered: root._flush()
     }
 
+    property var _monitorWrites: ({})
+
+    readonly property Timer _monitorTimer: Timer {
+        interval: 250
+        onTriggered: root._flushMonitors()
+    }
+
+    function _flushMonitors() {
+        for (const name of Object.keys(root._monitorWrites)) {
+            const overlay = root.monitorData[name] ?? {};
+            Fs.ensureDir(`${Paths.profileDir(root.profile)}/monitors`);
+            root._monitorWriter.path = Paths.monitorConfigFile(root.profile, name);
+            root._monitorWriter.setText(JSON.stringify(overlay, null, 4) + "\n");
+        }
+        root._monitorWrites = ({});
+    }
+
+    // One writer reused across outputs: monitor overlays are written rarely and
+    // one at a time, and a FileView per screen would mean a file watcher per
+    // screen for files that almost never change.
+    readonly property FileView _monitorWriter: FileView {
+        atomicWrites: true
+        printErrors: false
+    }
+
     function _scheduleWrite() {
         root.changed();
         root._writeTimer.restart();
@@ -205,6 +276,40 @@ QtObject {
         root.lastError = "";
         Log.info("config", `profile loaded (${Object.keys(data).length} top-level override(s))`);
         root.changed();
+    }
+
+    // The active profile is recorded in its own small file. Keeping it out of
+    // shell.json means switching profiles is one atomic write that cannot
+    // damage the configuration it is switching away from.
+    function switchProfile(name) {
+        if (!name || name === root.profile)
+            return;
+        Fs.ensureDir(Paths.configDir);
+        root._stateView.setText(JSON.stringify({ profile: name }, null, 4) + "\n");
+        root.profile = name;
+        Log.info("config", `switched to profile '${name}'`);
+    }
+
+    readonly property FileView _stateView: FileView {
+        path: Paths.stateFile
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: reload()
+
+        onLoaded: {
+            try {
+                const next = JSON.parse(text()).profile;
+                if (typeof next === "string" && next.length > 0 && next !== root.profile) {
+                    root.profile = next;
+                    Log.info("config", `active profile: ${next}`);
+                }
+            } catch (e) {
+                Log.warn("config", `state file unreadable, staying on '${root.profile}': ${e}`);
+            }
+        }
+
+        onLoadFailed: {} // no state file yet means the default profile
     }
 
     readonly property FileView _defaultsView: FileView {

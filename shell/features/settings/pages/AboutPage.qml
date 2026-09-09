@@ -3,8 +3,8 @@
 import QtQuick
 import qs.core
 import qs.domain.theme
-import qs.domain.widgets
 import qs.domain.launcher
+import qs.domain.widgets
 import qs.ui.primitives
 
 Column {
