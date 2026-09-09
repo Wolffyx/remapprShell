@@ -14,3 +14,4 @@ shell/core/Branding.qml
 *.swp
 *~
 shell/**/qmldir
+shell/widgets/index.json

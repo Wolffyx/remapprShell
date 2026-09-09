@@ -7,6 +7,7 @@ import QtQuick
 import Quickshell
 import qs.core
 import qs.features.panel
+import qs.platform.system
 
 ShellRoot {
     id: root
@@ -22,7 +23,7 @@ ShellRoot {
     Component.onCompleted: {
         // Reading the environment belongs to the platform layer, not to core,
         // so the logger is configured here rather than reaching for it itself.
-        Log.debugEnabled = Quickshell.env(Branding.debugVar) === "1";
+        Log.debugEnabled = Env.debug();
         Log.info("shell", `${Branding.displayName} ${Branding.version} started`);
     }
 }

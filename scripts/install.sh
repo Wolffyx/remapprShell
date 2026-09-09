@@ -82,7 +82,11 @@ install_template() {
 log_step "$MODE ($DISPLAY_NAME $VERSION)"
 
 # The generated singleton must exist before shell/ is linked or copied.
-[ "$MODE" = uninstall ] || "$REPO_ROOT/scripts/gen-branding.sh" >/dev/null
+if [ "$MODE" != uninstall ]; then
+    "$REPO_ROOT/scripts/gen-branding.sh"     >/dev/null
+    "$REPO_ROOT/scripts/gen-qmldir.sh"       >/dev/null
+    "$REPO_ROOT/scripts/gen-widget-index.sh" >/dev/null
+fi
 
 failed=0
 while IFS='|' read -r kind src dest; do

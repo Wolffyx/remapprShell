@@ -1,23 +1,17 @@
 {
     "schemaVersion": 1,
-
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",
         "thickness": 40
     },
-
     "bar": {
         "entries": [
-            { "id": "clock", "zone": "middle", "enabled": true }
+            {
+                "id": "clock",
+                "zone": "middle",
+                "enabled": true
+            }
         ]
-    },
-
-    "widgets": {
-        "clock": {
-            "format": "HH:mm",
-            "showDate": false,
-            "dateFormat": "ddd d MMM"
-        }
     }
 }

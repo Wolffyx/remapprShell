@@ -10,6 +10,7 @@ pragma Singleton
 import QtQuick
 import qs.core
 import qs.domain.config
+import qs.domain.widgets
 
 QtObject {
     id: root
@@ -43,10 +44,22 @@ QtObject {
         });
     }
 
-    // Per-widget configuration: the widget's own subtree of the config, merged
-    // over whatever the entry carries inline.
+    // Per-widget configuration, lowest precedence first:
+    //
+    //   1. the defaults the widget's own manifest declares
+    //   2. the user's `widgets.<id>` block
+    //   3. anything the entry carries inline, for two instances of one widget
+    //      configured differently
+    //
+    // Manifest defaults are the base so that a widget's defaults live with the
+    // widget. Repeating them in the shipped shell.json would mean every new
+    // option had to be added in two places, and third-party widgets could not
+    // have defaults at all.
     function configFor(entry) {
-        const fromConfig = ConfigStore.value(`widgets.${entry.id}`, {}) ?? {};
-        return Obj.deepMerge(fromConfig, entry.config ?? {});
+        return Obj.deepMerge(
+            WidgetRegistry.configDefaults(entry.id),
+            ConfigStore.value(`widgets.${entry.id}`, {}) ?? {},
+            entry.config ?? {}
+        );
     }
 }

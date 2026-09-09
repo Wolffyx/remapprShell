@@ -35,7 +35,7 @@ Item {
         Repeater {
             model: PanelModel.entriesFor(root.zone)
 
-            WidgetHost {
+            WidgetSlot {
                 required property var modelData
                 entry: modelData
                 bar: root.bar

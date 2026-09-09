@@ -13,8 +13,10 @@ help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sort | \
 	 awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-brand: ## Regenerate shell/core/Branding.qml from branding.json
+brand: ## Regenerate all generated files (branding, qmldir, widget index)
 	@scripts/gen-branding.sh
+	@scripts/gen-qmldir.sh
+	@scripts/gen-widget-index.sh
 
 link: ## Symlink the shell into place (development; edits are live)
 	@scripts/install.sh --link
