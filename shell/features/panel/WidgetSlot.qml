@@ -109,6 +109,7 @@ Item {
         focusable: root.widget?.popoutGrabsFocus ?? false
 
         color: "transparent"
+
         implicitWidth: popout.contentItem?.implicitWidth ?? 1
         implicitHeight: popout.contentItem?.implicitHeight ?? 1
 
@@ -118,6 +119,14 @@ Item {
             color: PlasmaColors.background
             border.width: 1
             border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+
+            // Quickshell 0.3.1 exposes no layer-shell keyboard-focus mode, so
+            // `focusable` is on-demand: Wayland grants the keyboard only once
+            // the surface is clicked. Clicking into the popout therefore
+            // works; a popout opened from a keybinding has nothing to click,
+            // which is why the panel forwards its keys here too.
+            focus: true
+            Keys.forwardTo: popout.contentItem ? [popout.contentItem] : []
 
             Loader {
                 id: content

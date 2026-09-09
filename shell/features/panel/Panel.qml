@@ -46,9 +46,18 @@ PanelWindow {
     // not steal focus from the window the user is working in.
     focusable: true
 
+    property Item openPopoutContent: null
+
     Rectangle {
         anchors.fill: parent
         color: PlasmaColors.panelBackground
+
+        // Typing while the panel has focus goes to whichever popout is open.
+        // The panel receives the click that opens a popout, so this is what
+        // makes "click the launcher, then type" work. Keys attaches to an
+        // Item, never to a window, so it lives here rather than on the panel.
+        focus: true
+        Keys.forwardTo: root.openPopoutContent ? [root.openPopoutContent] : []
 
         // Three zones. Left and right hug their edges; middle is centred on the
         // panel itself, not on the space left over between the other two, so a
