@@ -11,7 +11,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Sy --noconfirm --needed git jq make qt6-declarative
+        run: pacman -Sy --noconfirm --needed git jq make qt6-declarative xorg-server-xvfb
 
       - uses: actions/checkout@v4
 
@@ -28,6 +28,9 @@ jobs:
 
       - name: QML lint
         run: ./scripts/lint-qml.sh
+
+      - name: Tests
+        run: xvfb-run -a ./scripts/test.sh
 
       - name: Shell script syntax
         run: |

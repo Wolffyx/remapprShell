@@ -1,4 +1,4 @@
-# Generated from branding.json - never committed
+# Generated - never committed
 shell/core/Branding.qml
 
 # Build / scratch
@@ -13,3 +13,4 @@ shell/core/Branding.qml
 .vscode/
 *.swp
 *~
+shell/**/qmldir

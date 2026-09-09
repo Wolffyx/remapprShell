@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml brand clean
+.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml brand test clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -48,3 +48,6 @@ lint-qml: brand ## Run qmllint over the shell
 
 clean: ## Remove generated files
 	@rm -f shell/core/Branding.qml
+
+test: brand ## Run the QML test suite
+	@scripts/test.sh

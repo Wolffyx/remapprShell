@@ -1,0 +1,31 @@
+{
+    "id": "clock",
+    "apiVersion": 1,
+    "name": "Clock",
+    "description": "Current time and date.",
+    "icon": "clock",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.digitalclock" }
+    },
+    "config": {
+        "format": {
+            "type": "string",
+            "default": "HH:mm",
+            "label": "Time format",
+            "description": "Qt date/time format string."
+        },
+        "showDate": {
+            "type": "bool",
+            "default": false,
+            "label": "Show date"
+        },
+        "dateFormat": {
+            "type": "string",
+            "default": "ddd d MMM",
+            "label": "Date format"
+        }
+    }
+}

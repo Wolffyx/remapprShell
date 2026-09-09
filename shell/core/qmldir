@@ -1,4 +1,0 @@
-module qs.core
-
-singleton Branding 1.0 Branding.qml
-singleton Log 1.0 Log.qml
