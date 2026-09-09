@@ -45,12 +45,31 @@ make uninstall
 ### Command line
 
 ```bash
-rmpr preflight   # what would change, and whether this machine is ready
-rmpr snapshot    # take a restore point now
-rmpr restore     # put KDE back the way it was
-rmpr theme apply # install and activate the look and feel
+rmpr preflight          # what would change, and whether this machine is ready
+rmpr snapshot create    # take a restore point now
+rmpr snapshot list      # what exists, with sizes
+rmpr restore            # put KDE back the way it was
+rmpr theme apply        # install and activate the look and feel
 rmpr status
 ```
+
+### Restore points are never deleted automatically
+
+Not on restore, not on uninstall, not to reclaim space, not to prune old ones.
+A restore point the software may delete by itself is not a restore point, and
+an early version of the restore code proved the point by deleting its own
+archive mid-restore and taking a user's configuration with it.
+
+They are removed only when asked:
+
+```bash
+rmpr snapshot remove <name>   # delete one, after confirming
+rmpr snapshot prune --keep 5  # delete all but the newest N, after confirming
+```
+
+Both prompt first. Every delete path in the codebase goes through a guard that
+refuses to touch anything inside the snapshot store, so the rule holds even if
+a future call site forgets it.
 
 ### Changing KDE settings
 

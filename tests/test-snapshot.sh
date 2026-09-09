@@ -79,6 +79,33 @@ check "package added to a captured dir survives" \
 check "snapshot survived being restored"  "$([ -s "$snap/manifest.txt" ] && echo yes)" "yes"
 check "snapshot can be restored twice"    "$(snapshot_restore "$snap" >/dev/null 2>&1 && echo yes)" "yes"
 
+echo "== snapshots are never deleted by us =="
+
+# The store must survive a restore that names it, and every delete path must
+# refuse to touch it. This is the rule that an earlier version broke.
+check "store path is recognised" \
+      "$(snapshot_is_store_path "$(snapshot_root)/anything" && echo yes)" "yes"
+check "unrelated path is not"    \
+      "$(snapshot_is_store_path "$XDG_CONFIG_HOME/kdeglobals" && echo yes || echo no)" "no"
+
+snapshot_safe_rm "$(snapshot_root)/$(basename "$snap")" >/dev/null 2>&1
+check "safe_rm refuses inside the store" "$([ -d "$snap" ] && echo yes)" "yes"
+
+count_before=$(ls -1 "$(snapshot_root)" | wc -l)
+snapshot_restore "$snap" >/dev/null 2>&1
+check "restore leaves every snapshot in place" "$(ls -1 "$(snapshot_root)" | wc -l)" "$count_before"
+
+echo "== removal is possible, but only when asked =="
+extra=$(snapshot_create disposable)
+check "a second snapshot exists" "$([ -d "$extra" ] && echo yes)" "yes"
+snapshot_remove "$(basename "$extra")" >/dev/null 2>&1
+check "explicit remove works" "$([ -d "$extra" ] && echo yes || echo no)" "no"
+
+for i in 1 2 3; do snapshot_create "p$i" >/dev/null; sleep 1; done
+snapshot_prune 2 >/dev/null 2>&1
+check "prune keeps exactly N" "$(ls -1 "$(snapshot_root)" | wc -l)" "2"
+check "prune refuses keep=0" "$(snapshot_prune 0 >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+
 echo "== fail-closed =="
 broken=$(mktemp -d); mkdir -p "$broken/files"; : > "$broken/manifest.txt"
 check "empty manifest is refused" "$(snapshot_restore "$broken" >/dev/null 2>&1 && echo restored || echo refused)" "refused"

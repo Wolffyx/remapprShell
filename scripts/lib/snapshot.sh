@@ -21,6 +21,35 @@
 # archive kept inside it destroys itself the moment it is used.
 snapshot_root() { printf '%s/%s-snapshots' "$XDG_STATE_HOME" "$SLUG"; }
 
+# Nothing in this project ever deletes a snapshot.
+#
+# Not on restore, not on uninstall, not to prune old ones, not to reclaim
+# space. A restore point is worthless if the software that might need it is
+# also allowed to remove it, and the one time an earlier version deleted its
+# own archive it took a user's configuration with it. Snapshots are removed
+# only when the user asks, through `snapshot remove` or `snapshot prune`.
+#
+# This is the guard that enforces it: every delete path checks it first.
+snapshot_is_store_path() {
+    local path=$1 root
+    root=$(snapshot_root)
+    case "$path" in
+        "$root"|"$root"/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Refuses to delete anything inside the snapshot store. Used everywhere this
+# project removes a path, so the rule cannot be forgotten at one call site.
+snapshot_safe_rm() {
+    local path=$1
+    if snapshot_is_store_path "$path"; then
+        log_warn "refusing to delete inside the snapshot store: $path"
+        return 1
+    fi
+    rm -rf "$path"
+}
+
 # --- tier detection -------------------------------------------------------
 
 snapshot_home_is_btrfs() {
@@ -167,6 +196,10 @@ snapshot_restore() {
 
     while IFS= read -r path; do
         [ -n "$path" ] || continue
+        if snapshot_is_store_path "$path"; then
+            log_debug "skipping the snapshot store itself: $path"
+            continue
+        fi
         rel=${path#"$HOME"/}
         [ -e "$staging/$rel" ] || continue
 
@@ -193,8 +226,7 @@ snapshot_restore() {
         [ -n "$path" ] || continue
         [ -e "$path" ] || continue
         if ! grep -qxF -- "$path" <<< "$manifest"; then
-            rm -rf "$path"
-            removed=$((removed + 1))
+            snapshot_safe_rm "$path" && removed=$((removed + 1))
         fi
     done < <(owned_paths)
 
@@ -210,4 +242,66 @@ snapshot_restore() {
 
     rm -rf "$staging"
     log_step "restored $restored path(s), removed $removed of ours, left $skipped in place"
+}
+
+# --- removal: user-invoked only -------------------------------------------
+
+snapshot_list() {
+    local root d
+    root=$(snapshot_root)
+    [ -d "$root" ] || { log_info "no snapshots"; return 0; }
+
+    local found=0
+    for d in "$root"/*/; do
+        [ -d "$d" ] || continue
+        found=1
+        printf '%-34s %-26s %s path(s)  %s\n' \
+            "$(basename "$d")" \
+            "$(sed -n 's/^created=//p' "$d/meta" 2>/dev/null)" \
+            "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo '?')" \
+            "$(du -sh "$d" 2>/dev/null | cut -f1)"
+    done
+    [ "$found" = 1 ] || log_info "no snapshots"
+}
+
+# Removes one snapshot by name. The only place a snapshot is ever deleted,
+# and it is reached only from an explicit command.
+snapshot_remove() {
+    local name=$1 root dir
+    root=$(snapshot_root)
+    dir="$root/$(basename "$name")"
+
+    [ -d "$dir" ] || { log_error "no such snapshot: $name"; return 1; }
+    # Removing the oldest means losing the pre-install state, which is the one
+    # most likely to be wanted and the least likely to be missed until then.
+    local oldest
+    oldest=$(ls -1 "$root" 2>/dev/null | sort | head -1)
+    if [ "$(basename "$dir")" = "$oldest" ]; then
+        log_warn "this is the oldest snapshot -- usually the pre-install state"
+    fi
+
+    rm -rf "$dir"
+    log_step "removed $dir"
+}
+
+# Removes all but the newest N. Never runs on its own.
+snapshot_prune() {
+    local keep=${1:-5} root
+    root=$(snapshot_root)
+    [ -d "$root" ] || { log_info "no snapshots"; return 0; }
+
+    case "$keep" in ''|*[!0-9]*) log_error "keep must be a number"; return 1 ;; esac
+    [ "$keep" -ge 1 ] || { log_error "keep must be at least 1"; return 1; }
+
+    local total
+    total=$(ls -1 "$root" 2>/dev/null | wc -l)
+    [ "$total" -gt "$keep" ] || { log_info "$total snapshot(s), keeping $keep: nothing to do"; return 0; }
+
+    local n
+    while IFS= read -r n; do
+        rm -rf "$root/$n"
+        log_info "  removed $n"
+    done < <(ls -1 "$root" | sort | head -n "$((total - keep))")
+
+    log_step "pruned $((total - keep)), kept $keep"
 }

@@ -12,7 +12,7 @@ usage() {
 usage: @ALIAS@ <command> [options]
 
   preflight [--suggest-snapshots]   check this machine, report what may change
-  snapshot [label]                  take a restore point now
+  snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
   status                            is the shell installed and running?
   log [-f]                          show the shell's journal
@@ -39,15 +39,7 @@ case "$cmd" in
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
 
-    snapshot)
-        require_repo
-        # shellcheck source=/dev/null
-        source "$REPO_ROOT/scripts/lib/log.sh"
-        source "$REPO_ROOT/scripts/lib/brand.sh"
-        source "$REPO_ROOT/scripts/lib/protected.sh"
-        source "$REPO_ROOT/scripts/lib/snapshot.sh"
-        snapshot_create "${1:-manual}" >/dev/null
-        ;;
+    snapshot)  require_repo; exec "$REPO_ROOT/scripts/snapshot.sh" "$@" ;;
 
     status)
         printf 'installed:  '
