@@ -46,6 +46,10 @@ case "$cmd" in
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher toggle
         ;;
 
+    settings)
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings toggle
+        ;;
+
     search)
         if [ $# -gt 0 ]; then
             exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher query "$*"

@@ -10,6 +10,8 @@ import qs.core
 import qs.features.panel
 import qs.platform.system
 import qs.domain.launcher
+import qs.domain.config
+import qs.features.settings
 
 ShellRoot {
     id: root
@@ -26,6 +28,31 @@ ShellRoot {
     // would open. Reimplementing the choice in the CLI would let the two drift
     // apart, which is exactly the sort of thing nobody notices until it is
     // confusing.
+    // Built only when first opened: a settings window nobody has asked for
+    // should cost nothing at startup.
+    LazyLoader {
+        id: settings
+        loading: false
+
+        SettingsWindow {
+            visible: true
+            sections: Schema.sections
+
+            // FloatingWindow has no `closed` signal; the window going invisible
+            // is how a close reaches us, and unloading then means reopening
+            // starts fresh rather than restoring the last page.
+            onVisibleChanged: if (!visible) settings.activeAsync = false
+        }
+    }
+
+    IpcHandler {
+        target: "settings"
+
+        function open(): void { settings.activeAsync = true; }
+        function close(): void { settings.activeAsync = false; }
+        function toggle(): void { settings.activeAsync = !settings.activeAsync; }
+    }
+
     IpcHandler {
         target: "launcher"
 
