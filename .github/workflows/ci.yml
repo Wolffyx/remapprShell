@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Sy --noconfirm --needed git jq make qt6-declarative
+
+      - uses: actions/checkout@v4
+
+      - name: Generate branding
+        run: ./scripts/gen-branding.sh
+
+      # Fails if the project name is hardcoded outside branding.json.
+      - name: Slug lint
+        run: ./scripts/lint-slug.sh
+
+      # Fails on imports that violate the dependency ladder.
+      - name: Layer lint
+        run: ./scripts/lint-layers.sh
+
+      - name: QML lint
+        run: ./scripts/lint-qml.sh
+
+      - name: Shell script syntax
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            bash -n "$f" || { echo "syntax error: $f"; fail=1; }
+          done < <(find scripts bin -name '*.sh' -o -name '*.sh.in' | grep -v '\.in$')
+          exit $fail

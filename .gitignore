@@ -1,0 +1,15 @@
+# Generated from branding.json - never committed
+shell/core/Branding.qml
+
+# Build / scratch
+/build/
+/dist/
+*.qmlc
+*.jsc
+.qmlls.ini
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~

@@ -1,0 +1,13 @@
+{
+    "slug": "remappr-shell",
+    "alias": "rmpr",
+    "displayName": "Remappr Shell",
+    "appId": "com.remappr.shell",
+    "dbusName": "com.remappr.Shell",
+    "envPrefix": "REMAPPR_SHELL",
+    "shellPackageId": "remappr-shell.desktop",
+    "repo": {
+        "push": "git@github.com:Wolffyx/remapprShell.git",
+        "fetch": "https://github.com/Wolffyx/remapprShell.git"
+    }
+}

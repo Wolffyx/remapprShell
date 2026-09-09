@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# @DISPLAY_NAME@ session launcher -- rendered from bin/session.sh.in.
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link  (or scripts/install.sh)
+#
+# Deliberately does NOT daemonize. Under a systemd user unit, detaching would
+# replace journald stdio with /dev/null, and every application launched from
+# the shell inherits those descriptors.
+set -euo pipefail
+
+# Quickshell resolves `import qs.<dir>` relative to the config root, so the
+# shell directory itself must be on the import path.
+export QML2_IMPORT_PATH="@QS_CONFIG_DIR@${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+
+export QS_NO_RELOAD_POPUP=1
+export QSG_RENDER_LOOP=threaded
+
+# Safe mode loads no third-party widgets. It is the way back in when a plugin
+# takes the panel down, so it is honoured before anything else runs.
+if [ "${@SAFE_MODE_VAR@:-}" = "1" ]; then
+    echo "@DISPLAY_NAME@: safe mode -- third-party widgets disabled" >&2
+fi
+
+exec /usr/bin/quickshell -n -p "@QS_CONFIG_DIR@/shell.qml" "$@"
