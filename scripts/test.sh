@@ -22,7 +22,7 @@ ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 
 # Shell-level tests, each inside its own throwaway HOME.
-for t in test-snapshot test-kconfig test-theme; do
+for t in test-snapshot test-kconfig test-theme test-edges; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
 done

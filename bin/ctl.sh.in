@@ -38,6 +38,7 @@ case "$cmd" in
     preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
+    edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
 
     snapshot)  require_repo; exec "$REPO_ROOT/scripts/snapshot.sh" "$@" ;;
 

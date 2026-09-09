@@ -31,16 +31,16 @@ read_key() { kreadconfig6 --file "$1" --group "$2" --key "$3" --default "<unset>
 kwriteconfig6 --file kdeglobals --group General --key ColorScheme "TheirScheme"
 
 echo "== set =="
-kconfig_set kdeglobals General ColorScheme "OurScheme"
-kconfig_set kdeglobals General BrandNewKey "OurValue"
-kconfig_set kwinrc "Effect-overview" BorderActivate "9"
+kconfig_set theme kdeglobals General ColorScheme "OurScheme"
+kconfig_set theme kdeglobals General BrandNewKey "OurValue"
+kconfig_set edges kwinrc "Effect-overview" BorderActivate "9"
 
 check "existing key overwritten"     "$(read_key kdeglobals General ColorScheme)" "OurScheme"
 check "new key written"              "$(read_key kdeglobals General BrandNewKey)" "OurValue"
 check "nested group written"         "$(read_key kwinrc Effect-overview BorderActivate)" "9"
 
 echo "== ledger records the state BEFORE our first write =="
-kconfig_set kdeglobals General ColorScheme "OurSecondScheme"
+kconfig_set theme kdeglobals General ColorScheme "OurSecondScheme"
 check "second write does not overwrite the record" \
       "$(jq -r '[.entries[] | select(.key=="ColorScheme")] | length' "$(kconfig_ledger)")" "1"
 check "record holds the original value" \
@@ -57,6 +57,23 @@ check "ledger emptied"               "$(jq '.entries | length' "$(kconfig_ledger
 echo "== revert is idempotent =="
 kconfig_revert_all >/dev/null 2>&1
 check "second revert changes nothing" "$(read_key kdeglobals General ColorScheme)" "TheirScheme"
+
+echo "== scopes are independent =="
+# Reverting one feature must not undo another. A single shared ledger made
+# `edges revert` also revert the theme, which is not what anyone asked for.
+kwriteconfig6 --file kdeglobals --group General --key ColorScheme "Base"
+kconfig_set theme kdeglobals General ColorScheme "ThemeValue"
+kconfig_set edges kwinrc Windows ElectricBorderTiling "false"
+
+kconfig_revert edges >/dev/null 2>&1
+check "edges scope reverted"        "$(read_key kwinrc Windows ElectricBorderTiling)" "<unset>"
+check "theme scope left alone"      "$(read_key kdeglobals General ColorScheme)" "ThemeValue"
+check "theme record still in ledger" "$(jq '[.entries[] | select(.scope=="theme")] | length' "$(kconfig_ledger)")" "1"
+check "edges records dropped"        "$(jq '[.entries[] | select(.scope=="edges")] | length' "$(kconfig_ledger)")" "0"
+
+kconfig_revert theme >/dev/null 2>&1
+check "theme scope reverted after"  "$(read_key kdeglobals General ColorScheme)" "Base"
+check "ledger empty"                "$(jq '.entries | length' "$(kconfig_ledger)")" "0"
 
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi

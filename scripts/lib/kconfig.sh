@@ -18,12 +18,17 @@ _kconfig_ledger_init() {
     [ -s "$led" ] || printf '{"entries":[]}\n' > "$led"
 }
 
-# kconfig_set <file> <group> <key> <value>
+# kconfig_set <scope> <file> <group> <key> <value>
+#
+# The scope groups related changes -- "theme", "edges", "backend" -- so each
+# feature can be undone on its own. Without it a single shared ledger means
+# reverting the screen edges also reverts the theme, which is not what anyone
+# asked for.
 #
 # The group may be nested, written as "A/B" -- kwriteconfig6 takes repeated
 # --group arguments for that.
 kconfig_set() {
-    local file=$1 group=$2 key=$3 value=$4
+    local scope=$1 file=$2 group=$3 key=$4 value=$5
     _kconfig_ledger_init
 
     local -a gargs=()
@@ -55,9 +60,9 @@ kconfig_set() {
             '.entries[] | select(.file == $f and .group == $g and .key == $k)' "$led" >/dev/null 2>&1; then
         local tmp
         tmp=$(mktemp)
-        jq --arg f "$file" --arg g "$group" --arg k "$key" \
+        jq --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \
            --argjson had "$had" --arg v "$prior" \
-           '.entries += [{file: $f, group: $g, key: $k, had: $had, value: $v}]' "$led" > "$tmp"
+           '.entries += [{scope: $s, file: $f, group: $g, key: $k, had: $had, value: $v}]' "$led" > "$tmp"
         mv "$tmp" "$led"
     fi
 
@@ -65,15 +70,27 @@ kconfig_set() {
     log_debug "kconfig: $file [$group] $key = $value (was: $([ "$had" = true ] && printf '%s' "$prior" || printf '<unset>'))"
 }
 
-# Puts every recorded key back and empties the ledger.
-kconfig_revert_all() {
+# kconfig_revert <scope|--all>
+#
+# Puts the recorded keys back and drops them from the ledger. Entries are
+# reverted newest first: if two scopes ever touched the same key, the older
+# record is the one that holds the state before this project was involved.
+kconfig_revert() {
+    local scope=${1:---all}
     local led
     led=$(kconfig_ledger)
     [ -s "$led" ] || { log_info "nothing to revert"; return 0; }
 
+    local filter
+    if [ "$scope" = "--all" ]; then
+        filter='.entries'
+    else
+        filter=$(printf '[.entries[] | select(.scope == "%s")]' "$scope")
+    fi
+
     local count
-    count=$(jq '.entries | length' "$led")
-    [ "$count" -gt 0 ] || { log_info "nothing to revert"; return 0; }
+    count=$(jq "$filter | length" "$led")
+    [ "$count" -gt 0 ] || { log_info "nothing to revert${scope:+ for $scope}"; return 0; }
 
     local file group key had value
     while IFS=$'\t' read -r file group key had value; do
@@ -90,15 +107,29 @@ kconfig_revert_all() {
             kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" --delete
             log_debug "kconfig: removed $file [$group] $key (was unset)"
         fi
-    done < <(jq -r '.entries[] | [.file, .group, .key, (.had|tostring), .value] | @tsv' "$led")
+    done < <(jq -r "$filter | reverse | .[] | [.file, .group, .key, (.had|tostring), .value] | @tsv" "$led")
 
-    printf '{"entries":[]}\n' > "$led"
-    log_step "reverted $count KDE config key(s)"
+    # Drop only what was reverted; other scopes keep their records.
+    local tmp
+    tmp=$(mktemp)
+    if [ "$scope" = "--all" ]; then
+        printf '{"entries":[]}\n' > "$tmp"
+    else
+        jq --arg s "$scope" '.entries |= map(select(.scope != $s))' "$led" > "$tmp"
+    fi
+    mv "$tmp" "$led"
+
+    log_step "reverted $count KDE config key(s)$([ "$scope" = "--all" ] || printf ' for %s' "$scope")"
 }
+
+# Kept for callers that mean "undo everything".
+kconfig_revert_all() { kconfig_revert --all; }
 
 kconfig_ledger_summary() {
     local led
     led=$(kconfig_ledger)
     [ -s "$led" ] || { echo "no ledger"; return 0; }
-    jq -r '.entries[] | "  \(.file) [\(.group)] \(.key) (was: \(if .had then .value else "<unset>" end))"' "$led"
+    local filter='.entries'
+    [ $# -gt 0 ] && filter=$(printf '[.entries[] | select(.scope == "%s")]' "$1")
+    jq -r "$filter"' | .[] | "  [\(.scope)] \(.file) [\(.group)] \(.key) (was: \(if .had then .value else "<unset>" end))"' "$led"
 }

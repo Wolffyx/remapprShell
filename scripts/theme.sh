@@ -75,7 +75,7 @@ apply_defaults() {
         [ -n "$file" ] || continue
         key=${line%%=*}
         value=${line#*=}
-        kconfig_set "$file" "$group" "$key" "$value"
+        kconfig_set theme "$file" "$group" "$key" "$value"
     done < "$defaults"
 }
 
@@ -107,7 +107,7 @@ case "$cmd" in
 
         # Activating the package is what makes our OSD, splash and logout QML
         # take effect. It is a single key, and it is ledgered like the rest.
-        kconfig_set kdeglobals KDE LookAndFeelPackage "$LNF_PACKAGE_ID"
+        kconfig_set theme kdeglobals KDE LookAndFeelPackage "$LNF_PACKAGE_ID"
 
         # KDE caches installed packages; without this the new one is invisible
         # until the next login.
@@ -119,7 +119,7 @@ case "$cmd" in
         ;;
 
     revert)
-        kconfig_revert_all
+        kconfig_revert theme
         if [ -d "$LNF_DEST" ]; then
             rm -rf "$LNF_DEST"
             log_step "removed $LNF_DEST"
@@ -137,7 +137,7 @@ case "$cmd" in
         printf 'widget style: %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle --default '<unset>')"
         echo
         echo 'ledger (what revert would undo):'
-        kconfig_ledger_summary
+        kconfig_ledger_summary theme
         ;;
 
     *) die "unknown command: $cmd (expected apply, revert or status)" ;;
