@@ -16,6 +16,18 @@ _kconfig_ledger_init() {
     led=$(kconfig_ledger)
     mkdir -p "$(dirname "$led")"
     [ -s "$led" ] || printf '{"entries":[]}\n' > "$led"
+
+    # Entries written before scopes existed have none, which makes them
+    # unreachable by a scoped revert -- the very records that most need to be
+    # undoable. They are attributed to the theme, which is the only thing that
+    # wrote a ledger before scopes.
+    if jq -e '[.entries[] | select(has("scope") | not)] | length > 0' "$led" >/dev/null 2>&1; then
+        local tmp
+        tmp=$(mktemp)
+        jq '.entries |= map(if has("scope") then . else . + {scope: "theme"} end)' "$led" > "$tmp"
+        mv "$tmp" "$led"
+        log_debug "kconfig: gave unscoped ledger entries a scope"
+    fi
 }
 
 # kconfig_set <scope> <file> <group> <key> <value>

@@ -58,7 +58,7 @@ fi
 
 log_step "conflicts"
 
-others=$(pgrep -af 'quickshell' 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
 if [ -n "$others" ]; then
     warn "another Quickshell instance is running:"
     printf '%s\n' "$others" | sed 's/^/      /' >&2

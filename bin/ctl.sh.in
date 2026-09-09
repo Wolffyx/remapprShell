@@ -15,6 +15,7 @@ usage: @ALIAS@ <command> [options]
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
   status                            is the shell installed and running?
+  doctor                            check everything and report fixes
   log [-f]                          show the shell's journal
   start | stop | restart            control the user service
   version                           print the version
@@ -38,6 +39,7 @@ case "$cmd" in
     preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
+    doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 

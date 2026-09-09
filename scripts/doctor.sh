@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# Checks the installation and reports what is wrong, with the fix for each.
+#
+# Every finding carries a command or a file, because a diagnostic that only
+# says something is wrong leaves the person no better off than the symptom did.
+set -uo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+source "$REPO_ROOT/scripts/lib/log.sh"
+source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/protected.sh"
+source "$REPO_ROOT/scripts/lib/snapshot.sh"
+source "$REPO_ROOT/scripts/lib/kconfig.sh"
+
+problems=0
+warnings=0
+
+ok()   { printf '  %sok%s    %s\n'   "$_c_grn" "$_c_off" "$*"; }
+warn() { printf '  %swarn%s  %s\n'   "$_c_yel" "$_c_off" "$*"; warnings=$((warnings + 1)); }
+bad()  { printf '  %sfail%s  %s\n'   "$_c_red" "$_c_off" "$*"; problems=$((problems + 1)); }
+fix()  { printf '        %s\n' "$*"; }
+
+section() { printf '\n%s==>%s %s\n' "$_c_grn" "$_c_off" "$*"; }
+
+# ---------------------------------------------------------------- environment
+
+section "environment"
+
+if [ "${XDG_CURRENT_DESKTOP:-}" = "KDE" ]; then
+    ok "running under KDE"
+else
+    warn "XDG_CURRENT_DESKTOP is '${XDG_CURRENT_DESKTOP:-unset}'"
+    fix "this shell targets Plasma; other desktops are untested"
+fi
+
+for tool in quickshell jq busctl gdbus kwriteconfig6; do
+    if command -v "$tool" >/dev/null 2>&1; then
+        ok "$tool present"
+    else
+        bad "$tool not found"
+        fix "install it; the shell needs it at runtime"
+    fi
+done
+
+if [ -x /usr/lib/qt6/bin/qmllint ]; then
+    ok "Qt6 qmllint present"
+else
+    warn "Qt6 qmllint not found"
+    fix "install qt6-declarative to run 'make lint'"
+fi
+
+# -------------------------------------------------------------------- install
+
+section "install"
+
+missing=0
+while IFS='|' read -r kind src dest; do
+    [ -n "$kind" ] || continue
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        continue
+    fi
+    bad "missing: $dest"
+    missing=$((missing + 1))
+done < <(source "$REPO_ROOT/scripts/lib/manifest.sh"; manifest_entries)
+
+if [ "$missing" -eq 0 ]; then
+    ok "every installed path is present"
+else
+    fix "run: make link   (or make install)"
+fi
+
+case ":$PATH:" in
+    *":$BIN_DIR:"*) ok "$BIN_DIR is on PATH" ;;
+    *) warn "$BIN_DIR is not on PATH"
+       fix "add it, or run $BIN_DIR/$CTL_BIN by full path" ;;
+esac
+
+# -------------------------------------------------------------------- service
+
+section "service"
+
+if systemctl --user cat "$SYSTEMD_UNIT" >/dev/null 2>&1; then
+    state=$(systemctl --user is-active "$SYSTEMD_UNIT" 2>/dev/null || true)
+    case "$state" in
+        active) ok "service is running" ;;
+        failed) bad "service has failed"
+                fix "see why: $ALIAS log -n 50" ;;
+        *)      warn "service is $state"
+                fix "start it: $ALIAS start" ;;
+    esac
+
+    restarts=$(systemctl --user show "$SYSTEMD_UNIT" -p NRestarts --value 2>/dev/null || echo 0)
+    if [ "${restarts:-0}" -gt 3 ]; then
+        warn "the service has restarted $restarts times"
+        fix "a widget may be crashing it: $ALIAS log -n 100"
+    fi
+else
+    warn "no systemd unit installed"
+    fix "run: make link"
+fi
+
+# --------------------------------------------------------------- configuration
+
+section "configuration"
+
+profile_file="$CONFIG_DIR/profiles/default/shell.json"
+if [ -f "$profile_file" ]; then
+    if jq -e . "$profile_file" >/dev/null 2>&1; then
+        ok "profile parses ($(jq -r '.schemaVersion // "no version"' "$profile_file"))"
+    else
+        bad "profile is not valid JSON: $profile_file"
+        fix "the shell keeps its last good configuration and refuses to write until this parses"
+        fix "check it with: jq . $profile_file"
+    fi
+else
+    warn "no profile yet at $profile_file"
+    fix "it is written the first time the shell starts"
+fi
+
+defaults_file="$DATA_DIR/config/defaults/shell.json"
+if jq -e . "$defaults_file" >/dev/null 2>&1; then
+    ok "shipped defaults parse"
+else
+    bad "shipped defaults are missing or invalid: $defaults_file"
+    fix "run: make link"
+fi
+
+# ------------------------------------------------------------------- widgets
+
+section "widgets"
+
+health="$STATE_DIR/widget-health.json"
+if [ -f "$health" ]; then
+    q=$(jq -r '.quarantined | keys | join(", ")' "$health" 2>/dev/null || true)
+    if [ -n "$q" ] && [ "$q" != "" ]; then
+        warn "quarantined: $q"
+        fix "these were disabled after repeatedly failing to load"
+        fix "re-enable one from the settings window, Widgets page"
+    else
+        ok "no quarantined widgets"
+    fi
+else
+    ok "no widget failures recorded"
+fi
+
+# ---------------------------------------------------------------- KDE changes
+
+section "KDE configuration we have changed"
+
+led=$(kconfig_ledger)
+if [ -s "$led" ] && [ "$(jq '.entries | length' "$led")" -gt 0 ]; then
+    drift=0
+    while IFS=$'\t' read -r scope file group key had value; do
+        gargs=()
+        while IFS= read -r g; do [ -n "$g" ] && gargs+=(--group "$g"); done \
+            < <(printf '%s\n' "${group//\// }" | tr ' ' '\n')
+        live=$(kreadconfig6 --file "$file" "${gargs[@]}" --key "$key" --default '<unset>' 2>/dev/null)
+        printf '  %-9s %s [%s] %s = %s\n' "[$scope]" "$file" "$group" "$key" "$live"
+        [ "$live" = "<unset>" ] && drift=$((drift + 1))
+    done < <(jq -r '.entries[] | [(.scope // "-"), .file, .group, .key, (.had|tostring), .value] | @tsv' "$led")
+
+    if [ "$drift" -gt 0 ]; then
+        warn "$drift recorded key(s) are no longer set"
+        fix "something else changed them; revert is still safe and will restore the recorded values"
+    fi
+    fix "undo everything: $ALIAS theme revert / edges revert / shortcuts revert"
+else
+    ok "no KDE settings changed by this project"
+fi
+
+# ------------------------------------------------------------------- hazards
+
+section "known hazards"
+
+shell_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop')
+if [ "$shell_pkg" = "org.kde.plasma.desktop" ] \
+   || [ -d "$XDG_DATA_HOME/plasma/shells/$shell_pkg" ] \
+   || [ -d "/usr/share/plasma/shells/$shell_pkg" ]; then
+    ok "plasmashell's shell package '$shell_pkg' exists"
+else
+    bad "plasmashell is set to '$shell_pkg', which is not installed"
+    fix "on the next login plasmashell falls back to the default layout"
+    fix "reinstall that package, or: kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage org.kde.plasma.desktop"
+fi
+
+others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+if [ -n "$others" ]; then
+    warn "another Quickshell shell is running"
+    printf '%s\n' "$others" | sed 's/^/        /'
+    fix "both draw at once, and they compete for global shortcuts"
+else
+    ok "no competing Quickshell instance"
+fi
+
+if command -v kreadconfig6 >/dev/null 2>&1; then
+    scripts_loaded=$(ls "$XDG_DATA_HOME/kwin/scripts" 2>/dev/null | tr '\n' ' ' || true)
+    if [ -n "$scripts_loaded" ]; then
+        warn "KWin scripts installed: $scripts_loaded"
+        fix "a tiling script and edge tiling can both claim the same drag"
+    else
+        ok "no third-party KWin scripts"
+    fi
+fi
+
+# ----------------------------------------------------------------- snapshots
+
+section "restore points"
+
+root=$(snapshot_root)
+count=$(ls -1 "$root" 2>/dev/null | wc -l)
+if [ "$count" -gt 0 ]; then
+    ok "$count restore point(s), $(du -sh "$root" 2>/dev/null | cut -f1) total"
+    fix "oldest is the pre-install state; nothing is ever removed automatically"
+else
+    warn "no restore points"
+    fix "take one before changing KDE settings: $ALIAS snapshot create"
+fi
+
+# ------------------------------------------------------------------- optional
+
+section "optional components"
+
+for pair in "union:a Qt style, selectable as the widget style" \
+            "fuzzel:an alternative launcher" \
+            "rofi:an alternative launcher"; do
+    bin=${pair%%:*}; desc=${pair#*:}
+    if command -v "$bin" >/dev/null 2>&1 || pacman -Qq "$bin" >/dev/null 2>&1; then
+        ok "$bin present ($desc)"
+    else
+        printf '  %s--%s    %s not installed (%s)\n' "$_c_dim" "$_c_off" "$bin" "$desc"
+    fi
+done
+
+# ------------------------------------------------------------------- verdict
+
+echo
+if [ "$problems" -gt 0 ]; then
+    log_error "$problems problem(s), $warnings warning(s)"
+    exit 1
+fi
+log_step "no problems${warnings:+, $warnings warning(s)}"
