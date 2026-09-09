@@ -1,0 +1,11 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Id": "@LNF_PACKAGE_ID@",
+        "Name": "@DISPLAY_NAME@",
+        "Description": "Look and feel for @DISPLAY_NAME@.",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@"
+    }
+}

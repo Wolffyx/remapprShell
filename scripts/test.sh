@@ -21,6 +21,8 @@ ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 
 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 
-# Shell-level tests. These run against a throwaway HOME, never the caller's.
-log_step "snapshot/restore tests"
-"$REPO_ROOT/tests/test-snapshot.sh"
+# Shell-level tests, each inside its own throwaway HOME.
+for t in test-snapshot test-kconfig test-theme; do
+    log_step "$t"
+    "$REPO_ROOT/tests/$t.sh" || exit 1
+done

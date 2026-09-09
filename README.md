@@ -36,10 +36,31 @@ default.
 make link     # symlink into ~/.config/quickshell/<slug>; edits are live
 make run      # run in the foreground against the working tree
 make lint     # slug, layer and QML lints
+make test     # QML tests, plus shell tests in a throwaway HOME
 make uninstall
 ```
 
 `make help` lists every target.
+
+### Command line
+
+```bash
+rmpr preflight   # what would change, and whether this machine is ready
+rmpr snapshot    # take a restore point now
+rmpr restore     # put KDE back the way it was
+rmpr theme apply # install and activate the look and feel
+rmpr status
+```
+
+### Changing KDE settings
+
+Every key this project writes is recorded with its prior state first, including
+whether the key existed at all, so `revert` restores exactly what was there.
+Anything outside `scripts/lib/protected.sh` is never touched, and restore never
+deletes a file it did not create -- a restore that leaves an extra file behind
+is a nuisance, one that deletes the wrong file is not recoverable.
+
+Destructive code is tested against a throwaway `HOME`, never a real one.
 
 ### Project name
 

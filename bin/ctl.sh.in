@@ -37,6 +37,7 @@ cmd=${1:-help}
 case "$cmd" in
     preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
+    theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
 
     snapshot)
         require_repo
