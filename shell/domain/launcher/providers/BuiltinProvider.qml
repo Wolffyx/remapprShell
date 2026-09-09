@@ -1,0 +1,99 @@
+// The launcher that ships with the shell.
+//
+// It holds only state -- query, results, visibility. The window that shows it
+// lives in the feature layer, because domain code must not draw. That split is
+// also why this is the one provider whose popup can be anchored to the panel
+// button: it is our own window.
+
+import QtQuick
+import Quickshell
+import qs.core
+import qs.domain.launcher
+
+Provider {
+    id: root
+
+    providerId: "builtin"
+    label: "Built-in launcher"
+    available: true
+    embedded: true
+
+    property string query: ""
+    property int selectedIndex: 0
+    property int maxResults: 8
+
+    // Applications, minus the ones that ask not to be shown.
+    readonly property var applications: DesktopEntries.applications.values
+        .filter(a => a && !a.noDisplay)
+
+    readonly property var results: {
+        const q = root.query.trim().toLowerCase();
+        const apps = root.applications;
+
+        if (q.length === 0) {
+            return apps.slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .slice(0, root.maxResults);
+        }
+
+        // Ranked, not merely filtered: a prefix match on the name is almost
+        // always what was meant, and burying it under an alphabetical list of
+        // substring matches makes the launcher feel wrong even when the right
+        // entry is present.
+        const scored = [];
+        for (const app of apps) {
+            const name = (app.name ?? "").toLowerCase();
+            const generic = (app.genericName ?? "").toLowerCase();
+            const keywords = (app.keywords ?? "").toLowerCase();
+
+            let score = -1;
+            if (name === q) score = 0;
+            else if (name.startsWith(q)) score = 1;
+            else if (name.includes(q)) score = 2;
+            else if (generic.includes(q)) score = 3;
+            else if (keywords.includes(q)) score = 4;
+
+            if (score >= 0)
+                scored.push({ app: app, score: score, name: name });
+        }
+
+        scored.sort((a, b) => a.score !== b.score ? a.score - b.score
+                                                  : a.name.localeCompare(b.name));
+        return scored.slice(0, root.maxResults).map(s => s.app);
+    }
+
+    function open(mode) {
+        root.query = "";
+        root.selectedIndex = 0;
+        root.visible = true;
+    }
+
+    function openWithQuery(q) {
+        root.query = q;
+        root.selectedIndex = 0;
+        root.visible = true;
+    }
+
+    function close() {
+        root.visible = false;
+        root.query = "";
+    }
+
+    function moveSelection(delta) {
+        const count = root.results.length;
+        if (count === 0)
+            return;
+        root.selectedIndex = ((root.selectedIndex + delta) % count + count) % count;
+    }
+
+    function activateSelected() {
+        const app = root.results[root.selectedIndex];
+        if (!app) {
+            Log.debug("launcher", `nothing to launch for '${root.query}'`);
+            return;
+        }
+        Log.info("launcher", `launching ${app.id}`);
+        app.execute();
+        root.close();
+    }
+}

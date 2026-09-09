@@ -36,7 +36,11 @@ Item {
     property bool wantsWheel: false
 
     // Shown when the widget is activated. Null means the widget has no popout.
+    // The panel builds the window; the widget supplies only the contents, so a
+    // widget never has to know where on the panel it sits or which edge the
+    // panel is on.
     property Component popout: null
+    property bool popoutVisible: false
 
     // ---- behaviour, overridden by the widget ---------------------------
 

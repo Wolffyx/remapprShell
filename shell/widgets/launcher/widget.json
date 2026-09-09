@@ -1,0 +1,18 @@
+{
+    "id": "launcher",
+    "apiVersion": 1,
+    "name": "Application launcher",
+    "description": "Opens whichever launcher is configured: Kickoff, KRunner, the built-in one, or a command of your own.",
+    "icon": "start-here-kde",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.kickoff" }
+    },
+    "config": {
+        "icon": { "type": "string", "default": "start-here-kde", "label": "Icon" },
+        "label": { "type": "string", "default": "", "label": "Label",
+                   "description": "Shown beside the icon. Empty for icon only." }
+    }
+}

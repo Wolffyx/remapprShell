@@ -1,0 +1,128 @@
+pragma ComponentBehavior: Bound
+
+// The window for the built-in launcher.
+//
+// Only the built-in provider gets one. Every other provider is its own process
+// or plasmashell's, and those position and dismiss themselves -- chasing an
+// external window's geometry on Wayland is not something to attempt.
+
+import QtQuick
+import QtQuick.Controls
+import qs.domain.launcher
+import qs.domain.launcher.providers
+import qs.domain.theme
+import qs.ui.primitives
+
+// The contents of the launcher popout. The window around it is the panel's --
+// see WidgetSlot -- so this is a plain Item and knows nothing about anchoring.
+Item {
+    id: root
+
+    readonly property BuiltinProvider provider: LauncherService.builtin
+
+    implicitWidth: 380
+    implicitHeight: layout.implicitHeight + 16
+
+    Component.onCompleted: search.forceActiveFocus()
+
+    Rectangle {
+        anchors.fill: parent
+        radius: 8
+        color: PlasmaColors.background
+        border.width: 1
+        border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+
+        Column {
+            id: layout
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 6
+
+            TextField {
+                id: search
+                width: parent.width
+                placeholderText: "Search applications"
+                color: PlasmaColors.foreground
+                text: root.provider.query
+
+                background: Rectangle {
+                    radius: 5
+                    color: PlasmaColors.backgroundAlternate
+                }
+
+                onTextChanged: {
+                    root.provider.query = text;
+                    root.provider.selectedIndex = 0;
+                }
+
+                Keys.onDownPressed: root.provider.moveSelection(1)
+                Keys.onUpPressed: root.provider.moveSelection(-1)
+                Keys.onReturnPressed: root.provider.activateSelected()
+                Keys.onEnterPressed: root.provider.activateSelected()
+                Keys.onEscapePressed: root.provider.close()
+            }
+
+            Repeater {
+                model: root.provider.results
+
+                Rectangle {
+                    id: row
+
+                    required property var modelData
+                    required property int index
+
+                    width: layout.width
+                    height: 34
+                    radius: 5
+                    color: row.index === root.provider.selectedIndex
+                        ? PlasmaColors.alpha(PlasmaColors.accent, 0.25)
+                        : (rowHover.hovered ? PlasmaColors.hoverBackground : "transparent")
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        spacing: 8
+
+                        PanelIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 22
+                            iconName: row.modelData.icon ?? ""
+                        }
+
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 0
+
+                            PanelText { text: row.modelData.name ?? "" }
+
+                            PanelText {
+                                visible: (row.modelData.genericName ?? "").length > 0
+                                text: row.modelData.genericName ?? ""
+                                font.pixelSize: 11
+                                color: PlasmaColors.foregroundInactive
+                            }
+                        }
+                    }
+
+                    HoverHandler {
+                        id: rowHover
+                        onHoveredChanged: if (hovered) root.provider.selectedIndex = row.index
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            root.provider.selectedIndex = row.index;
+                            root.provider.activateSelected();
+                        }
+                    }
+                }
+            }
+
+            PanelText {
+                visible: root.provider.results.length === 0
+                text: root.provider.query.length > 0 ? "No matches" : "No applications found"
+                color: PlasmaColors.foregroundInactive
+            }
+        }
+    }
+}

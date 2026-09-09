@@ -5,7 +5,9 @@
 // widgets it has never heard of and one that needs editing for each new type.
 
 import QtQuick
+import Quickshell
 import qs.ui.primitives
+import qs.domain.theme
 
 Item {
     id: root
@@ -62,5 +64,46 @@ Item {
         }
 
         onClicked: event => root.widget?.handleActivate(event.button)
+    }
+
+    // A widget that declares a popout gets a window for it, anchored to itself.
+    // The widget supplies the contents and never touches window placement --
+    // which is what lets a plugin have a popout without knowing where on the
+    // panel it will end up, or which edge the panel is on.
+    PopupWindow {
+        id: popout
+
+        readonly property bool wanted: !!root.widget?.popout && !!root.widget?.popoutVisible
+
+        anchor.window: root.QsWindow.window
+        anchor.rect.x: root.mapToItem(null, 0, 0).x
+        anchor.rect.y: root.mapToItem(null, 0, 0).y
+        anchor.rect.width: root.width
+        anchor.rect.height: root.height
+        anchor.edges: root.bar?.position === "top" ? Edges.Bottom : Edges.Top
+
+        visible: popout.wanted
+        color: "transparent"
+        readonly property Item contentItem: content.item as Item
+        implicitWidth: popout.contentItem?.implicitWidth ?? 1
+        implicitHeight: popout.contentItem?.implicitHeight ?? 1
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 8
+            color: PlasmaColors.background
+            border.width: 1
+            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+
+            Loader {
+                id: content
+                anchors.fill: parent
+                anchors.margins: 8
+                // Built only while shown: a popout that is never opened should
+                // cost nothing, and one that is closed should not keep state.
+                active: popout.wanted
+                sourceComponent: root.widget?.popout ?? null
+            }
+        }
     }
 }

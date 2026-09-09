@@ -1,0 +1,67 @@
+// The start button.
+//
+// It knows nothing about which launcher will open -- that is
+// LauncherService's decision, made from configuration. Adding a provider never
+// touches this file.
+
+import QtQuick
+import qs.ui.primitives
+import qs.domain.theme
+import qs.domain.launcher
+
+BarWidget {
+    id: root
+
+    readonly property string iconName: root.widgetConfig?.icon ?? "start-here-kde"
+    readonly property string labelText: root.widgetConfig?.label ?? ""
+
+    wantsHover: true
+
+    // The built-in launcher draws in one of our own windows, so it gets a
+    // popout anchored to this button. Every other provider is its own process
+    // and positions itself, so there is nothing to anchor.
+    popout: LauncherService.active.embedded ? popoutComponent : null
+
+    readonly property Component popoutComponent: Component {
+        LauncherPanel {}
+    }
+
+    popoutVisible: LauncherService.active.visible && LauncherService.active.embedded
+
+    implicitWidth: content.implicitWidth + 12
+    implicitHeight: 26
+
+    function handleActivate(button) {
+        LauncherService.toggle("apps");
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: 5
+        color: LauncherService.active.visible ? PlasmaColors.pressedBackground
+             : hover.hovered ? PlasmaColors.hoverBackground
+             : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
+
+        Row {
+            id: content
+            anchors.centerIn: parent
+            spacing: 6
+
+            PanelIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                implicitSize: 18
+                iconName: root.iconName
+                fallbackName: "application-x-executable"
+            }
+
+            PanelText {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.labelText.length > 0
+                text: root.labelText
+            }
+        }
+
+        HoverHandler { id: hover }
+    }
+}
