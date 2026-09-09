@@ -39,7 +39,19 @@ owned_by_us() {
     local dest=$1
     [ -L "$dest" ] && return 0                 # our symlink
     [ -e "$dest/.rmpr-owned" ] && return 0     # our copied dir
-    [ -f "$dest" ] && head -3 "$dest" 2>/dev/null | grep -q 'GENERATED FILE' && return 0
+    # Rendered templates say so in their first few lines. Without this an
+    # install after the first would decline to replace them, and editing a
+    # template would silently never take effect.
+    [ -f "$dest" ] && head -5 "$dest" 2>/dev/null | grep -q 'GENERATED FILE' && return 0
+
+    # A destination whose own name carries the project slug is ours by
+    # construction -- nothing else writes ~/.config/systemd/user/<slug>.service.
+    # The marker alone was not enough: files installed before it existed could
+    # never be replaced, so the marker could never arrive, and an upgrade would
+    # keep skipping them forever.
+    case "$(basename "$dest")" in
+        "$SLUG"|"$SLUG".*|"$SLUG"-*) return 0 ;;
+    esac
     return 1
 }
 
@@ -88,7 +100,7 @@ install_template() {
     render_template "$src" "$dest"
     # Templates default to executable because most of them are scripts; a
     # systemd unit must not be.
-    case "$dest" in *.service) chmod 644 "$dest" ;; esac
+    case "$dest" in *.service|*.desktop) chmod 644 "$dest" ;; esac
     log_info "  gen   $dest"
 }
 

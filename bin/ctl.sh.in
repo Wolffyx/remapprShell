@@ -39,6 +39,7 @@ case "$cmd" in
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
+    shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 
     # Both talk to the running shell rather than reimplementing the choice, so
     # a keybinding and the panel button always open the same thing.

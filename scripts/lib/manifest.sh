@@ -19,6 +19,9 @@ template|bin/session.sh.in|$BIN_DIR/$SESSION_BIN
 template|bin/ctl.sh.in|$BIN_DIR/$CTL_BIN
 symlink|$CTL_BIN|$BIN_DIR/$ALIAS
 template|share/systemd/service.in|$SYSTEMD_USER_DIR/$SYSTEMD_UNIT
+template|share/applications/launcher.desktop.in|$APPLICATIONS_DIR/$SLUG-launcher.desktop
+template|share/applications/search.desktop.in|$APPLICATIONS_DIR/$SLUG-search.desktop
+template|share/applications/settings.desktop.in|$APPLICATIONS_DIR/$SLUG-settings.desktop
 ENTRIES
 }
 

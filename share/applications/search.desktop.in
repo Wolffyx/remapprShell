@@ -1,0 +1,10 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+[Desktop Entry]
+Type=Application
+Name=@DISPLAY_NAME@: search
+Comment=Opens whichever search is configured
+Exec=@BIN_DIR@/@CTL_BIN@ search
+Icon=system-search
+Terminal=false
+NoDisplay=true
+X-KDE-GlobalAccel-CommandShortcut=true

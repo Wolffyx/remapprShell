@@ -1,3 +1,4 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
 [Unit]
 Description=@DISPLAY_NAME@
 Documentation=@REPO_FETCH@

@@ -1,0 +1,10 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+[Desktop Entry]
+Type=Application
+Name=@DISPLAY_NAME@: settings
+Comment=Opens the shell's settings window
+Exec=@BIN_DIR@/@CTL_BIN@ settings
+Icon=configure
+Terminal=false
+NoDisplay=true
+X-KDE-GlobalAccel-CommandShortcut=true
