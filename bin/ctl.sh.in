@@ -40,6 +40,7 @@ case "$cmd" in
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
+    preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 

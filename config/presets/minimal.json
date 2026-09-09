@@ -1,0 +1,14 @@
+{
+    "name": "Minimal",
+    "description": "A thin bar with the time and the system tray. Nothing else.",
+    "config": {
+        "panel": { "position": "top", "thickness": 28 },
+        "bar": {
+            "entries": [
+                { "id": "clock", "zone": "middle", "enabled": true },
+                { "id": "tray",  "zone": "right",  "enabled": true }
+            ]
+        },
+        "widgets": { "clock": { "format": "HH:mm" } }
+    }
+}

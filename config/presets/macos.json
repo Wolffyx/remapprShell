@@ -1,0 +1,20 @@
+{
+    "name": "macOS-like",
+    "description": "A slim menu bar across the top: launcher on the left, clock centred, status on the right.",
+    "config": {
+        "panel": { "position": "top", "thickness": 26 },
+        "bar": {
+            "entries": [
+                { "id": "launcher",   "zone": "left",   "enabled": true },
+                { "id": "workspaces", "zone": "left",   "enabled": true },
+                { "id": "clock",      "zone": "middle", "enabled": true },
+                { "id": "tray",       "zone": "right",  "enabled": true },
+                { "id": "power",      "zone": "right",  "enabled": true }
+            ]
+        },
+        "widgets": {
+            "clock": { "format": "ddd d MMM  HH:mm" },
+            "launcher": { "icon": "start-here-kde" }
+        }
+    }
+}

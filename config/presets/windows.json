@@ -1,0 +1,20 @@
+{
+    "name": "Windows-like",
+    "description": "Bottom bar, start button on the left, clock and tray on the right, and a show-desktop strip at the far end.",
+    "config": {
+        "panel": { "position": "bottom", "thickness": 40 },
+        "bar": {
+            "entries": [
+                { "id": "launcher",    "zone": "left",   "enabled": true },
+                { "id": "workspaces",  "zone": "left",   "enabled": true },
+                { "id": "tray",        "zone": "right",  "enabled": true },
+                { "id": "clock",       "zone": "right",  "enabled": true },
+                { "id": "showdesktop", "zone": "right",  "enabled": true }
+            ]
+        },
+        "widgets": {
+            "clock": { "format": "HH:mm", "showDate": true, "dateFormat": "ddd d MMM" },
+            "launcher": { "icon": "start-here-kde" }
+        }
+    }
+}

@@ -1,6 +1,5 @@
 {
     "comment": "Describes every setting so the GUI can render controls for it. Deliberately the same shape as the `config` block in a widget.json, so one renderer handles built-in settings and third-party widgets alike.",
-
     "sections": [
         {
             "id": "panel",
@@ -10,7 +9,12 @@
             "keys": {
                 "panel.position": {
                     "type": "enum",
-                    "values": ["top", "bottom", "left", "right"],
+                    "values": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right"
+                    ],
                     "default": "bottom",
                     "label": "Position",
                     "description": "Which edge the panel is anchored to."
@@ -26,7 +30,12 @@
                 },
                 "panel.renderer": {
                     "type": "enum",
-                    "values": ["quickshell", "plasma", "caelestia", "none"],
+                    "values": [
+                        "quickshell",
+                        "plasma",
+                        "caelestia",
+                        "none"
+                    ],
                     "default": "quickshell",
                     "label": "Drawn by",
                     "description": "Only one panel can be active at a time. The Plasma renderer is drawn by plasmashell from the same configuration, and cannot reproduce every widget."
@@ -41,26 +50,52 @@
             "keys": {
                 "launcher.provider": {
                     "type": "enum",
-                    "values": ["auto", "kickoff", "builtin", "krunner", "fuzzel", "rofi", "custom"],
+                    "values": [
+                        "auto",
+                        "kickoff",
+                        "builtin",
+                        "krunner",
+                        "fuzzel",
+                        "rofi",
+                        "custom"
+                    ],
                     "default": "auto",
                     "label": "Application menu",
                     "description": "Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one."
                 },
                 "launcher.searchProvider": {
                     "type": "enum",
-                    "values": ["auto", "krunner", "builtin", "kickoff", "fuzzel", "rofi", "custom"],
+                    "values": [
+                        "auto",
+                        "krunner",
+                        "builtin",
+                        "kickoff",
+                        "fuzzel",
+                        "rofi",
+                        "custom"
+                    ],
                     "default": "auto",
                     "label": "Search",
                     "description": "KRunner is Plasma's own search."
                 },
                 "launcher.kickoffMode": {
                     "type": "enum",
-                    "values": ["menu", "windowed"],
+                    "values": [
+                        "menu",
+                        "windowed"
+                    ],
                     "default": "menu",
                     "label": "Kickoff style",
                     "description": "Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus."
                 }
             }
+        },
+        {
+            "id": "presets",
+            "label": "Layouts",
+            "icon": "preferences-desktop-theme",
+            "description": "Shipped panel layouts. Applying one replaces your current configuration.",
+            "page": "presets"
         },
         {
             "id": "widgets",

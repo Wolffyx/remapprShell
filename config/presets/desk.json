@@ -1,0 +1,20 @@
+{
+    "name": "Workspace-focused",
+    "description": "Bottom bar built around virtual desktops, with a centred clock and a compact status area.",
+    "config": {
+        "panel": { "position": "bottom", "thickness": 36 },
+        "bar": {
+            "entries": [
+                { "id": "workspaces", "zone": "left",   "enabled": true },
+                { "id": "launcher",   "zone": "left",   "enabled": true },
+                { "id": "clock",      "zone": "middle", "enabled": true },
+                { "id": "tray",       "zone": "right",  "enabled": true },
+                { "id": "power",      "zone": "right",  "enabled": true }
+            ]
+        },
+        "widgets": {
+            "workspaces": { "showNames": false, "scrollToSwitch": true },
+            "clock": { "format": "HH:mm", "showDate": true }
+        }
+    }
+}

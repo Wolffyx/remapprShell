@@ -8,6 +8,7 @@ pragma ComponentBehavior: Bound
 // reimplementing the logic, so the two cannot drift apart.
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.theme
@@ -20,7 +21,7 @@ Column {
     property var snapshots: []
     property string status: ""
 
-    readonly property string ctl: `${Branding.stateDir}/../../bin/${Branding.slug}-ctl`
+    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
     spacing: 8
 
@@ -33,7 +34,7 @@ Column {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [`${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`, "snapshot", "list"]
+        command: [root.ctl, "snapshot", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = [];
@@ -57,7 +58,7 @@ Column {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [`${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`].concat(args);
+        runProc.command = [root.ctl].concat(args);
         runProc.running = true;
     }
 
