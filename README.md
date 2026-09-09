@@ -53,6 +53,23 @@ rmpr theme apply        # install and activate the look and feel
 rmpr status
 ```
 
+### Updating
+
+```bash
+rmpr update --check          # what an update would bring
+rmpr update                  # from the configured git remote
+rmpr update --from ~/src/x   # from a local checkout
+rmpr update --rollback       # back to where it was
+```
+
+Both sources run the same pipeline -- preflight, restore point, apply, check
+migrations exist, verify, install, restart -- and it returns to the previous
+state if any step fails. A local install that skipped verification would mean
+the path most used during development is the one least tested.
+
+An update refuses to start if the checkout has uncommitted changes, and a
+version that fails its own QML lint is rolled back rather than installed.
+
 ### Restore points are never deleted automatically
 
 Not on restore, not on uninstall, not to reclaim space, not to prune old ones.
