@@ -100,8 +100,10 @@ Item {
         // Kept on screen: a popout under a button near the right edge would
         // otherwise run off it.
         //
-        // qmllint cannot resolve `margins` on a panel window and warns about
-        // it; the property is real and works at runtime.
+        // The linter cannot resolve the grouped `margins` property on a panel
+        // window and warns about it; the property is real and works at
+        // runtime. (Note for the next person: a comment whose first word is
+        // the linter's own name is parsed as a directive to it.)
         margins.left: Math.max(0, Math.min(popout.slotX, (popout.screen?.width ?? 0) - popout.implicitWidth - 8))
         margins.top: popout.atTop ? (root.bar?.thickness ?? 0) + 4 : 0
         margins.bottom: popout.atTop ? 0 : (root.bar?.thickness ?? 0) + 4
