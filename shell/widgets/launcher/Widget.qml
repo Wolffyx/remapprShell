@@ -26,13 +26,24 @@ BarWidget {
         LauncherPanel {}
     }
 
-    popoutVisible: LauncherService.active.visible && LauncherService.active.embedded
+    popoutVisible: LauncherService.active.visible
+                   && LauncherService.active.embedded
+                   && LauncherService.builtin.onScreen === root.screenName
+
+    // The built-in launcher is a search field; it is useless without the
+    // keyboard.
+    popoutGrabsFocus: true
 
     implicitWidth: content.implicitWidth + 12
     implicitHeight: 26
 
     function handleActivate(button) {
-        LauncherService.toggle("apps");
+        // Tell the provider which screen this button is on, so the popout is
+        // built there and only there.
+        if (LauncherService.active === LauncherService.builtin && !LauncherService.builtin.visible)
+            LauncherService.builtin.openOn(root.screenName, "apps");
+        else
+            LauncherService.toggle("apps");
     }
 
     Rectangle {

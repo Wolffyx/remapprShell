@@ -42,6 +42,11 @@ Item {
     property Component popout: null
     property bool popoutVisible: false
 
+    // Whether the popout needs the keyboard. A popout that only displays
+    // something should not steal focus from whatever the user was typing in,
+    // so this is opt-in rather than always on.
+    property bool popoutGrabsFocus: false
+
     // ---- behaviour, overridden by the widget ---------------------------
 
     function handleHover(position, horizontal) {}

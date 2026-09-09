@@ -83,6 +83,7 @@ Item {
         anchor.edges: root.bar?.position === "top" ? Edges.Bottom : Edges.Top
 
         visible: popout.wanted
+        grabFocus: root.widget?.popoutGrabsFocus ?? false
         color: "transparent"
         readonly property Item contentItem: content.item as Item
         implicitWidth: popout.contentItem?.implicitWidth ?? 1

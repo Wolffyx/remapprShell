@@ -22,6 +22,14 @@ Provider {
     property int selectedIndex: 0
     property int maxResults: 8
 
+    // Which screen the launcher belongs to while it is open.
+    //
+    // The panel exists once per monitor, so without this every screen builds
+    // its own popout and they all try to grab the keyboard at once. Wayland
+    // grants the grab to one and refuses the rest, which leaves a launcher on
+    // screen that cannot be typed into.
+    property string onScreen: ""
+
     // Applications, minus the ones that ask not to be shown.
     readonly property var applications: DesktopEntries.applications.values
         .filter(a => a && !a.noDisplay)
@@ -65,7 +73,16 @@ Provider {
     function open(mode) {
         root.query = "";
         root.selectedIndex = 0;
+        // Opened without a screen -- from IPC or a keybinding -- so fall back
+        // to the first one rather than showing it everywhere.
+        if (root.onScreen.length === 0)
+            root.onScreen = Quickshell.screens[0]?.name ?? "";
         root.visible = true;
+    }
+
+    function openOn(screenName, mode) {
+        root.onScreen = screenName ?? "";
+        root.open(mode);
     }
 
     function openWithQuery(q) {
@@ -77,6 +94,7 @@ Provider {
     function close() {
         root.visible = false;
         root.query = "";
+        root.onScreen = "";
     }
 
     function moveSelection(delta) {

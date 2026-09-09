@@ -25,6 +25,10 @@ Item {
 
     Component.onCompleted: search.forceActiveFocus()
 
+    // Clicking away closes it. Without this the popout survives losing focus
+    // and has to be dismissed from the button it was opened with.
+    onActiveFocusChanged: if (!activeFocus && root.provider.visible) root.provider.close()
+
     Rectangle {
         anchors.fill: parent
         radius: 8

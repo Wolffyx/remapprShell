@@ -38,6 +38,13 @@ PanelWindow {
 
     color: "transparent"
 
+    // A grabbing popup requires its parent surface to be able to take keyboard
+    // input; without this Wayland refuses to create one and the built-in
+    // launcher's search field can never be typed into. On-demand focus means
+    // the panel takes the keyboard only when something in it asks, so it does
+    // not steal focus from the window the user is working in.
+    focusable: true
+
     Rectangle {
         anchors.fill: parent
         color: PlasmaColors.panelBackground
