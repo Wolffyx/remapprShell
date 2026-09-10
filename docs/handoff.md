@@ -63,8 +63,11 @@ for lessons — which patterns to avoid.
   redaction are built and tested, which was the precondition; the providers
   (`clipboard`, `claude-code`, `ollama`, `custom`), the consent dialog that
   shows the actual redacted bundle, and the `busctl --user monitor` eavesdrop
-  are not. Verification step 6 — whether that eavesdrop is permitted for an
-  unprivileged user on this dbus build — has not been run.
+  are not. Verification step 6 has now been run: `busctl --user monitor
+  org.freedesktop.Notifications` starts and monitors without error as an
+  unprivileged user on this dbus build, so Tier 1 is viable and the
+  Plasma-notification-history fallback is not needed. The eavesdrop stays
+  opt-in and off unless AI assist or notification history is enabled.
 - **Active-window / task-list widget** — *blocked*: Quickshell 0.3.1's Wayland
   module exposes only session-lock types, so window state needs a KWin JS
   script feeding it out. Do not attempt it with a C++ KWin effect.
