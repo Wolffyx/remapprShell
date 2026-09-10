@@ -15,6 +15,7 @@ pragma Singleton
 // Until then the list is empty, and the panel simply has nothing to draw.
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.windows.events
@@ -85,6 +86,75 @@ QtObject {
         }
 
         onRunningChanged: if (!running) Log.warn("windows", "the window list stopped following changes")
+    }
+
+    // ---- matching a window to the application that owns it ---------------
+    //
+    // KWin gives us two hints and neither is reliably an icon name: the
+    // desktop file it associated with the window (often empty), and the X11
+    // resource class (often the wrong case, sometimes a binary name). Guessing
+    // an icon from those is what produces a panel of identical grey
+    // placeholders.
+    //
+    // So the hints are resolved against the desktop entries the system
+    // actually has, by the three keys a launcher would use, and only then
+    // falls back to guessing.
+    readonly property var _entries: DesktopEntries.applications.values
+
+    // Built once per change of the installed applications rather than per
+    // window per repaint.
+    readonly property var _index: {
+        const byKey = ({});
+        for (const entry of root._entries ?? []) {
+            const add = (key, value) => {
+                const k = String(key ?? "").toLowerCase();
+                if (k.length > 0 && !byKey[k])
+                    byKey[k] = value;
+            };
+            add(entry.id, entry);
+            // The .desktop id without its suffix, which is the form KWin
+            // usually reports.
+            add(String(entry.id ?? "").replace(/\.desktop$/, ""), entry);
+            // What the application tells the compositor to call itself. This
+            // is the one that matches windows whose class bears no relation to
+            // their desktop file.
+            add(entry.startupClass, entry);
+        }
+        return byKey;
+    }
+
+    function entryFor(window) {
+        if (!window)
+            return null;
+        const index = root._index;
+        for (const hint of [window.desktopFile, window.appId]) {
+            const key = String(hint ?? "").toLowerCase();
+            if (key.length === 0)
+                continue;
+            if (index[key])
+                return index[key];
+            const stripped = key.replace(/\.desktop$/, "");
+            if (index[stripped])
+                return index[stripped];
+        }
+        return null;
+    }
+
+    // The icon to draw. The entry's own icon first, because that is the one
+    // the application chose; the hints only if nothing matched.
+    function iconFor(window) {
+        const entry = root.entryFor(window);
+        if (entry && String(entry.icon ?? "").length > 0)
+            return entry.icon;
+        return WindowEvents.iconName(window);
+    }
+
+    // "Dolphin", not "org.kde.dolphin".
+    function appNameFor(window) {
+        const entry = root.entryFor(window);
+        if (entry && String(entry.name ?? "").length > 0)
+            return entry.name;
+        return window?.appId ?? "";
     }
 
     // KWin's own runner. The id it expects is the uuid in braces behind a

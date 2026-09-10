@@ -18,6 +18,20 @@ Item {
     required property var widgetConfig
 
     readonly property BarWidget widget: host.item as BarWidget
+
+    // Where along this slot the popout should point, as the widget last asked.
+    // A widget with one popout for the whole of itself never sets it and gets
+    // the slot's own edge; one with a row of things -- a task list -- names the
+    // centre of the thing being hovered, so the popout appears under that
+    // rather than under the start of the row.
+    property real popoutCentre: 0
+
+    Connections {
+        target: root.widget
+        function onRequestPopout(name: string, centre: real): void {
+            root.popoutCentre = centre;
+        }
+    }
     readonly property bool wantsHover: root.widget?.wantsHover ?? false
     readonly property bool wantsWheel: root.widget?.wantsWheel ?? false
     readonly property bool interactive: root.wantsHover || root.wantsWheel || !!root.widget?.popout
@@ -104,7 +118,13 @@ Item {
         // window and warns about it; the property is real and works at
         // runtime. (Note for the next person: a comment whose first word is
         // the linter's own name is parsed as a directive to it.)
-        margins.left: Math.max(0, Math.min(popout.slotX, (popout.screen?.width ?? 0) - popout.implicitWidth - 8))
+        // Centred on what the widget pointed at, then kept on screen: a popout
+        // under a button near either edge would otherwise run off it.
+        margins.left: {
+            const wanted = popout.slotX + root.popoutCentre - popout.implicitWidth / 2;
+            const limit = (popout.screen?.width ?? 0) - popout.implicitWidth - 8;
+            return Math.max(8, Math.min(wanted, Math.max(8, limit)));
+        }
         margins.top: popout.atTop ? (root.bar?.thickness ?? 0) + 4 : 0
         margins.bottom: popout.atTop ? 0 : (root.bar?.thickness ?? 0) + 4
 

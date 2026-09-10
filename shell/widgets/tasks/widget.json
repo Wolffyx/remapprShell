@@ -37,10 +37,11 @@
         },
         "iconSize": {
             "type": "int",
-            "default": 18,
-            "min": 12,
+            "default": 0,
+            "min": 0,
             "max": 48,
-            "label": "Icon size"
+            "label": "Icon size",
+            "description": "0 follows the panel's thickness, so resizing the panel resizes the icons with it."
         }
     }
 }

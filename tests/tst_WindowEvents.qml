@@ -92,6 +92,14 @@ TestCase {
         compare(WindowEvents.label(null), "");
     }
 
+    // Steam games have no desktop entry: the class is the numeric app id, so
+    // nothing can match and the fallback is all there is.
+    function test_steam_games_get_steams_icon() {
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam");
+        // But an application that merely mentions steam is not one.
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steamworks-tool" })), "steamworks-tool");
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
         // Lower-cased, which is what turns "Google-chrome" into an icon that

@@ -109,6 +109,16 @@ for lessons — which patterns to avoid.
   is in that path and the daemon stays one-directional. `rmpr windows
   enable|disable|status|show`; opt-in, ledgered in `kwinrc [Plugins]`.
   Verified live: 11 windows listed, a window opening moved the shell to 12.
+  Icons resolve against the installed desktop entries by id, by id without the
+  suffix and by `StartupWMClass` -- 10 of 11 windows here, where guessing from
+  the window class alone produced a row of generic placeholders.
+- **No window thumbnails, and not for want of trying.** Window images come from
+  the plasma-window-management protocol, which Quickshell does not bind. KWin's
+  other route, `org.kde.KWin.ScreenShot2.CaptureWindow`, exists and takes a
+  window handle -- and refuses us: *"The process is not authorized to take a
+  screenshot"*. It is restricted to callers KWin allows. So a KDE-style hover
+  thumbnail needs either a Quickshell binding for plasma-window-management or a
+  C++ KWin effect, and the latter is ruled out for the reasons in the plan.
 
 ## Known problems
 

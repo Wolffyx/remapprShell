@@ -27,14 +27,23 @@ BarWidget {
     id: root
 
     readonly property bool showTitles: root.widgetConfig?.showTitles ?? false
-    readonly property int iconSize: root.widgetConfig?.iconSize ?? 18
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 180
+
+    // Follows the panel unless a size was chosen. Everything here is derived
+    // from `bar.thickness`, so making the panel thicker or thinner resizes the
+    // buttons and their icons with it rather than leaving a row of small icons
+    // in a tall strip.
+    readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
+    readonly property int iconSize: root.configuredIconSize > 0
+        ? root.configuredIconSize
+        : Math.max(12, Math.min(48, root.bar.thickness - 14))
 
     readonly property var windows: WindowsService.windows
 
     // One button's width. Square for icons only, wider when titles are shown.
     readonly property int buttonWidth: root.showTitles ? root.maxWidth
                                                        : Math.max(24, root.iconSize + 14)
+    readonly property int buttonHeight: Math.max(18, root.bar.thickness - 10)
     readonly property int spacing: 4
 
     // Which button the pointer is over, or -1. The panel reports the position
@@ -93,7 +102,7 @@ BarWidget {
                 readonly property bool isHovered: button.index === root.hoveredIndex
 
                 width: root.buttonWidth
-                height: Math.max(20, root.bar.thickness - 10)
+                height: root.buttonHeight
                 radius: 5
 
                 color: button.isActive  ? PlasmaColors.alpha(PlasmaColors.accent, 0.28)
@@ -114,7 +123,7 @@ BarWidget {
                     PanelIcon {
                         anchors.verticalCenter: parent.verticalCenter
                         implicitSize: root.iconSize
-                        iconName: WindowEvents.iconName(button.modelData)
+                        iconName: WindowsService.iconFor(button.modelData)
                     }
 
                     PanelText {
@@ -145,47 +154,58 @@ BarWidget {
         }
     }
 
-    // The preview. A thumbnail is not possible here: window images come from
-    // the plasma-window-management protocol, which Quickshell does not bind and
-    // KWin exposes over no other interface. So it shows what is actually
-    // knowable -- the application, the full title, and what state the window is
-    // in.
+    // The preview.
+    //
+    // It is not a thumbnail, and cannot be one here. Window images come from
+    // the plasma-window-management protocol, which Quickshell does not bind;
+    // KWin's other route, ScreenShot2.CaptureWindow, refuses us outright with
+    // "the process is not authorized to take a screenshot" -- it is restricted
+    // to callers KWin allows, and we are not one. So the preview shows what is
+    // actually knowable, at a size worth hovering for: the application's own
+    // icon, its real name rather than its window class, the full title, and
+    // the state the window is in.
     popout: Component {
         Item {
             id: preview
 
             readonly property var window: root.windows[root.hoveredIndex] ?? null
 
-            implicitWidth: Math.max(220, body.implicitWidth + 20)
-            implicitHeight: body.implicitHeight + 8
+            implicitWidth: Math.max(240, body.implicitWidth + 24)
+            implicitHeight: body.implicitHeight + 12
 
             Row {
                 id: body
                 anchors.centerIn: parent
-                spacing: 10
+                spacing: 12
 
                 PanelIcon {
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitSize: 32
-                    iconName: WindowEvents.iconName(preview.window)
+                    implicitSize: 48
+                    iconName: WindowsService.iconFor(preview.window)
                 }
 
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 2
+                    spacing: 3
+
+                    PanelText {
+                        text: WindowsService.appNameFor(preview.window)
+                        font.bold: true
+                    }
 
                     PanelText {
                         id: previewTitle
                         width: Math.min(previewTitle.implicitWidth, 320)
                         elide: Text.ElideRight
                         text: preview.window?.title ?? ""
-                        font.bold: true
+                        color: PlasmaColors.foreground
+                        font.pixelSize: 12
                     }
 
                     PanelText {
                         text: preview.window
-                            ? `${preview.window.appId} — ${preview.window.minimized ? "minimised"
-                                                          : preview.window.active ? "active" : "open"}`
+                            ? (preview.window.minimized ? "minimised"
+                             : preview.window.active ? "active" : "open")
                             : ""
                         color: PlasmaColors.foregroundInactive
                         font.pixelSize: 11

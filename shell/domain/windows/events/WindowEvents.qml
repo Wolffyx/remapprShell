@@ -95,12 +95,21 @@ QtObject {
         return window.title.length > 0 ? window.title : window.appId;
     }
 
-    // The icon name to try. A desktop file id is the reliable one; the
-    // resource class is the fallback, and lower-casing it is what turns
-    // "Google-chrome" into an icon that exists.
+    // The icon name to try when no installed application matched the window.
+    //
+    // A desktop file id is the reliable one; the resource class is the
+    // fallback, and lower-casing it is what turns "Google-chrome" into an icon
+    // that exists.
     function iconName(window) {
         if (!window)
             return "";
+
+        // A game launched through Steam has no desktop entry of its own -- its
+        // class is the numeric app id -- so nothing above can have matched and
+        // the only honest answer is Steam's icon rather than a blank square.
+        if (/^steam_app_\d+$/.test(window.appId))
+            return "steam";
+
         if (window.desktopFile.length > 0)
             return window.desktopFile;
         return window.appId.toLowerCase();
