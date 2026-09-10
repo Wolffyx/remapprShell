@@ -1,9 +1,10 @@
 # Where the project stands
 
-A snapshot for picking the work up fresh. Written 2026-09-10, after the
-session that built the Plasma renderer, diagnostics, the wizard, the theme
-layer, the open-window list and panel auto-hide -- and updated the same day
-after AI assist and the notification history landed.
+A snapshot for picking the work up fresh. Written 2026-09-10, across two
+sessions: the first built the Plasma renderer, diagnostics, the wizard, the
+theme layer, the open-window list and panel auto-hide; the second added AI
+assist, the notification history, crash reporting, and a tray you can curate
+whose menus open.
 
 ## What this is
 
@@ -31,18 +32,20 @@ off the running system rather than remembered.
 | Shell | installed via `make link`, running as `remappr-shell.service` — **active but not enabled**, so it will not come back after a reboot until `systemctl --user enable remappr-shell.service` |
 | plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
-| Tray | nothing pinned, so every item is on the panel and there is no chevron. Curate it in Settings → Tray icons |
+| Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
-| Crash dumps | five from before the `image-data` fix in `~/.cache/quickshell/crashes/`, all with the same stack, plus one from the isolated shell that reproduced it. Safe to delete: `rmpr crash remove --all` |
+| Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
-| Window list | KWin script loaded, daemon answering, 11 windows |
+| Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
 | `rmpr doctor` | no problems, 3 warnings (the competing shell, krohnkite, one drifted ledger key) |
 
 ### What to check first, before building anything
 
-Three things this session could not verify from inside itself. They are quick,
-and one of them is a bug if it fails:
+Everything below needs a real mouse or keyboard, which no session here has
+had: `ydotool`, `wtype`, `dotool` and `xdotool` are all absent, so a keystroke
+and a click cannot be produced from inside. Each is quick, and some are a bug
+if they fail.
 
 1. **Type into the launcher.** `rmpr launcher`, then type. The keyboard-focus
    fix is only proven as far as item focus; proving a keystroke lands needs a
@@ -50,7 +53,15 @@ and one of them is a bug if it fails:
 2. **Click a task button once.** It should activate the window on the first
    click, not the second.
 3. **Drag a row in Settings → Widgets.** Reordering by dragging is new.
-4. **Click the bell, then click Ask on an entry** (after turning AI assist on
+4. **Right-click a tray icon.** The application's own menu should open, drawn
+   by us. Left click activates, middle click is the secondary action, the wheel
+   scrolls the icon under the pointer. The menu data was read successfully from
+   every tray item on this machine, including submenus -- what is unproven is
+   the drawing and the clicking.
+5. **Drag a row in `rmpr settings tray`.** Three lists: on the panel, behind
+   the chevron, never shown. Dragging between them is the whole point of the
+   page.
+6. **Click the bell, then click Ask on an entry** (after turning AI assist on
    in Settings → AI assist). The consent window was proven to map -- the
    window list reports "Ask about a report" -- and `rmpr ask` is tested in a
    sandbox with every provider faked, but nobody has yet pressed Send in the
@@ -213,6 +224,11 @@ are not.
 
 ## Not built yet
 
+- **Tray tooltips.** A tray item carries `tooltipTitle` and
+  `tooltipDescription` and nothing shows them. A tooltip has to escape the
+  panel, so it needs a window, and the widget's one popout is already spoken
+  for by the menu and the overflow flyout. The honest fix is a second popout
+  slot on `BarWidget` rather than a special case in the tray.
 - ~~**AI assist and the notification ring buffer.**~~ Built; see "Working
   today". What is still not built from that plan: a watcher that *notices*
   a failed unit or a core dump by itself. `rmpr ask --failed` gathers them on
@@ -499,6 +515,30 @@ Non-obvious things that cost time to discover:
 
 `~/.claude/plans/in-this-project-i-cryptic-horizon.md` holds the full approved
 plan, including the sections not yet built.
+
+## Where the second session of 2026-09-10 left off
+
+Seven commits, `e2b3957..HEAD`, 44 files, about 4,300 lines added. In order:
+
+| commit | what |
+| --- | --- |
+| `0c4f3d6` | AI assist (`rmpr ask`) and the notification history |
+| `525b887` | the crash: a notification carrying an icon took the shell down |
+| `baaa528` | notice a crash quickshell caught and systemd did not |
+| `07531bb` | bound every line off the bus, not just the one that crashed |
+| `7e61506` | the first crash on a fresh install was never reported |
+| `737cbcb` | a tray you can curate, with menus that open |
+| `7cf9e7e` | open the settings window on a page |
+
+The shape of the session is worth knowing, because two of those commits exist
+only because of the first one: a feature landed, it crashed the shell five
+times, the fix exposed that **nothing was reporting the crashes**, and closing
+that exposed two bugs in the closing. Each step was found by reproducing rather
+than by reading, and each ended as a test.
+
+Nothing is half-finished. `make lint` and `make test` are green, `rmpr doctor`
+reports no problems, and the six items under "What to check first" are things
+no session here can do rather than things left undone.
 
 ## The Phase 6b gate, run against the live desktop
 
