@@ -50,6 +50,9 @@ rmpr snapshot create    # take a restore point now
 rmpr snapshot list      # what exists, with sizes
 rmpr restore            # put KDE back the way it was
 rmpr theme apply        # install and activate the look and feel
+rmpr renderer list      # what can draw the panel here
+rmpr renderer set plasma --dry-run   # the applet layout it would install
+rmpr renderer set plasma             # switch, with a restore point and a rollback
 rmpr status
 ```
 

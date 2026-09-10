@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.features.panel
+import qs.features.panel.model
 import qs.platform.system
 import qs.domain.launcher
 import qs.domain.config
@@ -21,8 +22,13 @@ ShellRoot {
     // Per-output overrides, one watcher per connected screen.
     MonitorConfigLoader {}
 
+    // Drawn only when this renderer is the one selected. The Plasma renderer
+    // draws the same panel through plasmashell, and both drawing at once is
+    // the two-panels-at-one-edge bug the renderer key exists to prevent -- so
+    // the check lives here, where the panels are created, rather than in
+    // anything that could be forgotten.
     Variants {
-        model: Quickshell.screens
+        model: PanelModel.renderer === "quickshell" ? Quickshell.screens : []
 
         Panel {}
     }

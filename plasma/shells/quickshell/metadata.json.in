@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Id": "@SHELL_PACKAGE_ID@",
+        "Name": "@DISPLAY_NAME@",
+        "Description": "Desktop only. The panel is drawn by @DISPLAY_NAME@ itself, not by plasmashell.",
+        "Icon": "user-desktop",
+        "License": "GPL-3.0",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell",
+    "X-Plasma-APIVersion": "2"
+}

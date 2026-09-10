@@ -151,9 +151,7 @@ led=$(kconfig_ledger)
 if [ -s "$led" ] && [ "$(jq '.entries | length' "$led")" -gt 0 ]; then
     drift=0
     while IFS=$'\t' read -r scope file group key had value; do
-        gargs=()
-        while IFS= read -r g; do [ -n "$g" ] && gargs+=(--group "$g"); done \
-            < <(printf '%s\n' "${group//\// }" | tr ' ' '\n')
+        mapfile -t gargs < <(_kconfig_group_args "$group")
         live=$(kreadconfig6 --file "$file" "${gargs[@]}" --key "$key" --default '<unset>' 2>/dev/null)
         printf '  %-9s %s [%s] %s = %s\n' "[$scope]" "$file" "$group" "$key" "$live"
         [ "$live" = "<unset>" ] && drift=$((drift + 1))
@@ -181,6 +179,48 @@ else
     bad "plasmashell is set to '$shell_pkg', which is not installed"
     fix "on the next login plasmashell falls back to the default layout"
     fix "reinstall that package, or: kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage org.kde.plasma.desktop"
+fi
+
+# The headline failure mode of having two renderers: both drawing at once.
+# Counted rather than assumed, because the case that matters is the one where
+# the configuration and what is on screen have come apart.
+configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo unknown)
+[ "$configured_renderer" = "null" ] && configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$defaults_file" 2>/dev/null || echo quickshell)
+
+case "$configured_renderer" in
+    plasma)     expected_pkg="$PLASMA_SHELL_PACKAGE_ID" ;;
+    none)       expected_pkg="org.kde.plasma.desktop" ;;
+    unknown)    expected_pkg="$shell_pkg" ;;
+    *)          expected_pkg="$SHELL_PACKAGE_ID" ;;
+esac
+
+if [ "$shell_pkg" = "$expected_pkg" ]; then
+    ok "renderer '$configured_renderer' matches plasmashell's package"
+else
+    warn "configured renderer is '$configured_renderer' but plasmashell uses '$shell_pkg'"
+    fix "the panel you see may not be the one configured"
+    fix "re-apply it: $ALIAS renderer set $configured_renderer"
+fi
+
+# Every panel containment in every layout we own. More than one, or one while
+# the Quickshell panel is also drawing, is the stacked-panels bug.
+our_panels=0
+for pkg in "$SHELL_PACKAGE_ID" "$PLASMA_SHELL_PACKAGE_ID"; do
+    f="$XDG_CONFIG_HOME/plasma-$pkg-appletsrc"
+    [ -f "$f" ] || continue
+    n=$(grep -c '^plugin=org.kde.panel$' "$f" 2>/dev/null || true)
+    our_panels=$((our_panels + n))
+    if [ "$pkg" = "$shell_pkg" ] && [ "$n" -gt 0 ] && [ "$configured_renderer" != "plasma" ]; then
+        bad "the active layout for '$pkg' has a Plasma panel, but the renderer is '$configured_renderer'"
+        fix "two panels will be drawn at the same edge"
+        fix "regenerate it: $ALIAS renderer set $configured_renderer"
+    fi
+done
+if [ "$our_panels" -le 1 ]; then
+    ok "$our_panels panel containment(s) in the layouts we generate"
+else
+    bad "$our_panels panel containments across our layouts; at most one may exist"
+    fix "regenerate them: $ALIAS renderer set $configured_renderer"
 fi
 
 others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)

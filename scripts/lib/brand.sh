@@ -64,7 +64,20 @@ SESSION_BIN="$SLUG-session"
 CTL_BIN="$SLUG-ctl"
 SYSTEMD_UNIT="$SLUG.service"
 LNF_PACKAGE_ID="$SLUG.lookandfeel"
+
+# The Plasma renderer needs a shell package of its own rather than a flag on
+# the first one. plasmashell namespaces both the applet layout
+# (plasma-<id>-appletsrc) and the panel views (plasmashellrc [PlasmaViews])
+# by package id, so two ids means switching renderers cannot overwrite the
+# other renderer's layout -- the switch is non-destructive by construction
+# rather than by care.
+PLASMA_SHELL_PACKAGE_ID="${SLUG}-plasma.desktop"
 SAFE_MODE_VAR="${ENV_PREFIX}_SAFE_MODE"
+# Set to keep a command away from the live session -- no DBus calls, no service
+# restarts, no package cache rebuild. Tests run against a throwaway HOME but
+# share the real session bus, so without this a test switching shell packages
+# would switch the desktop the person is sitting in front of.
+NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 
 export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
@@ -72,4 +85,5 @@ export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        QS_CONFIG_DIR CONFIG_DIR DATA_DIR STATE_DIR BIN_DIR SYSTEMD_USER_DIR \
        PLASMA_SHELLS_DIR PLASMA_LNF_DIR PLASMA_PLASMOIDS_DIR KWIN_SWITCHER_DIR \
        COLORS_DIR APPLICATIONS_DIR \
-       SESSION_BIN CTL_BIN SYSTEMD_UNIT LNF_PACKAGE_ID SAFE_MODE_VAR DEBUG_VAR
+       SESSION_BIN CTL_BIN SYSTEMD_UNIT LNF_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
+       SAFE_MODE_VAR DEBUG_VAR NO_SESSION_VAR

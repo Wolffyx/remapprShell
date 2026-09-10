@@ -27,20 +27,15 @@
                     "default": 40,
                     "label": "Thickness",
                     "description": "Height of a horizontal panel, width of a vertical one."
-                },
-                "panel.renderer": {
-                    "type": "enum",
-                    "values": [
-                        "quickshell",
-                        "plasma",
-                        "caelestia",
-                        "none"
-                    ],
-                    "default": "quickshell",
-                    "label": "Drawn by",
-                    "description": "Only one panel can be active at a time. The Plasma renderer is drawn by plasmashell from the same configuration, and cannot reproduce every widget."
                 }
             }
+        },
+        {
+            "id": "renderer",
+            "label": "Drawn by",
+            "icon": "preferences-desktop-plasma",
+            "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
+            "page": "renderer"
         },
         {
             "id": "launcher",

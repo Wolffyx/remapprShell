@@ -30,6 +30,22 @@ _kconfig_ledger_init() {
     fi
 }
 
+# Turns a "A/B" group path into the repeated --group arguments kwriteconfig6
+# takes.
+#
+# Split on "/" and nothing else. An earlier version replaced slashes with
+# spaces and split on whitespace, which silently broke every group whose name
+# contains one -- plasmashellrc's "[PlasmaViews][Panel 811]" being exactly that
+# case, written as two groups called "Panel" and "811" that KDE never reads.
+_kconfig_group_args() {
+    local path=$1 g
+    local -a out=()
+    while IFS= read -r g; do
+        [ -n "$g" ] && out+=(--group "$g")
+    done < <(printf '%s\n' "$path" | tr '/' '\n')
+    printf '%s\n' "${out[@]}"
+}
+
 # kconfig_set <scope> <file> <group> <key> <value>
 #
 # The scope groups related changes -- "theme", "edges", "backend" -- so each
@@ -44,10 +60,7 @@ kconfig_set() {
     _kconfig_ledger_init
 
     local -a gargs=()
-    local g
-    while IFS= read -r g; do
-        [ -n "$g" ] && gargs+=(--group "$g")
-    done < <(printf '%s\n' "${group//\// }" | tr ' ' '\n')
+    mapfile -t gargs < <(_kconfig_group_args "$group")
 
     # Read the prior state before touching anything. A plain read cannot
     # distinguish "unset" from "set to empty", so an improbable sentinel is
@@ -107,10 +120,7 @@ kconfig_revert() {
     local file group key had value
     while IFS=$'\t' read -r file group key had value; do
         local -a gargs=()
-        local g
-        while IFS= read -r g; do
-            [ -n "$g" ] && gargs+=(--group "$g")
-        done < <(printf '%s\n' "${group//\// }" | tr ' ' '\n')
+        mapfile -t gargs < <(_kconfig_group_args "$group")
 
         if [ "$had" = "true" ]; then
             kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" "$value"

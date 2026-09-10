@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Id": "@PLASMA_SHELL_PACKAGE_ID@",
+        "Name": "@DISPLAY_NAME@ (Plasma panel)",
+        "Description": "Desktop plus a panel drawn by plasmashell, generated from the same configuration as the Quickshell panel.",
+        "Icon": "user-desktop",
+        "License": "GPL-3.0",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell",
+    "X-Plasma-APIVersion": "2"
+}

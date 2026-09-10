@@ -116,6 +116,7 @@ FloatingWindow {
                         if (!page)
                             return keysPage;
                         switch (page) {
+                            case "renderer":  return rendererPage;
                             case "presets":   return presetsPage;
                             case "widgets":   return widgetsPage;
                             case "profiles":  return profilesPage;
@@ -134,6 +135,7 @@ FloatingWindow {
                     }
                 }
 
+                Component { id: rendererPage;  RendererPage  { width: parent.width } }
                 Component { id: presetsPage;   PresetsPage   { width: parent.width } }
                 Component { id: widgetsPage;   WidgetsPage   { width: parent.width } }
                 Component { id: profilesPage;  ProfilesPage  { width: parent.width } }
