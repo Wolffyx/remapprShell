@@ -223,6 +223,16 @@ Non-obvious things that cost time to discover:
   imported by `qmltestrunner` at all**, which makes every pure function beside
   it untestable by association. `qs.domain.osd.events` exists as its own module
   for exactly that reason.
+- **Replacing a Controls `background`/`handle` with plain Rectangles collapses
+  the control.** A `Slider` takes its implicit height from them, so custom ones
+  with no implicit size of their own made the whole slider zero pixels tall: it
+  drew nothing and there was nothing to drag, and the setting looked broken
+  because it was. Give replacements an `implicitWidth`/`implicitHeight`, or the
+  control an explicit size. The other controls set their own and were fine.
+- **`Grid { rows: 1; columns: 0 }` is not "one row, any number of columns".**
+  Zero is not unset -- Qt reads `rows * columns` as the capacity, so a zone with
+  two widgets in it warned and laid them out wrongly. The unset value is -1. It
+  stayed hidden until a zone held more than one widget.
 - **A widget must not define a function named after a `BarWidget` signal.**
   QML refuses the whole file ("Duplicate method name") and the widget silently
   never appears; qmllint cannot see it, because it does not resolve BarWidget.

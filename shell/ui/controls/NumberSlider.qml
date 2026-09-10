@@ -20,6 +20,13 @@ Row {
         id: slider
         anchors.verticalCenter: parent.verticalCenter
         width: root.width - readout.width - root.spacing
+
+        // Explicit, and this is not cosmetic. A Controls Slider takes its
+        // implicit height from its background and handle, and replacing both
+        // with plain Rectangles that have no implicit size of their own
+        // collapses the whole control to zero height: it drew nothing, and
+        // there was nothing to drag. The setting looked broken because it was.
+        height: 20
         from: root.from
         to: root.to
         stepSize: root.stepSize
@@ -30,6 +37,8 @@ Row {
         onPressedChanged: if (!pressed) root.moved(value)
 
         background: Rectangle {
+            implicitWidth: 120
+            implicitHeight: 4
             x: slider.leftPadding
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
             width: slider.availableWidth
@@ -46,6 +55,8 @@ Row {
         }
 
         handle: Rectangle {
+            implicitWidth: 14
+            implicitHeight: 14
             x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
             width: 14

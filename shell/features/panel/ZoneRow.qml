@@ -21,13 +21,17 @@ Item {
 
     // A Grid rather than a Row/Column pair: one element that lays out either
     // way, so nothing below has to branch on orientation. `rows: 1` gives a
-    // single horizontal line, `columns: 1` a single vertical one.
+    // single horizontal line, `columns: 1` a single vertical one -- and the
+    // other dimension must be -1, not 0. Zero is not "unset": Qt reads
+    // rows * columns as the capacity, so a zone with a second widget in it
+    // warned that it held more items than would fit and laid them out
+    // accordingly. It only showed up once a zone had two.
     Grid {
         id: layout
 
         anchors.centerIn: parent
-        rows: root.horizontal ? 1 : 0
-        columns: root.horizontal ? 0 : 1
+        rows: root.horizontal ? 1 : -1
+        columns: root.horizontal ? -1 : 1
         spacing: 10
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
