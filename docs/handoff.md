@@ -2,7 +2,8 @@
 
 A snapshot for picking the work up fresh. Written 2026-09-10, after the
 session that built the Plasma renderer, diagnostics, the wizard, the theme
-layer, the open-window list and panel auto-hide.
+layer, the open-window list and panel auto-hide -- and updated the same day
+after AI assist and the notification history landed.
 
 ## What this is
 
@@ -29,7 +30,8 @@ off the running system rather than remembered.
 | --- | --- |
 | Shell | installed via `make link`, running as `remappr-shell.service` — **active but not enabled**, so it will not come back after a reboot until `systemctl --user enable remappr-shell.service` |
 | plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
-| Panel | bottom, 40px, entries `launcher, tasks, tray, clock, showdesktop` — the `windows` preset |
+| Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
+| Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
 | Window list | KWin script loaded, daemon answering, 11 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
@@ -46,6 +48,12 @@ and one of them is a bug if it fails:
 2. **Click a task button once.** It should activate the window on the first
    click, not the second.
 3. **Drag a row in Settings → Widgets.** Reordering by dragging is new.
+4. **Click the bell, then click Ask on an entry** (after turning AI assist on
+   in Settings → AI assist). The consent window was proven to map -- the
+   window list reports "Ask about a report" -- and `rmpr ask` is tested in a
+   sandbox with every provider faked, but nobody has yet pressed Send in the
+   window with a real provider behind it. The claude-code path opens a
+   terminal; that was exercised only with a fake terminal.
 
 ### The lesson this session paid for twice
 
@@ -112,7 +120,7 @@ are not.
   the shell is dead — and both are held to `tests/fixtures/redact-cases.json`.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
-  report, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
+  report, ask, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
 - **Auto-hide** — `panel.autoHide`, per output like position and thickness.
   The surface really does shrink to a sliver rather than a full-height
   transparent one moved out of sight: a transparent surface still eats every
@@ -124,19 +132,49 @@ are not.
   `page` and `keys` renders as the page in the settings window while its keys
   still reach the reference, which is how `panel.renderer` is documented as the
   config key it is without becoming a text field in the GUI.
-- **Tests** — 9 shell suites in throwaway HOMEs, plus a QML suite. All green.
+- **AI assist** — `rmpr ask`, off by default. Every path writes a report
+  locally first, through the same reporter and the same redaction, and the
+  bundle a provider receives is byte-for-byte what `rmpr report show` prints
+  plus a question. Sources: the newest report, `--new`, `--report <name>`,
+  `--last-notification` / `--notification <n>` (over IPC from the running
+  shell), `--unit <name>` (its journal tail) and `--failed` (failed user units
+  and `coredumpctl`). Providers: `clipboard` (default, sends nothing),
+  `claude-code` (opens `claude` in a terminal), `ollama` (local HTTP; an
+  address that is not localhost counts as leaving), `custom` (`ai.command`
+  with `%report`, or the bundle on stdin). A provider whose program is missing
+  is reported as unavailable with the reason, not offered. Consent for a
+  provider that leaves the machine is asked once, showing the whole bundle:
+  in a terminal, or in the shell's consent window when there is none
+  (`rmpr ask` hands off to the window with exit code 2; `--review` forces the
+  window whatever the provider). `--forget` withdraws it. Everything the
+  window and the widget do goes through the CLI, so there is one code path
+  that sends. Wizard step 6 offers the detected providers, default off.
+  `rmpr shortcuts set ask <key>` binds "ask about the last notification".
+- **Notification history** — `notifications.history`, off by default. A
+  `busctl monitor` match on `Notify` method calls to
+  `org.freedesktop.Notifications`, the OSD listener's pattern: Plasma keeps
+  the name and keeps drawing, we read what goes past. Memory only, capped by
+  `notifications.historySize`, never written to disk -- a notification body is
+  the sort of thing a person would not expect to find in a file later. The
+  `notifications` widget is a bell with an unseen badge and a popout list; its
+  Ask button runs `rmpr ask --notification <n> --review`. Maps to
+  `org.kde.plasma.notifications` under the Plasma renderer. The listener runs
+  when either the history or AI assist is on. The parser lives in its own
+  module (`qs.domain.notifications.events`) for the qmltestrunner reason
+  below, and its fixture is a line captured from the real bus.
+- **Tests** — 10 shell suites in throwaway HOMEs, plus a QML suite. All green.
+  `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
+  runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
+  missing one.
 
 ## Not built yet
 
-- **AI assist and the notification ring buffer.** The report bundle and its
-  redaction are built and tested, which was the precondition; the providers
-  (`clipboard`, `claude-code`, `ollama`, `custom`), the consent dialog that
-  shows the actual redacted bundle, and the `busctl --user monitor` eavesdrop
-  are not. Verification step 6 has now been run: `busctl --user monitor
-  org.freedesktop.Notifications` starts and monitors without error as an
-  unprivileged user on this dbus build, so Tier 1 is viable and the
-  Plasma-notification-history fallback is not needed. The eavesdrop stays
-  opt-in and off unless AI assist or notification history is enabled.
+- ~~**AI assist and the notification ring buffer.**~~ Built; see "Working
+  today". What is still not built from that plan: a watcher that *notices*
+  a failed unit or a core dump by itself. `rmpr ask --failed` gathers them on
+  request, and that is as far as it goes -- a watcher that pops something up
+  is a notification of our own, which is the thing this project does not do
+  uninvited.
 - **The lock screen.** Deliberately not shipped. The Look-and-Feel package can
   override `lockscreen/LockScreen.qml`, and a broken one means being unable to
   unlock — the worst failure this project could ship, and the only one that
@@ -306,6 +344,19 @@ Non-obvious things that cost time to discover:
   Zero is not unset -- Qt reads `rows * columns` as the capacity, so a zone with
   two widgets in it warned and laid them out wrongly. The unset value is -1. It
   stayed hidden until a zone held more than one widget.
+- **A Quickshell-dependent singleton poisons its whole module for the QML
+  tests.** Putting `NotificationWatch` beside `Redact` in
+  `qs.domain.diagnostics` made the redaction test fail to compile with "Type
+  NotificationWatch unavailable" -- exactly the trap recorded for the OSD, and
+  walked into again. The watcher lives in `qs.domain.notifications` now, with
+  the pure parser under it in `events/`.
+- **`git mv -k` silently skips an untracked directory.** It reported nothing
+  and moved nothing; the next test run said the module was not installed.
+- **`echo "$@"` in a fake terminal eats a leading `-e`.** Fakes that record
+  their arguments must use `printf '%s\n' "$@"`.
+- **`"$(cat file)"` drops the file's final newline**, so a byte comparison
+  between what a provider received as an argument and the bundle on disk is
+  off by one byte. Compare with the newline added back.
 - **A widget must not define a function named after a `BarWidget` signal.**
   QML refuses the whole file ("Duplicate method name") and the widget silently
   never appears; qmllint cannot see it, because it does not resolve BarWidget.

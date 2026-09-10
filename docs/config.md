@@ -69,6 +69,27 @@ The volume and brightness popup. Plasma draws it by default and works well; ours
 | `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
 | `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
 
+### Notification history
+
+Plasma draws every notification and keeps doing so. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
+| `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
+
+### AI assist
+
+When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `ai.enabled` | `true` or `false` | `false` | Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about. |
+| `ai.provider` | `clipboard`, `claude-code`, `ollama`, `custom` | `clipboard` | `clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered. |
+| `ai.command` | a list | `[]` | For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input. |
+| `ai.ollamaUrl` | text | `http://127.0.0.1:11434` | Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other. |
+| `ai.ollamaModel` | text | `` | Empty picks the first model Ollama lists. |
+
 ### Layouts
 
 Shipped panel layouts. Applying one replaces your current configuration.
@@ -161,6 +182,7 @@ when two copies of a widget should differ.
 | --- | --- | --- | --- |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
+| Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
@@ -184,6 +206,12 @@ renderer, and is named before you switch rather than discovered afterwards.
 | --- | --- | --- | --- |
 | `icon` | text | `start-here-kde` | Icon |
 | `label` | text | `` | Shown beside the icon. Empty for icon only. |
+
+### `widgets.notifications`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showCount` | `true` or `false` | `true` | A badge with the number of notifications since the list was last opened. |
 
 ### `widgets.power`
 

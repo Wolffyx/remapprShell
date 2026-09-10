@@ -17,6 +17,7 @@ usage: @ALIAS@ <command> [options]
   renderer status|list|set|revert   choose what draws the panel
   theme apply|revert|osd|status     the look and feel, and which OSD draws
   report create|list|show|remove    write a local diagnostic report
+  ask [--last-notification|--unit]  hand a redacted report to an assistant (opt-in)
   windows enable|disable|status     the open-window list (needs a KWin script)
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
@@ -47,6 +48,7 @@ case "$cmd" in
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
     renderer)  require_repo; exec "$REPO_ROOT/scripts/renderer.sh" "$@" ;;
     report)    require_repo; exec "$REPO_ROOT/scripts/report.sh" "$@" ;;
+    ask)       require_repo; exec "$REPO_ROOT/scripts/ask.sh" "$@" ;;
     windows)   require_repo; exec "$REPO_ROOT/scripts/windows.sh" "$@" ;;
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;

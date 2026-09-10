@@ -182,10 +182,23 @@ case "$cmd" in
         fi
         dir="$REPORT_DIR/$(basename "$name")"
         [ -d "$dir" ] || die "no such report: $name"
+        # The known parts in a fixed order, then anything `ask` added -- a
+        # notification, a unit's journal -- except the bundle it builds from
+        # this very output.
+        shown=" "
         for f in error.txt environment.txt redaction.txt config.json widget-health.json journal.txt; do
             [ -f "$dir/$f" ] || continue
             printf '\n===== %s =====\n' "$f"
             cat "$dir/$f"
+            shown="$shown$f "
+        done
+        for path in "$dir"/*; do
+            f=$(basename "$path")
+            case "$shown" in *" $f "*) continue ;; esac
+            case "$f" in bundle.txt|question.txt) continue ;; esac
+            [ -f "$path" ] || continue
+            printf '\n===== %s =====\n' "$f"
+            cat "$path"
         done
         ;;
 

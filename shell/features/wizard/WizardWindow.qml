@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 
 // The first-run wizard.
 //
-// It asks four things, writes them, and gets out of the way. Everything it sets
+// It asks five things, writes them, and gets out of the way. Everything it sets
 // is reachable afterwards from the settings window, so nothing here is a
 // one-way door and every step can be skipped.
 //
@@ -31,7 +31,7 @@ FloatingWindow {
 
     signal finished
 
-    readonly property int stepCount: 5
+    readonly property int stepCount: 6
     property int step: 0
 
     // Answers, held until Finish. Nothing is written while the user is still
@@ -42,6 +42,10 @@ FloatingWindow {
     property string preset: ""
     property string launcher: ConfigStore.value("launcher.provider", "auto")
     property string renderer: "quickshell"
+    // "off", or a provider id. Off by default: nothing about a shell needs an
+    // assistant, and a wizard that pre-ticked it would be choosing for people.
+    property string ai: "off"
+    property var aiProviders: []
 
     property var presets: []
     property string status: ""
@@ -51,7 +55,27 @@ FloatingWindow {
     implicitHeight: 460
     color: PlasmaColors.background
 
-    Component.onCompleted: presetsProc.running = true
+    Component.onCompleted: {
+        presetsProc.running = true;
+        providersProc.running = true;
+    }
+
+    // Detected rather than listed: a provider whose program is not installed
+    // is not offered, so the answer "claude-code" cannot be given on a
+    // machine where it would fail.
+    readonly property Process _providers: Process {
+        id: providersProc
+        command: [Branding.ctlBin, "ask", "--providers", "--json"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.aiProviders = JSON.parse(text).filter(p => p.available).map(p => p.id);
+                } catch (e) {
+                    root.aiProviders = [];
+                }
+            }
+        }
+    }
 
     // The preset list comes from the CLI rather than a directory listing: it
     // already merges the shipped presets with the user's own, and duplicating
@@ -82,6 +106,9 @@ FloatingWindow {
         ConfigStore.set("panel.position", root.position);
         ConfigStore.set("panel.thickness", root.thickness);
         ConfigStore.set("launcher.provider", root.launcher);
+        ConfigStore.set("ai.enabled", root.ai !== "off");
+        if (root.ai !== "off")
+            ConfigStore.set("ai.provider", root.ai);
 
         if (root.renderer !== "quickshell") {
             root.status = `Switching to the ${root.renderer} renderer...`;
@@ -132,7 +159,8 @@ FloatingWindow {
         PanelText {
             text: [`Welcome`, `Where should the panel go?`, `Pick a layout`,
                    `What opens when you press the start button?`,
-                   `What should draw the panel?`][root.step] ?? ""
+                   `What should draw the panel?`,
+                   `When something breaks, ask an assistant?`][root.step] ?? ""
             font.pixelSize: 20
         }
 
@@ -251,6 +279,33 @@ FloatingWindow {
                 wrapMode: Text.WordWrap
                 color: PlasmaColors.foregroundInactive
                 text: "This one changes KDE's own settings. A restore point is taken first, and it is put back automatically if the switch does not work."
+            }
+        }
+
+        // ---- 5: AI assist
+        Column {
+            visible: root.step === 5
+            width: parent.width
+            spacing: 6
+
+            SettingRow {
+                width: parent.width
+                label: "AI assist"
+                description: "Hands a redacted diagnostic report to an assistant, on request. Nothing leaves this machine without showing you exactly what would go."
+                Select {
+                    values: ["off"].concat(root.aiProviders)
+                    currentIndex: Math.max(0, ["off"].concat(root.aiProviders).indexOf(root.ai))
+                    onPicked: value => root.ai = value
+                }
+            }
+
+            PanelText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: PlasmaColors.foregroundInactive
+                text: root.aiProviders.length === 0
+                    ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
+                    : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
             }
         }
 

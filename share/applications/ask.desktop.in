@@ -1,0 +1,10 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+[Desktop Entry]
+Type=Application
+Name=@DISPLAY_NAME@: ask about the last notification
+Comment=Hands the most recent notification, redacted, to the configured assistant
+Exec=@BIN_DIR@/@CTL_BIN@ ask --last-notification
+Icon=help-hint
+Terminal=false
+NoDisplay=true
+X-KDE-GlobalAccel-CommandShortcut=true

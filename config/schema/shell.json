@@ -129,6 +129,74 @@
             }
         },
         {
+            "id": "notifications",
+            "label": "Notification history",
+            "icon": "notifications",
+            "description": "Plasma draws every notification and keeps doing so. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.",
+            "keys": {
+                "notifications.history": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Keep a history",
+                    "description": "Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all."
+                },
+                "notifications.historySize": {
+                    "type": "int",
+                    "min": 5,
+                    "max": 500,
+                    "step": 5,
+                    "default": 50,
+                    "label": "Remember",
+                    "description": "How many recent notifications to keep."
+                }
+            }
+        },
+        {
+            "id": "ai",
+            "label": "AI assist",
+            "icon": "help-hint",
+            "description": "When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.",
+            "page": "ai",
+            "keys": {
+                "ai.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "AI assist",
+                    "description": "Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about."
+                },
+                "ai.provider": {
+                    "type": "enum",
+                    "values": [
+                        "clipboard",
+                        "claude-code",
+                        "ollama",
+                        "custom"
+                    ],
+                    "default": "clipboard",
+                    "label": "Provider",
+                    "description": "`clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered."
+                },
+                "ai.command": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Custom command",
+                    "description": "For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input."
+                },
+                "ai.ollamaUrl": {
+                    "type": "string",
+                    "default": "http://127.0.0.1:11434",
+                    "label": "Ollama address",
+                    "description": "Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other."
+                },
+                "ai.ollamaModel": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Ollama model",
+                    "description": "Empty picks the first model Ollama lists."
+                }
+            }
+        },
+        {
             "id": "presets",
             "label": "Layouts",
             "icon": "preferences-desktop-theme",

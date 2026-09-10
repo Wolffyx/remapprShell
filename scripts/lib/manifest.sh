@@ -25,6 +25,7 @@ template|share/systemd/report.in|$SYSTEMD_USER_DIR/$SLUG-report@.service
 template|share/applications/launcher.desktop.in|$APPLICATIONS_DIR/$SLUG-launcher.desktop
 template|share/applications/search.desktop.in|$APPLICATIONS_DIR/$SLUG-search.desktop
 template|share/applications/settings.desktop.in|$APPLICATIONS_DIR/$SLUG-settings.desktop
+template|share/applications/ask.desktop.in|$APPLICATIONS_DIR/$SLUG-ask.desktop
 ENTRIES
 }
 

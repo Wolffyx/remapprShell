@@ -360,13 +360,59 @@ else
     fix "the shell cannot report its own death without it: make link"
 fi
 
+# ----------------------------------------------------------------- AI assist
+
+section "AI assist"
+
+merged_cfg=$(jq -s '.[0] * (.[1] // {})' "$defaults_file" "$profile_file" 2>/dev/null || cat "$defaults_file" 2>/dev/null || echo '{}')
+ai_enabled=$(jq -r '.ai.enabled // false' <<< "$merged_cfg")
+ai_provider=$(jq -r '.ai.provider // "clipboard"' <<< "$merged_cfg")
+history_on=$(jq -r '.notifications.history // false' <<< "$merged_cfg")
+
+if [ "$ai_enabled" = true ]; then
+    avail=$("$REPO_ROOT/scripts/ask.sh" --providers --json 2>/dev/null \
+            | jq -r --arg p "$ai_provider" '.[] | select(.id == $p) | if .available then "yes" else .reason end')
+    if [ "$avail" = yes ]; then
+        ok "AI assist is on, provider '$ai_provider' can run here"
+    else
+        bad "AI assist is on, but provider '$ai_provider' cannot run here: ${avail:-unknown provider}"
+        fix "pick another: $ALIAS ask --providers"
+    fi
+    consent="$STATE_DIR/ai-consent.json"
+    if [ -f "$consent" ]; then
+        printf '  %s--%s    agreed to send: %s\n' "$_c_dim" "$_c_off" "$(jq -r 'keys | join(", ")' "$consent" 2>/dev/null)"
+        fix "withdraw: $ALIAS ask --forget"
+    fi
+    if [ "$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-ask.desktop" --key _launch --default '' | cut -d, -f1)" = "" ]; then
+        printf '  %s--%s    no key bound to ask about the last notification\n' "$_c_dim" "$_c_off"
+        fix "bind one: $ALIAS shortcuts set ask <key>"
+    fi
+else
+    ok "AI assist is off; nothing is ever sent"
+fi
+
+if [ "$ai_enabled" = true ] || [ "$history_on" = true ]; then
+    if pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1; then
+        n=$(quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications count 2>/dev/null || echo '?')
+        ok "the notification listener is wanted and the shell is running ($n remembered)"
+    else
+        warn "the notification listener is wanted, but the shell is not running"
+        fix "the history is kept in memory by the shell; nothing is recorded while it is down"
+    fi
+else
+    ok "no notification listener; nothing on the bus is read"
+fi
+
 # ------------------------------------------------------------------- optional
 
 section "optional components"
 
 for pair in "union:a Qt style, selectable as the widget style" \
             "fuzzel:an alternative launcher" \
-            "rofi:an alternative launcher"; do
+            "rofi:an alternative launcher" \
+            "claude:the claude-code AI provider" \
+            "ollama:the ollama AI provider" \
+            "wl-copy:the clipboard AI provider"; do
     bin=${pair%%:*}; desc=${pair#*:}
     if command -v "$bin" >/dev/null 2>&1 || pacman -Qq "$bin" >/dev/null 2>&1; then
         ok "$bin present ($desc)"

@@ -54,5 +54,16 @@
     "osd": {
         "enabled": false,
         "timeout": 1800
+    },
+    "notifications": {
+        "history": false,
+        "historySize": 50
+    },
+    "ai": {
+        "enabled": false,
+        "provider": "clipboard",
+        "command": [],
+        "ollamaUrl": "http://127.0.0.1:11434",
+        "ollamaModel": ""
     }
 }

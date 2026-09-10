@@ -16,6 +16,8 @@ import qs.domain.config
 import qs.features.osd
 import qs.features.settings
 import qs.features.wizard
+import qs.domain.notifications
+import qs.features.diagnostics
 
 ShellRoot {
     id: root
@@ -90,6 +92,57 @@ ShellRoot {
                 wizard.activeAsync = true;
             }
         }
+    }
+
+    // The consent window for AI assist, on one report. Opened by `rmpr ask`
+    // when it has no terminal to ask in, and by the widget's Ask button
+    // through the same command -- so there is exactly one way to send.
+    LazyLoader {
+        id: ask
+        loading: false
+
+        AskWindow {
+            visible: true
+            reportName: askReport.name
+            onVisibleChanged: if (!visible) ask.activeAsync = false
+        }
+    }
+
+    // Referenced so the eavesdrop starts with the shell when it is wanted,
+    // rather than the first time a widget happens to look at it.
+    readonly property bool _notificationsWanted: NotificationWatch.enabled
+
+    IpcHandler {
+        target: "notifications"
+
+        // JSON, because a notification is a record and IPC returns strings.
+        function at(index: string): string {
+            const entry = NotificationWatch.entries[parseInt(index, 10) || 0];
+            return entry ? JSON.stringify(entry) : "";
+        }
+        function last(): string { return at("0"); }
+        function count(): string { return String(NotificationWatch.entries.length); }
+        function list(): string { return JSON.stringify(NotificationWatch.entries); }
+        function clear(): void { NotificationWatch.clear(); }
+    }
+
+    IpcHandler {
+        target: "ask"
+
+        function open(report: string): void {
+            // A fresh window each time: the report it shows is a property set
+            // at construction, and reopening on a different one must not show
+            // the old bundle for a frame.
+            ask.activeAsync = false;
+            askReport.name = report;
+            ask.activeAsync = true;
+        }
+        function close(): void { ask.activeAsync = false; }
+    }
+
+    QtObject {
+        id: askReport
+        property string name: ""
     }
 
     IpcHandler {

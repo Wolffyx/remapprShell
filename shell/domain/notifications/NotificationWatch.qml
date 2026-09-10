@@ -1,0 +1,80 @@
+pragma Singleton
+
+// A ring buffer of recent notifications, off by default.
+//
+// Plasma owns org.freedesktop.Notifications and a second owner cannot have it,
+// so this is not a notification daemon and never will be by accident: it
+// listens to the `Notify` calls other applications send Plasma, with a match
+// rule narrow enough that nothing else on the bus comes through this process.
+//
+// It runs only while something asks for it -- the history widget, or AI assist,
+// which needs a notification to have been seen before it can be asked about.
+// The buffer is memory only. A notification body is exactly the sort of thing
+// a person would not expect to find written to disk later, so nothing here is.
+// `rmpr ask --last-notification` reaches it over IPC while the shell runs, and
+// gets nothing when it does not.
+
+import QtQuick
+import Quickshell.Io
+import qs.core
+import qs.domain.config
+import qs.domain.notifications.events
+
+QtObject {
+    id: root
+
+    readonly property bool historyWanted: ConfigStore.value("notifications.history", false) === true
+    readonly property bool aiWanted: ConfigStore.value("ai.enabled", false) === true
+    readonly property bool enabled: root.historyWanted || root.aiWanted
+    readonly property int capacity: Math.max(1, ConfigStore.value("notifications.historySize", 50))
+
+    // Newest first. Reassigned rather than mutated so bindings see the change.
+    property var entries: []
+    property int unseen: 0
+
+    signal received(var entry)
+
+    readonly property var last: root.entries[0] ?? null
+
+    function markSeen() { root.unseen = 0; }
+    function clear() { root.entries = []; root.unseen = 0; }
+
+    function _push(entry) {
+        const next = [entry].concat(root.entries);
+        if (next.length > root.capacity)
+            next.length = root.capacity;
+        root.entries = next;
+        root.unseen = Math.min(root.unseen + 1, root.capacity);
+        root.received(entry);
+        Log.debug("notifications", `${entry.appName}: ${entry.summary}`);
+    }
+
+    onCapacityChanged: {
+        if (root.entries.length > root.capacity)
+            root.entries = root.entries.slice(0, root.capacity);
+    }
+
+    // The eavesdrop. A match rule, not a whole-bus monitor, for the reason the
+    // OSD listener gives: eavesdropping on everything to catch one call would
+    // put every message on the session bus through this process.
+    readonly property Process _monitor: Process {
+        command: ["busctl", "--user", "--json=short", "monitor",
+                  "--match", `type='method_call',interface='${NotificationEvents.interfaceName}',member='Notify'`]
+        running: root.enabled
+
+        stdout: SplitParser {
+            onRead: line => {
+                const entry = NotificationEvents.parse(line);
+                if (entry)
+                    root._push(entry);
+            }
+        }
+
+        onRunningChanged: {
+            if (running)
+                Log.info("notifications", "listening for notifications on the session bus");
+            else if (root.enabled)
+                Log.warn("notifications", "the notification listener stopped; the history will not grow");
+        }
+    }
+}

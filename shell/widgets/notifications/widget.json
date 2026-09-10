@@ -1,0 +1,21 @@
+{
+    "id": "notifications",
+    "apiVersion": 1,
+    "name": "Notification history",
+    "description": "What went past: recent notifications, readable again, and askable with AI assist on.",
+    "icon": "notifications",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.notifications" }
+    },
+    "config": {
+        "showCount": {
+            "type": "bool",
+            "default": true,
+            "label": "Show a count",
+            "description": "A badge with the number of notifications since the list was last opened."
+        }
+    }
+}

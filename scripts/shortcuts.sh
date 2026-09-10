@@ -2,7 +2,7 @@
 # Global shortcuts.
 #
 #   status              what is bound, and what would conflict
-#   set <action> <key>  bind a key   (launcher, search, settings)
+#   set <action> <key>  bind a key   (launcher, search, settings, ask)
 #   clear <action>      unbind one
 #   revert              undo everything this project bound
 #
@@ -22,7 +22,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 
-ACTIONS=(launcher search settings)
+ACTIONS=(launcher search settings ask)
 
 action_desktop() { printf '%s-%s.desktop' "$SLUG" "$1"; }
 action_label() {
@@ -30,6 +30,7 @@ action_label() {
         launcher) printf 'Application menu' ;;
         search)   printf 'Search' ;;
         settings) printf 'Settings' ;;
+        ask)      printf 'Ask about the last notification' ;;
     esac
 }
 
