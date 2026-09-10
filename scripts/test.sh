@@ -19,10 +19,13 @@ IMPORT_ROOT=$(mktemp -d)
 trap 'rm -rf "$IMPORT_ROOT"' EXIT
 ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 
-"$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
+# The redaction test reads its fixture corpus with XMLHttpRequest, and Qt 6
+# refuses local-file reads unless this is set. Without it the test fails in a
+# way that looks like a JSON parse error rather than a permissions one.
+QML_XHR_ALLOW_FILE_READ=1 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 
 # Shell-level tests, each inside its own throwaway HOME.
-for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-update test-renderer; do
+for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-update test-renderer test-redact test-report; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
 done

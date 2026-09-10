@@ -41,14 +41,26 @@ for lessons — which patterns to avoid.
   panel. Two shell packages, one per renderer, so switching cannot overwrite the
   other one's layout. `rmpr renderer set` is plan → snapshot → apply → verify →
   rollback, and `--dry-run` prints the layout without writing anything.
+- **Diagnostics** — `rmpr report` writes a local bundle (error + qmllint,
+  environment, redacted config, journal tail + widget health). Written on unit
+  failure via `OnFailure=` and when a widget is quarantined, through the same
+  command. Redaction exists twice — `domain/diagnostics/Redact.qml` for the
+  running shell, `scripts/lib/redact.sh` for the reporter that must work when
+  the shell is dead — and both are held to `tests/fixtures/redact-cases.json`.
+  Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
-  edges, shortcuts, launcher, search, settings, preset, profile, update.
-- **Tests** — 7 shell suites in throwaway HOMEs, plus a QML suite. All green.
+  report, edges, shortcuts, launcher, search, settings, preset, profile, update.
+- **Tests** — 9 shell suites in throwaway HOMEs, plus a QML suite. All green.
 
 ## Not built yet
 
-- **First-run wizard**, **diagnostics/AI reporting** (off by default, redaction
-  is the privacy boundary and needs tests before anything network-bound ships).
+- **First-run wizard**.
+- **AI assist and the notification ring buffer.** The report bundle and its
+  redaction are built and tested, which was the precondition; the providers
+  (`clipboard`, `claude-code`, `ollama`, `custom`), the consent dialog that
+  shows the actual redacted bundle, and the `busctl --user monitor` eavesdrop
+  are not. Verification step 6 — whether that eavesdrop is permitted for an
+  unprivileged user on this dbus build — has not been run.
 - **Active-window / task-list widget** — *blocked*: Quickshell 0.3.1's Wayland
   module exposes only session-lock types, so window state needs a KWin JS
   script feeding it out. Do not attempt it with a C++ KWin effect.
@@ -111,6 +123,12 @@ Non-obvious things that cost time to discover:
   `Loader.setSource(url, props)`, not `onLoaded`.
 - **`Keys` attaches to an Item, never to a window.**
 - **A comment whose first word is `qmllint` is parsed as a lint directive.**
+- **`date +%s`-granularity directory names collide.** Two reports in the same
+  second shared a directory and one overwrote the other; snapshots had the same
+  latent bug. Both now count up a suffix.
+- **Qt 6 refuses local-file `XMLHttpRequest`** unless `QML_XHR_ALLOW_FILE_READ=1`
+  is set, and the failure surfaces as a JSON parse error rather than a
+  permissions one. `scripts/test.sh` sets it.
 - **A KConfig group name can contain a space** (`[PlasmaViews][Panel 811]`), so
   the ledger's group path is split on `/` and nothing else. Splitting on
   whitespace turned one group into two that KDE never reads.

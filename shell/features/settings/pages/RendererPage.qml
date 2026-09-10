@@ -14,7 +14,6 @@ pragma ComponentBehavior: Bound
 // exactly which of their widgets it cannot draw.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.config
@@ -26,7 +25,6 @@ import qs.ui.primitives
 Column {
     id: root
 
-    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
     readonly property string current: ConfigStore.value("panel.renderer", "quickshell")
 
     // Enabled entries only. A widget the user has already turned off is not
@@ -84,7 +82,7 @@ Column {
             return;
         root.status = `Switching to ${rendererId}...`;
         switchProc.running = false;
-        switchProc.command = [root.ctl, "renderer", "set", rendererId, "--yes"];
+        switchProc.command = [Branding.ctlBin, "renderer", "set", rendererId, "--yes"];
         switchProc.running = true;
     }
 

@@ -8,6 +8,10 @@ After=graphical-session.target
 # The shell is a Wayland client and cannot start without a compositor.
 Requisite=graphical-session.target
 
+# A shell that dies cannot write its own report, so the capture is a separate
+# unit that systemd starts precisely when this one fails.
+OnFailure=@SLUG@-report@%n.service
+
 [Service]
 Type=simple
 ExecStart=@BIN_DIR@/@SESSION_BIN@

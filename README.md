@@ -53,8 +53,34 @@ rmpr theme apply        # install and activate the look and feel
 rmpr renderer list      # what can draw the panel here
 rmpr renderer set plasma --dry-run   # the applet layout it would install
 rmpr renderer set plasma             # switch, with a restore point and a rollback
+rmpr report create      # write a local diagnostic bundle
+rmpr report show        # read the newest one
 rmpr status
 ```
+
+### Diagnostic reports
+
+`rmpr report` writes a bundle of four things to
+`~/.local/state/<slug>/diagnostics/<ts>/`: the error and what `qmllint` makes of
+the file it came from, versions and environment, the merged configuration, and a
+journal tail with widget health.
+
+**Nothing is sent anywhere.** A report is a directory of text files; every
+consumer of one is separate and opt-in.
+
+The configuration and the journal tail go through a redaction pass first: the
+home directory becomes `~`, the username becomes `<user>` wherever it appears,
+and any value whose key matches `token|key|password|secret|auth` is masked
+outright. That pattern deliberately over-reaches -- it masks `keyboardLayout`
+too -- because a report that withholds something harmless costs a question,
+while one that leaks a token cannot be taken back. The rules exist twice, in
+QML for the running shell and in shell for the crash reporter that has to work
+when the shell is dead, and both are held to one fixture corpus so they cannot
+drift apart.
+
+The shell's systemd unit carries `OnFailure=`, so a report is written precisely
+when the shell dies. A widget being quarantined writes one through the same
+command.
 
 ### Updating
 

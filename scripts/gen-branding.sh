@@ -37,6 +37,11 @@ QtObject {
     readonly property string stateDir: "$STATE_DIR"
     readonly property string qsConfigDir: "$QS_CONFIG_DIR"
 
+    // The control binary. Everything the shell asks the CLI to do -- switching
+    // renderer, writing a diagnostic report -- runs this, so the shell and the
+    // terminal always take the same code path.
+    readonly property string ctlBin: "$BIN_DIR/$CTL_BIN"
+
     readonly property string safeModeVar: "$SAFE_MODE_VAR"
     readonly property string debugVar: "$DEBUG_VAR"
 }

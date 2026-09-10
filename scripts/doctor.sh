@@ -256,6 +256,27 @@ else
     fix "take one before changing KDE settings: $ALIAS snapshot create"
 fi
 
+# --------------------------------------------------------------- diagnostics
+
+section "diagnostic reports"
+
+reports="$STATE_DIR/diagnostics"
+report_count=$(ls -1 "$reports" 2>/dev/null | wc -l)
+if [ "$report_count" -gt 0 ]; then
+    ok "$report_count report(s) in $reports"
+    fix "read the newest: $ALIAS report show"
+    fix "nothing in them has been sent anywhere; they are local files"
+else
+    ok "no reports written"
+fi
+
+if systemctl --user cat "$SLUG-report@.service" >/dev/null 2>&1; then
+    ok "the crash reporter is installed"
+else
+    warn "no crash reporter unit"
+    fix "the shell cannot report its own death without it: make link"
+fi
+
 # ------------------------------------------------------------------- optional
 
 section "optional components"

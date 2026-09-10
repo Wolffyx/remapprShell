@@ -121,8 +121,14 @@ _snapshot_copy() {
 # Echoes the snapshot directory on success.
 snapshot_create() {
     local label=${1:-manual}
-    local dir
-    dir="$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}"
+    # Two snapshots taken in the same second with the same label would share a
+    # directory and merge into each other -- a restore point that is quietly
+    # half of one state and half of another is worse than no restore point.
+    local base dir n
+    base="$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}"
+    dir=$base
+    n=2
+    while [ -e "$dir" ]; do dir="$base-$n"; n=$((n + 1)); done
 
     mkdir -p "$dir/files" || { log_error "cannot create $dir"; return 1; }
 

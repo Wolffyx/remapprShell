@@ -1,0 +1,77 @@
+{
+    "comment": "The corpus both redaction implementations are held to. QML redacts in-process; the reporter redacts in shell because it has to run when the shell is dead. One fixture file, two implementations, and a test each -- so they cannot drift apart without a test failing.",
+    "home": "/home/testuser",
+    "user": "testuser",
+    "cases": [
+        {
+            "name": "home path becomes a tilde",
+            "input": { "wallpaper": "/home/testuser/Pictures/a.png" },
+            "expected": { "wallpaper": "~/Pictures/a.png" }
+        },
+        {
+            "name": "the username alone is stripped",
+            "input": { "greeting": "welcome back, testuser" },
+            "expected": { "greeting": "welcome back, <user>" }
+        },
+        {
+            "name": "a username inside a window title",
+            "input": { "title": "testuser@thinkpad: ~/src — fish" },
+            "expected": { "title": "<user>@thinkpad: ~/src — fish" }
+        },
+        {
+            "name": "home is replaced before the username inside it",
+            "input": { "path": "/home/testuser/.config/testuser-notes" },
+            "expected": { "path": "~/.config/<user>-notes" }
+        },
+        {
+            "name": "a secret key is masked whatever its value",
+            "input": { "apiToken": "sk-live-1234", "password": "hunter2" },
+            "expected": { "apiToken": "<redacted>", "password": "<redacted>" }
+        },
+        {
+            "name": "a secret nested deep in the config",
+            "input": { "widgets": { "weather": { "config": { "api_key": "abcd" } } } },
+            "expected": { "widgets": { "weather": { "config": { "api_key": "<redacted>" } } } }
+        },
+        {
+            "name": "a secret whose value is an object, not a string",
+            "input": { "auth": { "user": "testuser", "refresh": "t-9" } },
+            "expected": { "auth": "<redacted>" }
+        },
+        {
+            "name": "a secret inside an array of objects",
+            "input": { "providers": [ { "name": "ollama", "secret": "s1" }, { "name": "custom" } ] },
+            "expected": { "providers": [ { "name": "ollama", "secret": "<redacted>" }, { "name": "custom" } ] }
+        },
+        {
+            "name": "key matching is case-insensitive",
+            "input": { "AuthHeader": "Bearer x", "Secret": 1 },
+            "expected": { "AuthHeader": "<redacted>", "Secret": "<redacted>" }
+        },
+        {
+            "name": "over-reach is deliberate: 'key' matches keyboardLayout too",
+            "input": { "keyboardLayout": "us" },
+            "expected": { "keyboardLayout": "<redacted>" }
+        },
+        {
+            "name": "strings inside arrays are scrubbed",
+            "input": { "recent": [ "/home/testuser/a", "/home/testuser/b" ] },
+            "expected": { "recent": [ "~/a", "~/b" ] }
+        },
+        {
+            "name": "numbers, booleans and nulls come through untouched",
+            "input": { "thickness": 40, "floating": true, "nothing": null },
+            "expected": { "thickness": 40, "floating": true, "nothing": null }
+        },
+        {
+            "name": "a home path repeated in one string",
+            "input": { "cmd": "cp /home/testuser/a /home/testuser/b" },
+            "expected": { "cmd": "cp ~/a ~/b" }
+        },
+        {
+            "name": "an empty object and an empty array survive",
+            "input": { "a": {}, "b": [] },
+            "expected": { "a": {}, "b": [] }
+        }
+    ]
+}

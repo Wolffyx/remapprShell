@@ -1,0 +1,16 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+#
+# Runs when the shell's unit fails. A shell cannot report its own death, so the
+# capture lives out here in a separate unit and a plain shell script: by the
+# time this runs, there is no QML left to ask.
+[Unit]
+Description=@DISPLAY_NAME@ diagnostic report for %i
+
+[Service]
+Type=oneshot
+ExecStart=@BIN_DIR@/@CTL_BIN@ report create --reason "%i failed"
+
+# The report is written locally and nothing is sent anywhere, so a failure here
+# is worth a journal line and nothing more.
+StandardOutput=journal
+StandardError=journal

@@ -15,6 +15,7 @@ usage: @ALIAS@ <command> [options]
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
   renderer status|list|set|revert   choose what draws the panel
+  report create|list|show|remove    write a local diagnostic report
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
   update [--check|--rollback]       update the shell
@@ -42,6 +43,7 @@ case "$cmd" in
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
     renderer)  require_repo; exec "$REPO_ROOT/scripts/renderer.sh" "$@" ;;
+    report)    require_repo; exec "$REPO_ROOT/scripts/report.sh" "$@" ;;
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;
     update)    require_repo; exec "$REPO_ROOT/scripts/update.sh" "$@" ;;
