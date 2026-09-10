@@ -3,7 +3,8 @@
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",
-        "thickness": 40
+        "thickness": 40,
+        "autoHide": false
     },
     "bar": {
         "entries": [

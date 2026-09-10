@@ -67,6 +67,12 @@ for lessons — which patterns to avoid.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
   report, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
+- **Auto-hide** — `panel.autoHide`, per output like position and thickness.
+  The surface really does shrink to a sliver rather than a full-height
+  transparent one moved out of sight: a transparent surface still eats every
+  click that lands on it. The content keeps its full thickness and slides,
+  rather than being squashed, so a reveal does not re-lay-out every widget
+  twice. It reserves no space while hiding is on.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys

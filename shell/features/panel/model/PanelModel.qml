@@ -28,6 +28,10 @@ QtObject {
     // anything not drawn per screen.
     function positionFor(name) { return ConfigStore.valueFor(name, "panel.position", "bottom"); }
     function thicknessFor(name) { return ConfigStore.valueFor(name, "panel.thickness", 40); }
+
+    // Hiding is per output as much as position is: a panel worth hiding on a
+    // laptop screen is often worth keeping on a second monitor.
+    function autoHideFor(name) { return ConfigStore.valueFor(name, "panel.autoHide", false) === true; }
     function horizontalFor(name) {
         const p = root.positionFor(name);
         return p === "top" || p === "bottom";

@@ -27,6 +27,12 @@
                     "default": 40,
                     "label": "Thickness",
                     "description": "Height of a horizontal panel, width of a vertical one."
+                },
+                "panel.autoHide": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Hide until pointed at",
+                    "description": "The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen."
                 }
             }
         },

@@ -40,6 +40,7 @@ Where the panel sits and how big it is.
 | --- | --- | --- | --- |
 | `panel.position` | `top`, `bottom`, `left`, `right` | `bottom` | Which edge the panel is anchored to. |
 | `panel.thickness` | a number, 20 to 96 | `40` | Height of a horizontal panel, width of a vertical one. |
+| `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
 
 ### Drawn by
 

@@ -48,16 +48,20 @@ Provider {
         // always what was meant, and burying it under an alphabetical list of
         // substring matches makes the launcher feel wrong even when the right
         // entry is present.
+        // Everything a desktop entry hands over goes through this.
+        //
+        // `keywords` is a list, and a QML list is not a JS array: `Array.isArray`
+        // says false and `.toLowerCase` is not there, so a first fix that
+        // tested for an array still threw on every query. String() copes with
+        // whatever the type actually is -- a list arrives comma-joined, which
+        // is exactly what a substring match wants.
+        const lower = value => String(value ?? "").toLowerCase();
+
         const scored = [];
         for (const app of apps) {
-            const name = (app.name ?? "").toLowerCase();
-            const generic = (app.genericName ?? "").toLowerCase();
-            // Quickshell hands `keywords` over as a list of strings, not a
-            // string. Without this every query threw before it scored
-            // anything, so search returned nothing and the launcher looked
-            // broken rather than empty.
-            const keywords = (Array.isArray(app.keywords) ? app.keywords.join(" ")
-                                                          : (app.keywords ?? "")).toLowerCase();
+            const name = lower(app.name);
+            const generic = lower(app.genericName);
+            const keywords = lower(app.keywords);
 
             let score = -1;
             if (name === q) score = 0;
