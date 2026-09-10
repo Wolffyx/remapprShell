@@ -31,6 +31,10 @@ source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
 LNF_SRC="$REPO_ROOT/theme/lookandfeel"
 LNF_DEST="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID"
+SWITCHER_SRC="$REPO_ROOT/theme/windowswitcher"
+SWITCHER_DEST="$KWIN_SWITCHER_DIR/$SLUG"
+DESKTOPTHEME_SRC="$REPO_ROOT/theme/desktoptheme"
+DESKTOPTHEME_DEST="$PLASMA_DESKTOPTHEME_DIR/$SLUG"
 
 install_package() {
     mkdir -p "$LNF_DEST/contents"
@@ -44,8 +48,90 @@ install_package() {
 
     cp -a "$LNF_SRC/contents/osd" "$LNF_DEST/contents/" || return 1
 
+    # The splash names the project, so it ships as a template like every other
+    # file that does.
+    render_template "$LNF_SRC/contents/splash/Splash.qml.in" "$LNF_DEST/contents/splash/Splash.qml" \
+        || { log_error "could not render the splash"; return 1; }
+    chmod 644 "$LNF_DEST/contents/splash/Splash.qml"
+
     chmod 644 "$LNF_DEST/metadata.json" "$LNF_DEST/contents/defaults"
     log_step "installed $LNF_DEST"
+
+    install_colors || return 1
+    install_switcher || return 1
+    install_desktoptheme
+}
+
+# Plasma's own widgets -- applet popups, the tray, tooltips -- read their
+# colours from the desktop theme rather than from the colour scheme. Ours ships
+# the scheme's colours and nothing else: every SVG it does not provide falls
+# back to Breeze's, so this is a recolour rather than a second set of assets to
+# maintain, and it cannot leave a widget with no graphics at all.
+install_desktoptheme() {
+    local dark="$REPO_ROOT/theme/colors/$SLUG-dark.colors"
+    [ -f "$dark" ] || { log_error "no generated colour scheme to build the desktop theme from"; return 1; }
+
+    mkdir -p "$DESKTOPTHEME_DEST"
+    render_template "$DESKTOPTHEME_SRC/metadata.json.in" "$DESKTOPTHEME_DEST/metadata.json" \
+        || { log_error "could not render the desktop theme metadata"; return 1; }
+    chmod 644 "$DESKTOPTHEME_DEST/metadata.json"
+
+    # The same file, so the panel, Plasma's widgets and every dialogue cannot
+    # disagree about what the accent colour is.
+    cp -a "$dark" "$DESKTOPTHEME_DEST/colors" || return 1
+    chmod 644 "$DESKTOPTHEME_DEST/colors"
+    log_step "installed $DESKTOPTHEME_DEST"
+}
+
+# Alt+Tab's look. Installed by a plain apply and selected only by
+# `--appearance`, like the colour schemes: a switcher package that is present
+# but not named in kwinrc changes nothing, and appears in System Settings for
+# someone who wants to try it without this command deciding for them.
+install_switcher() {
+    mkdir -p "$SWITCHER_DEST/contents"
+    render_template "$SWITCHER_SRC/metadata.json.in" "$SWITCHER_DEST/metadata.json" \
+        || { log_error "could not render the window switcher metadata"; return 1; }
+    chmod 644 "$SWITCHER_DEST/metadata.json"
+    cp -a "$SWITCHER_SRC/contents/ui" "$SWITCHER_DEST/contents/" || return 1
+    log_step "installed $SWITCHER_DEST"
+}
+
+# The colour schemes are installed by a plain apply, before anything is
+# activated. Installing them changes nothing on its own -- a scheme file that
+# is not selected has no effect -- but it is what makes ours appear in System
+# Settings, so a person can try it without this command choosing for them.
+# `--appearance` is what actually selects one.
+install_colors() {
+    local src="$REPO_ROOT/theme/colors"
+
+    # Generated from the palette, so a checkout that has never been built has
+    # none yet.
+    [ -n "$(ls -1 "$src"/*.colors 2>/dev/null)" ] || "$REPO_ROOT/scripts/gen-colors.sh" >/dev/null || {
+        log_error "could not generate the colour schemes"
+        return 1
+    }
+
+    mkdir -p "$COLORS_DIR"
+    local f
+    for f in "$src"/*.colors; do
+        [ -f "$f" ] || continue
+        cp -a "$f" "$COLORS_DIR/" || { log_error "could not install $(basename "$f")"; return 1; }
+        chmod 644 "$COLORS_DIR/$(basename "$f")"
+    done
+    log_step "installed $(ls -1 "$src"/*.colors | wc -l) colour scheme(s) in $COLORS_DIR"
+}
+
+remove_colors() {
+    local f removed=0
+    for f in "$REPO_ROOT/theme/colors"/*.colors; do
+        [ -f "$f" ] || continue
+        if [ -f "$COLORS_DIR/$(basename "$f")" ]; then
+            rm -f "$COLORS_DIR/$(basename "$f")"
+            removed=$((removed + 1))
+        fi
+    done
+    [ "$removed" -gt 0 ] && log_step "removed $removed colour scheme(s) from $COLORS_DIR"
+    true
 }
 
 # Reads contents/defaults and writes each key through the ledger.
@@ -120,6 +206,12 @@ case "$cmd" in
 
     revert)
         kconfig_revert theme
+        remove_colors
+        for d in "$SWITCHER_DEST" "$DESKTOPTHEME_DEST"; do
+            [ -d "$d" ] || continue
+            rm -rf "$d"
+            log_step "removed $d"
+        done
         if [ -d "$LNF_DEST" ]; then
             rm -rf "$LNF_DEST"
             log_step "removed $LNF_DEST"
@@ -133,6 +225,9 @@ case "$cmd" in
         printf 'package:      %s\n' "$([ -d "$LNF_DEST" ] && echo "installed ($LNF_DEST)" || echo "not installed")"
         printf 'active L&F:   %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')"
         printf 'colour:       %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
+        printf 'our schemes:  %s installed\n' "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")"
+        printf 'switcher:     %s\n' "$([ -d "$SWITCHER_DEST" ] && echo "installed" || echo "not installed")"
+        printf 'active Alt+Tab: %s\n' "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName --default '<unset>')"
         printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"
         printf 'widget style: %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle --default '<unset>')"
         echo

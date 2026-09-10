@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Theme",
+    "KPlugin": {
+        "Id": "@SLUG@",
+        "Name": "@DISPLAY_NAME@",
+        "Description": "Plasma's own widgets, in the same colours as the panel.",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@"
+    },
+    "X-Plasma-API": "5.0"
+}

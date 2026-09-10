@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# Runs qmllint over every QML file in the shell.
+# Runs qmllint over the project's QML.
+#
+# With no arguments it covers shell/ and theme/. The theme QML is drawn by
+# Plasma rather than by us -- the OSD, the window switcher -- which makes it
+# more important to lint, not less: a syntax error there means Alt+Tab silently
+# does nothing, with nothing in our own journal to say why.
+#
+# Given file arguments it lints exactly those, which is what the crash reporter
+# uses to say something useful about the file a failure came from.
 #
 # Two things this gets right that a naive `find | xargs qmllint` does not:
 #
@@ -13,6 +21,8 @@ set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
+source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/render.sh"
 cd "$REPO_ROOT"
 
 # Resolve the Qt6 qmllint explicitly; $PATH usually finds the Qt5 one first.
@@ -44,6 +54,24 @@ IMPORT_ROOT=$(mktemp -d)
 trap 'rm -rf "$IMPORT_ROOT"' EXIT
 ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 
+# QML that ships as a template is rendered and linted too. It is installed as
+# real QML, so an error in one is an error that reaches the user -- and the
+# splash screen, being a template, would otherwise be the one file nothing ever
+# checks.
+render_templates() {
+    local src rendered
+    while IFS= read -r src; do
+        rendered="$IMPORT_ROOT/rendered/${src%.in}"
+        mkdir -p "$(dirname "$rendered")"
+        if render_template "$src" "$rendered" >/dev/null 2>&1; then
+            printf '%s\n' "$rendered"
+        else
+            log_error "$src: unresolved placeholders"
+            failed=$((failed + 1))
+        fi
+    done < <(find shell theme -name '*.qml.in' -type f | sort)
+}
+
 failed=0
 checked=0
 while IFS= read -r file; do
@@ -56,7 +84,12 @@ while IFS= read -r file; do
         # qmllint reports warnings on a zero exit; surface them without failing.
         printf '%s\n' "$out" >&2
     fi
-done < <(find shell -name '*.qml' -type f | sort)
+done < <(if [ $# -gt 0 ]; then
+             printf '%s\n' "$@"
+         else
+             find shell theme -name '*.qml' -type f | sort
+             render_templates
+         fi)
 
 if [ "$failed" -gt 0 ]; then
     die "qmllint: $failed of $checked file(s) failed"

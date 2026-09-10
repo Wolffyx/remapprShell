@@ -59,6 +59,22 @@ rmpr report show        # read the newest one
 rmpr status
 ```
 
+### The theme layer
+
+`rmpr theme apply` installs a Look-and-Feel package (our OSD, splash and logout
+screens), two colour schemes, a window-switcher package for Alt+Tab, and a
+desktop theme, then activates the package. It does **not** select any of them:
+installed but unselected, a colour scheme or a switcher changes nothing, and
+they appear in System Settings for you to try. `--appearance` is what selects
+them, and `rmpr theme revert` puts every key back and removes every file we
+installed -- leaving anything you put in those directories yourself alone.
+
+The colour schemes are generated from `theme/colors/palette.json`, and the
+desktop theme ships the same file, so Plasma's widgets, its dialogues and our
+panel cannot disagree about what the accent colour is. The desktop theme
+provides colours only: every SVG it does not carry falls back to Breeze's, so
+it is a recolour rather than a second set of assets to maintain.
+
 ### Diagnostic reports
 
 `rmpr report` writes a bundle of four things to

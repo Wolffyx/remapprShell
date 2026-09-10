@@ -17,7 +17,7 @@ cd "$REPO_ROOT"
 #   docs/, README.md       prose for humans
 #   LICENSE                upstream text
 #   .git/                  not ours
-allow_re='^(branding\.json|shell/core/Branding\.qml|README\.md|docs/|LICENSE|\.git/)'
+allow_re='^(branding\.json|shell/core/Branding\.qml|README\.md|docs/|LICENSE|\.git/|theme/colors/[^/]*\.colors)'
 
 # git grep is faster and honours .gitignore, but it fails outside a work tree
 # (a release tarball, a CI checkout without .git). Falling back matters: with

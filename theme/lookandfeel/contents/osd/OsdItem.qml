@@ -9,6 +9,10 @@
     of its own.
 */
 
+// The base type comes from plasmashell's own qrc, which the linter cannot
+// resolve, so every property it provides reads as unqualified access. The
+// directive keeps that noise out of the way of real findings.
+// qmllint disable unqualified
 import QtQuick
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami

@@ -15,3 +15,4 @@ shell/core/Branding.qml
 *~
 shell/**/qmldir
 shell/widgets/index.json
+theme/colors/*.colors

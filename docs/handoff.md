@@ -46,6 +46,12 @@ for lessons — which patterns to avoid.
   `$STATE_DIR/wizard-done` is absent; re-runnable with `rmpr wizard`. A preset
   replaces the profile, so it is applied first and the other answers written on
   top of it.
+- **Theme layer** — Look-and-Feel package (OSD, splash), two generated colour
+  schemes, an Alt+Tab window-switcher package and a colours-only desktop theme.
+  All installed by `theme apply`, none selected without `--appearance`, all
+  removed by `theme revert` with the user's own files in those directories left
+  alone. One palette (`theme/colors/palette.json`) feeds the colour schemes and
+  the desktop theme, so nothing can disagree about the accent colour.
 - **Diagnostics** — `rmpr report` writes a local bundle (error + qmllint,
   environment, redacted config, journal tail + widget health). Written on unit
   failure via `OnFailure=` and when a widget is quarantined, through the same
@@ -68,6 +74,20 @@ for lessons — which patterns to avoid.
   unprivileged user on this dbus build, so Tier 1 is viable and the
   Plasma-notification-history fallback is not needed. The eavesdrop stays
   opt-in and off unless AI assist or notification history is enabled.
+- **The lock screen.** Deliberately not shipped. The Look-and-Feel package can
+  override `lockscreen/LockScreen.qml`, and a broken one means being unable to
+  unlock — the worst failure this project could ship, and the only one that
+  cannot be tested from inside the session it would break. Do it only with a
+  second TTY open and a tested way back (`loginctl unlock-session` from
+  Ctrl+Alt+F2, or `rmpr theme revert`), and gate it behind its own flag rather
+  than folding it into `theme apply`.
+- **Opt-in Quickshell OSD and notifications.** `org.kde.osdService` turns out to
+  emit `osdProgress(icon, percent, maximumPercent, additionalText)` and
+  `osdText(icon, text)` as plain DBus signals, so drawing our own OSD needs no
+  daemon takeover and no name ownership — just a listener. Suppressing Plasma's
+  own is the open question: there is no `[OSD] Enabled` key in plasmashell, so
+  the only lever is that our L&F package already supplies the QML Plasma draws.
+  Notifications are a harder case and stay Plasma's.
 - **Active-window / task-list widget** — *blocked*: Quickshell 0.3.1's Wayland
   module exposes only session-lock types, so window state needs a KWin JS
   script feeding it out. Do not attempt it with a C++ KWin effect.

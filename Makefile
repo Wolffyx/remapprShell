@@ -17,6 +17,7 @@ brand: ## Regenerate all generated files (branding, qmldir, widget index)
 	@scripts/gen-branding.sh
 	@scripts/gen-qmldir.sh
 	@scripts/gen-widget-index.sh
+	@scripts/gen-colors.sh
 
 link: ## Symlink the shell into place (development; edits are live)
 	@scripts/install.sh --link
@@ -49,7 +50,7 @@ lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh
 
 clean: ## Remove generated files
-	@rm -f shell/core/Branding.qml
+	@rm -f shell/core/Branding.qml theme/colors/*.colors
 
 test: brand ## Run the QML test suite
 	@scripts/test.sh
