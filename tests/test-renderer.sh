@@ -143,6 +143,12 @@ check "launcher first"            "$(grep -A2 '^\[Containments\]\[811\]\[Applets
 check "spacer centres the middle" "$(grep -c '^plugin=org.kde.plasma.panelspacer$' "$plasma_src")" "2"
 check "clock between the spacers" "$(grep -A2 '^\[Containments\]\[811\]\[Applets\]\[822\]$' "$plasma_src" | sed -n 's/^plugin=//p')" "org.kde.plasma.digitalclock"
 check "disabled widget left out"  "$(grep -c 'org.kde.plasma.showdesktop' "$plasma_src")" "0"
+# What the launcher's availability check reads. Under our own renderer the
+# package deliberately has no panel, so there is no launcher applet for
+# plasmashell's `activateLauncherMenu` to attach a menu to -- and a start button
+# that silently does nothing is what happens when something claims otherwise.
+check "a launcher applet to open at" "$(grep -c '^plugin=org.kde.plasma.kickoff$' "$plasma_src")" "1"
+check "and none under ours"          "$(grep -c '^plugin=org.kde.plasma.kickoff$' "$XDG_CONFIG_HOME/plasma-$SHELL_PACKAGE_ID-appletsrc")" "0"
 check "both packages installed"   "$([ -f "$PLASMA_SHELLS_DIR/$SHELL_PACKAGE_ID/metadata.json" ] && [ -f "$PLASMA_SHELLS_DIR/$PLASMA_SHELL_PACKAGE_ID/metadata.json" ] && echo yes)" "yes"
 # The comment in that file explains why it does not call loadTemplate, so the
 # check has to look past the comments to mean anything.

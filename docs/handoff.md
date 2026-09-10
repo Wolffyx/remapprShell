@@ -96,9 +96,27 @@ for lessons — which patterns to avoid.
   second owner cannot have it, so this is a genuine takeover rather than the
   listen-and-draw the OSD turned out to be. Not attempted. The eavesdrop needed
   for a notification history is verified to work (above).
-- **Active-window / task-list widget** — *blocked*: Quickshell 0.3.1's Wayland
-  module exposes only session-lock types, so window state needs a KWin JS
-  script feeding it out. Do not attempt it with a C++ KWin effect.
+- **Active-window / task-list widget** — still blocked, but the earlier reason
+  recorded here was wrong. Quickshell 0.3.1 *does* ship
+  `Quickshell.Wayland._ToplevelManagement`, re-exported through
+  `Quickshell.Wayland`, with `ToplevelManager.toplevels`, `activeToplevel` and
+  per-window `appId`/`title`/`activated`/`minimized`/`maximized`/`fullscreen`
+  plus `activate()` and `close()`. It imports and runs here and reports **zero
+  toplevels**, because it speaks `zwlr_foreign_toplevel_manager_v1` and KWin
+  does not implement it: `wayland-info` advertises `zwlr_layer_shell_v1` but no
+  foreign-toplevel interface, and the only window-management string in
+  `libkwin` is `org_kde_plasma_window_management`. `Quickshell.WindowManager` is
+  about windowsets (virtual desktops), not windows.
+
+  So the KWin JS script remains the path, and the open question is not how to
+  get the window list — `workspace` gives it — but how to get it *out*. KWin
+  scripts can only `callDBus`, `print` and `readConfig`; Quickshell cannot own
+  a DBus name, so there is nothing for the script to call. The three ways
+  across are: call a name nobody owns and watch the bus with the same
+  `busctl monitor` the OSD uses (a DBus error logged per update), `print` and
+  tail KWin's journal (a journal line per update), or ship a small daemon that
+  owns a name (a new moving part and a dependency). Each has a real cost on the
+  user's machine, so it is their choice to make, not one to slip in.
 
 ## Known problems
 

@@ -37,6 +37,11 @@ QtObject {
     readonly property string stateDir: "$STATE_DIR"
     readonly property string qsConfigDir: "$QS_CONFIG_DIR"
 
+    // KDE's own configuration lives here, and a couple of things need to read
+    // it -- which package plasmashell is using, and what that package's panel
+    // contains.
+    readonly property string xdgConfigDir: "$XDG_CONFIG_HOME"
+
     // The control binary. Everything the shell asks the CLI to do -- switching
     // renderer, writing a diagnostic report -- runs this, so the shell and the
     // terminal always take the same code path.

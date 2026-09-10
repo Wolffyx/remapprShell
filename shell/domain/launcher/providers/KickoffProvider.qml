@@ -22,6 +22,13 @@
 // Plasma shell package, that package's only panel is a hidden host carrying
 // the launcher applet, placed on the same edge as our panel. Until then, the
 // built-in provider is the one that opens where the button is.
+//
+// Which is why "is plasmashell running" is not the availability question.
+// `activateLauncherMenu` shows the menu attached to a launcher applet in the
+// active shell package's layout, and does nothing at all when there is none --
+// exactly the case under our own renderer, whose package deliberately has no
+// panel. Reported as available there, it becomes the automatic choice and the
+// start button silently does nothing.
 
 import QtQuick
 import Quickshell.Io
@@ -37,14 +44,68 @@ Provider {
     // "menu" or "windowed".
     property string mode: "menu"
 
+    // Two conditions, and both have to hold.
+    property bool _plasmashellRunning: false
+
     readonly property Process _probe: Process {
         running: true
         command: ["busctl", "--user", "--json=short", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
-                root.available = text.includes("org.kde.plasmashell");
-                Log.debug("launcher", `kickoff available: ${root.available} (plasmashell)`);
+                root._plasmashellRunning = text.includes("org.kde.plasmashell");
+                root._hostView.reload();
             }
+        }
+    }
+
+    // Which package plasmashell is drawing. Watched, because switching the
+    // renderer changes it and the answer to "can Kickoff open" changes with it.
+    property string _shellPackage: "org.kde.plasma.desktop"
+
+    readonly property FileView _shellrc: FileView {
+        path: `${Branding.xdgConfigDir}/plasmashellrc`
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: reload()
+        onLoaded: {
+            const match = text().match(/^\s*ShellPackage\s*=\s*(.+)$/m);
+            const next = match ? match[1].trim() : "org.kde.plasma.desktop";
+            if (next !== root._shellPackage) {
+                root._shellPackage = next;
+                root._hostView.reload();
+            }
+        }
+        onLoadFailed: root._hostView.reload()
+    }
+
+    // That package's applet layout, which is where a launcher applet would be.
+    readonly property FileView _hostView: FileView {
+        path: `${Branding.xdgConfigDir}/plasma-${root._shellPackage}-appletsrc`
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: reload()
+        onLoaded: root._update(text())
+        onLoadFailed: root._update("")
+    }
+
+    // A launcher applet, not merely a panel: a panel without one has nothing
+    // for the menu to attach to, and the call is just as silent.
+    property bool _probed: false
+
+    function _update(layout) {
+        const hasHost = /^plugin=org\.kde\.plasma\.(kickoff|kicker|dashboard)$/m.test(layout ?? "");
+        const next = root._plasmashellRunning && hasHost;
+        // Logged on the first determination as well as on a change: this
+        // provider starts unavailable, so a shell that never had it would
+        // otherwise never say why the obvious choice was not taken.
+        if (next !== root.available || !root._probed) {
+            root._probed = true;
+            root.available = next;
+            Log.info("launcher", next
+                ? `kickoff can open: ${root._shellPackage} has a launcher applet`
+                : `kickoff unavailable: ${root._shellPackage} has no launcher applet to open it at`);
         }
     }
 
