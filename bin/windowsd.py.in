@@ -24,7 +24,10 @@ is what keeps this one-directional, and one-directional is what keeps it small.
 """
 
 import json
+import os
+import re
 import signal
+import subprocess
 import sys
 
 import gi
@@ -33,6 +36,10 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 BUS_NAME = "@DBUS_NAME@"
+ICON_CACHE = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+    "@SLUG@", "window-icons",
+)
 OBJECT_PATH = "/Windows"
 INTERFACE = "@DBUS_NAME@.Windows"
 
@@ -56,12 +63,125 @@ INTROSPECTION = f"""
 """
 
 
+class WindowIcons:
+    """Icons taken from the windows themselves.
+
+    Most windows are matched to an installed application by the shell, which is
+    where an icon normally comes from. Some have no application to match: a
+    Steam game's window class is a numeric app id, and Steam installs a desktop
+    entry for only some of them. Those windows still *have* an icon -- they set
+    `_NET_WM_ICON`, which is what Plasma's own task manager draws -- and it is
+    the only place that icon exists.
+
+    So it is read from there and cached as a PNG. Reading it needs `xprop` and
+    writing it needs Pillow; where either is missing this does nothing at all
+    and the shell falls back to guessing from the window class, which is what
+    it did before.
+    """
+
+    def __init__(self):
+        self._cache = {}          # appId -> path or None
+        self._available = self._check()
+
+    @staticmethod
+    def _check():
+        try:
+            subprocess.run(["xprop", "-version"], capture_output=True, timeout=5, check=True)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        try:
+            import PIL.Image  # noqa: F401
+        except ImportError:
+            return False
+        return bool(os.environ.get("DISPLAY"))
+
+    def path_for(self, app_id, pid):
+        """A cached PNG for this application, or None."""
+        if not self._available or not app_id or not pid:
+            return None
+        # Once per application, not once per update: the answer cannot change
+        # while the window lives, and xprop over every window on every KWin
+        # event would be a poor way to draw a panel.
+        if app_id in self._cache:
+            return self._cache[app_id]
+
+        self._cache[app_id] = None
+        try:
+            window = self._x11_window_for(pid)
+            if window:
+                self._cache[app_id] = self._extract(window, app_id)
+        except Exception as exc:                      # never take the daemon down
+            print(f"could not read an icon for {app_id}: {exc}", file=sys.stderr)
+        return self._cache[app_id]
+
+    @staticmethod
+    def _x11_window_for(pid):
+        out = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"],
+                             capture_output=True, text=True, timeout=5).stdout
+        ids = re.findall(r"0x[0-9a-fA-F]+", out)
+        for window in ids:
+            prop = subprocess.run(["xprop", "-id", window, "_NET_WM_PID"],
+                                  capture_output=True, text=True, timeout=5).stdout
+            match = re.search(r"=\s*(\d+)", prop)
+            if match and int(match.group(1)) == int(pid):
+                return window
+        return None
+
+    def _extract(self, window, app_id):
+        out = subprocess.run(["xprop", "-id", window, "-notype", "32c", "_NET_WM_ICON"],
+                             capture_output=True, text=True, timeout=10).stdout
+        values = [int(v) for v in re.findall(r"-?\d+", out.split("=", 1)[-1])]
+        image = self._largest(values)
+        if image is None:
+            return None
+
+        width, height, pixels = image
+        from PIL import Image
+
+        # _NET_WM_ICON is ARGB packed into 32-bit cardinals, which is not a
+        # byte order any image library reads directly.
+        data = bytearray()
+        for value in pixels:
+            data += bytes(((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF, (value >> 24) & 0xFF))
+
+        os.makedirs(ICON_CACHE, exist_ok=True)
+        # The application id is a window class and can contain anything; it is
+        # about to become a filename.
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", app_id)[:96]
+        path = os.path.join(ICON_CACHE, f"{safe}.png")
+        Image.frombytes("RGBA", (width, height), bytes(data)).save(path)
+        return path
+
+    @staticmethod
+    def _largest(values):
+        """The biggest icon in the property, up to a size worth drawing.
+
+        The property holds several sizes one after another, each preceded by
+        its width and height. A malformed one must yield nothing rather than an
+        exception: it arrives from another application.
+        """
+        best = None
+        i = 0
+        while i + 2 <= len(values):
+            width, height = values[i], values[i + 1]
+            if width <= 0 or height <= 0 or width > 1024 or height > 1024:
+                break
+            start, end = i + 2, i + 2 + width * height
+            if end > len(values):
+                break
+            if width <= 256 and (best is None or width > best[0]):
+                best = (width, height, values[start:end])
+            i = end
+        return best
+
+
 class WindowList:
     """The current windows, as the KWin script last reported them."""
 
     def __init__(self):
         self._json = "[]"
         self._connection = None
+        self._icons = WindowIcons()
 
     def update(self, payload):
         # Validated rather than trusted: this crosses a process boundary, and a
@@ -77,6 +197,15 @@ class WindowList:
         if not isinstance(windows, list):
             print("ignoring an update that is not a list", file=sys.stderr)
             return False
+
+        # A window with no application to match keeps the icon it carries
+        # itself, which is the only copy of it that exists.
+        for window in windows:
+            if not isinstance(window, dict) or window.get("desktopFile"):
+                continue
+            path = self._icons.path_for(window.get("appId"), window.get("pid"))
+            if path:
+                window["iconPath"] = path
 
         # Re-serialised from the parsed value, so whatever reaches the shell is
         # known to be valid JSON of the shape it expects.

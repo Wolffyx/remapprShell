@@ -40,6 +40,9 @@ function describe(window) {
         title: window.caption || "",
         appId: window.resourceClass || "",
         desktopFile: window.desktopFileName || "",
+        // Only used to find the window's own icon, for the windows that have
+        // no application to match against.
+        pid: window.pid || 0,
         minimized: window.minimized === true,
         active: window.active === true,
         // Which virtual desktop, so the panel can show only the current one if

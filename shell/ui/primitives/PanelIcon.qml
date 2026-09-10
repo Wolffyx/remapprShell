@@ -16,9 +16,15 @@ IconImage {
     property string iconName: ""
     property string fallbackName: "application-x-executable"
 
+    // A file to use instead of a theme lookup. For icons that exist nowhere in
+    // the theme because they came out of the window that owns them.
+    property string iconFile: ""
+
     implicitSize: 18
 
     source: {
+        if (root.iconFile.length > 0)
+            return root.iconFile;
         if (root.iconName.length > 0 && Quickshell.hasThemeIcon(root.iconName))
             return Quickshell.iconPath(root.iconName);
         return Quickshell.iconPath(root.fallbackName, true);

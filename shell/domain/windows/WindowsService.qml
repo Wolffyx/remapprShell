@@ -140,13 +140,21 @@ QtObject {
         return null;
     }
 
-    // The icon to draw. The entry's own icon first, because that is the one
-    // the application chose; the hints only if nothing matched.
+    // The icon to draw, as a theme name. The entry's own icon first, because
+    // that is the one the application chose.
     function iconFor(window) {
         const entry = root.entryFor(window);
         if (entry && String(entry.icon ?? "").length > 0)
             return entry.icon;
         return WindowEvents.iconName(window);
+    }
+
+    // Some windows match no installed application at all -- a Steam game's
+    // class is a numeric app id -- and the only copy of their icon is the one
+    // the window carries. The daemon writes that out; this is the file.
+    function iconFileFor(window) {
+        const path = String(window?.iconPath ?? "");
+        return path.length > 0 ? `file://${path}` : "";
     }
 
     // "Dolphin", not "org.kde.dolphin".

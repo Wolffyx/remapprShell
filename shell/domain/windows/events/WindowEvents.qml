@@ -34,7 +34,10 @@ QtObject {
             appId: String(entry.appId ?? ""),
             desktopFile: String(entry.desktopFile ?? ""),
             minimized: entry.minimized === true,
-            active: entry.active === true
+            active: entry.active === true,
+            // A PNG the daemon lifted out of the window itself, for windows
+            // that match no installed application. Empty for the rest.
+            iconPath: String(entry.iconPath ?? "")
         };
     }
 

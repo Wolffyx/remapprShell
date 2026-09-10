@@ -58,9 +58,11 @@ case "$cmd" in
             exit 0
         fi
 
-        # Loading it explicitly means it starts working now rather than at the
-        # next login. KWin ignores a second load of a script already loaded, so
-        # this is safe to run twice.
+        # Unloaded first, because KWin ignores loading a script it already has
+        # -- so without this, re-running `enable` after changing the script
+        # silently keeps running the old one, which is a confusing thing to
+        # debug.
+        kwin_script unloadScript "$KWIN_SCRIPT_ID" >/dev/null
         kwin_script loadScript "$SCRIPT_DEST/contents/code/main.js" "$KWIN_SCRIPT_ID" >/dev/null
         kwin_script start >/dev/null
 

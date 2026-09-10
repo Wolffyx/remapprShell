@@ -112,6 +112,20 @@ for lessons — which patterns to avoid.
   Icons resolve against the installed desktop entries by id, by id without the
   suffix and by `StartupWMClass` -- 10 of 11 windows here, where guessing from
   the window class alone produced a row of generic placeholders.
+- **Icons for windows with no application.** A Steam game's window class is a
+  numeric app id and Steam installs a desktop entry for only some titles, so
+  nothing can match it -- but the window carries `_NET_WM_ICON`, which is the
+  copy Plasma's own task manager draws. The daemon reads it with `xprop`,
+  writes a PNG into `$STATE_DIR/window-icons/`, and reports the path; the shell
+  prefers a matched application, then that file, then a guess. Needs `xprop`
+  and Pillow, and does nothing where either is missing. Verified on WoT
+  (`steam_app_1407200`), which has no `steam_icon_1407200` in any theme here.
+- **`pgrep -f` and `pkill -f` match the command running them.** Both killed
+  this session's own shell while trying to restart the daemon. Use a bracket in
+  the pattern (`remappr-shell-window[s]d`).
+- **KWin ignores `loadScript` for a script it already has**, so re-running
+  `windows enable` after editing the script silently kept the old one running.
+  It unloads first now.
 - **No window thumbnails, and not for want of trying.** Window images come from
   the plasma-window-management protocol, which Quickshell does not bind. KWin's
   other route, `org.kde.KWin.ScreenShot2.CaptureWindow`, exists and takes a

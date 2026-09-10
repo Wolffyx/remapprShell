@@ -124,6 +124,7 @@ BarWidget {
                         anchors.verticalCenter: parent.verticalCenter
                         implicitSize: root.iconSize
                         iconName: WindowsService.iconFor(button.modelData)
+                        iconFile: WindowsService.iconFileFor(button.modelData)
                     }
 
                     PanelText {
@@ -182,6 +183,7 @@ BarWidget {
                     anchors.verticalCenter: parent.verticalCenter
                     implicitSize: 48
                     iconName: WindowsService.iconFor(preview.window)
+                    iconFile: WindowsService.iconFileFor(preview.window)
                 }
 
                 Column {

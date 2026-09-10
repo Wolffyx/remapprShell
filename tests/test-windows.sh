@@ -100,6 +100,44 @@ call Update s "$WINDOW" >/dev/null
 sleep 2
 check "says nothing when nothing changed" "$(grep -c '"member":"Changed"' "$monitor_out")" "0"
 
+# Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
+# from another application, holds several sizes one after another, and a
+# malformed one must yield nothing rather than an exception in the daemon
+# everything else depends on.
+echo "== icons taken from the windows themselves =="
+python3 - "$REPO_ROOT" <<'PYTEST'
+import sys, importlib.util, re, os
+repo = sys.argv[1]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+largest = mod["WindowIcons"]._largest
+
+def case(name, values, expect):
+    got = largest(values)
+    ok = (got is None and expect is None) or (got is not None and (got[0], got[1]) == expect)
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+    return ok
+
+fails = 0
+# One 2x2 icon.
+fails += not case("reads a single size", [2, 2] + [0] * 4, (2, 2))
+# Two sizes: the bigger one wins, because it is the one worth drawing.
+fails += not case("prefers the larger size", [2, 2] + [0] * 4 + [4, 4] + [0] * 16, (4, 4))
+# Absurd dimensions and truncated data are what a malformed property looks like.
+fails += not case("refuses absurd dimensions", [99999, 99999, 1], None)
+fails += not case("refuses truncated data", [4, 4, 1, 2, 3], None)
+fails += not case("refuses nothing at all", [], None)
+fails += not case("refuses a zero size", [0, 0], None)
+# A size beyond what a panel would draw is skipped, but a usable one after it
+# is still found.
+fails += not case("skips a size too large to draw", [512, 1] + [0] * 512 + [8, 1] + [0] * 8, (8, 1))
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
 printf 'OK: %d passed\n' "$pass"
