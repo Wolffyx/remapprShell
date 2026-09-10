@@ -60,6 +60,13 @@ kwriteconfig6 --file kdeglobals --group General --key ColorScheme "UserScheme"
 # non-destructive.
 stock="$XDG_CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
 cat > "$stock" <<'STOCK'
+[Containments][48]
+plugin=org.kde.plasma.folder
+wallpaperplugin=org.kde.image
+
+[Containments][48][Wallpaper][org.kde.image][General]
+Image=file:///home/testuser/Pictures/mine.png
+
 [Containments][49]
 plugin=org.kde.panel
 location=4
@@ -119,6 +126,10 @@ check "the panel is the plasma one" "$(panels_in "$XDG_CONFIG_HOME/plasma-$PLASM
 check "our own package has none"  "$(panels_in "$XDG_CONFIG_HOME/plasma-$SHELL_PACKAGE_ID-appletsrc")" "0"
 check "stock layout untouched"    "$(sha256sum "$stock")" "$stock_sum"
 
+# The desktop is Plasma's in every renderer, so a switch must not redecorate
+# it. The wallpaper comes from whichever package plasmashell was using.
+check "wallpaper carried across"  "$(sed -n 's/^Image=//p' "$XDG_CONFIG_HOME/plasma-$PLASMA_SHELL_PACKAGE_ID-appletsrc")" "file:///home/testuser/Pictures/mine.png"
+
 plasma_src="$XDG_CONFIG_HOME/plasma-$PLASMA_SHELL_PACKAGE_ID-appletsrc"
 check "top edge"                  "$(grep -A6 '^\[Containments\]\[811\]$' "$plasma_src" | sed -n 's/^location=//p')" "3"
 check "horizontal form factor"    "$(grep -A6 '^\[Containments\]\[811\]$' "$plasma_src" | sed -n 's/^formfactor=//p')" "2"
@@ -152,6 +163,44 @@ check "still exactly one panel"   "$(our_panels)" "1"
 rmpr_renderer set quickshell --yes >/dev/null 2>&1 || { echo "second set quickshell failed" >&2; exit 1; }
 check "still none after"          "$(our_panels)" "0"
 check "entries still unchanged"   "$(jq -c '.bar.entries' "$profile")" "$entries_before"
+
+# Observed on a live desktop: plasmashell wrote an empty config for the package
+# being switched away from, deleting a third-party shell's whole layout. The
+# switch is what triggers it, so recovering from it is this project's problem
+# whoever did the writing.
+echo "== the outgoing layout is held and put back =="
+source "$REPO_ROOT/scripts/lib/appletsrc.sh"
+
+third_party="$XDG_CONFIG_HOME/plasma-someothershell.desktop-appletsrc"
+cat > "$third_party" <<'OTHER'
+[Containments][1]
+plugin=org.kde.plasma.folder
+
+[Containments][2]
+plugin=org.kde.panel
+
+[Containments][2][General]
+AppletOrder=3
+OTHER
+before_count=$(appletsrc_containment_count "$third_party")
+check "counts containments"   "$before_count" "2"
+
+held=$(appletsrc_hold "someothershell.desktop" "$SANDBOX/held")
+check "held with its count"    "${held%% *}" "2"
+copy=${held#* }
+
+# What plasmashell did: everything but the trailing section, gone.
+printf '[ScreenMapping]\nitemsOnDisabledScreens=\n' > "$third_party"
+check "gutted layout counted"  "$(appletsrc_containment_count "$third_party")" "0"
+
+appletsrc_restore_if_gutted "someothershell.desktop" "$copy" "$before_count" >/dev/null 2>&1
+check "layout put back"        "$(appletsrc_containment_count "$third_party")" "2"
+
+# A layout that did not lose anything is left exactly as it is -- restoring
+# unconditionally would undo a change the user made in the meantime.
+printf '\n[Containments][9]\nplugin=org.kde.panel\n' >> "$third_party"
+appletsrc_restore_if_gutted "someothershell.desktop" "$copy" 2 >/dev/null 2>&1
+check "an intact layout is untouched" "$(appletsrc_containment_count "$third_party")" "3"
 
 echo "== revert =="
 rmpr_renderer revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }

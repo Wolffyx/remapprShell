@@ -154,15 +154,52 @@ Non-obvious things that cost time to discover:
 `~/.claude/plans/in-this-project-i-cryptic-horizon.md` holds the full approved
 plan, including the sections not yet built.
 
-## What Phase 6b left for the next session
+## The Phase 6b gate, run against the live desktop
 
-- The renderer switch is proven in a sandbox (`tests/test-renderer.sh`: 29
-  checks, including the byte-identical revert and "never more than one panel"),
-  but it has **not been run against the live desktop**. The plan's Phase 6b gate
-  wants the round trip performed on the real machine, watching that exactly one
-  panel is visible at each step and checking
-  `qdbus6 org.kde.plasmashell /StrutManager` plus a maximised window's geometry
-  for strut leaks.
+Passed, on 2026-09-10, with one significant finding.
+
+| step | shell package | Plasma panels | DP-2 available height |
+| --- | --- | --- | --- |
+| baseline | `caelestia.desktop` | 1 | 1386 of 1440 |
+| `set quickshell` | `remappr-shell.desktop` | 0 | 1440 — strut released |
+| `set plasma` | `remappr-shell-plasma.desktop` | 1 | 1398 — 42 reserved at the top |
+| `set quickshell` | `remappr-shell.desktop` | 0 | 1440 |
+
+Counted with `evaluateScript('print(panels().length)')` and
+`StrutManager.availableScreenRect`, which is the maximised-window geometry.
+Never more than one panel, no strut leaked, `bar.entries` unchanged across two
+round trips, and both the stock and caelestia applet layouts byte-identical
+afterwards. The generated panel came up with exactly the expected applets in
+zone order, and `changeShell` switched live every time — plasmashell was never
+restarted.
+
+**The finding: plasmashell gutted the layout of the package being switched
+away from.** Switching `ShellPackage` off `caelestia.desktop` left
+`plasma-caelestia.desktop-appletsrc` with every containment gone — the panel
+and both desktops it described, deleted, 4.8 KB down to 553 bytes. plasmashell
+wrote its own now-empty view of that package's config on the way out. It is not
+our write, but it happens because of our switch, so it is our problem: the file
+was restored byte-identical from the restore point the switch had just taken,
+and `appletsrc_hold` / `appletsrc_restore_if_gutted` now copy the outgoing
+layout aside and put it back if it comes out with fewer containments than it
+went in with. A layout that lost nothing is left alone, because restoring
+unconditionally would undo a change made in the meantime.
+
+**Still unverified:** that guard has not been exercised against the live
+failure, only against its exact shape in the sandbox. Doing so means pointing
+plasmashell back at `caelestia.desktop` and switching away again.
+
+Two smaller things from the same run:
+
+- The panel view's thickness now applies through the running plasmashell as
+  well as the key, because plasmashell holds the geometry in memory — a key
+  written alone did not appear until the next start. Waiting for `panels()` to
+  be non-empty first is required: the wait must break only on a positive count,
+  since an empty answer means plasmashell is still starting.
+- The wallpaper is carried across a switch from whichever package was active.
+  Without it, moving to a package that has never run hands the user Plasma's
+  default wallpaper — a switch about the panel silently redecorating the
+  desktop.
 - **No `plasma/plasmoids/org.remappr.*`.** Every built-in widget maps to a stock
   applet today, so nothing needed one yet. A widget with no stock equivalent is
   named in the compatibility matrix and left out of the panel.

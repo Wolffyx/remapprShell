@@ -50,6 +50,27 @@ _appletsrc_formfactor() {
 
 appletsrc_path() { printf '%s/plasma-%s-appletsrc' "$XDG_CONFIG_HOME" "$1"; }
 
+# The wallpaper the given applet layout uses, if it names one.
+#
+# Carried across a renderer switch because the desktop is Plasma's in every
+# renderer, and this project has no business changing it. Without this, moving
+# to a package that has never run before hands the user Plasma's default
+# wallpaper and no explanation -- a switch that was supposed to be about the
+# panel silently redecorating their desktop.
+appletsrc_wallpaper() {
+    local src=$1
+    [ -f "$src" ] || return 0
+    # The first Image= under any Wallpaper group. Several desktop containments
+    # (one per screen) normally share one image; taking the first is right when
+    # they agree and harmless when they do not, since Plasma keeps whatever the
+    # user later sets per screen.
+    awk '
+        /^\[Containments\]\[[0-9]+\]\[Wallpaper\]/ { inwp = 1; next }
+        /^\[/ { inwp = 0 }
+        inwp && /^Image=/ { sub(/^Image=/, ""); print; exit }
+    ' "$src"
+}
+
 # The applet a widget maps to under the Plasma renderer, or nothing if it has
 # no mapping. The manifest is the source of truth for support: a widget with no
 # `renderers.plasma` block is one this renderer genuinely cannot draw, and
@@ -110,9 +131,9 @@ _appletsrc_spacer() {
 # one key and one generator, so "two panels at the same screen edge" is not a
 # state this can produce.
 appletsrc_generate() {
-    local out=$1 config=$2 index=$3 renderer=$4
+    local out=$1 config=$2 index=$3 renderer=$4 wallpaper=${5:-}
 
-    local position thickness
+    local position
     position=$(jq -r '.panel.position // "bottom"' "$config")
 
     : > "$out"
@@ -136,6 +157,13 @@ appletsrc_generate() {
         printf 'plugin=org.kde.plasma.folder\n'
         printf 'wallpaperplugin=org.kde.image\n'
     } >> "$out"
+
+    if [ -n "$wallpaper" ]; then
+        {
+            printf '\n[Containments][%s][Wallpaper][org.kde.image][General]\n' "$APPLETSRC_DESKTOP_ID"
+            printf 'Image=%s\n' "$wallpaper"
+        } >> "$out"
+    fi
 
     if [ "$renderer" != "plasma" ]; then
         log_debug "appletsrc: no panel containment (renderer: $renderer)"
@@ -279,6 +307,65 @@ appletsrc_validate() {
 
     [ "$errors" -eq 0 ] || return 1
     log_debug "appletsrc: $file validates"
+}
+
+# How many containments a layout defines. The number that matters when asking
+# whether a layout is still the layout it was.
+appletsrc_containment_count() {
+    local file=$1
+    [ -f "$file" ] || { printf '0'; return 0; }
+    local n
+    n=$(grep -cE '^\[Containments\]\[[0-9]+\]$' "$file")
+    printf '%s' "${n:-0}"
+}
+
+# --- protecting a layout we are switching away from ------------------------
+#
+# Observed on a live desktop: switching plasmashell's ShellPackage away from a
+# third-party package left that package's applet layout gutted -- every
+# containment gone, the panel and desktop it described with them. plasmashell
+# had written its own now-empty view of that package's config back to disk on
+# the way out.
+#
+# It is not our write, but it happens because of our switch, and "it was
+# plasmashell" is no comfort to someone whose layout has just been deleted.
+
+# appletsrc_hold <pkg> <backup-dir>
+# Copies that package's layout aside and prints "<containments> <copy path>".
+appletsrc_hold() {
+    local pkg=$1 backup_dir=$2
+    local src
+    src=$(appletsrc_path "$pkg")
+    [ -f "$src" ] || return 0
+
+    mkdir -p "$backup_dir" || return 0
+    local copy="$backup_dir/$(basename "$src")"
+    cp -a "$src" "$copy" || return 0
+
+    printf '%s %s' "$(appletsrc_containment_count "$src")" "$copy"
+}
+
+# appletsrc_restore_if_gutted <pkg> <copy> <containments-before>
+#
+# Restores only when containments have gone missing. Restoring unconditionally
+# would undo a change the user made in the meantime, which is its own kind of
+# data loss.
+appletsrc_restore_if_gutted() {
+    local pkg=$1 copy=$2 before=$3
+    [ -n "$copy" ] && [ -f "$copy" ] || return 0
+
+    local dest now
+    dest=$(appletsrc_path "$pkg")
+    now=$(appletsrc_containment_count "$dest")
+    [ "$now" -ge "$before" ] && return 0
+
+    cp -a "$copy" "$dest" || {
+        log_error "$pkg's layout lost containments and could not be put back"
+        log_error "  a copy is at $copy"
+        return 1
+    }
+    log_warn "plasmashell emptied $pkg's applet layout on the way out"
+    log_info "  put it back from $copy ($before containment(s), had $now)"
 }
 
 # appletsrc_install <generated> <dest> <backup-dir>
