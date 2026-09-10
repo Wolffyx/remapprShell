@@ -7,7 +7,7 @@
 
 import QtQuick
 import QtTest
-import qs.domain.diagnostics
+import qs.domain.diagnostics.redact
 
 TestCase {
     id: root

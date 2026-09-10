@@ -17,6 +17,7 @@ import qs.features.osd
 import qs.features.settings
 import qs.features.wizard
 import qs.domain.notifications
+import qs.domain.diagnostics
 import qs.features.diagnostics
 
 ShellRoot {
@@ -107,6 +108,12 @@ ShellRoot {
             onVisibleChanged: if (!visible) ask.activeAsync = false
         }
     }
+
+    // Quickshell restarts itself after a crash without systemd noticing, so
+    // the only thing that can report one is the shell that came back.
+    // Referenced here so it runs at startup rather than whenever something
+    // first happens to look at it.
+    readonly property int _lastCrash: CrashWatch.lastSeen
 
     // Referenced so the eavesdrop starts with the shell when it is wanted,
     // rather than the first time a widget happens to look at it.

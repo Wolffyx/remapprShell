@@ -360,6 +360,35 @@ else
     fix "the shell cannot report its own death without it: make link"
 fi
 
+# --------------------------------------------------------------- crash dumps
+
+section "crashes"
+
+source "$REPO_ROOT/scripts/lib/crashes.sh"
+
+crash_count=$(crash_list | wc -l)
+if [ "$crash_count" -eq 0 ]; then
+    ok "no crash dumps from this shell"
+else
+    newest=$(crash_newest)
+    newest_when=$(crash_list | tail -1 | cut -f2)
+    # Not a failure on its own: a dump from before an update is history, and
+    # the shell has been restarting itself through all of them.
+    warn "$crash_count crash dump(s); the newest is $newest ($newest_when)"
+    fix "quickshell catches these itself and restarts, so systemd never reports a failure"
+    fix "read it:       $ALIAS crash show"
+    fix "ask about it:  $ALIAS ask --crash"
+    reported=$(grep -rlxF "crash:  $newest" "$STATE_DIR/diagnostics"/*/error.txt 2>/dev/null | head -1)
+    if [ -n "$reported" ]; then
+        ok "the newest crash has a report: $(basename "$(dirname "$reported")")"
+    else
+        warn "no report written for the newest crash"
+        fix "the shell writes one when it comes back; this dump predates that, or the shell has not restarted since"
+        fix "write one now: $ALIAS report create --crash $newest"
+    fi
+    fix "clear them:    $ALIAS crash remove --all"
+fi
+
 # ----------------------------------------------------------------- AI assist
 
 section "AI assist"

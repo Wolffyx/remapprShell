@@ -32,7 +32,7 @@ off the running system rather than remembered.
 | plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
-| Crash dumps | three from before the `image-data` fix, plus one from the isolated shell that reproduced it, in `~/.cache/quickshell/crashes/`. All four have the same stack. Safe to delete |
+| Crash dumps | five from before the `image-data` fix in `~/.cache/quickshell/crashes/`, all with the same stack, plus one from the isolated shell that reproduced it. Safe to delete: `rmpr crash remove --all` |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
 | Window list | KWin script loaded, daemon answering, 11 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
@@ -121,7 +121,7 @@ are not.
   the shell is dead — and both are held to `tests/fixtures/redact-cases.json`.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
-  report, ask, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
+  report, ask, crash, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
 - **Auto-hide** — `panel.autoHide`, per output like position and thickness.
   The surface really does shrink to a sliver rather than a full-height
   transparent one moved out of sight: a transparent surface still eats every
@@ -163,10 +163,35 @@ are not.
   when either the history or AI assist is on. The parser lives in its own
   module (`qs.domain.notifications.events`) for the qmltestrunner reason
   below, and its fixture is a line captured from the real bus.
-- **Tests** — 10 shell suites in throwaway HOMEs, plus a QML suite. All green.
+- **Crash reporting that survives quickshell catching its own crash.** The
+  engine traps a fatal signal itself: it writes `~/.cache/quickshell/crashes/
+  <id>/` and restarts the shell **in process**. systemd sees nothing -- the
+  unit stays `active`, `NRestarts` stays at 0 -- so the `OnFailure=` reporter
+  built for exactly this moment never ran, and five real crashes produced five
+  dumps and no report of ours.
+
+  That same restart is what makes the fix work: the config loads again, so
+  `domain/diagnostics/CrashWatch.qml` runs again and the dump is still there.
+  It writes a report bundle with the stack trace and the shell's last log lines
+  in it, redacted like every other part, and says so in the journal. It does
+  **not** put a window on screen -- a shell that has just come back should not
+  open a dialog over whatever the user was doing.
+
+  The "is this crash new" decision is in the CLI (`rmpr crash since <epoch>`),
+  not in QML, so a test can reach it. It compares by **time, not identity**:
+  keying on the last-seen id reported an *older* dump as a new crash once the
+  recorded one was deleted, which is now a test.
+
+  `rmpr crash list|show|remove|since`; `rmpr ask --crash` asks about one, and
+  reuses the bundle already written rather than making another. Ownership is
+  checked on every path, including when an id is named by hand: the dump
+  directory is shared by every quickshell on the machine, and a second shell's
+  crash is not ours to read or report.
+- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite. All green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
-  missing one.
+  missing one. `test-crash.sh` builds dumps by hand, including one belonging to
+  another shell.
 
 ## Not built yet
 
@@ -269,17 +294,10 @@ are not.
    sufficient -- proving keystrokes actually arrive needs a keystroke, and no
    key-injection tool is installed here. **Worth confirming by hand:** run
    `rmpr launcher` and type.
-3. **A crash inside quickshell never reaches systemd, so no report is written.**
-   Quickshell's own crash handler catches the signal, writes
-   `~/.cache/quickshell/crashes/<id>/` and **restarts the shell in process**.
-   The unit never enters `failed`, `NRestarts` stays at 0, and the
-   `OnFailure=` reporter this project built does not run. Three real crashes
-   produced three quickshell dumps and zero of our diagnostic bundles, and the
-   only reason they were noticed at all is that the user found the directory.
-   The dumps hold a stack trace and a log, so nothing is lost -- but anything
-   that assumes "the shell died" means "a report exists" is wrong. Worth
-   closing by having `doctor` look in that directory, and by having the shell
-   notice a dump newer than its own start.
+3. ~~**A crash inside quickshell never reaches systemd, so no report is
+   written.**~~ Closed; see "Working today". The finding stands, though, and
+   anything built on top of it should know: **the unit staying `active` with
+   `NRestarts` at 0 is not evidence the shell has not been dying.**
 4. **caelestia's bar is still running alongside ours**, holding Meta, and
    krohnkite is installed, which can fight edge tiling. Both are reported by
    `doctor`. Two bars on screen is a side-by-side development arrangement, not
@@ -389,8 +407,17 @@ Non-obvious things that cost time to discover:
   tests.** Putting `NotificationWatch` beside `Redact` in
   `qs.domain.diagnostics` made the redaction test fail to compile with "Type
   NotificationWatch unavailable" -- exactly the trap recorded for the OSD, and
-  walked into again. The watcher lives in `qs.domain.notifications` now, with
-  the pure parser under it in `events/`.
+  walked into again. Then `CrashWatch` landed in the same directory and broke
+  the same test a third time. The rule is now enforced rather than remembered:
+  `scripts/lint-tests.sh` reads each test's `qs.*` imports and fails if any
+  file in that module imports Quickshell. The pure parts live in leaf modules
+  of their own -- `qs.domain.osd.events`, `qs.domain.notifications.events`,
+  `qs.domain.diagnostics.redact`.
+
+  Worth noticing about this one: **the test that breaks is not the test that
+  was changed**, and the error names the type that was added rather than the
+  module that cannot load. That is why it was walked into twice after being
+  written down.
 - **`git mv -k` silently skips an untracked directory.** It reported nothing
   and moved nothing; the next test run said the module was not installed.
 - **`echo "$@"` in a fake terminal eats a leading `-e`.** Fakes that record

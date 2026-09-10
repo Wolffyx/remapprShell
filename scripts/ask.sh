@@ -8,6 +8,7 @@
 #   ask --notification <n>        the n-th most recent one (0 is the last)
 #   ask --unit <name>             a systemd user unit's journal tail
 #   ask --failed                  failed user units and recent core dumps
+#   ask --crash [<id>]            the shell's last crash, stack trace and all
 #
 #   --provider <p>   clipboard | claude-code | ollama | custom   (default: ai.provider)
 #   --show           print exactly what would be sent, then stop (--json for machines)
@@ -31,6 +32,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
+source "$REPO_ROOT/scripts/lib/crashes.sh"
 
 REPORT_DIR="$STATE_DIR/diagnostics"
 CONSENT_FILE="$STATE_DIR/ai-consent.json"
@@ -102,6 +104,15 @@ list_providers() {
 
 newest_report() { ls -1 "$REPORT_DIR" 2>/dev/null | sort | tail -1; }
 
+# The newest bundle already written about one crash dump, if any.
+crash_report_for() {
+    local id=$1 d
+    while IFS= read -r d; do
+        [ -f "$d/crash.txt" ] || continue
+        grep -qxF "crash:  $id" "$d/error.txt" 2>/dev/null && printf '%s' "$d"
+    done < <(ls -1d "$REPORT_DIR"/*/ 2>/dev/null | sort) | tail -1
+}
+
 create_report() {
     "$REPO_ROOT/scripts/report.sh" create --reason "$1" 2>/dev/null | tail -1
 }
@@ -147,6 +158,26 @@ gather_notification() {
     printf '%s' "$json" | redact_json "$HOME" "${USER:-$(id -un)}" > "$DIR/notification.json"
     chmod 600 "$DIR/notification.json"
     QUESTION="The application '$app' sent this notification. What does it mean, and what should I do about it?"
+}
+
+# A crash inside quickshell, which systemd never sees and which therefore has
+# no report of its own until someone asks for one.
+gather_crash() {
+    local id=$1
+    local crash
+    crash=$(crash_dir "$id") || die "no crash dump from this shell$([ -n "$id" ] && printf " matching '%s'" "$id")"
+    id=$(basename "$crash")
+
+    # One report per crash, not one per question about it. A dump does not
+    # change, so asking twice should not fill the directory with copies of the
+    # same bundle -- and `--show` is a thing people run more than once.
+    DIR=$(crash_report_for "$id")
+    if [ -z "$DIR" ]; then
+        DIR=$("$REPO_ROOT/scripts/report.sh" create --reason "crash $id" --crash "$id" 2>/dev/null | tail -1)
+    fi
+    [ -d "$DIR" ] || die "could not write a report"
+
+    QUESTION="This shell crashed. crash.txt has the stack trace, the signal and the log from just before it went. What crashed, and what in the shell's own code is most likely responsible?"
 }
 
 gather_unit() {
@@ -339,6 +370,8 @@ while [ $# -gt 0 ]; do
         --notification)      MODE=notification; MODE_ARG=${2:?--notification needs an index}; shift ;;
         --unit)              MODE=unit; MODE_ARG=${2:?--unit needs a name}; shift ;;
         --failed)            MODE=failed ;;
+        --crash)             MODE=crash
+                             case "${2-}" in -*|"") ;; *) MODE_ARG=$2; shift ;; esac ;;
         --provider)          PROVIDER=${2:?--provider needs a name}; shift ;;
         --show)              SHOW=yes ;;
         --review)            REVIEW=yes ;;
@@ -376,6 +409,7 @@ case "$MODE" in
     notification) gather_notification "$MODE_ARG" ;;
     unit)         gather_unit "$MODE_ARG" ;;
     failed)       gather_failed ;;
+    crash)        gather_crash "$MODE_ARG" ;;
 esac
 write_bundle
 

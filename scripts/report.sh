@@ -2,6 +2,7 @@
 # Writes a diagnostic report bundle.
 #
 #   create [--reason <text>] [--qml <file>]   write one now
+#          [--crash <id>]                     ... about a quickshell crash dump
 #   list                                      what has been collected
 #   show [<name>]                             print a bundle (newest by default)
 #   remove <name>                             delete one
@@ -24,6 +25,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
+source "$REPO_ROOT/scripts/lib/crashes.sh"
 
 REPORT_DIR="$STATE_DIR/diagnostics"
 JOURNAL_LINES=${JOURNAL_LINES:-200}
@@ -54,6 +56,24 @@ part_error() {
             fi
         fi
     } > "$dir/error.txt"
+}
+
+# Quickshell's own crash dump, when the report is about one.
+#
+# The dump is the only record of a crash inside the engine -- systemd never
+# sees one, because quickshell catches the signal and restarts itself -- and it
+# holds the stack trace and the shell's last words. Both go through the text
+# redaction: the dump carries the environment and absolute paths.
+part_crash() {
+    local dir=$1 id=$2
+    local crash
+    crash=$(crash_dir "$id") || {
+        printf 'no crash dump found for: %s\n' "${id:-<newest>}" >> "$dir/error.txt"
+        return 0
+    }
+
+    crash_text "$crash" | redact_text > "$dir/crash.txt"
+    printf 'crash:  %s\n' "$(basename "$crash")" >> "$dir/error.txt"
 }
 
 part_environment() {
@@ -124,11 +144,14 @@ cmd=${1:-create}
 
 REASON=""
 QML_FILE=""
+CRASH_ID=""
+WANT_CRASH=no
 args=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --reason) REASON=${2:?--reason needs a value}; shift ;;
         --qml)    QML_FILE=${2:?--qml needs a value}; shift ;;
+        --crash)  CRASH_ID=${2-}; WANT_CRASH=yes; [ $# -gt 1 ] && shift ;;
         -*)       die "unknown option: $1" ;;
         *)        args+=("$1") ;;
     esac
@@ -148,6 +171,7 @@ case "$cmd" in
         mkdir -p "$dir" || die "cannot write to $REPORT_DIR"
 
         part_error       "$dir" "$REASON" "$QML_FILE"
+        [ "$WANT_CRASH" = yes ] && part_crash "$dir" "$CRASH_ID"
         part_environment "$dir"
         part_config      "$dir"
         part_journal     "$dir"
@@ -186,7 +210,7 @@ case "$cmd" in
         # notification, a unit's journal -- except the bundle it builds from
         # this very output.
         shown=" "
-        for f in error.txt environment.txt redaction.txt config.json widget-health.json journal.txt; do
+        for f in error.txt crash.txt environment.txt redaction.txt config.json widget-health.json journal.txt; do
             [ -f "$dir/$f" ] || continue
             printf '\n===== %s =====\n' "$f"
             cat "$dir/$f"

@@ -1,5 +1,12 @@
 pragma Singleton
 
+// In a module of its own, with no Quickshell import anywhere in it, because
+// that is what makes it loadable by qmltestrunner. A module holding one
+// singleton that needs the Quickshell runtime cannot be imported at all
+// outside a running shell, and every pure function beside it becomes
+// untestable by association -- which happened twice here before
+// scripts/lint-tests.sh started failing the build for it.
+
 // The privacy boundary, as a pure function.
 //
 // Everything a diagnostic report contains passes through here, and a report is
