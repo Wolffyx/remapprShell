@@ -53,6 +53,7 @@ rmpr theme apply        # install and activate the look and feel
 rmpr renderer list      # what can draw the panel here
 rmpr renderer set plasma --dry-run   # the applet layout it would install
 rmpr renderer set plasma             # switch, with a restore point and a rollback
+rmpr wizard             # re-run the first-run wizard
 rmpr report create      # write a local diagnostic bundle
 rmpr report show        # read the newest one
 rmpr status

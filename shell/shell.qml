@@ -13,6 +13,7 @@ import qs.platform.system
 import qs.domain.launcher
 import qs.domain.config
 import qs.features.settings
+import qs.features.wizard
 
 ShellRoot {
     id: root
@@ -52,6 +53,40 @@ ShellRoot {
             // starts fresh rather than restoring the last page.
             onVisibleChanged: if (!visible) settings.activeAsync = false
         }
+    }
+
+    // Shown once, on a machine that has never run it. The marker lives in the
+    // state directory rather than in the profile: a profile with no overrides
+    // in it is an ordinary thing to have, so "the config is empty" cannot be
+    // the signal for "this person has never seen this".
+    LazyLoader {
+        id: wizard
+        loading: false
+
+        WizardWindow {
+            visible: true
+            onFinished: wizard.activeAsync = false
+            onVisibleChanged: if (!visible) wizard.activeAsync = false
+        }
+    }
+
+    FileView {
+        path: Paths.wizardDoneFile
+        printErrors: false
+
+        onLoadFailed: err => {
+            if (err === FileViewError.FileNotFound) {
+                Log.info("wizard", "first run; showing the wizard");
+                wizard.activeAsync = true;
+            }
+        }
+    }
+
+    IpcHandler {
+        target: "wizard"
+
+        function open(): void { wizard.activeAsync = true; }
+        function close(): void { wizard.activeAsync = false; }
     }
 
     IpcHandler {

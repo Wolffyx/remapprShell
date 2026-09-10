@@ -41,6 +41,11 @@ for lessons — which patterns to avoid.
   panel. Two shell packages, one per renderer, so switching cannot overwrite the
   other one's layout. `rmpr renderer set` is plan → snapshot → apply → verify →
   rollback, and `--dry-run` prints the layout without writing anything.
+- **First-run wizard** — four questions (panel position and thickness, layout
+  preset, launcher provider, renderer), applied only on Finish. Shown when
+  `$STATE_DIR/wizard-done` is absent; re-runnable with `rmpr wizard`. A preset
+  replaces the profile, so it is applied first and the other answers written on
+  top of it.
 - **Diagnostics** — `rmpr report` writes a local bundle (error + qmllint,
   environment, redacted config, journal tail + widget health). Written on unit
   failure via `OnFailure=` and when a widget is quarantined, through the same
@@ -49,12 +54,11 @@ for lessons — which patterns to avoid.
   the shell is dead — and both are held to `tests/fixtures/redact-cases.json`.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
-  report, edges, shortcuts, launcher, search, settings, preset, profile, update.
+  report, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
 - **Tests** — 9 shell suites in throwaway HOMEs, plus a QML suite. All green.
 
 ## Not built yet
 
-- **First-run wizard**.
 - **AI assist and the notification ring buffer.** The report bundle and its
   redaction are built and tested, which was the precondition; the providers
   (`clipboard`, `claude-code`, `ollama`, `custom`), the consent dialog that

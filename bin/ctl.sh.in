@@ -16,6 +16,7 @@ usage: @ALIAS@ <command> [options]
   restore [--preinstall|--list]     put KDE back the way it was
   renderer status|list|set|revert   choose what draws the panel
   report create|list|show|remove    write a local diagnostic report
+  wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
   update [--check|--rollback]       update the shell
@@ -59,6 +60,10 @@ case "$cmd" in
 
     settings)
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings toggle
+        ;;
+
+    wizard)
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call wizard open
         ;;
 
     search)
