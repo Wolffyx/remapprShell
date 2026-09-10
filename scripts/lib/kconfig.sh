@@ -144,6 +144,44 @@ kconfig_revert() {
     log_step "reverted $count KDE config key(s)$([ "$scope" = "--all" ] || printf ' for %s' "$scope")"
 }
 
+# kconfig_purge_group <file> <group>
+#
+# Removes a whole group, header and all.
+#
+# ONLY for groups this project creates in their entirety. kwriteconfig6 can
+# delete a key but not a group, and the ledger can only put back keys it wrote
+# -- so a group we created that something else has since added a key to
+# ([PlasmaViews][Panel <our containment id>], where plasmashell writes its own
+# `floating`) survives a revert as an orphan referring to a containment that no
+# longer exists. That residue is small, but "we left something in a KDE file"
+# is exactly what this project promises not to do.
+#
+# The group is identified by the containment id we allocated, so nothing else
+# can legitimately own keys in it. Anywhere that is not true, revert the keys
+# individually and leave the group alone.
+kconfig_purge_group() {
+    local file=$1 group=$2
+    local path="$XDG_CONFIG_HOME/$file"
+    [ -f "$path" ] || return 0
+
+    # "A/B" is written "[A][B]" in the file.
+    local header="[${group//\//][}]"
+    grep -qxF -- "$header" "$path" || return 0
+
+    local tmp
+    tmp=$(mktemp)
+    awk -v header="$header" '
+        $0 == header { skipping = 1; next }
+        /^\[/ { skipping = 0 }
+        !skipping { print }
+    ' "$path" > "$tmp" || { rm -f "$tmp"; return 1; }
+
+    # Written in place so the file keeps its permissions and any hard link.
+    cat "$tmp" > "$path"
+    rm -f "$tmp"
+    log_debug "kconfig: removed group $header from $file"
+}
+
 # Kept for callers that mean "undo everything".
 kconfig_revert_all() { kconfig_revert --all; }
 

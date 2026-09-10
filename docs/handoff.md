@@ -212,8 +212,23 @@ layout aside and put it back if it comes out with fewer containments than it
 went in with. A layout that lost nothing is left alone, because restoring
 unconditionally would undo a change made in the meantime.
 
-**Still unverified:** that guard has not been exercised against the live
-failure, only against its exact shape in the sandbox. Doing so means pointing
+**A second finding, reported by the user afterwards: the desktop was left with
+no panel.** The gate ended on the `quickshell` renderer, whose shell package
+ships no Plasma panel *because our shell draws it* -- and our shell was not
+installed as a service on that machine, so nothing drew one. `rmpr renderer
+revert` put the previous shell package back from the ledger. `renderer set
+quickshell` now refuses unless the shell is running, installed or enabled,
+naming the two renderers that draw without it; `--force` is there for someone
+who means it.
+
+That revert also left `[PlasmaViews][Panel 811]` behind in `plasmashellrc`:
+plasmashell had added its own `floating` key to our panel view's group, and the
+ledger can only put back keys we wrote. `kconfig_purge_group` removes a whole
+group, and is only for groups named after an id we allocate -- nothing else can
+own a key in one.
+
+**Still unverified:** the outgoing-layout guard has not been exercised against
+the live failure, only against its exact shape in the sandbox. Doing so means pointing
 plasmashell back at `caelestia.desktop` and switching away again.
 
 Two smaller things from the same run:

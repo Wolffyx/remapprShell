@@ -148,8 +148,18 @@ check "both packages installed"   "$([ -f "$PLASMA_SHELLS_DIR/$SHELL_PACKAGE_ID/
 # check has to look past the comments to mean anything.
 check "no stock panel template"   "$(grep -vE '^\s*//' "$PLASMA_SHELLS_DIR/$PLASMA_SHELL_PACKAGE_ID/contents/layouts/org.kde.plasma.desktop-layout.js" | grep -c 'loadTemplate')" "0"
 
+# The switch that once left a real desktop with no panel: the quickshell
+# renderer's package ships no Plasma panel because our shell draws it, so
+# switching to it with our shell absent leaves nothing at all.
+echo "== refusing to leave the desktop with no panel =="
+out=$(rmpr_renderer set quickshell --yes 2>&1)
+check "refused"               "$?" "1"
+check "said why"              "$(printf '%s' "$out" | grep -c 'no panel at all')" "1"
+check "offered a way forward" "$(printf '%s' "$out" | grep -c 'renderer set plasma')" "1"
+check "nothing was switched"  "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "$PLASMA_SHELL_PACKAGE_ID"
+
 echo "== back to quickshell =="
-rmpr_renderer set quickshell --yes >/dev/null 2>&1 || { echo "set quickshell failed" >&2; exit 1; }
+rmpr_renderer set quickshell --yes --force >/dev/null 2>&1 || { echo "set quickshell failed" >&2; exit 1; }
 
 check "shell package back"        "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "$SHELL_PACKAGE_ID"
 check "renderer written"          "$(jq -r '.panel.renderer' "$profile")" "quickshell"
@@ -160,7 +170,7 @@ check "stock layout still untouched" "$(sha256sum "$stock")" "$stock_sum"
 echo "== a second round trip =="
 rmpr_renderer set plasma --yes     >/dev/null 2>&1 || { echo "second set plasma failed" >&2; exit 1; }
 check "still exactly one panel"   "$(our_panels)" "1"
-rmpr_renderer set quickshell --yes >/dev/null 2>&1 || { echo "second set quickshell failed" >&2; exit 1; }
+rmpr_renderer set quickshell --yes --force >/dev/null 2>&1 || { echo "second set quickshell failed" >&2; exit 1; }
 check "still none after"          "$(our_panels)" "0"
 check "entries still unchanged"   "$(jq -c '.bar.entries' "$profile")" "$entries_before"
 

@@ -75,6 +75,34 @@ kconfig_revert theme >/dev/null 2>&1
 check "theme scope reverted after"  "$(read_key kdeglobals General ColorScheme)" "Base"
 check "ledger empty"                "$(jq '.entries | length' "$(kconfig_ledger)")" "0"
 
+
+# Removing a whole group.
+#
+# The ledger can only put back keys we wrote, so a group we create that
+# something else later adds a key to survives a revert as an orphan. This is
+# the escape hatch for groups whose name is an id we allocated -- and it must
+# leave every other group in the file exactly as it was.
+echo "== purging a group we own =="
+
+kwriteconfig6 --file purge.rc --group Keep --key mine "yes"
+kwriteconfig6 --file purge.rc --group PlasmaViews --group "Panel 811" --key shell "ours"
+kwriteconfig6 --file purge.rc --group PlasmaViews --group "Panel 811" --key floating "1"
+kwriteconfig6 --file purge.rc --group PlasmaViews --group "Panel 49" --key floating "1"
+
+kconfig_purge_group purge.rc "PlasmaViews/Panel 811"
+
+check "group gone"           "$(grep -c 'Panel 811' "$XDG_CONFIG_HOME/purge.rc")" "0"
+check "someone else's key went with it" "$(grep -c '^floating=1$' "$XDG_CONFIG_HOME/purge.rc")" "1"
+check "other groups kept"    "$(kreadconfig6 --file purge.rc --group Keep --key mine)" "yes"
+check "sibling group kept"   "$(kreadconfig6 --file purge.rc --group PlasmaViews --group "Panel 49" --key floating)" "1"
+
+# Purging what is not there is not an error: revert runs on machines that never
+# had the group in the first place.
+kconfig_purge_group purge.rc "PlasmaViews/Panel 999"
+check "absent group is fine" "$(kreadconfig6 --file purge.rc --group Keep --key mine)" "yes"
+kconfig_purge_group nosuchfile.rc "A/B"
+check "absent file is fine"  "$?" "0"
+
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
 printf 'OK: %d passed\n' "$pass"

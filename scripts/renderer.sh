@@ -87,6 +87,25 @@ package_for() {
     esac
 }
 
+# Will anything of ours actually draw a panel?
+#
+# The quickshell renderer's shell package ships no Plasma panel *because our
+# shell draws it*. If our shell is neither running nor installed, switching to
+# it leaves plasmashell with no panel and nothing in its place -- a desktop with
+# no panel at all, which is what this check exists to prevent. It cost a real
+# desktop its panel once.
+shell_will_draw() {
+    # Matched on the installed path, not the slug: the slug appears in a
+    # development run from a checkout too, and more importantly it makes this
+    # answer depend on which HOME is in play -- which is what lets a test in a
+    # throwaway HOME get a deterministic answer instead of inheriting whatever
+    # the developer happens to be running.
+    pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1 && return 0
+    session_available && systemctl --user is-active "$SYSTEMD_UNIT" >/dev/null 2>&1 && return 0
+    session_available && systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1 && return 0
+    return 1
+}
+
 caelestia_available() { session_available && systemctl --user cat "$CAELESTIA_UNIT" >/dev/null 2>&1; }
 
 # Whether this run may touch the running desktop at all.
@@ -313,10 +332,12 @@ cmd=${1:-status}
 
 ASSUME_YES=0
 DRY_RUN=0
+FORCE=0
 args=()
 while [ $# -gt 0 ]; do
     case "$1" in
         -y|--yes)   ASSUME_YES=1 ;;
+        --force)    FORCE=1 ;;
         --dry-run)  DRY_RUN=1 ;;
         -*)         die "unknown option: $1" ;;
         *)          args+=("$1") ;;
@@ -371,6 +392,20 @@ case "$cmd" in
 
         [ "$target" = caelestia ] && ! caelestia_available \
             && die "caelestia is not installed here ($CAELESTIA_UNIT not found)"
+
+        # The one switch that can leave a desktop with nothing.
+        if [ "$target" = quickshell ] && [ "$FORCE" != 1 ] && ! shell_will_draw; then
+            log_error "$DISPLAY_NAME is not running, and the quickshell renderer expects it to draw the panel"
+            log_error "switching now would leave you with no panel at all"
+            echo >&2
+            log_info "either start the shell first:"
+            log_info "    make link && $ALIAS start"
+            log_info "or pick a renderer that draws without it:"
+            log_info "    $ALIAS renderer set plasma   # plasmashell draws our panel"
+            log_info "    $ALIAS renderer set none     # your stock Plasma panels"
+            log_info "or, if you know what you are doing: --force"
+            exit 1
+        fi
 
         pkg=$(package_for "$target")
         log_step "switching to the $target renderer (shell package: $pkg)"
@@ -457,6 +492,10 @@ case "$cmd" in
         # After the switch, for the reason apply_panel_geometry explains.
         [ "$target" = plasma ] && apply_panel_geometry "$pkg" "$thickness" "$position"
 
+        # Leaving the plasma renderer leaves our panel view's group behind,
+        # for the same reason a revert does.
+        [ "$target" = plasma ] || kconfig_purge_group plasmashellrc "PlasmaViews/Panel $APPLETSRC_PANEL_ID"
+
         # plasmashell writes the outgoing package's config on its way out, and
         # has been seen to write an empty one.
         session_available && sleep 1
@@ -495,6 +534,11 @@ case "$cmd" in
 
     revert)
         kconfig_revert backend
+        # plasmashell adds its own keys to our panel view's group while the
+        # panel exists, and the ledger can only put back the keys we wrote. The
+        # group is named after a containment id we allocate, so nothing else
+        # can own anything in it.
+        kconfig_purge_group plasmashellrc "PlasmaViews/Panel $APPLETSRC_PANEL_ID"
         write_renderer_setting quickshell || true
         restart_plasmashell
         log_step "reverted to the shell package plasmashell had before"
