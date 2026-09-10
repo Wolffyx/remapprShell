@@ -1,6 +1,8 @@
 # Where the project stands
 
-A snapshot for picking the work up fresh. Written 2026-09-10, after Phase 6b.
+A snapshot for picking the work up fresh. Written 2026-09-10, after the
+session that built the Plasma renderer, diagnostics, the wizard, the theme
+layer, the open-window list and panel auto-hide.
 
 ## What this is
 
@@ -17,6 +19,50 @@ and never the default.
 
 **Clean-room.** No code is taken from caelestia-dots-kde. It is referenced only
 for lessons — which patterns to avoid.
+
+## The state of this machine, right now
+
+Written 2026-09-10, after a long working session. Everything below was read
+off the running system rather than remembered.
+
+| | |
+| --- | --- |
+| Shell | installed via `make link`, running as `remappr-shell.service` — **active but not enabled**, so it will not come back after a reboot until `systemctl --user enable remappr-shell.service` |
+| plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
+| Panel | bottom, 40px, entries `launcher, tasks, tray, clock, showdesktop` — the `windows` preset |
+| Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
+| Window list | KWin script loaded, daemon answering, 11 windows |
+| Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
+| `rmpr doctor` | no problems, 3 warnings (the competing shell, krohnkite, one drifted ledger key) |
+
+### What to check first, before building anything
+
+Three things this session could not verify from inside itself. They are quick,
+and one of them is a bug if it fails:
+
+1. **Type into the launcher.** `rmpr launcher`, then type. The keyboard-focus
+   fix is only proven as far as item focus; proving a keystroke lands needs a
+   keystroke, and no key-injection tool is installed here.
+2. **Click a task button once.** It should activate the window on the first
+   click, not the second.
+3. **Drag a row in Settings → Widgets.** Reordering by dragging is new.
+
+### The lesson this session paid for twice
+
+**Everything in this file that says something is impossible is a claim, not a
+fact — re-verify it before repeating it.** Three of them were wrong:
+
+- "Quickshell exposes no layer-shell keyboard-focus mode" — it does,
+  `WlrLayershell.keyboardFocus`, and the launcher works because of it.
+- "Quickshell's Wayland module exposes only session-lock types" — it ships
+  `ToplevelManagement`; the real obstacle was a KWin protocol, found only by
+  running it.
+- "A window with no desktop entry cannot have an icon" — never stated outright,
+  but assumed; `_NET_WM_ICON` had it all along.
+
+Each cost more time to work around than it would have cost to check. The
+measurements in this file are trustworthy; the conclusions drawn from absence
+are not.
 
 ## Working today
 
@@ -163,12 +209,12 @@ for lessons — which patterns to avoid.
 
 ## Known problems
 
-1. ~~**`plasmashellrc` names a shell package that does not exist.**~~ Resolved:
-   `~/.local/share/plasma/shells/caelestia.desktop` is present again, and
-   `rmpr doctor` now reports the package as fine. What it does report is that
-   plasmashell still uses `caelestia.desktop` while `panel.renderer` says
-   `quickshell` — `rmpr renderer set quickshell` is the switch that makes the
-   two agree, and it is a live change to the desktop, so it has not been run.
+1. ~~**`plasmashellrc` names a shell package that does not exist.**~~ Resolved,
+   and since superseded: plasmashell is on `remappr-shell.desktop` and the
+   configured renderer agrees with it.
+
+   What replaced it: **the service is not enabled**, so the panel does not
+   survive a reboot. `systemctl --user enable remappr-shell.service`.
 2. ~~**Typing into the built-in launcher only works after clicking it.**~~
    The claim behind this was wrong, in the same way the ToplevelManager one
    was. Quickshell 0.3.1 *does* expose a layer-shell keyboard-focus mode:
@@ -184,8 +230,13 @@ for lessons — which patterns to avoid.
    sufficient -- proving keystrokes actually arrive needs a keystroke, and no
    key-injection tool is installed here. **Worth confirming by hand:** run
    `rmpr launcher` and type.
-3. **caelestia is still running alongside**, holding Meta, and krohnkite is
-   installed, which can fight edge tiling. Both are reported by `doctor`.
+3. **caelestia's bar is still running alongside ours**, holding Meta, and
+   krohnkite is installed, which can fight edge tiling. Both are reported by
+   `doctor`. Two bars on screen is a side-by-side development arrangement, not
+   a bug — but it is why the screen looks busy.
+4. **No window thumbnails in the task preview**, and this one is settled rather
+   than open: see the entry under "Not built yet". It needs privileges KWin
+   does not give us.
 
 ## The incident worth knowing about
 
