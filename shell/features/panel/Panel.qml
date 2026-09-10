@@ -40,13 +40,18 @@ PanelWindow {
 
     color: "transparent"
 
-    // A grabbing popup requires its parent surface to be able to take keyboard
-    // input; without this Wayland refuses to create one and the built-in
-    // launcher's search field can never be typed into. On-demand focus means
-    // the panel takes the keyboard only when something in it asks, so it does
-    // not steal focus from the window the user is working in.
-    focusable: true
+    // Only while a popout that wants the keyboard is open.
+    //
+    // It used to be unconditional, which cost a click everywhere else: clicking
+    // an on-demand layer surface hands it the keyboard, so a click on the task
+    // list activated a window and then immediately took focus back off it, and
+    // the window only stayed once you clicked a second time. Nothing was
+    // gained in return -- `openPopout` was never assigned, so the key
+    // forwarding below never ran either.
+    focusable: root.openPopout !== null
 
+    // Set by the slot whose popout wants the keyboard, and cleared when it
+    // closes. This is what makes the forwarding below work at all.
     property Item openPopout: null
 
     Rectangle {

@@ -4,18 +4,28 @@
     "name": "Open windows",
     "description": "The windows you have open, and a click to switch to one. Needs the window list turned on: rmpr windows enable.",
     "icon": "preferences-system-windows",
-    "zones": ["left", "middle", "right"],
-    "orientation": ["horizontal"],
+    "zones": [
+        "left",
+        "middle",
+        "right"
+    ],
+    "orientation": [
+        "horizontal"
+    ],
     "renderers": {
-        "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.icontasks" }
+        "quickshell": {
+            "entry": "Widget.qml"
+        },
+        "plasma": {
+            "applet": "org.kde.plasma.icontasks"
+        }
     },
     "config": {
         "showTitles": {
             "type": "bool",
-            "default": true,
+            "default": false,
             "label": "Show titles",
-            "description": "Off for icons only, which fits far more windows on a panel."
+            "description": "Off by default: a panel runs out of room after four or five titles, and the title is one hover away."
         },
         "maxWidth": {
             "type": "int",

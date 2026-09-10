@@ -118,6 +118,18 @@ Item {
         implicitWidth: popout.popoutContent?.implicitWidth ?? 1
         implicitHeight: popout.popoutContent?.implicitHeight ?? 1
 
+        // Tell the panel, so it takes the keyboard for as long as this is open
+        // and forwards what it receives here. A popout that only displays
+        // something does not ask, and the panel stays out of the way.
+        onWantedChanged: {
+            if (!root.bar)
+                return;
+            if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))
+                root.bar.openPopout = popout.popoutContent;
+            else if (root.bar.openPopout === popout.popoutContent)
+                root.bar.openPopout = null;
+        }
+
         Rectangle {
             anchors.fill: parent
             radius: 8

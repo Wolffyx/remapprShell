@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs docs brand test clean
+.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets docs brand test clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -38,7 +38,7 @@ restart: ## Restart the installed systemd user unit
 log: ## Follow the shell's journal
 	@journalctl --user -u $(UNIT) -f
 
-lint: lint-slug lint-layers lint-qml lint-docs ## Run every lint
+lint: lint-slug lint-layers lint-qml lint-widgets lint-docs ## Run every lint
 
 lint-slug: ## Fail if the project name is hardcoded anywhere
 	@scripts/lint-slug.sh
@@ -48,6 +48,9 @@ lint-layers: ## Fail on imports that violate the dependency ladder
 
 docs: brand ## Regenerate the configuration reference
 	@scripts/gen-docs.sh
+
+lint-widgets: ## Fail on widget mistakes qmllint cannot see
+	@scripts/lint-widgets.sh
 
 lint-docs: ## Fail if the configuration reference is out of date
 	@scripts/lint-docs.sh

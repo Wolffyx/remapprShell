@@ -200,7 +200,7 @@ renderer, and is named before you switch rather than discovered afterwards.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `showTitles` | `true` or `false` | `true` | Off for icons only, which fits far more windows on a panel. |
+| `showTitles` | `true` or `false` | `false` | Off by default: a panel runs out of room after four or five titles, and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |
 | `iconSize` | a number, 12 to 48 | `18` | Icon size |
 

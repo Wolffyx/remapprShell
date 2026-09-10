@@ -178,6 +178,17 @@ Non-obvious things that cost time to discover:
   imported by `qmltestrunner` at all**, which makes every pure function beside
   it untestable by association. `qs.domain.osd.events` exists as its own module
   for exactly that reason.
+- **A widget must not define a function named after a `BarWidget` signal.**
+  QML refuses the whole file ("Duplicate method name") and the widget silently
+  never appears; qmllint cannot see it, because it does not resolve BarWidget.
+  `scripts/lint-widgets.sh` checks for it now.
+- **The panel was `focusable: true` unconditionally**, which cost a click on
+  every widget: clicking an on-demand layer surface hands it the keyboard, so
+  activating a window and then taking focus straight back off it looked like
+  the first click doing nothing. It bought nothing either -- `openPopout` was
+  never assigned, so the key-forwarding it existed for never ran. Now it is
+  focusable only while a popout that wants the keyboard is open, and the slot
+  assigns `openPopout`.
 - **A KConfig group name can contain a space** (`[PlasmaViews][Panel 811]`), so
   the ledger's group path is split on `/` and nothing else. Splitting on
   whitespace turned one group into two that KDE never reads.
