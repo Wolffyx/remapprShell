@@ -138,23 +138,6 @@ TestCase {
         compare(e.summary, "Image probe");
     }
 
-    function test_the_pixels_are_gone_before_parsing() {
-        const stripped = NotificationEvents.stripByteArrays(imageLine(16384));
-        verify(stripped.length < 1000);
-        verify(stripped.indexOf("image-data") >= 0);
-        compare(JSON.parse(stripped).payload.data[6]["image-data"].data[6].length, 0);
-    }
-
-    // The dimensions in front of the byte array are a short list and must
-    // survive; so must a notification's actions, which are strings.
-    function test_short_arrays_are_left_alone() {
-        const stripped = NotificationEvents.stripByteArrays(imageLine(16384));
-        const img = JSON.parse(stripped).payload.data[6]["image-data"].data;
-        compare(img[0], 64);
-        compare(img[1], 64);
-        compare(img[2], 256);
-    }
-
     function test_actions_survive_the_strip() {
         const e = NotificationEvents.parse(call(["a", 0, "", "s", "b", ["default", "Open"], {}, -1]));
         compare(e.actions.length, 2);
@@ -162,7 +145,9 @@ TestCase {
     }
 
     // Text that looks like pixel data is text. The notification a person sees
-    // and the one recorded here have to be the same one.
+    // and the one recorded here have to be the same one. The scanning itself
+    // is tested in tst_BusLine; this checks it through the parser a
+    // notification actually takes.
     function test_a_body_full_of_numbers_is_not_touched() {
         let body = "1";
         for (let i = 2; i <= 200; i++)
@@ -183,15 +168,6 @@ TestCase {
         const body = 'he said "[1,2,3]" and left';
         const e = NotificationEvents.parse(call(["a", 0, "", "s", body, [], {}, -1]));
         compare(e.body, body);
-    }
-
-    function test_a_line_too_big_even_stripped_is_dropped() {
-        const before = NotificationEvents.dropped;
-        let body = "";
-        while (body.length < NotificationEvents.maxLineLength + 1000)
-            body += "abcdefghij";
-        compare(NotificationEvents.parse(call(["a", 0, "", "s", body, [], {}, -1])), null);
-        compare(NotificationEvents.dropped, before + 1);
     }
 
     function test_junk_is_not_a_notification() {

@@ -65,6 +65,8 @@ QtObject {
 
     // And then followed. A match rule rather than a whole-bus monitor: this
     // wants two signals, not every message on the session bus.
+    property int _dropped: 0
+
     readonly property Process _monitor: Process {
         running: true
         command: ["busctl", "--user", "--json=short", "monitor",
@@ -72,8 +74,17 @@ QtObject {
         stdout: SplitParser {
             onRead: line => {
                 const list = WindowEvents.parseSignal(line);
-                if (list === null)
+                if (list === null) {
+                    // A dropped line means the window list on screen is now
+                    // out of date and nothing will say so, since the daemon
+                    // sends state rather than changes. Worth a warning, unlike
+                    // the ordinary case of a line that is simply not ours.
+                    if (BusLine.dropped > root._dropped) {
+                        root._dropped = BusLine.dropped;
+                        Log.warn("windows", "a window update was too large to read; the list may be stale");
+                    }
                     return;
+                }
                 // A window opening or closing is worth a journal line; a title
                 // changing is not, and there are a great many of those.
                 const changed = list.length !== root.windows.length;

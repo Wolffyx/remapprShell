@@ -19,6 +19,7 @@ pragma Singleton
 // association.
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
@@ -35,21 +36,16 @@ QtObject {
     // showing an empty bar because a payload was one element short is worse
     // than one that does not appear.
     function parse(line) {
-        if (!line || line.length === 0)
+        // Bounded before it is parsed, like every line off the bus. Plasma's
+        // OSD signals are strings and numbers today, so nothing here is
+        // expected to be large -- but "expected" is exactly what was assumed
+        // about notification hints, and that took the shell down five times.
+        const msg = BusLine.parse(line);
+        if (!BusLine.isSignal(msg, "org.kde.osdService"))
             return null;
 
-        let msg;
-        try {
-            msg = JSON.parse(line);
-        } catch (e) {
-            return null;   // banner lines and partial reads
-        }
-
-        if (msg.type !== "signal" || msg.interface !== "org.kde.osdService")
-            return null;
-
-        const data = msg.payload?.data;
-        if (!Array.isArray(data))
+        const data = BusLine.payload(msg);
+        if (!data)
             return null;
 
         if (msg.member === "osdProgress") {

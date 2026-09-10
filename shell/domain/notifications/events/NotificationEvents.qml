@@ -29,105 +29,12 @@ pragma Singleton
 // icon this reads is `image-path`, which is a string.
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
 
     readonly property string interfaceName: "org.freedesktop.Notifications"
-
-    // A run of this many plain integers in a row is pixel data. Nothing we
-    // read is a number at all: the summary, body, icon and desktop entry are
-    // strings and the actions are a list of strings, so no honest field can be
-    // caught by this. Sixty-four is far above any array a notification carries
-    // and far below the smallest icon anyone sends.
-    readonly property int pixelRunLength: 64
-
-    // A line still this large once the pixels are out is not something to hand
-    // to JSON.parse. It should not happen; if it does, dropping one
-    // notification is the right answer and the shell stays up.
-    readonly property int maxLineLength: 1048576
-
-    // Set when a line was dropped for being too large, so the service can say
-    // so once rather than the parser logging from inside a hot handler.
-    property int dropped: 0
-
-    // Removes byte arrays from a busctl JSON line, leaving the rest intact.
-    // A string pass rather than a structural one, because the structure is
-    // exactly what cannot be built: this runs before JSON.parse, on the line
-    // that would kill the engine.
-    //
-    // Quotes are respected. A body reading "1, 2, 3, ..." is text, and text
-    // must not be edited on its way past -- the notification a person sees and
-    // the one this records have to be the same one.
-    function stripByteArrays(line) {
-        if (!line || line.indexOf("[") < 0)
-            return line;
-
-        let out = "";
-        let i = 0;
-        let inString = false;
-
-        while (i < line.length) {
-            const c = line[i];
-
-            if (inString) {
-                out += c;
-                if (c === "\\") {
-                    // An escape takes the next character with it, so a
-                    // backslash before a quote does not end the string.
-                    if (i + 1 < line.length)
-                        out += line[i + 1];
-                    i += 2;
-                    continue;
-                }
-                if (c === '"')
-                    inString = false;
-                i++;
-                continue;
-            }
-
-            if (c === '"') {
-                inString = true;
-                out += c;
-                i++;
-                continue;
-            }
-
-            if (c === "[") {
-                // Measure the run of integers this bracket opens, without
-                // keeping any of it.
-                let j = i + 1;
-                let count = 0;
-                let digits = 0;
-                while (j < line.length) {
-                    const d = line[j];
-                    if (d >= "0" && d <= "9") {
-                        digits++;
-                        j++;
-                    } else if (d === "," && digits > 0) {
-                        count++;
-                        digits = 0;
-                        j++;
-                    } else {
-                        break;
-                    }
-                }
-                if (digits > 0)
-                    count++;
-
-                if (line[j] === "]" && count >= root.pixelRunLength) {
-                    out += "[]";
-                    i = j + 1;
-                    continue;
-                }
-            }
-
-            out += c;
-            i++;
-        }
-
-        return out;
-    }
 
     // busctl renders an a{sv} as { key: { type, data } }. Anything else is
     // taken as already unwrapped, which is what a hand-written fixture is.
@@ -143,33 +50,17 @@ QtObject {
     // Returns { appName, appIcon, summary, body, actions, urgency, desktopEntry,
     // when } or null.
     function parse(line, now) {
-        if (!line || line.length === 0)
+        // BusLine takes the pixels out and bounds the size before anything
+        // here sees the line. That is the step this parser used to die in.
+        const msg = BusLine.parse(line);
+        if (!BusLine.isCall(msg, root.interfaceName, "Notify"))
             return null;
 
-        // Before anything else, including the cheap checks below: the whole
-        // point is that this line must never reach JSON.parse intact.
-        const text = root.stripByteArrays(line);
-        if (text.length > root.maxLineLength) {
-            root.dropped++;
-            return null;
-        }
-
-        let msg;
-        try {
-            msg = JSON.parse(text);
-        } catch (e) {
-            return null;   // banner lines and partial reads
-        }
-
-        if (msg.type !== "method_call" || msg.interface !== root.interfaceName
-                || msg.member !== "Notify")
-            return null;
-
-        const data = msg.payload?.data;
         // The spec's argument list: app_name, replaces_id, app_icon, summary,
         // body, actions, hints, expire_timeout. A call short of the summary is
         // not a notification anyone could have seen.
-        if (!Array.isArray(data) || data.length < 4)
+        const data = BusLine.payload(msg, 4);
+        if (!data)
             return null;
 
         const hints = data[6];

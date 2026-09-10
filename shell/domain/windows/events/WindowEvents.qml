@@ -13,6 +13,7 @@ pragma Singleton
 // rather than blanking the panel.
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
@@ -70,21 +71,15 @@ QtObject {
     // One line of `busctl --json=short monitor`, which wraps the daemon's JSON
     // string inside a DBus payload.
     function parseSignal(line) {
-        if (!line || line.length === 0)
+        // Bounded before it is parsed. The daemon is ours and its payload is a
+        // JSON string of a known shape, but the window titles inside it come
+        // from whatever the user happens to be running, and that is not ours.
+        const msg = BusLine.parse(line);
+        if (!msg || msg.type !== "signal" || msg.member !== "Changed")
             return null;
 
-        let msg;
-        try {
-            msg = JSON.parse(line);
-        } catch (e) {
-            return null;
-        }
-
-        if (msg.type !== "signal" || msg.member !== "Changed")
-            return null;
-
-        const data = msg.payload?.data;
-        if (!Array.isArray(data) || data.length === 0)
+        const data = BusLine.payload(msg, 1);
+        if (!data)
             return null;
 
         return root.parseList(String(data[0]));

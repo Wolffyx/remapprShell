@@ -57,8 +57,8 @@ QtObject {
     property int _dropped: 0
 
     function _reportDropped() {
-        const n = NotificationEvents.dropped - root._dropped;
-        root._dropped = NotificationEvents.dropped;
+        const n = BusLine.dropped - root._dropped;
+        root._dropped = BusLine.dropped;
         Log.warn("notifications", `${n} notification(s) too large to read safely; skipped`);
     }
 
@@ -80,7 +80,7 @@ QtObject {
                 const entry = NotificationEvents.parse(line);
                 if (entry)
                     root._push(entry);
-                else if (NotificationEvents.dropped > root._dropped)
+                else if (BusLine.dropped > root._dropped)
                     root._reportDropped();
             }
         }

@@ -187,7 +187,8 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite. All green.
+- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite of 78. All
+  green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
   missing one. `test-crash.sh` builds dumps by hand, including one belonging to
@@ -374,6 +375,12 @@ Non-obvious things that cost time to discover:
   Zero is not unset -- Qt reads `rows * columns` as the capacity, so a zone with
   two widgets in it warned and laid them out wrongly. The unset value is -1. It
   stayed hidden until a zone held more than one widget.
+- **Every line off a bus monitor goes through `core/BusLine.qml`.** It strips
+  byte arrays, bounds the length, and answers the questions each listener used
+  to ask for itself (is this a signal on that interface, is the payload long
+  enough). The three parsers -- OSD, notifications, windows -- all read through
+  it, so the fix below is applied everywhere rather than only where it bit.
+  Pure, and in `core/`, so those parsers stay loadable by qmltestrunner.
 - **`busctl --json=short` renders a byte array as one integer per byte, and
   parsing one segfaults the QML engine.** An application with no icon file
   sends its icon as pixels in an `image-data` hint, `(iiibiiay)`. A 512x512
@@ -384,17 +391,18 @@ Non-obvious things that cost time to discover:
   send icons this way, so it is ordinary desktop traffic -- which is why it
   looked like a shell that crashed at no particular time.
 
-  `NotificationEvents.stripByteArrays` removes any run of 64 or more plain
-  integers **before** the line reaches `JSON.parse`; after is too late, since
-  parsing is the step that dies. It is a string scan that respects quotes and
-  escapes, so a body full of numbers is left alone. Nothing is lost: the only
-  icon read here is `image-path`, which is a string. Reproduced first, in an
-  isolated shell that did nothing but this pipeline, and the fixed parser now
-  takes a 15 MB line (1024x1024) and still reports the summary.
+  `BusLine.stripByteArrays` removes any run of 64 or more plain integers
+  **before** the line reaches `JSON.parse`; after is too late, since parsing is
+  the step that dies. It is a string scan that respects quotes and escapes, so
+  a body full of numbers is left alone. Nothing is lost: the only icon read
+  here is `image-path`, which is a string. Reproduced first, in an isolated
+  shell that did nothing but this pipeline, and the fixed parser now takes a
+  15 MB line (1024x1024) and still reports the summary.
 
-  The general lesson: **a `SplitParser` line is attacker-shaped input even when
-  it comes from your own desktop.** Anything read off a bus monitor needs a
-  size bound before it is handed to a parser.
+  The general lesson, and the reason the guard is shared rather than local:
+  **a `SplitParser` line is attacker-shaped input even when it comes from your
+  own desktop.** The OSD listener and the window list read the same way and
+  were fixed at the same time, before either was the one that crashed.
 - **A crash in a signal handler leaves no QML error at all.** The only
   evidence was `~/.cache/quickshell/crashes/`, and the three dumps had
   byte-identical stacks -- which is what made it clear it was one bug and not
