@@ -86,7 +86,7 @@ are not.
   so a fresh install shows the tray it has rather than an empty strip and a
   chevron. Settings has a Tray icons page that edits all three lists by
   dragging a row between them, because the alternative is typing ids like
-  `org.kde.StatusNotifierItem-5616-1`. The rules are in
+  `org.kde.StatusNotifierItem-5616-1`. `rmpr settings tray` opens it. The rules are in
   `qs.domain.tray.layout`, which the page and the panel both read, so they
   cannot disagree. Left click activates, right click opens the application's
   own menu, middle click is the secondary action, the wheel scrolls the icon
@@ -132,7 +132,10 @@ are not.
   the shell is dead — and both are held to `tests/fixtures/redact-cases.json`.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
-  report, ask, crash, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
+  report, ask, crash, wizard, edges, shortcuts, launcher, search, `settings [page]`,
+  preset, profile, update. A page name is a schema section id, which is also
+  its heading in the generated reference -- so `rmpr settings tray` opens the
+  window where the docs say it is.
 - **Auto-hide** — `panel.autoHide`, per output like position and thickness.
   The surface really does shrink to a sliver rather than a full-height
   transparent one moved out of sight: a transparent surface still eats every

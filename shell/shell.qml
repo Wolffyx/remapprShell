@@ -51,6 +51,7 @@ ShellRoot {
         loading: false
 
         SettingsWindow {
+            id: settingsWindow
             visible: true
             sections: Schema.sections
 
@@ -193,6 +194,23 @@ ShellRoot {
         function open(): void { settings.activeAsync = true; }
         function close(): void { settings.activeAsync = false; }
         function toggle(): void { settings.activeAsync = !settings.activeAsync; }
+
+        // Opens on a named page. The names are the schema's section ids, which
+        // are also the headings in the generated configuration reference, so
+        // there is one set of names for the window, the CLI and the docs.
+        function page(name: string): string {
+            const sections = Schema.sections ?? [];
+            const index = sections.findIndex(s => s && s.id === name);
+            if (index < 0)
+                return `no such page: ${name} (${sections.map(s => s.id).join(", ")})`;
+            settings.activeAsync = true;
+            settings.item.currentIndex = index;
+            return name;
+        }
+
+        function pages(): string {
+            return (Schema.sections ?? []).map(s => s.id).join("\n");
+        }
     }
 
     IpcHandler {

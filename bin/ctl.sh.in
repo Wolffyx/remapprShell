@@ -20,6 +20,7 @@ usage: @ALIAS@ <command> [options]
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
   windows enable|disable|status     the open-window list (needs a KWin script)
+  settings [page]                   open the settings window, on a page
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
@@ -66,6 +67,10 @@ case "$cmd" in
         ;;
 
     settings)
+        # `settings <page>` opens straight to one, by its schema section id.
+        if [ $# -gt 0 ]; then
+            exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings page "$1"
+        fi
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings toggle
         ;;
 
