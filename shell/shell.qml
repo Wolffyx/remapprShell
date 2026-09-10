@@ -113,7 +113,7 @@ ShellRoot {
     // the only thing that can report one is the shell that came back.
     // Referenced here so it runs at startup rather than whenever something
     // first happens to look at it.
-    readonly property int _lastCrash: CrashWatch.lastSeen
+    readonly property string _lastCrash: CrashWatch.reported
 
     // Referenced so the eavesdrop starts with the shell when it is wanted,
     // rather than the first time a widget happens to look at it.

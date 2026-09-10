@@ -177,10 +177,13 @@ are not.
   **not** put a window on screen -- a shell that has just come back should not
   open a dialog over whatever the user was doing.
 
-  The "is this crash new" decision is in the CLI (`rmpr crash since <epoch>`),
-  not in QML, so a test can reach it. It compares by **time, not identity**:
-  keying on the last-seen id reported an *older* dump as a new crash once the
-  recorded one was deleted, which is now a test.
+  The whole decision is in the CLI (`rmpr crash check`) rather than in QML, so
+  a test can reach it -- and it needed to. The first version kept it in QML and
+  got two things wrong: it compared by **identity**, so deleting the recorded
+  dump made an *older* one look new; and on a machine with no dumps at all it
+  wrote no record, so the very first crash was seeded away as history instead
+  of reported -- losing exactly the crash that matters most. Both are tests
+  now. The QML runs the command and reacts to what it prints.
 
   `rmpr crash list|show|remove|since`; `rmpr ask --crash` asks about one, and
   reuses the bundle already written rather than making another. Ownership is

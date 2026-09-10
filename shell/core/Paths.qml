@@ -31,11 +31,6 @@ QtObject {
     // an empty config cannot be the signal.
     readonly property string wizardDoneFile: `${root.stateDir}/wizard-done`
 
-    // The last quickshell crash dump already reported. Quickshell restarts
-    // itself after a crash, so without a record the same dump would be
-    // reported again on every restart.
-    readonly property string lastCrashFile: `${root.stateDir}/last-crash`
-
     // Widgets the user installed, deliberately outside the Quickshell config
     // directory: Quickshell reloads its entire config on any change beneath
     // that directory, so editing a plugin there would restart the whole shell.

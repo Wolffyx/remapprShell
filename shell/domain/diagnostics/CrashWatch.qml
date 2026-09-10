@@ -16,62 +16,44 @@ pragma Singleton
 // anything and it does not put a window on screen: a shell that has just come
 // back should not open a dialog over whatever the user was doing. `rmpr ask
 // --crash` is how a person acts on it, and `rmpr doctor` says it is there.
+//
+// The deciding is all in `rmpr crash check` -- which dumps are ours, whether
+// one is newer than the last accounted for, and remembering that it now is.
+// This runs it and reacts. That is deliberate: the first version kept the
+// record here in QML and got two things wrong that a test would have caught
+// at once. It compared by id, so deleting the recorded dump made an older one
+// look new; and on a machine with no dumps at all it wrote no record, so the
+// very first crash was seeded away as history instead of reported.
 
 import QtQuick
 import Quickshell.Io
 import qs.core
-import qs.platform.system
+
 
 QtObject {
     id: root
 
-    // When the newest dump already accounted for was written. Time rather than
-    // identity: an id does not survive its dump being deleted, and "the newest
-    // is not the one I recorded" is then true of a dump OLDER than it -- which
-    // reports an old crash as a new one. Seen the first time this was wired up.
-    //
-    // The comparison itself belongs to the CLI (`crash since`), where a test
-    // can reach it. This part starts it and reacts.
-    property int lastSeen: 0
     property string reported: ""
 
     function check() {
-        sinceProc.running = false;
-        sinceProc.command = [Branding.ctlBin, "crash", "since", String(root.lastSeen)];
-        sinceProc.running = true;
+        checkProc.running = false;
+        checkProc.running = true;
     }
 
-    readonly property Process _since: Process {
-        id: sinceProc
+    // Prints "<epoch> <id>" for a crash to report, and nothing otherwise.
+    readonly property Process _check: Process {
+        id: checkProc
+        running: true
+        command: [Branding.ctlBin, "crash", "check"]
+
         stdout: StdioCollector {
             onStreamFinished: {
-                const line = text.trim();
-                if (line.length === 0)
-                    return;   // nothing newer: an ordinary start
-
-                const parts = line.split(/\s+/);
-                const when = parseInt(parts[0], 10);
-                const id = parts[1] ?? "";
-                if (!Number.isFinite(when) || id.length === 0)
-                    return;
-
-                root._remember(when, id);
-
-                // A first start records what is already there without
-                // reporting it: every dump on a machine that has never run
-                // this predates it, and none of them is news.
-                if (root._seeding) {
-                    root._seeding = false;
-                    Log.debug("crash", `${id} predates this shell; noted, not reported`);
-                    return;
-                }
-
-                root._report(id);
+                const id = text.trim().split(/\s+/)[1] ?? "";
+                if (id.length > 0)
+                    root._report(id);
             }
         }
     }
-
-    property bool _seeding: false
 
     function _report(id) {
         root.reported = id;
@@ -82,10 +64,7 @@ QtObject {
         reportProc.running = true;
     }
 
-    // Written locally and sent nowhere, like every report. It is deliberately
-    // not put on screen: a shell that has just come back should not open a
-    // window over whatever the user was doing. The journal says it happened,
-    // `doctor` says it is there, and `ask --crash` is how a person acts on it.
+    // Written locally and sent nowhere, like every report.
     readonly property Process _reporter: Process {
         id: reportProc
         stdout: StdioCollector {
@@ -93,36 +72,6 @@ QtObject {
                 const dir = text.trim().split("\n").pop();
                 if (dir.length > 0)
                     Log.warn("crash", `report written: ${dir} -- read it with 'report show', ask about it with 'ask --crash'`);
-            }
-        }
-    }
-
-    function _remember(when, id) {
-        root.lastSeen = when;
-        Fs.ensureDir(Paths.stateDir);
-        seenView.setText(`${when} ${id}\n`);
-    }
-
-    // Which crash has been accounted for, kept across restarts. In state
-    // rather than config: it is ours to remember, never something a person
-    // would set.
-    readonly property FileView _seen: FileView {
-        id: seenView
-        path: Paths.lastCrashFile
-        atomicWrites: true
-        printErrors: false
-
-        onLoaded: {
-            const when = parseInt(seenView.text().trim().split(/\s+/)[0], 10);
-            root.lastSeen = Number.isFinite(when) ? when : 0;
-            root.check();
-        }
-
-        onLoadFailed: err => {
-            if (err === FileViewError.FileNotFound) {
-                root.lastSeen = 0;
-                root._seeding = true;
-                root.check();
             }
         }
     }

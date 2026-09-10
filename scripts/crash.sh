@@ -5,6 +5,7 @@
 #   show [<id>]            the stack trace and the log from just before it
 #   remove <id> | --all    delete dumps
 #   since <epoch>          the newest dump written after that moment, if any
+#   check                  is there a crash the shell has not accounted for?
 #
 # These exist because a crash inside quickshell never reaches systemd: the
 # engine catches the signal, writes a dump, and restarts the shell in process.
@@ -63,6 +64,40 @@ case "$cmd" in
         crash_since "${args[0]:-0}"
         ;;
 
+    # What the shell runs when it starts. It answers one question -- has this
+    # shell come back from a crash it has not already reported -- and keeps the
+    # record of what it has seen, so the whole decision is here where a test
+    # can reach it rather than in QML where one cannot.
+    #
+    # Prints "<epoch> <id>" for a crash to report, and nothing otherwise.
+    check)
+        seen_file="$STATE_DIR/last-crash"
+        newest=$(crash_newest_epoch)
+
+        if [ ! -f "$seen_file" ]; then
+            # Never run here before, so every dump already present predates
+            # this shell and none of them is news. The record is written even
+            # when there are none: without that, the first crash on a fresh
+            # install would arrive with the file still missing and be seeded
+            # away as history instead of reported.
+            mkdir -p "$STATE_DIR"
+            printf '%s %s
+' "${newest:-0}" "$(crash_newest)" > "$seen_file"
+            exit 0
+        fi
+
+        seen=$(cut -d' ' -f1 "$seen_file" 2>/dev/null)
+        case "$seen" in ''|*[!0-9]*) seen=0 ;; esac
+
+        line=$(crash_since "$seen")
+        [ -n "$line" ] || exit 0
+
+        printf '%s
+' "$line" > "$seen_file"
+        printf '%s
+' "$line"
+        ;;
+
     show)
         dir=$(crash_dir "${args[0]:-}") || die "no crash dump from this shell"
         # Redacted like everything else here: a dump carries the environment
@@ -87,5 +122,5 @@ case "$cmd" in
         log_step "removed $dir"
         ;;
 
-    *) die "unknown command: $cmd (expected list, show, remove or since)" ;;
+    *) die "unknown command: $cmd (expected list, show, remove, since or check)" ;;
 esac

@@ -173,6 +173,49 @@ make_dump theirs-new "$HOME/.config/quickshell/somebody/shell.qml" "2026-01-03 0
 check "their crash is not ours"       "$("$CRASH" since "$newest_epoch")" ""
 rm -rf "$CRASHES/theirs-new"
 
+# --- check: the whole decision the shell makes at startup ---------------------
+
+seen="$STATE_DIR/last-crash"
+
+# A machine that has never run this. Every dump already there predates it, so
+# none of them is news -- but the record must still be written, or the next
+# start would seed all over again.
+rm -f "$seen"
+check "a first start reports nothing"  "$("$CRASH" check)" ""
+check "and writes the record"          "$([ -f "$seen" ] && echo yes)" "yes"
+check "naming the newest it saw"       "$(cut -d' ' -f2 "$seen")" "new-ours"
+
+# An ordinary restart, with nothing new.
+check "a restart reports nothing"      "$("$CRASH" check)" ""
+
+# A crash. Reported once, and not again on the next start.
+make_dump crash-one "$QS_CONFIG_DIR/shell.qml" "2026-02-01 09:00:00"
+check "a new crash is reported"        "$("$CRASH" check | cut -d' ' -f2)" "crash-one"
+check "and not a second time"          "$("$CRASH" check)" ""
+
+# The case the first version got wrong: a fresh install with NO dumps at all,
+# where the very first crash arrives with no record yet written. Seeding it
+# away as history would lose exactly the crash that matters most.
+rm -f "$seen"
+"$CRASH" remove --all >/dev/null 2>&1
+check "a first start with no dumps"    "$("$CRASH" check)" ""
+check "still writes a record"          "$([ -f "$seen" ] && echo yes)" "yes"
+make_dump first-ever "$QS_CONFIG_DIR/shell.qml" "2026-03-01 09:00:00"
+check "the first crash IS reported"    "$("$CRASH" check | cut -d' ' -f2)" "first-ever"
+
+# Somebody else's crash is not something this shell came back from.
+make_dump theirs-later "$HOME/.config/quickshell/somebody/shell.qml" "2026-04-01 09:00:00"
+check "their crash is not reported"    "$("$CRASH" check)" ""
+
+# A record that has been corrupted is not a reason to stay silent for ever.
+printf 'nonsense\n' > "$seen"
+make_dump after-corrupt "$QS_CONFIG_DIR/shell.qml" "2026-05-01 09:00:00"
+check "a corrupt record still reports" "$("$CRASH" check | cut -d' ' -f2)" "after-corrupt"
+
+rm -rf "$CRASHES/theirs-later" "$CRASHES/after-corrupt" "$CRASHES/first-ever"
+make_dump old-ours "$QS_CONFIG_DIR/shell.qml" "2026-01-01 10:00:00"
+make_dump new-ours "$QS_CONFIG_DIR/shell.qml" "2026-01-01 12:00:00"
+
 # --- removal ------------------------------------------------------------------
 "$CRASH" remove old-ours >/dev/null 2>&1
 check "one dump removed"              "$("$CRASH" list --ids | wc -l)" "1"
