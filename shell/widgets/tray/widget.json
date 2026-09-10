@@ -2,17 +2,44 @@
     "id": "tray",
     "apiVersion": 1,
     "name": "System tray",
-    "description": "StatusNotifierItem icons from running applications.",
+    "description": "StatusNotifierItem icons from running applications, with the rest behind a chevron.",
     "icon": "preferences-system-tray",
-    "zones": ["left", "middle", "right"],
-    "orientation": ["horizontal", "vertical"],
+    "zones": [
+        "left",
+        "middle",
+        "right"
+    ],
+    "orientation": [
+        "horizontal",
+        "vertical"
+    ],
     "renderers": {
-        "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.systemtray" }
+        "quickshell": {
+            "entry": "Widget.qml"
+        },
+        "plasma": {
+            "applet": "org.kde.plasma.systemtray"
+        }
     },
     "config": {
-        "iconSize": { "type": "int", "default": 18, "min": 12, "max": 48, "label": "Icon size" },
-        "hidden": { "type": "list", "default": [], "label": "Hidden items",
-                    "description": "StatusNotifierItem ids to leave out." }
+        "iconSize": {
+            "type": "int",
+            "default": 18,
+            "min": 12,
+            "max": 48,
+            "label": "Icon size"
+        },
+        "pinned": {
+            "type": "list",
+            "default": [],
+            "label": "On the panel",
+            "description": "StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids."
+        },
+        "hidden": {
+            "type": "list",
+            "default": [],
+            "label": "Never shown",
+            "description": "Ids left out altogether, not even behind the chevron."
+        }
     }
 }

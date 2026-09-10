@@ -104,6 +104,13 @@ What appears on the panel, and in which zone.
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
+### Tray icons
+
+Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Profiles
 
 Separate configurations you can switch between, and per-monitor overrides within each.
@@ -239,7 +246,8 @@ renderer, and is named before you switch rather than discovered afterwards.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `iconSize` | a number, 12 to 48 | `18` | Icon size |
-| `hidden` | a list | `[]` | StatusNotifierItem ids to leave out. |
+| `pinned` | a list | `[]` | StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids. |
+| `hidden` | a list | `[]` | Ids left out altogether, not even behind the chevron. |
 
 ### `widgets.workspaces`
 

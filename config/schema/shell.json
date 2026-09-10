@@ -211,6 +211,13 @@
             "page": "widgets"
         },
         {
+            "id": "tray",
+            "label": "Tray icons",
+            "icon": "preferences-system-tray",
+            "description": "Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.",
+            "page": "tray"
+        },
+        {
             "id": "profiles",
             "label": "Profiles",
             "icon": "preferences-desktop-display",

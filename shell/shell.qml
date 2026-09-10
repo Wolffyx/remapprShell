@@ -6,6 +6,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.SystemTray
 import qs.core
 import qs.features.panel
 import qs.features.panel.model
@@ -118,6 +119,33 @@ ShellRoot {
     // Referenced so the eavesdrop starts with the shell when it is wanted,
     // rather than the first time a widget happens to look at it.
     readonly property bool _notificationsWanted: NotificationWatch.enabled
+
+    // What the tray host can see, which is otherwise only knowable by looking
+    // at the panel. `doctor` reads it, and so does anyone working out why an
+    // application's icon is not where they expected.
+    IpcHandler {
+        target: "tray"
+
+        function list(): string {
+            const out = [];
+            for (const item of SystemTray.items?.values ?? []) {
+                if (!item)
+                    continue;
+                out.push({
+                    id: item.id,
+                    title: item.title,
+                    tooltip: item.tooltipTitle,
+                    status: item.status,
+                    category: item.category,
+                    hasMenu: item.hasMenu,
+                    onlyMenu: item.onlyMenu
+                });
+            }
+            return JSON.stringify(out);
+        }
+
+        function count(): string { return String(SystemTray.items?.values?.length ?? 0); }
+    }
 
     IpcHandler {
         target: "notifications"

@@ -31,6 +31,7 @@ off the running system rather than remembered.
 | Shell | installed via `make link`, running as `remappr-shell.service` — **active but not enabled**, so it will not come back after a reboot until `systemctl --user enable remappr-shell.service` |
 | plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
+| Tray | nothing pinned, so every item is on the panel and there is no chevron. Curate it in Settings → Tray icons |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Crash dumps | five from before the `image-data` fix in `~/.cache/quickshell/crashes/`, all with the same stack, plus one from the isolated shell that reproduced it. Safe to delete: `rmpr crash remove --all` |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
@@ -77,9 +78,19 @@ are not.
 
 - **Panel** — Quickshell layer-shell, one per monitor, position/thickness from
   config, live reload with no restart.
-- **Widgets** — launcher, workspaces (KWin virtual desktops), clock, tray
-  (StatusNotifierItem), power (Plasma's logout prompt), show-desktop. Built-ins
+- **Widgets** — launcher, workspaces (KWin virtual desktops), clock, tray,
+  power (Plasma's logout prompt), show-desktop, notification history. Built-ins
   and third-party plugins share one manifest format and one code path.
+- **Tray** — three states: on the panel, behind the chevron, never shown.
+  `widgets.tray.pinned` is the ordered panel list and **empty means everything**,
+  so a fresh install shows the tray it has rather than an empty strip and a
+  chevron. Settings has a Tray icons page that edits all three lists by
+  dragging a row between them, because the alternative is typing ids like
+  `org.kde.StatusNotifierItem-5616-1`. The rules are in
+  `qs.domain.tray.layout`, which the page and the panel both read, so they
+  cannot disagree. Left click activates, right click opens the application's
+  own menu, middle click is the secondary action, the wheel scrolls the icon
+  under the pointer.
 - **Config** — layered defaults → profile → per-monitor → runtime. Sparse
   deltas. Live reload. Refuses to write over a file that does not parse.
 - **Settings window** — schema-driven; every control is generated from a schema,
@@ -190,7 +201,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite of 78. All
+- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite of 92. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -414,6 +425,27 @@ Non-obvious things that cost time to discover:
   addresses against `libQt6Qml.so` named functions up to 10 KB away
   (`changeVTableImpl`, `cleanupDeletedQObjectWrappersInSweep`) and sent the
   first guess in the wrong direction. Reproducing was faster than symbolising.
+- **`SystemTrayItem.display()` does not work over layer-shell.** It is the
+  obvious way to show an application's tray menu and it fails twice: first with
+  "Cannot display PlatformMenuEntry as quickshell was not started in
+  QApplication mode", and then, once `//@ pragma UseQApplication` is added and
+  the shell **restarted** (a reload is not enough), with "Cannot attach popup
+  ... as the popup is not an xdg_popup" and a grabbing-popup warning. A
+  platform menu is a QWidget popup needing an xdg parent that has already
+  received input; our panel is a layer surface. The pragma was reverted.
+
+  `QsMenuOpener` is the way through: it exposes the DBus menu as a plain model
+  of text, icons, check states and submenus, and `widgets/tray/TrayMenu.qml`
+  draws it in the widget's own popout. Verified against every tray item on this
+  machine -- Steam's game list, Discover, Cachy-Update's four submenus.
+- **A QML component cannot instantiate itself** ("TrayMenu is instantiated
+  recursively"), and a menu of submenus is recursive by nature. `Loader` with a
+  **file name** rather than a type resolves at runtime and breaks the cycle:
+  `setSource("TrayMenu.qml", { ... })`.
+- **`StartLimitIntervalSec` and `StartLimitBurst` belong in `[Unit]`.** They
+  were in `[Service]`, where systemd ignored them -- "Unknown key
+  'StartLimitIntervalSec' in section [Service]" in the journal on every start,
+  and no start limit actually applied. The unit looked correct and was not.
 - **A Quickshell-dependent singleton poisons its whole module for the QML
   tests.** Putting `NotificationWatch` beside `Redact` in
   `qs.domain.diagnostics` made the redaction test fail to compile with "Type

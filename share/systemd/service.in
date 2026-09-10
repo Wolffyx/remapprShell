@@ -9,8 +9,17 @@ After=graphical-session.target
 Requisite=graphical-session.target
 
 # A shell that dies cannot write its own report, so the capture is a separate
-# unit that systemd starts precisely when this one fails.
+# unit that systemd starts precisely when this one fails. Note that quickshell
+# catches its own crashes and restarts in process, so this fires for a failure
+# to start rather than for a crash -- `rmpr crash list` is where those are.
 OnFailure=@SLUG@-report@%n.service
+
+# A shell that cannot start at all must stop trying, rather than spinning and
+# filling the journal. These belong in [Unit]: systemd ignores them in
+# [Service], where they were, with "Unknown key 'StartLimitIntervalSec'" in the
+# journal and no limit actually applied.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -21,11 +30,6 @@ ExecStart=@BIN_DIR@/@SESSION_BIN@
 # detected by the shell's own quarantine, not by giving up here.
 Restart=on-failure
 RestartSec=2s
-
-# But a shell that cannot start at all must stop trying, rather than spinning
-# and filling the journal.
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 Slice=session.slice
 TimeoutStopSec=5s

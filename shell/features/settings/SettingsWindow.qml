@@ -120,6 +120,7 @@ FloatingWindow {
                             case "ai":        return aiPage;
                             case "presets":   return presetsPage;
                             case "widgets":   return widgetsPage;
+                            case "tray":      return trayPage;
                             case "profiles":  return profilesPage;
                             case "snapshots": return snapshotsPage;
                             case "about":     return aboutPage;
@@ -140,6 +141,7 @@ FloatingWindow {
                 Component { id: aiPage;        AiPage        { width: parent.width } }
                 Component { id: presetsPage;   PresetsPage   { width: parent.width } }
                 Component { id: widgetsPage;   WidgetsPage   { width: parent.width } }
+                Component { id: trayPage;      TrayPage      { width: parent.width } }
                 Component { id: profilesPage;  ProfilesPage  { width: parent.width } }
                 Component { id: snapshotsPage; SnapshotsPage { width: parent.width } }
                 Component { id: aboutPage;     AboutPage     { width: parent.width } }
