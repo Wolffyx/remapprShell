@@ -7,6 +7,7 @@ pragma ComponentBehavior: Bound
 // external window's geometry on Wayland is not something to attempt.
 
 import QtQuick
+import qs.core
 import QtQuick.Controls
 import qs.domain.launcher
 import qs.domain.launcher.providers
@@ -64,6 +65,11 @@ Item {
                     root.provider.query = text;
                     root.provider.selectedIndex = 0;
                 }
+
+                // Verifiable without typing: opened from a keybinding with
+                // nothing clicked, this says whether the keyboard arrived.
+                onActiveFocusChanged: Log.info("launcher",
+                    search.activeFocus ? "search has the keyboard" : "search lost the keyboard")
 
                 Keys.onDownPressed: root.provider.moveSelection(1)
                 Keys.onUpPressed: root.provider.moveSelection(-1)

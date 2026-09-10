@@ -163,11 +163,21 @@ for lessons — which patterns to avoid.
    plasmashell still uses `caelestia.desktop` while `panel.renderer` says
    `quickshell` — `rmpr renderer set quickshell` is the switch that makes the
    two agree, and it is a live change to the desktop, so it has not been run.
-2. **Typing into the built-in launcher only works after clicking it.**
-   Quickshell 0.3.1 exposes no layer-shell keyboard-focus mode, so `focusable`
-   means on-demand and Wayland grants the keyboard only once the surface is
-   clicked. The panel forwards its keys to an open popout as a partial fix.
-   Opened purely from IPC with no click anywhere, it cannot be typed into.
+2. ~~**Typing into the built-in launcher only works after clicking it.**~~
+   The claim behind this was wrong, in the same way the ToplevelManager one
+   was. Quickshell 0.3.1 *does* expose a layer-shell keyboard-focus mode:
+   `WlrLayershell.keyboardFocus`, attachable to any PanelWindow, with
+   `WlrKeyboardFocus.None | Exclusive | OnDemand`. `focusable: true` is merely
+   the OnDemand case, which is why the keyboard only ever arrived after a
+   click. A popout that says it needs the keyboard now asks for **Exclusive**,
+   which the compositor grants as soon as the surface is mapped; every other
+   popout asks for **None** and takes nothing from the window in use.
+
+   Opened purely over IPC with nothing clicked, the search field now reports
+   `search has the keyboard`. That is item focus, which is necessary but not
+   sufficient -- proving keystrokes actually arrive needs a keystroke, and no
+   key-injection tool is installed here. **Worth confirming by hand:** run
+   `rmpr launcher` and type.
 3. **caelestia is still running alongside**, holding Meta, and krohnkite is
    installed, which can fight edge tiling. Both are reported by `doctor`.
 

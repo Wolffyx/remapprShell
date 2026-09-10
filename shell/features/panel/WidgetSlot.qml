@@ -6,6 +6,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import qs.ui.primitives
 import qs.domain.theme
 
@@ -131,7 +132,21 @@ Item {
         // The panel already reserves its strip; this must not reserve another.
         exclusionMode: ExclusionMode.Ignore
         aboveWindows: true
-        focusable: root.widget?.popoutGrabsFocus ?? false
+
+        // Exclusive, not on-demand.
+        //
+        // `focusable` maps to on-demand keyboard focus, which means Wayland
+        // hands over the keyboard only once the surface has been clicked -- so
+        // a launcher opened from a keybinding or from `rmpr launcher` could
+        // never be typed into, which is what the shell has been shipping with
+        // and apologising for. Exclusive asks for the keyboard as soon as the
+        // surface is mapped, which is exactly what a launcher wants, and it is
+        // requested only by a popout that says it needs the keyboard -- the
+        // rest ask for None and take nothing away from the window the user was
+        // working in.
+        WlrLayershell.keyboardFocus: (root.widget?.popoutGrabsFocus ?? false)
+            ? WlrKeyboardFocus.Exclusive
+            : WlrKeyboardFocus.None
 
         color: "transparent"
 
@@ -157,11 +172,8 @@ Item {
             border.width: 1
             border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
 
-            // Quickshell 0.3.1 exposes no layer-shell keyboard-focus mode, so
-            // `focusable` is on-demand: Wayland grants the keyboard only once
-            // the surface is clicked. Clicking into the popout therefore
-            // works; a popout opened from a keybinding has nothing to click,
-            // which is why the panel forwards its keys here too.
+            // The panel forwards its keys here as well, for the case where
+            // the panel itself holds the keyboard because it was clicked.
             focus: true
             Keys.forwardTo: popout.popoutContent ? [popout.popoutContent] : []
 
