@@ -126,13 +126,34 @@ for lessons — which patterns to avoid.
 - **KWin ignores `loadScript` for a script it already has**, so re-running
   `windows enable` after editing the script silently kept the old one running.
   It unloads first now.
-- **No window thumbnails, and not for want of trying.** Window images come from
-  the plasma-window-management protocol, which Quickshell does not bind. KWin's
-  other route, `org.kde.KWin.ScreenShot2.CaptureWindow`, exists and takes a
-  window handle -- and refuses us: *"The process is not authorized to take a
-  screenshot"*. It is restricted to callers KWin allows. So a KDE-style hover
-  thumbnail needs either a Quickshell binding for plasma-window-management or a
-  C++ KWin effect, and the latter is ruled out for the reasons in the plan.
+- **No window thumbnails, and here is exactly why.** Investigated properly
+  after "how does caelestia do it?", which turned out to be the right question.
+
+  Caelestia renders previews with `org.kde.pipewire`'s `PipeWireSourceItem`
+  (kpipewire, installed here) fed by its own compiled QML plugin
+  (`~/.local/lib/qt6/qml/Caelestia/libcaelestia-*.so`), which binds the Wayland
+  protocol `zkde_screencast_unstable_v1` to turn a window uuid into a PipeWire
+  node. Rendering is free from QML; *obtaining the stream* is the part that
+  needs the protocol.
+
+  That protocol is **not advertised to ordinary clients on this KWin**: 66
+  globals are offered and no screencast interface is among them. It is
+  privileged, like `ScreenShot2.CaptureWindow`, which refuses us outright with
+  "The process is not authorized to take a screenshot". So a compiled plugin
+  alone may well not be enough — whether KWin would grant it to a Quickshell
+  process is untested and only testable by building one.
+
+  Which leaves three honest options, none of them a small edit:
+  1. **The `plasma` renderer.** `org.kde.plasma.icontasks` is what actually
+     draws the previews people have seen "in caelestia" -- caelestia's Plasma
+     panel ships it, and plasmashell is a client KWin allows. Our `tasks`
+     widget already maps to it, so this works today with no new code.
+  2. **A compiled QML plugin** binding `zkde_screencast_unstable_v1`. Not a
+     KWin effect -- no root, no KWin ABI -- but it introduces a C++ build to a
+     project that has none, and may still be refused by KWin.
+  3. **Leave it.** The preview shows the application, its real name, the full
+     title and the window's state, which is what is knowable without any of the
+     above.
 
 ## Known problems
 
