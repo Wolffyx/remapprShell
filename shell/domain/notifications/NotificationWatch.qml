@@ -49,6 +49,19 @@ QtObject {
         Log.debug("notifications", `${entry.appName}: ${entry.summary}`);
     }
 
+    // Said once per notification dropped, and from outside the parser: the
+    // parser runs in a hot read handler and a pure function has nowhere to log
+    // to anyway. A drop means a line stayed over a megabyte after its pixels
+    // were removed, which should not happen -- so it is worth a line rather
+    // than silence.
+    property int _dropped: 0
+
+    function _reportDropped() {
+        const n = NotificationEvents.dropped - root._dropped;
+        root._dropped = NotificationEvents.dropped;
+        Log.warn("notifications", `${n} notification(s) too large to read safely; skipped`);
+    }
+
     onCapacityChanged: {
         if (root.entries.length > root.capacity)
             root.entries = root.entries.slice(0, root.capacity);
@@ -67,6 +80,8 @@ QtObject {
                 const entry = NotificationEvents.parse(line);
                 if (entry)
                     root._push(entry);
+                else if (NotificationEvents.dropped > root._dropped)
+                    root._reportDropped();
             }
         }
 

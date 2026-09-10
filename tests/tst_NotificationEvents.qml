@@ -88,6 +88,112 @@ TestCase {
         compare(NotificationEvents.parse(call(["a", 0, "", "s", "b", [], {}, -1], {interface: "org.kde.osdService"})), null);
     }
 
+    // ---- image-data: the case that took the shell down ----------------
+    //
+    // An application with no icon file sends its icon as pixels, and busctl
+    // renders that byte array as one integer per byte. Parsing a 512x512 one
+    // segfaults the QML engine from inside the read handler. Reproduced with
+    // a real notification before this test was written.
+
+    function pixels(n) {
+        const a = [];
+        for (let i = 0; i < n; i++)
+            a.push(i % 256);
+        return a;
+    }
+
+    function imageLine(n) {
+        return JSON.stringify({
+            type: "method_call",
+            interface: "org.freedesktop.Notifications",
+            member: "Notify",
+            payload: {
+                type: "susssasa{sv}i",
+                data: ["image-probe", 0, "", "Image probe", "has an image-data hint", [],
+                       {
+                           "image-data": {
+                               type: "(iiibiiay)",
+                               data: [64, 64, 256, true, 8, 4, pixels(n)]
+                           },
+                           "urgency": { type: "y", data: 1 }
+                       }, -1]
+            }
+        });
+    }
+
+    function test_a_notification_carrying_pixels_still_arrives() {
+        const line = imageLine(16384);
+        verify(line.length > 50000);
+        const e = NotificationEvents.parse(line);
+        verify(e !== null);
+        compare(e.summary, "Image probe");
+        compare(e.body, "has an image-data hint");
+        compare(e.appName, "image-probe");
+    }
+
+    // The size that crashed a running shell. A quarter of a million pixels.
+    function test_a_large_image_does_not_take_the_parser_with_it() {
+        const e = NotificationEvents.parse(imageLine(1048576));
+        verify(e !== null);
+        compare(e.summary, "Image probe");
+    }
+
+    function test_the_pixels_are_gone_before_parsing() {
+        const stripped = NotificationEvents.stripByteArrays(imageLine(16384));
+        verify(stripped.length < 1000);
+        verify(stripped.indexOf("image-data") >= 0);
+        compare(JSON.parse(stripped).payload.data[6]["image-data"].data[6].length, 0);
+    }
+
+    // The dimensions in front of the byte array are a short list and must
+    // survive; so must a notification's actions, which are strings.
+    function test_short_arrays_are_left_alone() {
+        const stripped = NotificationEvents.stripByteArrays(imageLine(16384));
+        const img = JSON.parse(stripped).payload.data[6]["image-data"].data;
+        compare(img[0], 64);
+        compare(img[1], 64);
+        compare(img[2], 256);
+    }
+
+    function test_actions_survive_the_strip() {
+        const e = NotificationEvents.parse(call(["a", 0, "", "s", "b", ["default", "Open"], {}, -1]));
+        compare(e.actions.length, 2);
+        compare(e.actions[1], "Open");
+    }
+
+    // Text that looks like pixel data is text. The notification a person sees
+    // and the one recorded here have to be the same one.
+    function test_a_body_full_of_numbers_is_not_touched() {
+        let body = "1";
+        for (let i = 2; i <= 200; i++)
+            body += "," + i;
+        const e = NotificationEvents.parse(call(["a", 0, "", "counts", body, [], {}, -1]));
+        compare(e.body, body);
+    }
+
+    function test_a_bracketed_list_inside_a_string_is_not_touched() {
+        const body = "[" + Array.from({length: 200}, (_, i) => i).join(",") + "]";
+        const e = NotificationEvents.parse(call(["a", 0, "", "s", body, [], {}, -1]));
+        compare(e.body, body);
+    }
+
+    // A quote escaped inside a body must not end the string early, or
+    // everything after it would be scanned as if it were structure.
+    function test_an_escaped_quote_does_not_confuse_the_scanner() {
+        const body = 'he said "[1,2,3]" and left';
+        const e = NotificationEvents.parse(call(["a", 0, "", "s", body, [], {}, -1]));
+        compare(e.body, body);
+    }
+
+    function test_a_line_too_big_even_stripped_is_dropped() {
+        const before = NotificationEvents.dropped;
+        let body = "";
+        while (body.length < NotificationEvents.maxLineLength + 1000)
+            body += "abcdefghij";
+        compare(NotificationEvents.parse(call(["a", 0, "", "s", body, [], {}, -1])), null);
+        compare(NotificationEvents.dropped, before + 1);
+    }
+
     function test_junk_is_not_a_notification() {
         compare(NotificationEvents.parse(""), null);
         compare(NotificationEvents.parse("Monitoring bus message stream."), null);

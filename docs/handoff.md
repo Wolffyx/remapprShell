@@ -32,6 +32,7 @@ off the running system rather than remembered.
 | plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
+| Crash dumps | three from before the `image-data` fix, plus one from the isolated shell that reproduced it, in `~/.cache/quickshell/crashes/`. All four have the same stack. Safe to delete |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
 | Window list | KWin script loaded, daemon answering, 11 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
@@ -268,11 +269,22 @@ are not.
    sufficient -- proving keystrokes actually arrive needs a keystroke, and no
    key-injection tool is installed here. **Worth confirming by hand:** run
    `rmpr launcher` and type.
-3. **caelestia's bar is still running alongside ours**, holding Meta, and
+3. **A crash inside quickshell never reaches systemd, so no report is written.**
+   Quickshell's own crash handler catches the signal, writes
+   `~/.cache/quickshell/crashes/<id>/` and **restarts the shell in process**.
+   The unit never enters `failed`, `NRestarts` stays at 0, and the
+   `OnFailure=` reporter this project built does not run. Three real crashes
+   produced three quickshell dumps and zero of our diagnostic bundles, and the
+   only reason they were noticed at all is that the user found the directory.
+   The dumps hold a stack trace and a log, so nothing is lost -- but anything
+   that assumes "the shell died" means "a report exists" is wrong. Worth
+   closing by having `doctor` look in that directory, and by having the shell
+   notice a dump newer than its own start.
+4. **caelestia's bar is still running alongside ours**, holding Meta, and
    krohnkite is installed, which can fight edge tiling. Both are reported by
    `doctor`. Two bars on screen is a side-by-side development arrangement, not
    a bug — but it is why the screen looks busy.
-4. **No window thumbnails in the task preview**, and this one is settled rather
+5. **No window thumbnails in the task preview**, and this one is settled rather
    than open: see the entry under "Not built yet". It needs privileges KWin
    does not give us.
 
@@ -344,6 +356,35 @@ Non-obvious things that cost time to discover:
   Zero is not unset -- Qt reads `rows * columns` as the capacity, so a zone with
   two widgets in it warned and laid them out wrongly. The unset value is -1. It
   stayed hidden until a zone held more than one widget.
+- **`busctl --json=short` renders a byte array as one integer per byte, and
+  parsing one segfaults the QML engine.** An application with no icon file
+  sends its icon as pixels in an `image-data` hint, `(iiibiiay)`. A 512x512
+  icon arrives as a 3.7 MB line holding a million numbers, and `JSON.parse` on
+  it inside the read handler takes the whole shell down: SIGSEGV, no QML error,
+  nothing in the journal, and a stack that is entirely Qt internals under
+  `QQmlBoundSignalExpression::evaluate`. Telegram, Spotify and KDE Connect all
+  send icons this way, so it is ordinary desktop traffic -- which is why it
+  looked like a shell that crashed at no particular time.
+
+  `NotificationEvents.stripByteArrays` removes any run of 64 or more plain
+  integers **before** the line reaches `JSON.parse`; after is too late, since
+  parsing is the step that dies. It is a string scan that respects quotes and
+  escapes, so a body full of numbers is left alone. Nothing is lost: the only
+  icon read here is `image-path`, which is a string. Reproduced first, in an
+  isolated shell that did nothing but this pipeline, and the fixed parser now
+  takes a 15 MB line (1024x1024) and still reports the summary.
+
+  The general lesson: **a `SplitParser` line is attacker-shaped input even when
+  it comes from your own desktop.** Anything read off a bus monitor needs a
+  size bound before it is handed to a parser.
+- **A crash in a signal handler leaves no QML error at all.** The only
+  evidence was `~/.cache/quickshell/crashes/`, and the three dumps had
+  byte-identical stacks -- which is what made it clear it was one bug and not
+  three. Comparing dumps before reading code was the step that paid.
+- **Nearest-symbol lookup lies in an LTO build.** Resolving the crash
+  addresses against `libQt6Qml.so` named functions up to 10 KB away
+  (`changeVTableImpl`, `cleanupDeletedQObjectWrappersInSweep`) and sent the
+  first guess in the wrong direction. Reproducing was faster than symbolising.
 - **A Quickshell-dependent singleton poisons its whole module for the QML
   tests.** Putting `NotificationWatch` beside `Redact` in
   `qs.domain.diagnostics` made the redaction test fail to compile with "Type
