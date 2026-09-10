@@ -11,7 +11,9 @@ import qs.features.panel
 import qs.features.panel.model
 import qs.platform.system
 import qs.domain.launcher
+import qs.domain.osd
 import qs.domain.config
+import qs.features.osd
 import qs.features.settings
 import qs.features.wizard
 
@@ -53,6 +55,14 @@ ShellRoot {
             // starts fresh rather than restoring the last page.
             onVisibleChanged: if (!visible) settings.activeAsync = false
         }
+    }
+
+    // Off unless asked for, and built only then: Plasma's OSD already works,
+    // and this exists for someone who wants a layer-shell one instead.
+    Variants {
+        model: OsdService.enabled ? Quickshell.screens.slice(0, 1) : []
+
+        OsdOverlay {}
     }
 
     // Shown once, on a machine that has never run it. The marker lives in the

@@ -256,6 +256,34 @@ else
     fix "take one before changing KDE settings: $ALIAS snapshot create"
 fi
 
+# ------------------------------------------------------------------- the OSD
+
+section "on-screen display"
+
+osd_enabled=$(jq -r '.osd.enabled // false' "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo false)
+lnf_active=$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')
+osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
+osd_silenced=no
+grep -q 'drawn as nothing' "$osd_file" 2>/dev/null && osd_silenced=yes
+
+if [ "$osd_enabled" != "true" ]; then
+    ok "Plasma draws the OSD"
+    if [ "$osd_silenced" = yes ]; then
+        bad "but our package silences Plasma's OSD, and ours is switched off"
+        fix "nothing will draw an OSD at all"
+        fix "put it back: $ALIAS theme osd plasma"
+    fi
+elif [ "$lnf_active" != "$LNF_PACKAGE_ID" ]; then
+    warn "our OSD is on, but our look-and-feel package is not active"
+    fix "Plasma is drawing its own as well, so you will see two"
+    fix "either apply the package ($ALIAS theme apply) or turn ours off"
+elif [ "$osd_silenced" = yes ]; then
+    ok "our OSD draws, Plasma's is silenced"
+else
+    warn "our OSD is on and Plasma's is not silenced; you will see two"
+    fix "silence Plasma's: $ALIAS theme osd ours"
+fi
+
 # --------------------------------------------------------------- diagnostics
 
 section "diagnostic reports"

@@ -75,6 +75,24 @@ panel cannot disagree about what the accent colour is. The desktop theme
 provides colours only: every SVG it does not carry falls back to Breeze's, so
 it is a recolour rather than a second set of assets to maintain.
 
+### The on-screen display
+
+Plasma draws the volume and brightness popup, and that is the default. Ours is
+opt-in and takes nothing over: `plasmashell` emits `osdProgress` and `osdText`
+on `org.kde.osdService` as plain DBus signals, so the shell listens and draws.
+Turn it off and Plasma is exactly as it was.
+
+With our Look-and-Feel package active, Plasma draws *our* OSD QML, so enabling
+ours without silencing that shows two. One command settles both:
+
+```bash
+rmpr theme osd ours     # the shell draws it; Plasma's is silenced
+rmpr theme osd plasma   # back to Plasma's
+```
+
+`rmpr doctor` reports the combination that would show two, and the one that
+would show none.
+
 ### Diagnostic reports
 
 `rmpr report` writes a bundle of four things to

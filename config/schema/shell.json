@@ -86,6 +86,29 @@
             }
         },
         {
+            "id": "osd",
+            "label": "On-screen display",
+            "icon": "audio-volume-high",
+            "description": "The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.",
+            "keys": {
+                "osd.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Draw our own",
+                    "description": "Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was."
+                },
+                "osd.timeout": {
+                    "type": "int",
+                    "min": 500,
+                    "max": 5000,
+                    "step": 100,
+                    "default": 1800,
+                    "label": "Visible for",
+                    "description": "Milliseconds before it fades."
+                }
+            }
+        },
+        {
             "id": "presets",
             "label": "Layouts",
             "icon": "preferences-desktop-theme",

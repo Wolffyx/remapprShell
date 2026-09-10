@@ -44,5 +44,9 @@
         "searchProvider": "auto",
         "kickoffMode": "menu",
         "command": []
+    },
+    "osd": {
+        "enabled": false,
+        "timeout": 1800
     }
 }

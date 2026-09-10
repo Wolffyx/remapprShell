@@ -15,6 +15,7 @@ usage: @ALIAS@ <command> [options]
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
   renderer status|list|set|revert   choose what draws the panel
+  theme apply|revert|osd|status     the look and feel, and which OSD draws
   report create|list|show|remove    write a local diagnostic report
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?

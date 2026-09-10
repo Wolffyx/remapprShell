@@ -34,7 +34,11 @@ kwriteconfig6 --file kwinrc     --group TabBox  --key LayoutName  "thumbnail_gri
 
 before=$(mktemp -d)
 cp -a "$XDG_CONFIG_HOME/." "$before/"
-before_sums=$(cd "$XDG_CONFIG_HOME" && find . -type f | sort | xargs sha256sum)
+# KDE's files, not ours. The gate is that reverting leaves the desktop
+# byte-identical; this project's own configuration directory is ours to write
+# and is removed by an uninstall, not by a theme revert.
+kde_sums() { (cd "$XDG_CONFIG_HOME" && find . -type f -not -path "./$SLUG/*" | sort | xargs sha256sum); }
+before_sums=$(kde_sums)
 
 # A colour scheme of the user's own, sitting in the same directory. Our revert
 # removes what we installed and nothing else -- the directory is KDE's, and
@@ -70,6 +74,26 @@ check "defaults applied"      "$(kreadconfig6 --file kdeglobals --group General 
 check "nested group applied"  "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
 check "unrelated key untouched" "$(kreadconfig6 --file kwinrc --group Windows --key Unrelated)" "keepme"
 
+# Our package supplies the QML plasmashell draws for the OSD, so with it active
+# there is no way to have both ours and Plasma's without seeing two. Swapping
+# that one file is the whole mechanism.
+echo "== which OSD draws =="
+osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
+profile="$CONFIG_DIR/profiles/default/shell.json"
+
+check "Plasma's by default"    "$(grep -c 'drawn as nothing' "$osd_file")" "0"
+
+"$REPO_ROOT/scripts/theme.sh" osd ours >/dev/null 2>&1
+check "silenced for ours"      "$(grep -c 'drawn as nothing' "$osd_file")" "1"
+check "the shell was told"     "$(jq -r '.osd.enabled' "$profile")" "true"
+# plasmashell still drives every property on that window, so the interface has
+# to survive the swap or every volume key fills the journal with errors.
+check "interface kept"         "$(grep -c 'property alias osdValue' "$osd_file")" "1"
+
+"$REPO_ROOT/scripts/theme.sh" osd plasma >/dev/null 2>&1
+check "back to Plasma's"       "$(grep -c 'drawn as nothing' "$osd_file")" "0"
+check "the shell was told too" "$(jq -r '.osd.enabled' "$profile")" "false"
+
 echo "== revert =="
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
 
@@ -86,7 +110,7 @@ check "their scheme untouched"     "$([ -f "$COLORS_DIR/TheirScheme.colors" ] &&
 check "L&F key removed (was unset)" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')" "<unset>"
 
 # The gate: byte-identical, not merely equivalent.
-after_sums=$(cd "$XDG_CONFIG_HOME" && find . -type f | sort | xargs sha256sum)
+after_sums=$(kde_sums)
 if [ "$before_sums" = "$after_sums" ]; then
     printf '  PASS  every config file byte-identical after revert\n'; pass=$((pass+1))
 else

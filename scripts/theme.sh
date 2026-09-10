@@ -3,6 +3,7 @@
 #
 #   apply [--appearance]   install the package and activate it
 #   revert                 put every key back and remove the package
+#   osd ours|plasma        which OSD draws when our package is active
 #   status                 what is active, and what would be undone
 #
 # A plain apply installs the package and activates it -- which is what makes
@@ -169,13 +170,79 @@ cmd=${1:-status}
 [ $# -gt 0 ] && shift
 
 WITH_APPEARANCE=0
+positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --appearance) WITH_APPEARANCE=1 ;;
-        *) die "unknown option: $1" ;;
+        -*) die "unknown option: $1" ;;
+        *) positional+=("$1") ;;
     esac
     shift
 done
+set -- "${positional[@]+"${positional[@]}"}"
+
+# Which OSD draws.
+#
+# Our Look-and-Feel package supplies the QML plasmashell draws for the OSD, so
+# with the package active there is no way to have both ours and Plasma's
+# without seeing two. Swapping that one file is the whole mechanism: plasmashell
+# still creates the window and still emits the signals our own OSD listens to,
+# it simply draws nothing.
+osd_mode() {
+    local mode=$1
+    local dest="$LNF_DEST/contents/osd/Osd.qml"
+
+    [ -d "$LNF_DEST" ] || die "the look-and-feel package is not installed ($ALIAS theme apply)"
+
+    case "$mode" in
+        ours)
+            cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$dest" || die "could not silence Plasma's OSD"
+            chmod 644 "$dest"
+            set_osd_enabled true
+            log_step "Plasma's OSD is silenced; the shell draws its own"
+            ;;
+        plasma)
+            cp -a "$LNF_SRC/contents/osd/Osd.qml" "$dest" || die "could not restore Plasma's OSD"
+            chmod 644 "$dest"
+            set_osd_enabled false
+            log_step "Plasma draws the OSD again"
+            ;;
+        status)
+            if grep -q 'drawn as nothing' "$dest" 2>/dev/null; then
+                printf 'osd: ours (Plasma'"'"'s is silenced)\n'
+            else
+                printf 'osd: Plasma'"'"'s\n'
+            fi
+            return 0
+            ;;
+        *) die "unknown OSD mode: $mode (expected ours, plasma or status)" ;;
+    esac
+
+    log_info "restart plasmashell to see it: systemctl --user restart plasma-plasmashell.service"
+}
+
+# The shell watches its configuration, so this is what makes our OSD appear or
+# stop appearing. Written by the same command that swaps the QML: two settings
+# that must agree are better set by one thing.
+set_osd_enabled() {
+    local value=$1
+    local profile="$CONFIG_DIR/profiles/$( [ -f "$CONFIG_DIR/state.json" ] && jq -r '.profile // "default"' "$CONFIG_DIR/state.json" 2>/dev/null || echo default )/shell.json"
+    mkdir -p "$(dirname "$profile")"
+
+    if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
+        log_warn "$profile does not parse; leaving osd.enabled alone"
+        return 0
+    fi
+
+    local tmp
+    tmp=$(mktemp)
+    if [ -f "$profile" ]; then
+        jq --argjson v "$value" '.osd = ((.osd // {}) + {enabled: $v})' "$profile" > "$tmp" || return 1
+    else
+        jq -n --argjson v "$value" '{osd: {enabled: $v}}' > "$tmp" || return 1
+    fi
+    mv "$tmp" "$profile"
+}
 
 case "$cmd" in
     apply)
@@ -226,6 +293,7 @@ case "$cmd" in
         printf 'active L&F:   %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')"
         printf 'colour:       %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
         printf 'our schemes:  %s installed\n' "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")"
+        osd_mode status 2>/dev/null || true
         printf 'switcher:     %s\n' "$([ -d "$SWITCHER_DEST" ] && echo "installed" || echo "not installed")"
         printf 'active Alt+Tab: %s\n' "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName --default '<unset>')"
         printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"
@@ -235,5 +303,9 @@ case "$cmd" in
         kconfig_ledger_summary theme
         ;;
 
-    *) die "unknown command: $cmd (expected apply, revert or status)" ;;
+    osd)
+        osd_mode "${1:-status}"
+        ;;
+
+    *) die "unknown command: $cmd (expected apply, revert, osd or status)" ;;
 esac

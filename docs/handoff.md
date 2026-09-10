@@ -52,6 +52,12 @@ for lessons — which patterns to avoid.
   removed by `theme revert` with the user's own files in those directories left
   alone. One palette (`theme/colors/palette.json`) feeds the colour schemes and
   the desktop theme, so nothing can disagree about the accent colour.
+- **On-screen display** — opt-in, off by default. `plasmashell` emits
+  `osdProgress` and `osdText` on `org.kde.osdService` as plain DBus signals, so
+  ours listens and draws rather than taking anything over. `rmpr theme osd
+  ours|plasma` swaps the QML our L&F package supplies for a silent one, because
+  with that package active there is no other way to avoid seeing two. Verified
+  end to end against the real bus.
 - **Diagnostics** — `rmpr report` writes a local bundle (error + qmllint,
   environment, redacted config, journal tail + widget health). Written on unit
   failure via `OnFailure=` and when a widget is quarantined, through the same
@@ -81,13 +87,10 @@ for lessons — which patterns to avoid.
   second TTY open and a tested way back (`loginctl unlock-session` from
   Ctrl+Alt+F2, or `rmpr theme revert`), and gate it behind its own flag rather
   than folding it into `theme apply`.
-- **Opt-in Quickshell OSD and notifications.** `org.kde.osdService` turns out to
-  emit `osdProgress(icon, percent, maximumPercent, additionalText)` and
-  `osdText(icon, text)` as plain DBus signals, so drawing our own OSD needs no
-  daemon takeover and no name ownership — just a listener. Suppressing Plasma's
-  own is the open question: there is no `[OSD] Enabled` key in plasmashell, so
-  the only lever is that our L&F package already supplies the QML Plasma draws.
-  Notifications are a harder case and stay Plasma's.
+- **Opt-in notifications.** Plasma owns `org.freedesktop.Notifications` and a
+  second owner cannot have it, so this is a genuine takeover rather than the
+  listen-and-draw the OSD turned out to be. Not attempted. The eavesdrop needed
+  for a notification history is verified to work (above).
 - **Active-window / task-list widget** — *blocked*: Quickshell 0.3.1's Wayland
   module exposes only session-lock types, so window state needs a KWin JS
   script feeding it out. Do not attempt it with a C++ KWin effect.
@@ -156,6 +159,10 @@ Non-obvious things that cost time to discover:
 - **Qt 6 refuses local-file `XMLHttpRequest`** unless `QML_XHR_ALLOW_FILE_READ=1`
   is set, and the failure surfaces as a JSON parse error rather than a
   permissions one. `scripts/test.sh` sets it.
+- **A QML module containing one Quickshell-dependent singleton cannot be
+  imported by `qmltestrunner` at all**, which makes every pure function beside
+  it untestable by association. `qs.domain.osd.events` exists as its own module
+  for exactly that reason.
 - **A KConfig group name can contain a space** (`[PlasmaViews][Panel 811]`), so
   the ledger's group path is split on `/` and nothing else. Splitting on
   whitespace turned one group into two that KDE never reads.
