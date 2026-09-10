@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""@DISPLAY_NAME@ window list daemon.
+
+GENERATED FILE -- DO NOT EDIT. Regenerate: make link (or scripts/install.sh)
+
+Why this exists at all.
+
+KWin does not implement `zwlr_foreign_toplevel_manager_v1`, so Quickshell's
+ToplevelManager reports nothing here, and `Quickshell.WindowManager` is about
+virtual desktops rather than windows. The window list has to come from KWin's
+own scripting API -- and a KWin script can only *call* DBus, never receive or
+be received from. Quickshell cannot own a DBus name, so there was nothing for
+the script to call.
+
+This is that something: a name the KWin script can call, holding the current
+window list and announcing changes. It is deliberately the smallest thing that
+closes the gap -- it holds a list, hands it out, and emits a signal. It does not
+talk to KWin, does not talk to the shell, and makes no decisions about what a
+window is.
+
+Activation goes the other way and does not come through here at all: the shell
+calls KWin's own `/WindowsRunner` directly, which is a supported interface. That
+is what keeps this one-directional, and one-directional is what keeps it small.
+"""
+
+import json
+import signal
+import sys
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+BUS_NAME = "@DBUS_NAME@"
+OBJECT_PATH = "/Windows"
+INTERFACE = "@DBUS_NAME@.Windows"
+
+# Update: what the KWin script pushes in. List: what a shell that started later
+# asks for, so it does not have to wait for the next window change to draw
+# anything. Changed: what the shell listens to.
+INTROSPECTION = f"""
+<node>
+  <interface name="{INTERFACE}">
+    <method name="Update">
+      <arg type="s" name="windows" direction="in"/>
+    </method>
+    <method name="List">
+      <arg type="s" name="windows" direction="out"/>
+    </method>
+    <signal name="Changed">
+      <arg type="s" name="windows"/>
+    </signal>
+  </interface>
+</node>
+"""
+
+
+class WindowList:
+    """The current windows, as the KWin script last reported them."""
+
+    def __init__(self):
+        self._json = "[]"
+        self._connection = None
+
+    def update(self, payload):
+        # Validated rather than trusted: this crosses a process boundary, and a
+        # malformed payload must leave the last good list in place rather than
+        # blanking a panel. The shell parses it again at its end for the same
+        # reason.
+        try:
+            windows = json.loads(payload)
+        except (ValueError, TypeError) as exc:
+            print(f"ignoring an unparseable update: {exc}", file=sys.stderr)
+            return False
+
+        if not isinstance(windows, list):
+            print("ignoring an update that is not a list", file=sys.stderr)
+            return False
+
+        # Re-serialised from the parsed value, so whatever reaches the shell is
+        # known to be valid JSON of the shape it expects.
+        normalised = json.dumps(windows, separators=(",", ":"))
+        if normalised == self._json:
+            return False   # KWin repeats itself; a signal per repeat is noise
+
+        self._json = normalised
+        self._emit()
+        return True
+
+    def _emit(self):
+        if self._connection is None:
+            return
+        self._connection.emit_signal(
+            None, OBJECT_PATH, INTERFACE, "Changed", GLib.Variant("(s)", (self._json,))
+        )
+
+    def handle_call(self, connection, sender, path, interface, method, params, invocation):
+        self._connection = connection
+        if method == "Update":
+            self.update(params[0])
+            invocation.return_value(None)
+        elif method == "List":
+            invocation.return_value(GLib.Variant("(s)", (self._json,)))
+        else:
+            invocation.return_error_literal(
+                Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
+            )
+
+
+def main():
+    windows = WindowList()
+    node = Gio.DBusNodeInfo.new_for_xml(INTROSPECTION)
+    loop = GLib.MainLoop()
+
+    def on_bus_acquired(connection, name):
+        windows._connection = connection
+        connection.register_object(
+            OBJECT_PATH, node.interfaces[0], windows.handle_call, None, None
+        )
+
+    def on_name_lost(connection, name):
+        # Another copy is already running, or the bus went away. Either way this
+        # one has nothing to do, and two daemons answering the same name would
+        # give the shell two different window lists.
+        print(f"lost the name {name}; exiting", file=sys.stderr)
+        loop.quit()
+
+    Gio.bus_own_name(
+        Gio.BusType.SESSION,
+        BUS_NAME,
+        Gio.BusNameOwnerFlags.NONE,
+        on_bus_acquired,
+        None,
+        on_name_lost,
+    )
+
+    # Without this, Ctrl+C leaves the main loop running and systemd has to
+    # resort to SIGKILL on every stop.
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (loop.quit(), True)[1])
+
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

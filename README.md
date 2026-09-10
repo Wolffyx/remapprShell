@@ -83,6 +83,35 @@ panel cannot disagree about what the accent colour is. The desktop theme
 provides colours only: every SVG it does not carry falls back to Breeze's, so
 it is a recolour rather than a second set of assets to maintain.
 
+### The open-window list
+
+KWin implements `org_kde_plasma_window_management` and not
+`zwlr_foreign_toplevel_manager_v1`, so Quickshell's own toplevel API sees
+nothing here. KWin's scripting API is the supported way in, and a KWin script
+can *call* DBus but never be called -- while Quickshell cannot own a DBus name.
+So there is a small daemon in between:
+
+```
+KWin script  --Update-->  windowsd  --Changed-->  the shell
+                                    <--List--
+```
+
+The daemon is started by the bus the first time anything calls it, holds the
+list, and does nothing else. Clicking a window goes the other way entirely,
+straight to KWin's own `/WindowsRunner`, which is a supported interface -- so
+nothing of ours sits in the activation path.
+
+All of it is opt-in:
+
+```bash
+rmpr windows enable    # install and load the KWin script
+rmpr windows show      # what it currently sees
+rmpr windows disable   # unload it and put kwinrc back
+```
+
+Then add the **Open windows** widget to the panel. `rmpr doctor` reports the
+widget being present without the list being on, and the reverse.
+
 ### The on-screen display
 
 Plasma draws the volume and brightness popup, and that is the default. Ours is

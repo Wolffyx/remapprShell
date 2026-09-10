@@ -96,27 +96,19 @@ for lessons — which patterns to avoid.
   second owner cannot have it, so this is a genuine takeover rather than the
   listen-and-draw the OSD turned out to be. Not attempted. The eavesdrop needed
   for a notification history is verified to work (above).
-- **Active-window / task-list widget** — still blocked, but the earlier reason
-  recorded here was wrong. Quickshell 0.3.1 *does* ship
-  `Quickshell.Wayland._ToplevelManagement`, re-exported through
-  `Quickshell.Wayland`, with `ToplevelManager.toplevels`, `activeToplevel` and
-  per-window `appId`/`title`/`activated`/`minimized`/`maximized`/`fullscreen`
-  plus `activate()` and `close()`. It imports and runs here and reports **zero
-  toplevels**, because it speaks `zwlr_foreign_toplevel_manager_v1` and KWin
-  does not implement it: `wayland-info` advertises `zwlr_layer_shell_v1` but no
-  foreign-toplevel interface, and the only window-management string in
-  `libkwin` is `org_kde_plasma_window_management`. `Quickshell.WindowManager` is
-  about windowsets (virtual desktops), not windows.
-
-  So the KWin JS script remains the path, and the open question is not how to
-  get the window list — `workspace` gives it — but how to get it *out*. KWin
-  scripts can only `callDBus`, `print` and `readConfig`; Quickshell cannot own
-  a DBus name, so there is nothing for the script to call. The three ways
-  across are: call a name nobody owns and watch the bus with the same
-  `busctl monitor` the OSD uses (a DBus error logged per update), `print` and
-  tail KWin's journal (a journal line per update), or ship a small daemon that
-  owns a name (a new moving part and a dependency). Each has a real cost on the
-  user's machine, so it is their choice to make, not one to slip in.
+- **Open-window list** — built, and no longer blocked. KWin implements
+  `org_kde_plasma_window_management` and not `zwlr_foreign_toplevel_manager_v1`,
+  so Quickshell's `ToplevelManager` sees nothing here and
+  `Quickshell.WindowManager` is virtual desktops rather than windows. The route
+  is: a KWin JS script reads `workspace`, filters on KWin's own `skipTaskbar`,
+  and pushes JSON to `bin/windowsd.py.in` — a small bus-activated daemon that
+  exists solely because a KWin script can call DBus but cannot be called, and
+  Quickshell cannot own a name. The shell follows the daemon's `Changed` signal
+  with the same `busctl monitor` pattern as the OSD. Activation goes the other
+  way entirely, straight to KWin's `/WindowsRunner` `Run()`, so nothing of ours
+  is in that path and the daemon stays one-directional. `rmpr windows
+  enable|disable|status|show`; opt-in, ledgered in `kwinrc [Plugins]`.
+  Verified live: 11 windows listed, a window opening moved the shell to 12.
 
 ## Known problems
 

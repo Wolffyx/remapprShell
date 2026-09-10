@@ -278,6 +278,39 @@ else
     fix "take one before changing KDE settings: $ALIAS snapshot create"
 fi
 
+# --------------------------------------------------------------- window list
+
+section "open windows"
+
+profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
+    "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo "")
+[ -n "$profile_entries" ] || profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
+    "$defaults_file" 2>/dev/null || echo "")
+
+script_loaded=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo unknown)
+daemon_answers=no
+busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List >/dev/null 2>&1 && daemon_answers=yes
+
+case " $profile_entries " in
+    *" tasks "*)
+        if [ "$script_loaded" = "true" ] && [ "$daemon_answers" = yes ]; then
+            count=$(busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List 2>/dev/null \
+                    | jq -r '.data[0] | fromjson | length' 2>/dev/null || echo '?')
+            ok "the window list is running ($count window(s))"
+        else
+            bad "the panel has the open-windows widget, but the window list is off"
+            fix "it will show nothing at all until the KWin script is loaded"
+            fix "turn it on: $ALIAS windows enable"
+        fi ;;
+    *)
+        if [ "$script_loaded" = "true" ]; then
+            warn "the window list is running, but no panel widget shows it"
+            fix "add the 'tasks' widget from the settings window, or: $ALIAS windows disable"
+        else
+            ok "the window list is off, and nothing asks for it"
+        fi ;;
+esac
+
 # ------------------------------------------------------------------- the OSD
 
 section "on-screen display"

@@ -1,0 +1,88 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    Reports the open windows to @DISPLAY_NAME@.
+
+    KWin is the only thing on this system that knows what windows exist:
+    it implements org_kde_plasma_window_management and not
+    zwlr_foreign_toplevel_manager_v1, so Quickshell's own toplevel API sees
+    nothing. A KWin script can read the list but can only *call* DBus, never
+    be called -- hence the small daemon this pushes to.
+
+    Everything here is a read. The script never moves, closes or focuses a
+    window: activation goes the other way entirely, through KWin's own
+    /WindowsRunner, so this stays one-directional and stays simple.
+
+    A JS script rather than a C++ effect, deliberately. An effect is ABI-locked
+    to one KWin version, needs a root install and must be rebuilt on every
+    Plasma update. This installs to the home directory, loads at runtime and
+    survives updates.
+*/
+
+const SERVICE = "@DBUS_NAME@";
+const PATH = "/Windows";
+const IFACE = "@DBUS_NAME@.Windows";
+
+// Windows KWin owns but nobody would want to click: docks, panels, tooltips,
+// notification surfaces, our own layer-shell surfaces. `skipTaskbar` is KWin's
+// own answer to "should a task manager show this", so it is the one we use
+// rather than inventing a second opinion.
+function isTaskbarWindow(window) {
+    return !!window
+        && window.normalWindow === true
+        && window.skipTaskbar !== true
+        && window.deleted !== true;
+}
+
+function describe(window) {
+    return {
+        uuid: String(window.internalId).replace(/[{}]/g, ""),
+        title: window.caption || "",
+        appId: window.resourceClass || "",
+        desktopFile: window.desktopFileName || "",
+        minimized: window.minimized === true,
+        active: window.active === true,
+        // Which virtual desktop, so the panel can show only the current one if
+        // asked to. `desktops` is a list; a window on all of them has none.
+        desktops: (window.desktops || []).map(d => String(d.id))
+    };
+}
+
+function snapshot() {
+    const out = [];
+    const windows = workspace.windowList();
+    for (let i = 0; i < windows.length; ++i) {
+        if (isTaskbarWindow(windows[i]))
+            out.push(describe(windows[i]));
+    }
+    return out;
+}
+
+function publish() {
+    callDBus(SERVICE, PATH, IFACE, "Update", JSON.stringify(snapshot()));
+}
+
+// Per-window signals matter as much as the list changing: a title changing or
+// a window being minimised leaves the set identical, and a task manager that
+// only watched the set would show a stale title until something else happened.
+function watch(window) {
+    if (!window)
+        return;
+    window.captionChanged.connect(publish);
+    window.minimizedChanged.connect(publish);
+    window.desktopsChanged.connect(publish);
+    window.skipTaskbarChanged.connect(publish);
+}
+
+workspace.windowList().forEach(watch);
+
+workspace.windowAdded.connect(window => {
+    watch(window);
+    publish();
+});
+workspace.windowRemoved.connect(publish);
+workspace.windowActivated.connect(publish);
+
+// The daemon starts empty, and the shell may have been running for hours
+// before this script loads.
+publish();

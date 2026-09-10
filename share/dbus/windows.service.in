@@ -1,0 +1,8 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+#
+# Starts the window-list daemon on demand, the first time anything calls it --
+# the KWin script pushing an update, or the shell asking for the list. Nothing
+# runs until something needs it, and nothing has to be enabled or remembered.
+[D-BUS Service]
+Name=@DBUS_NAME@
+Exec=@BIN_DIR@/@WINDOWSD_BIN@

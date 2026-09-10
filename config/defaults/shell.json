@@ -18,6 +18,11 @@
                 "enabled": true
             },
             {
+                "id": "tasks",
+                "zone": "left",
+                "enabled": true
+            },
+            {
                 "id": "clock",
                 "zone": "middle",
                 "enabled": true

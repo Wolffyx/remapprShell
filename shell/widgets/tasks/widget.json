@@ -1,0 +1,36 @@
+{
+    "id": "tasks",
+    "apiVersion": 1,
+    "name": "Open windows",
+    "description": "The windows you have open, and a click to switch to one. Needs the window list turned on: rmpr windows enable.",
+    "icon": "preferences-system-windows",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.icontasks" }
+    },
+    "config": {
+        "showTitles": {
+            "type": "bool",
+            "default": true,
+            "label": "Show titles",
+            "description": "Off for icons only, which fits far more windows on a panel."
+        },
+        "maxWidth": {
+            "type": "int",
+            "default": 180,
+            "min": 60,
+            "max": 400,
+            "label": "Widest a button gets",
+            "description": "Titles are elided past this."
+        },
+        "iconSize": {
+            "type": "int",
+            "default": 18,
+            "min": 12,
+            "max": 48,
+            "label": "Icon size"
+        }
+    }
+}

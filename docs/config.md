@@ -122,6 +122,11 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "tasks",
+        "zone": "left",
+        "enabled": true
+      },
+      {
         "id": "clock",
         "zone": "middle",
         "enabled": true
@@ -157,6 +162,7 @@ when two copies of a widget should differ.
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
+| Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
 | Virtual desktops | `workspaces` | left, middle, right | `org.kde.plasma.pager` |
 
@@ -189,6 +195,14 @@ renderer, and is named before you switch rather than discovered afterwards.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `width` | a number, 2 to 40 | `8` | Strip width |
+
+### `widgets.tasks`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showTitles` | `true` or `false` | `true` | Off for icons only, which fits far more windows on a panel. |
+| `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |
+| `iconSize` | a number, 12 to 48 | `18` | Icon size |
 
 ### `widgets.tray`
 

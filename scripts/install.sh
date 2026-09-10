@@ -135,6 +135,13 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload 2>/dev/null || true
 fi
 
+# The bus caches its list of activatable names the same way. Without this the
+# window daemon is "not activatable" until the next login, which looks exactly
+# like the daemon being broken.
+if [ "$MODE" != uninstall ] && command -v busctl >/dev/null 2>&1; then
+    busctl --user call org.freedesktop.DBus / org.freedesktop.DBus ReloadConfig 2>/dev/null || true
+fi
+
 if [ "$MODE" != uninstall ]; then
     case ":$PATH:" in
         *":$BIN_DIR:"*) : ;;

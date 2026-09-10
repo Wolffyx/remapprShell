@@ -52,7 +52,12 @@ Provider {
         for (const app of apps) {
             const name = (app.name ?? "").toLowerCase();
             const generic = (app.genericName ?? "").toLowerCase();
-            const keywords = (app.keywords ?? "").toLowerCase();
+            // Quickshell hands `keywords` over as a list of strings, not a
+            // string. Without this every query threw before it scored
+            // anything, so search returned nothing and the launcher looked
+            // broken rather than empty.
+            const keywords = (Array.isArray(app.keywords) ? app.keywords.join(" ")
+                                                          : (app.keywords ?? "")).toLowerCase();
 
             let score = -1;
             if (name === q) score = 0;

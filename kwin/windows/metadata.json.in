@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "@SLUG@-windows",
+        "Name": "@DISPLAY_NAME@ window list",
+        "Description": "Reports open windows to @DISPLAY_NAME@'s panel.",
+        "Icon": "preferences-system-windows",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}
