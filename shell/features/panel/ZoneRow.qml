@@ -19,6 +19,13 @@ Item {
     implicitWidth: layout.implicitWidth
     implicitHeight: layout.implicitHeight
 
+    // See the Repeater below for why this is a string and not the list.
+    readonly property string entriesKey: JSON.stringify(PanelModel.entriesForScreen(root.screenName, root.zone))
+    property var entries: []
+
+    onEntriesKeyChanged: root.entries = JSON.parse(root.entriesKey)
+    Component.onCompleted: root.entries = JSON.parse(root.entriesKey)
+
     // A Grid rather than a Row/Column pair: one element that lays out either
     // way, so nothing below has to branch on orientation. `rows: 1` gives a
     // single horizontal line, `columns: 1` a single vertical one -- and the
@@ -37,7 +44,16 @@ Item {
         horizontalItemAlignment: Grid.AlignHCenter
 
         Repeater {
-            model: PanelModel.entriesForScreen(root.screenName, root.zone)
+            // Not the function call directly. A binding to it yields a fresh
+            // array on every configuration change of any kind, and a Repeater
+            // handed a new array rebuilds every delegate -- so changing the
+            // panel thickness, or anything else, destroyed and recreated every
+            // widget on the panel. That is what "the taskbar resets when I
+            // change a setting" was.
+            //
+            // The string only changes when the entries actually change, so the
+            // model is replaced then and at no other time.
+            model: root.entries
 
             WidgetSlot {
                 required property var modelData

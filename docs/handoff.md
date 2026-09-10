@@ -223,6 +223,12 @@ Non-obvious things that cost time to discover:
   imported by `qmltestrunner` at all**, which makes every pure function beside
   it untestable by association. `qs.domain.osd.events` exists as its own module
   for exactly that reason.
+- **A Repeater handed a fresh array rebuilds every delegate.** `model:` bound
+  to a function call over config produced a new array on *any* configuration
+  change, so adjusting the panel thickness destroyed and recreated every widget
+  on the panel -- "the taskbar resets when I change a setting". Binding a
+  JSON string and reassigning the model only when that string changes fixes it,
+  and needs no deep-compare.
 - **Replacing a Controls `background`/`handle` with plain Rectangles collapses
   the control.** A `Slider` takes its implicit height from them, so custom ones
   with no implicit size of their own made the whole slider zero pixels tall: it
