@@ -1,5 +1,5 @@
 {
-    "comment": "Describes every setting so the GUI can render controls for it. Deliberately the same shape as the `config` block in a widget.json, so one renderer handles built-in settings and third-party widgets alike.",
+    "comment": "Describes every setting so the GUI can render controls for it, and so docs/config.md can be generated from it. A section carrying both `page` and `keys` renders as the page -- that wins -- while the keys still reach the generated reference, which is how a setting that needs more than a control in the window is still documented as the config key it is. Deliberately the same shape as the `config` block in a widget.json, so one renderer handles built-in settings and third-party widgets alike.",
     "sections": [
         {
             "id": "panel",
@@ -35,7 +35,21 @@
             "label": "Drawn by",
             "icon": "preferences-desktop-plasma",
             "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
-            "page": "renderer"
+            "page": "renderer",
+            "keys": {
+                "panel.renderer": {
+                    "type": "enum",
+                    "values": [
+                        "quickshell",
+                        "plasma",
+                        "caelestia",
+                        "none"
+                    ],
+                    "default": "quickshell",
+                    "label": "Drawn by",
+                    "description": "Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
+                }
+            }
         },
         {
             "id": "launcher",

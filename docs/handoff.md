@@ -67,6 +67,11 @@ for lessons — which patterns to avoid.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
   report, wizard, edges, shortcuts, launcher, search, settings, preset, profile, update.
+- **Generated docs** — `docs/config.md` comes from the schema and the widget
+  manifests; `make lint` fails when it is stale. A schema section carrying both
+  `page` and `keys` renders as the page in the settings window while its keys
+  still reach the reference, which is how `panel.renderer` is documented as the
+  config key it is without becoming a text field in the GUI.
 - **Tests** — 9 shell suites in throwaway HOMEs, plus a QML suite. All green.
 
 ## Not built yet

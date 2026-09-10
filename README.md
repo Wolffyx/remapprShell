@@ -59,6 +59,14 @@ rmpr report show        # read the newest one
 rmpr status
 ```
 
+### Configuring it
+
+[`docs/config.md`](docs/config.md) is the full reference: every setting, its
+type, its default and what it means, plus each widget's own options. It is
+generated from `config/schema/shell.json` and the widget manifests, and
+`make lint` fails if it has drifted from them -- a configuration reference that
+is quietly wrong is worse than none, because it is trusted.
+
 ### The theme layer
 
 `rmpr theme apply` installs a Look-and-Feel package (our OSD, splash and logout

@@ -223,6 +223,28 @@ else
     fix "regenerate them: $ALIAS renderer set $configured_renderer"
 fi
 
+# The state a real desktop was left in: the renderer says we draw the panel,
+# and we are not running, so nothing does. plasmashell is behaving correctly
+# and the screen is empty, which is the hardest kind of fault to place.
+# Only when the quickshell renderer is actually in effect. With plasmashell on
+# some other package, something else is drawing and the mismatch warning above
+# is the finding -- reporting "no panel at all" while one is plainly on screen
+# teaches people to ignore this output.
+if [ "$configured_renderer" = "quickshell" ] && [ "$shell_pkg" = "$SHELL_PACKAGE_ID" ]; then
+    if pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1; then
+        ok "the shell is running and drawing the panel"
+    elif systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1; then
+        warn "the shell is not running, so nothing is drawing a panel"
+        fix "start it: $ALIAS start"
+    else
+        bad "the renderer is 'quickshell' but the shell is neither running nor enabled"
+        fix "nothing is drawing a panel at all"
+        fix "start it:            make link && $ALIAS start"
+        fix "or hand it back:     $ALIAS renderer set plasma   (plasmashell draws our panel)"
+        fix "or use your own:     $ALIAS renderer set none     (your stock Plasma panels)"
+    fi
+fi
+
 others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
 if [ -n "$others" ]; then
     warn "another Quickshell shell is running"
