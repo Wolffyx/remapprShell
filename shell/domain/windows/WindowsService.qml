@@ -165,6 +165,62 @@ QtObject {
         return window?.appId ?? "";
     }
 
+    // ---- windows grouped by the application that owns them ---------------
+    //
+    // What KDE's task manager does, and the one part of its behaviour that
+    // needs no privilege at all: grouping is arithmetic over a list we already
+    // have. The thumbnails in its tooltips are not -- those come from a
+    // Wayland protocol KWin hands only to clients it trusts.
+    //
+    // Keyed by the matched application where there is one, so two windows of
+    // the same program group even when their titles and classes differ, and by
+    // the class otherwise.
+    readonly property var groups: {
+        const order = [];
+        const byKey = ({});
+
+        for (const window of root.windows) {
+            const entry = root.entryFor(window);
+            const key = entry ? String(entry.id) : `class:${window.appId}`;
+
+            if (!byKey[key]) {
+                byKey[key] = {
+                    key: key,
+                    appName: root.appNameFor(window),
+                    windows: [],
+                    active: false,
+                    // The first window's icon stands for the group: they are
+                    // the same application, so it is the same icon.
+                    iconName: root.iconFor(window),
+                    iconFile: root.iconFileFor(window)
+                };
+                order.push(key);
+            }
+
+            byKey[key].windows.push(window);
+            if (window.active)
+                byKey[key].active = true;
+        }
+
+        return order.map(key => byKey[key]);
+    }
+
+    // Clicking a group with more than one window moves through them rather
+    // than always returning to the same one -- which is what makes a grouped
+    // button useful instead of merely tidy.
+    function activateGroup(group) {
+        if (!group || group.windows.length === 0)
+            return;
+        if (group.windows.length === 1) {
+            root.activate(group.windows[0].uuid);
+            return;
+        }
+
+        const current = group.windows.findIndex(w => w.active);
+        const next = group.windows[(current + 1) % group.windows.length];
+        root.activate(next.uuid);
+    }
+
     // KWin's own runner. The id it expects is the uuid in braces behind a
     // "0_" prefix, which is what its Match() hands out.
     readonly property Process _activate: Process {}

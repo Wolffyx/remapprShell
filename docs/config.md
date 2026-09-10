@@ -200,6 +200,7 @@ renderer, and is named before you switch rather than discovered afterwards.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `groupByApp` | `true` or `false` | `true` | One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows. |
 | `showTitles` | `true` or `false` | `false` | Off by default: a panel runs out of room after four or five titles, and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |

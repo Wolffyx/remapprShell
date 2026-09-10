@@ -38,7 +38,21 @@ BarWidget {
         ? root.configuredIconSize
         : Math.max(12, Math.min(48, root.bar.thickness - 14))
 
-    readonly property var windows: WindowsService.windows
+    readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
+
+    // One button per application when grouping, one per window otherwise. Both
+    // are the same shape -- a list of {windows, appName, icon...} -- so the row
+    // below does not care which it is drawing.
+    readonly property var items: root.groupByApp
+        ? WindowsService.groups
+        : WindowsService.windows.map(w => ({
+            key: w.uuid,
+            appName: WindowsService.appNameFor(w),
+            windows: [w],
+            active: w.active === true,
+            iconName: WindowsService.iconFor(w),
+            iconFile: WindowsService.iconFileFor(w)
+        }))
 
     // One button's width. Square for icons only, wider when titles are shown.
     readonly property int buttonWidth: root.showTitles ? root.maxWidth
@@ -59,7 +73,7 @@ BarWidget {
     function handleHover(position, horizontal) {
         const stride = root.buttonWidth + root.spacing;
         const index = Math.floor(position / stride);
-        root.hoveredIndex = (index >= 0 && index < root.windows.length) ? index : -1;
+        root.hoveredIndex = (index >= 0 && index < root.items.length) ? index : -1;
 
         if (root.hoveredIndex >= 0) {
             root.popoutVisible = true;
@@ -78,9 +92,9 @@ BarWidget {
     }
 
     function handleActivate(button) {
-        const window = root.windows[root.hoveredIndex];
-        if (window)
-            WindowsService.activate(window.uuid);
+        const item = root.items[root.hoveredIndex];
+        if (item)
+            WindowsService.activateGroup(item);
     }
 
     Row {
@@ -89,7 +103,7 @@ BarWidget {
         spacing: root.spacing
 
         Repeater {
-            model: root.windows
+            model: root.items
 
             Rectangle {
                 id: button
@@ -98,8 +112,11 @@ BarWidget {
                 required property int index
 
                 readonly property bool isActive: button.modelData.active === true
-                readonly property bool isMinimized: button.modelData.minimized === true
+                // A group is dimmed only when every window in it is minimised:
+                // one visible window means the application is on screen.
+                readonly property bool isMinimized: button.modelData.windows.every(w => w.minimized)
                 readonly property bool isHovered: button.index === root.hoveredIndex
+                readonly property int windowCount: button.modelData.windows.length
 
                 width: root.buttonWidth
                 height: root.buttonHeight
@@ -123,8 +140,8 @@ BarWidget {
                     PanelIcon {
                         anchors.verticalCenter: parent.verticalCenter
                         implicitSize: root.iconSize
-                        iconName: WindowsService.iconFor(button.modelData)
-                        iconFile: WindowsService.iconFileFor(button.modelData)
+                        iconName: button.modelData.iconName
+                        iconFile: button.modelData.iconFile
                     }
 
                     PanelText {
@@ -133,23 +150,38 @@ BarWidget {
                         visible: root.showTitles
                         width: Math.min(title.implicitWidth, root.maxWidth - root.iconSize - 24)
                         elide: Text.ElideRight
-                        text: WindowEvents.label(button.modelData)
+                        text: button.modelData.windows.length === 1
+                            ? WindowEvents.label(button.modelData.windows[0])
+                            : button.modelData.appName
                         font.bold: button.isActive
                     }
                 }
 
-                // The active window gets a line under it as well as a tint:
-                // colour alone is the one distinction a person with low vision
-                // may not see at all.
-                Rectangle {
-                    visible: button.isActive
+                // How many windows the application has, and which is active,
+                // in one mark: a dash per window, filled for the active one.
+                // Colour alone is the distinction a person with low vision may
+                // not see at all, so the count is shape as well as tint.
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 2
-                    width: parent.width * 0.5
-                    height: 2
-                    radius: 1
-                    color: PlasmaColors.accent
+                    spacing: 2
+
+                    Repeater {
+                        // Past four the marks stop being countable and start
+                        // being noise.
+                        model: Math.min(4, button.windowCount)
+
+                        Rectangle {
+                            required property int index
+
+                            width: button.windowCount === 1 ? button.width * 0.5 : 4
+                            height: 2
+                            radius: 1
+                            color: button.isActive ? PlasmaColors.accent
+                                                   : PlasmaColors.alpha(PlasmaColors.foreground, 0.35)
+                        }
+                    }
                 }
             }
         }
@@ -169,48 +201,78 @@ BarWidget {
         Item {
             id: preview
 
-            readonly property var window: root.windows[root.hoveredIndex] ?? null
+            readonly property var item: root.items[root.hoveredIndex] ?? null
+            readonly property var windows: preview.item?.windows ?? []
 
-            implicitWidth: Math.max(240, body.implicitWidth + 24)
-            implicitHeight: body.implicitHeight + 12
+            implicitWidth: Math.max(260, body.implicitWidth + 24)
+            implicitHeight: body.implicitHeight + 14
 
-            Row {
+            Column {
                 id: body
                 anchors.centerIn: parent
-                spacing: 12
+                spacing: 8
 
-                PanelIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    implicitSize: 48
-                    iconName: WindowsService.iconFor(preview.window)
-                    iconFile: WindowsService.iconFileFor(preview.window)
+                // The application, once, however many windows it has.
+                Row {
+                    spacing: 12
+
+                    PanelIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitSize: 40
+                        iconName: preview.item?.iconName ?? ""
+                        iconFile: preview.item?.iconFile ?? ""
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+
+                        PanelText {
+                            text: preview.item?.appName ?? ""
+                            font.bold: true
+                        }
+
+                        PanelText {
+                            visible: preview.windows.length > 1
+                            text: `${preview.windows.length} windows — click to move through them`
+                            color: PlasmaColors.foregroundInactive
+                            font.pixelSize: 11
+                        }
+                    }
                 }
 
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
+                // Then every window it has, which is the part a grouped button
+                // otherwise hides. KDE puts a thumbnail beside each of these;
+                // the protocol that would give us one is not offered to us, so
+                // this is the title and the state instead.
+                Repeater {
+                    model: preview.windows
 
-                    PanelText {
-                        text: WindowsService.appNameFor(preview.window)
-                        font.bold: true
-                    }
+                    Row {
+                        id: line
 
-                    PanelText {
-                        id: previewTitle
-                        width: Math.min(previewTitle.implicitWidth, 320)
-                        elide: Text.ElideRight
-                        text: preview.window?.title ?? ""
-                        color: PlasmaColors.foreground
-                        font.pixelSize: 12
-                    }
+                        required property var modelData
 
-                    PanelText {
-                        text: preview.window
-                            ? (preview.window.minimized ? "minimised"
-                             : preview.window.active ? "active" : "open")
-                            : ""
-                        color: PlasmaColors.foregroundInactive
-                        font.pixelSize: 11
+                        spacing: 6
+
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 3
+                            height: 12
+                            radius: 1.5
+                            color: line.modelData.active ? PlasmaColors.accent : "transparent"
+                        }
+
+                        PanelText {
+                            id: lineTitle
+                            width: Math.min(lineTitle.implicitWidth, 320)
+                            elide: Text.ElideRight
+                            text: WindowEvents.label(line.modelData)
+                            color: line.modelData.minimized ? PlasmaColors.foregroundInactive
+                                                            : PlasmaColors.foreground
+                            font.pixelSize: 12
+                            font.italic: line.modelData.minimized
+                        }
                     }
                 }
             }

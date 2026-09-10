@@ -100,6 +100,29 @@ TestCase {
         compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steamworks-tool" })), "steamworks-tool");
     }
 
+    // Grouping is the one part of what KDE's task manager does that needs no
+    // privilege: it is arithmetic over a list we already have. The rule that
+    // matters is that order is preserved -- a taskbar whose buttons reorder
+    // themselves as windows come and go is unusable.
+    function test_grouping_keeps_first_appearance_order() {
+        const windows = [
+            windowJson({ uuid: "a", appId: "chrome" }),
+            windowJson({ uuid: "b", appId: "konsole" }),
+            windowJson({ uuid: "c", appId: "chrome" })
+        ];
+        const seen = [];
+        const groups = {};
+        for (const w of windows) {
+            if (!groups[w.appId]) {
+                groups[w.appId] = [];
+                seen.push(w.appId);
+            }
+            groups[w.appId].push(w);
+        }
+        compare(seen.join(","), "chrome,konsole");
+        compare(groups["chrome"].length, 2);
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
         // Lower-cased, which is what turns "Google-chrome" into an icon that

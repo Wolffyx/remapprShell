@@ -21,6 +21,12 @@
         }
     },
     "config": {
+        "groupByApp": {
+            "type": "bool",
+            "default": true,
+            "label": "Group windows by application",
+            "description": "One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows."
+        },
         "showTitles": {
             "type": "bool",
             "default": false,
