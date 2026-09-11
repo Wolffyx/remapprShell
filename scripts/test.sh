@@ -22,7 +22,13 @@ ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 # The redaction test reads its fixture corpus with XMLHttpRequest, and Qt 6
 # refuses local-file reads unless this is set. Without it the test fails in a
 # way that looks like a JSON parse error rather than a permissions one.
-QML_XHR_ALLOW_FILE_READ=1 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
+#
+# Offscreen, because the tests are pure functions and need no window -- and on
+# Wayland qmltestrunner opens a real one per test file, on the desktop of
+# whoever runs `make test`, and waits for it to be shown. With the screen
+# locked it never is: every file then took exactly five seconds, the suite
+# fifty instead of five, on 2026-09-11.
+QT_QPA_PLATFORM=offscreen QML_XHR_ALLOW_FILE_READ=1 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 
 # Shell-level tests, each inside its own throwaway HOME.
 #
