@@ -39,7 +39,7 @@ rows are what that did.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` would put them in place |
+| Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` -- or "Install the missing parts" in Settings -> Appearance -- would put them in place |
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours. krohnkite is installed but **not loaded** (`isScriptLoaded krohnkite` false, `krohnkiteEnabled=false`, read 2026-09-11) |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
@@ -181,6 +181,16 @@ if they fail.
     because it takes the user's Alt+Tab. **Unknown before trying:** whether
     caelestia's shell notices losing a key when kglobalaccel restarts, or
     asks for it back.
+20. **The application style, by hand.** `rmpr settings appearance`, then
+    Darkly: an open Dolphin or Konsole should restyle at once, and "Undo the
+    style" should bring Breeze back. Verified: the key written and put back,
+    in the sandbox; the live `theme status --json` finding Breeze, Fusion,
+    Darkly and Kvantum installed and Union not. Not seen: an application
+    restyling on the notification. **Union**, once installed (`sudo pacman
+    -S --needed union`): check its plugin's file name against the
+    `*union*.so` glob and its key against "Union" in `scripts/theme.sh`
+    before trusting the button. "Install the missing parts" is a real
+    `theme apply` on this machine -- see the state table.
 
 ### The lesson this session paid for twice
 
@@ -528,7 +538,7 @@ are not.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
   report, ask, crash, wizard, edges, shortcuts, launcher, search, `settings [page]`,
-  preset, profile, update. A page name is a schema section id, which is also
+  preset, profile, update, switcher, reload. A page name is a schema section id, which is also
   its heading in the generated reference -- so `rmpr settings tray` opens the
   window where the docs say it is.
 - **Auto-hide** — `panel.autoHide`, per output like position and thickness.
@@ -594,6 +604,16 @@ are not.
   multi-key binding, takes the key off them (ledgered), and writes each
   group in its own format: `[services][x.desktop] _launch` is the key
   alone, a component's action is `active,default,friendly`.
+- **Appearance** (§C) -- Settings -> Appearance, `rmpr theme style`. The Qt
+  style applications are drawn in, from the ones installed (found by plugin
+  file in Qt's styles directory; Fusion is built in), written to
+  `kdeglobals [KDE] widgetStyle` under its own `style` ledger scope, with
+  KDE's StyleChanged notification so open KDE applications follow. A
+  missing style shows the command that installs it; `install-style <id>`
+  prints it, and runs it only with `--run` in a terminal. The page also
+  names the theme parts that are not installed and offers a plain `theme
+  apply` -- which now keeps a silenced OSD silenced, rather than copying
+  Plasma's back over it.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys
@@ -1314,6 +1334,7 @@ order:
 | `153a9fc` | a revert that turned a tab into a backslash; the suite reading the real kdedefaults |
 | `c594525` | shortcuts said they took a key from its holder, and did not; and wrote the wrong format |
 | `b78bb38` | Alt+Tab and Meta+Tab, and who holds them |
+| `e123ab6` | the application style, and the theme's missing parts |
 
 The fixes were all found while building the features, and each by
 measuring: the kglobalaccel restarts were in the journal at the times of
@@ -1326,11 +1347,12 @@ Nothing was clicked and nothing was put on the user's screen: a Meet window
 was open, so the settings page was rendered offscreen instead. Items 17 and
 18 under "What to check first" are what needs a pointer.
 
-§D is complete, apart from what needs a pointer (items 17-19).
+§D, and the widget style from §C, are complete apart from what needs a
+pointer or a person (items 17-20).
 
-**Next, from §C:** `theme.widgetStyle` -- breeze, darkly and kvantum are
-installed here; Union is not, and is in `extra` (6.7.5) -- and `rmpr theme
-install-style union`, which must not run a package manager by itself. The
-theme's own parts are worth a page too: this machine has the L&F package
-from 2026-09-09 and none of the schemes, switcher or desktop theme added
-since (see the state table).
+**What is left of the plan is Phase 8, and none of it should be started
+without the user.** The lock screen needs a second TTY open and someone at
+the machine (see "Not built yet"). Notifications of our own mean taking
+`org.freedesktop.Notifications` from Plasma: a replacement, opt-in by the
+plan's own rule, and a design question before it is a coding one. The
+colours-only desktop theme already stands in for the "SVG desktoptheme".
