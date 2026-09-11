@@ -265,6 +265,64 @@ QtObject {
         root.activate(next.uuid);
     }
 
+    // ---- pinned applications, and acting on windows --------------------
+
+    function entryById(id) {
+        const key = String(id ?? "").toLowerCase();
+        return key.length > 0 ? (root._index[key] ?? null) : null;
+    }
+
+    // A pinned application with no windows: a button that starts it. Null
+    // for one that is no longer installed.
+    function launcherFor(id) {
+        const entry = root.entryById(id);
+        if (!entry)
+            return null;
+        return {
+            key: String(entry.id),
+            appKey: String(entry.id),
+            appName: entry.name || String(entry.id),
+            windows: [],
+            active: false,
+            attention: false,
+            attentionSince: 0,
+            iconName: entry.icon || "",
+            iconFile: ""
+        };
+    }
+
+    // Starts the application -- or one of its own actions, "New Incognito
+    // Window" and the like -- the way a launcher would.
+    function launch(id, action) {
+        if (action) {
+            action.execute();
+            return;
+        }
+        root.entryById(id)?.execute();
+    }
+
+    // The active window, minimised, by KWin's own "Window Minimize" action --
+    // what its key does. Only ever asked for when the window clicked is the
+    // active one, which is the one that action works on.
+    readonly property Process _minimize: Process {
+        command: ["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
+                  "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Window Minimize"]
+    }
+
+    function minimizeActive() {
+        root._minimize.running = false;
+        root._minimize.running = true;
+    }
+
+    // Any window, closed. KWin has no call for it, so the CLI loads a
+    // one-shot script (`windows close`). It is the close button's request,
+    // so an application with unsaved work can still ask.
+    function close(uuid) {
+        if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(uuid ?? "")))
+            return;
+        Quickshell.execDetached([Branding.ctlBin, "windows", "close", uuid]);
+    }
+
     // KWin's own runner. The id it expects is the uuid in braces behind a
     // "0_" prefix, which is what its Match() hands out.
     readonly property Process _activate: Process {}

@@ -139,6 +139,12 @@ if they fail.
     - Add `activewindow` in Settings → Widgets: each monitor's panel should
       name a window on that monitor, dimmed on the one without the focus.
       Clicking the dimmed one should bring that window forward.
+    - Click the active window's task button: it should minimise, and a
+      second click should bring it back. Middle-click Konsole's: a new
+      Konsole should open. Right-click Chrome's: "New Incognito Window"
+      should be offered. Choose "Pin to taskbar", close Chrome, and the
+      button should stay, now as a launcher. "Close window" on a window with
+      unsaved work should let the application ask first.
 
     None of this could be tried here. A full-screen game had the screen, and
     popouts are now on the overlay layer, so they would have opened on top of
@@ -261,6 +267,33 @@ are not.
   Verified: the reloaded script's list carries the field. Not seen: a button
   actually flashing. Nothing asked for attention while this was built, and
   no request was faked.
+- **Task buttons that behave like Windows'.** Clicking the window that is
+  already active minimises it, by invoking KWin's own "Window Minimize"
+  action, which acts on the active window, the very one clicked. A middle
+  click starts another instance. A right click opens `TaskMenu`, a jump list
+  built from what Linux applications declare: their desktop actions first
+  (Chrome's "New Incognito Window", Konsole's "Open New Tab"), then the
+  application itself, "Pin to taskbar", and "Close window" or "Close all N
+  windows". **Pinned applications** (`widgets.tasks.pinned`, desktop entry
+  ids) come first, in pin order. A pinned application holds its windows when
+  running and is a plain launcher when not. The ordering is
+  `WindowEvents.arrangeTasks`, tested.
+
+  Closing a window that is not active has no KWin call, so `rmpr windows
+  close <uuid>` loads a one-shot KWin script that finds the window and calls
+  `closeWindow()`, the close button's request, so unsaved work can still ask.
+  The id is written into the script's source, so it must match a uuid
+  exactly, and the suite checks that a script in its place is refused and
+  that nothing reaches KWin without a session.
+
+  The popout keeps one window for two contents, the preview and the menu. It
+  can turn from one into the other while open, so `WidgetSlot` now follows
+  "open and closes-on-outside-click" as a pair (`modal`) rather than only the
+  moment of opening.
+
+  Not tried on screen: none of the clicks, the menu, pinning or closing. The
+  screen was in use throughout, and each of these would have acted on the
+  user's real windows.
 - **Active window** — `activewindow`, the last widget from Phase 2 of the
   plan. KWin has one active window for the whole desktop, so each panel
   names the window last active on *its own* monitor instead. That is the
@@ -537,7 +570,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 168. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 173. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -920,6 +953,23 @@ Non-obvious things that cost time to discover:
   the service itself carries out -- kglobalaccel's `invokeShortcut` on
   `/component/kwin` did it here -- before writing a helper whose only job is
   to hold a connection open.
+- **The test suite restarted the real shell, on every run.** `test-update.sh`
+  runs `update.sh` against a copy of the repo in a throwaway HOME, and
+  `update.sh` ends by restarting the unit when it is active. A HOME does not
+  sandbox systemd: that was the user's own running shell. On 2026-09-11 the
+  journal shows it stopped and started seven times, each at a `make test`,
+  some while the user was playing a game. Nothing reported it. `NRestarts`
+  stays at 0 for a restart asked for by hand, and it looked like a live
+  reload. It was found only because the shell's PID had changed.
+
+  Now `update.sh` restarts only with a session (`NO_SESSION_VAR` unset), and
+  so do `install.sh`'s `daemon-reload` and bus `ReloadConfig`.
+  `scripts/test.sh` exports the switch for every suite, rather than trusting
+  each one to. `test-update.sh` checks that the update said it was not
+  restarting, and the whole suite was run once with the unit's start time
+  compared before and after. **A throwaway HOME is not a throwaway session**
+  was already written down in this file, for `changeShell`. It needed
+  enforcing, not remembering.
 - **Quickshell's PipeWire link API is half live.** Each of these was found by
   running a throwaway config in the scratchpad, not by reading the docs:
   - An ObjectModel's `values` is a Qt sequence, not a JS array. Its `filter`
@@ -1095,10 +1145,10 @@ Then a third: `privacy`, the camera and microphone indicator, after finding
 that Chrome was recording with nothing on screen to show it. The rule was
 right the first time and the tests passed; the live answer was still empty
 until three Quickshell PipeWire behaviours were pinned down in a throwaway
-config (see "Non-obvious things"). Also worth knowing: **a `Write` that
-replaces a QML file wholesale may not trigger the live reload** -- the
-shell kept the old version until `shell.qml` was touched. Check that a
-diagnostic field you just added is there before trusting the answer.
+config (see "Non-obvious things"). It was written at the time that a
+wholesale `Write` of a QML file had failed to trigger the live reload. **That
+was wrong.** The "reload" that brought the new code in was the test suite
+restarting the whole shell; see "The test suite restarted the real shell".
 
 Then the user's report: popouts too small for their contents, none closing on
 a click elsewhere, and taskbar buttons that never asked for attention. See
@@ -1106,4 +1156,6 @@ a click elsewhere, and taskbar buttons that never asked for attention. See
 "Working today", and item 16 under "What to check first".
 
 Then the active-window widget, which finishes Phase 2 of the plan, and the
-task list's per-monitor option that the same data made cheap.
+task list's per-monitor option that the same data made cheap. Then task
+buttons that behave like Windows': minimise on the active one, middle-click
+for a new instance, a right-click jump list, and pinned applications.

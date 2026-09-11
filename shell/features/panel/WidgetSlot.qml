@@ -211,17 +211,23 @@ Item {
 
         // One popout open at a time, closed by a click anywhere else: see
         // PanelModel. A preview that follows the pointer closes by itself and
-        // stays out of it.
-        //
-        // Then tell the panel, so it takes the keyboard for as long as this is
+        // stays out of it. Followed as a pair rather than at the moment the
+        // popout opens, because a widget can turn one kind into the other
+        // while it stays open -- the task list's preview becomes its menu on
+        // a right click.
+        readonly property bool modal: popout.wanted && (root.widget?.popoutClosesOnOutsideClick ?? true)
+
+        onModalChanged: {
+            if (popout.modal)
+                PanelModel.popoutOpened(root);
+            else
+                PanelModel.popoutClosed(root);
+        }
+
+        // Tell the panel, so it takes the keyboard for as long as this is
         // open and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
-            if (popout.wanted && (root.widget?.popoutClosesOnOutsideClick ?? true))
-                PanelModel.popoutOpened(root);
-            else if (!popout.wanted)
-                PanelModel.popoutClosed(root);
-
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))

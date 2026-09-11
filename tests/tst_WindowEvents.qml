@@ -197,6 +197,64 @@ TestCase {
         compare(m["DP-3"], "a");
     }
 
+    function group(key, count) {
+        const windows = [];
+        for (let i = 0; i < (count ?? 1); ++i)
+            windows.push({ uuid: `${key}-${i}` });
+        return { key: key, windows: windows };
+    }
+
+    function launcher(id) {
+        return id === "gone" ? null : { key: id, appKey: id, windows: [] };
+    }
+
+    function keys(items) {
+        return items.map(i => `${i.key}${i.pinned ? "*" : ""}${i.launcher ? "^" : ""}`).join(",");
+    }
+
+    // Pinned first, in pin order, whether running or not; then the rest in
+    // the order they appeared. A pinned application that is running holds its
+    // windows in its pinned place.
+    function test_pinned_first_then_the_rest() {
+        const items = WindowEvents.arrangeTasks(
+            [group("konsole"), group("org.kde.dolphin"), group("class:steam_app_1")],
+            ["org.kde.dolphin", "google-chrome"], launcher);
+        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:steam_app_1");
+        compare(items[1].windows.length, 0);
+    }
+
+    // An application uninstalled since it was pinned is skipped, and a pin
+    // listed twice counts once.
+    function test_missing_and_repeated_pins() {
+        const items = WindowEvents.arrangeTasks([group("konsole")], ["gone", "konsole", "konsole"], launcher);
+        compare(keys(items), "konsole*");
+    }
+
+    // Ungrouped, each window is its own item; all of a pinned application's
+    // windows go to its place.
+    function test_ungrouped_windows_follow_their_pin() {
+        const items = WindowEvents.arrangeTasks([
+            { key: "w1", appKey: "konsole", windows: [{}] },
+            { key: "w2", appKey: "org.kde.dolphin", windows: [{}] },
+            { key: "w3", appKey: "konsole", windows: [{}] }
+        ], ["konsole"], launcher);
+        compare(keys(items), "w1*,w3*,w2");
+    }
+
+    function test_app_id_of_an_item() {
+        compare(WindowEvents.appIdOf({ key: "org.kde.dolphin" }), "org.kde.dolphin");
+        compare(WindowEvents.appIdOf({ key: "class:steam_app_1" }), "");
+        compare(WindowEvents.appIdOf({ key: "uuid", appKey: "konsole" }), "konsole");
+        compare(WindowEvents.appIdOf(null), "");
+    }
+
+    function test_toggle_pinned() {
+        compare(WindowEvents.togglePinned(["a"], "b"), ["a", "b"]);
+        compare(WindowEvents.togglePinned(["a", "b"], "a"), ["b"]);
+        compare(WindowEvents.togglePinned(null, "a"), ["a"]);
+        compare(WindowEvents.togglePinned(["a"], ""), ["a"]);
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
         // Lower-cased, which is what turns "Google-chrome" into an icon that

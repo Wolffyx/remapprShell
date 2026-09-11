@@ -27,6 +27,12 @@
             "label": "Group windows by application",
             "description": "One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows."
         },
+        "pinned": {
+            "type": "list",
+            "default": [],
+            "label": "Pinned applications",
+            "description": "Desktop entry ids (\"org.kde.dolphin\"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose \"Pin to taskbar\" rather than typing them."
+        },
         "thisScreenOnly": {
             "type": "bool",
             "default": false,

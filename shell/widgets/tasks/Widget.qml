@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 
-// The open windows.
+// The open windows, and the applications kept on the taskbar.
 //
 // Icons only. A panel is the one surface with no room to spare, and a row of
 // titles runs out of it after four or five windows -- which is why every
@@ -14,10 +14,16 @@ pragma ComponentBehavior: Bound
 // keyboard when clicked and the window that had just been activated lost it
 // again.
 //
-// A click activates; KWin does the rest. Nothing here moves, closes or
-// rearranges a window.
+// The buttons do what Windows' do. A click activates, and on the window that
+// is already active it minimises; on an application with several windows it
+// moves through them. A middle click starts another instance. A right click
+// opens a menu (TaskMenu): the application's own actions, pinning, closing.
+// Pinned applications stay on the taskbar, first and in the order pinned,
+// whether or not they are running. KWin does everything asked of it; nothing
+// here moves or rearranges a window.
 
 import QtQuick
+import qs.domain.config
 import qs.domain.theme
 import qs.domain.windows
 import qs.domain.windows.events
@@ -40,9 +46,9 @@ BarWidget {
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
 
-    // One button per application when grouping, one per window otherwise. Both
-    // are the same shape -- a list of {windows, appName, icon...} -- so the row
-    // below does not care which it is drawing.
+    // Desktop entry ids, in the order they sit on the taskbar.
+    readonly property var pinned: root.widgetConfig?.pinned ?? []
+
     // Only the windows on this panel's own monitor, when asked -- Windows'
     // "show taskbar apps on the taskbar where the window is open". A window
     // with no monitor named (a script older than that field) is shown
@@ -52,10 +58,14 @@ BarWidget {
         ? WindowsService.windows.filter(w => !w.output || w.output === root.screenName)
         : WindowsService.windows
 
-    readonly property var items: root.groupByApp
+    // One item per application when grouping, one per window otherwise. Both
+    // are the same shape -- a list of {windows, appName, icon...} -- so the row
+    // below does not care which it is drawing.
+    readonly property var running: root.groupByApp
         ? (root.thisScreenOnly ? WindowsService.groupsOf(root.windowsHere) : WindowsService.groups)
         : root.windowsHere.map(w => ({
             key: w.uuid,
+            appKey: String(WindowsService.entryFor(w)?.id ?? ""),
             appName: WindowsService.appNameFor(w),
             windows: [w],
             active: w.active === true,
@@ -65,22 +75,31 @@ BarWidget {
             iconFile: WindowsService.iconFileFor(w)
         }))
 
+    // Pinned first, then the rest: see WindowEvents.arrangeTasks.
+    readonly property var items: WindowEvents.arrangeTasks(root.running, root.pinned,
+                                                           id => WindowsService.launcherFor(id))
+
     // One button's width. Square for icons only, wider when titles are shown.
     readonly property int buttonWidth: root.showTitles ? root.maxWidth
                                                        : Math.max(24, root.iconSize + 14)
     readonly property int buttonHeight: Math.max(18, root.bar.thickness - 10)
     readonly property int spacing: 4
+    readonly property int stride: root.buttonWidth + root.spacing
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
     // handler per button.
     property int hoveredIndex: -1
 
-    wantsHover: true
+    // What the popout shows: the preview while the pointer is over a button,
+    // or a button's menu after a right click. The menu stays put while the
+    // pointer travels to it, and a click anywhere else closes it; the preview
+    // follows the pointer and closes by itself.
+    property string popoutMode: "preview"
+    property var menuItem: null
 
-    // The preview follows the pointer and closes when it leaves, so a click
-    // elsewhere has nothing to close.
-    popoutClosesOnOutsideClick: false
+    wantsHover: true
+    popoutClosesOnOutsideClick: root.popoutMode === "menu"
 
     // How long a button flashes once its window asks for attention, before
     // settling to a steady tint.
@@ -90,13 +109,14 @@ BarWidget {
     implicitHeight: root.bar.thickness
 
     function handleHover(position, horizontal) {
-        const stride = root.buttonWidth + root.spacing;
-        const index = Math.floor(position / stride);
+        const index = Math.floor(position / root.stride);
         root.hoveredIndex = (index >= 0 && index < root.items.length) ? index : -1;
 
+        if (root.popoutMode === "menu")
+            return;
         if (root.hoveredIndex >= 0) {
             root.popoutVisible = true;
-            root.requestPopout("tasks", root.hoveredIndex * stride + root.buttonWidth / 2);
+            root.requestPopout("tasks", root.hoveredIndex * root.stride + root.buttonWidth / 2);
         } else {
             root.popoutVisible = false;
         }
@@ -104,16 +124,58 @@ BarWidget {
 
     // `dismissPopout` is a signal on the base type -- the panel emits it when
     // the pointer leaves -- so this handles it rather than defining a function
-    // of the same name, which is a silent clash at load time.
+    // of the same name, which is a silent clash at load time. The pointer
+    // leaving is how it reaches an open menu, so the menu stays.
     onDismissPopout: {
         root.hoveredIndex = -1;
-        root.popoutVisible = false;
+        if (root.popoutMode !== "menu")
+            root.popoutVisible = false;
+    }
+
+    // However it closed -- chosen from, clicked away from, replaced by another
+    // popout -- the next one opens as the preview again.
+    onPopoutVisibleChanged: {
+        if (!root.popoutVisible) {
+            root.popoutMode = "preview";
+            root.menuItem = null;
+        }
     }
 
     function handleActivate(button) {
-        const item = root.items[root.hoveredIndex];
-        if (item)
-            WindowsService.activateGroup(item);
+        const item = root.items[root.hoveredIndex] ?? null;
+
+        // A click on the taskbar while the menu is open closes it and does
+        // nothing else -- unless it is another right click, which moves the
+        // menu to that button.
+        if (root.popoutMode === "menu") {
+            root.popoutVisible = false;
+            if (button !== Qt.RightButton)
+                return;
+        }
+        if (!item)
+            return;
+
+        if (button === Qt.RightButton) {
+            root.openMenu(item);
+            return;
+        }
+        if (button === Qt.MiddleButton || item.windows.length === 0) {
+            WindowsService.launch(WindowEvents.appIdOf(item), null);
+            return;
+        }
+        // The active window's own button minimises it, as on Windows.
+        if (item.windows.length === 1 && item.windows[0].active) {
+            WindowsService.minimizeActive();
+            return;
+        }
+        WindowsService.activateGroup(item);
+    }
+
+    function openMenu(item) {
+        root.menuItem = item;
+        root.popoutMode = "menu";
+        root.popoutVisible = true;
+        root.requestPopout("tasks", root.items.indexOf(item) * root.stride + root.buttonWidth / 2);
     }
 
     Row {
@@ -132,8 +194,11 @@ BarWidget {
 
                 readonly property bool isActive: button.modelData.active === true
                 // A group is dimmed only when every window in it is minimised:
-                // one visible window means the application is on screen.
-                readonly property bool isMinimized: button.modelData.windows.every(w => w.minimized)
+                // one visible window means the application is on screen. A
+                // pinned application with no windows is not minimised, just
+                // not running.
+                readonly property bool isMinimized: button.windowCount > 0
+                                                    && button.modelData.windows.every(w => w.minimized)
                 readonly property bool isHovered: button.index === root.hoveredIndex
                 readonly property int windowCount: button.modelData.windows.length
 
@@ -141,8 +206,11 @@ BarWidget {
                 height: root.buttonHeight
                 radius: 5
 
+                // A pinned application that is not running sits on the panel
+                // itself, the way Windows draws one: no tile until hovered.
                 color: button.isActive  ? PlasmaColors.alpha(PlasmaColors.accent, 0.28)
                      : button.isHovered ? PlasmaColors.hoverBackground
+                     : button.windowCount === 0 ? "transparent"
                                         : PlasmaColors.backgroundAlternate
 
                 // A minimised window is still there and still clickable; it is
@@ -254,6 +322,49 @@ BarWidget {
         }
     }
 
+    // One popout, two contents: a button's menu, or the preview.
+    popout: Component {
+        Item {
+            // The loaded contents are Items; the linter only knows they are
+            // QObjects, so they are read through a typed alias.
+            readonly property Item shownContent: (menuLoader.item ?? previewLoader.item) as Item
+
+            implicitWidth: shownContent?.implicitWidth ?? 1
+            implicitHeight: shownContent?.implicitHeight ?? 1
+
+            Loader {
+                id: menuLoader
+                active: root.popoutMode === "menu" && root.menuItem !== null
+                sourceComponent: TaskMenu {
+                    item: root.menuItem
+                    entry: WindowsService.entryById(WindowEvents.appIdOf(root.menuItem))
+                    pinned: root.menuItem?.pinned === true
+
+                    onLaunch: action => {
+                        WindowsService.launch(WindowEvents.appIdOf(root.menuItem), action);
+                        root.popoutVisible = false;
+                    }
+                    onTogglePin: {
+                        ConfigStore.set("widgets.tasks.pinned",
+                                        WindowEvents.togglePinned(root.pinned, WindowEvents.appIdOf(root.menuItem)));
+                        root.popoutVisible = false;
+                    }
+                    onCloseWindows: {
+                        for (const w of root.menuItem?.windows ?? [])
+                            WindowsService.close(w.uuid);
+                        root.popoutVisible = false;
+                    }
+                }
+            }
+
+            Loader {
+                id: previewLoader
+                active: root.popoutMode !== "menu"
+                sourceComponent: root.preview
+            }
+        }
+    }
+
     // The preview.
     //
     // It is not a thumbnail, and cannot be one here. Window images come from
@@ -264,7 +375,7 @@ BarWidget {
     // actually knowable, at a size worth hovering for: the application's own
     // icon, its real name rather than its window class, the full title, and
     // the state the window is in.
-    popout: Component {
+    readonly property Component preview: Component {
         Item {
             id: preview
 
@@ -300,8 +411,10 @@ BarWidget {
                         }
 
                         PanelText {
-                            visible: preview.windows.length > 1
-                            text: `${preview.windows.length} windows — click to move through them`
+                            visible: text.length > 0
+                            text: preview.windows.length > 1
+                                ? `${preview.windows.length} windows — click to move through them`
+                                : preview.windows.length === 0 ? "Pinned — click to start it" : ""
                             color: PlasmaColors.foregroundInactive
                             font.pixelSize: 11
                         }

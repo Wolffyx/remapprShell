@@ -149,6 +149,62 @@ QtObject {
         return out;
     }
 
+    // The application a task item stands for, as a desktop entry id ("org.kde.
+    // dolphin"). Empty for windows no installed application matched, which
+    // are grouped by class and cannot be pinned or started again.
+    function appIdOf(item) {
+        if (!item)
+            return "";
+        if (item.appKey !== undefined)
+            return String(item.appKey);
+        const key = String(item.key ?? "");
+        return key.startsWith("class:") ? "" : key;
+    }
+
+    // The task list in the order Windows keeps it: pinned applications first,
+    // in the order they were pinned, each holding its windows when it has any
+    // and otherwise a button that starts it -- `launcher(id)`, which answers
+    // null for an application no longer installed, and that pin is skipped.
+    // Then every other running item, in the order it appeared. Every item
+    // comes back with `pinned`, and a launcher with `launcher: true`.
+    function arrangeTasks(items, pinned, launcher) {
+        const list = items ?? [];
+        const out = [];
+        const used = new Set();
+        const seen = new Set();
+        for (const raw of pinned ?? []) {
+            const id = String(raw ?? "");
+            if (!id || seen.has(id))
+                continue;
+            seen.add(id);
+            const mine = list.filter(i => root.appIdOf(i) === id);
+            if (mine.length > 0) {
+                for (const i of mine) {
+                    used.add(i);
+                    out.push(Object.assign({}, i, { pinned: true, launcher: false }));
+                }
+            } else {
+                const made = launcher ? launcher(id) : null;
+                if (made)
+                    out.push(Object.assign({}, made, { pinned: true, launcher: true }));
+            }
+        }
+        for (const i of list) {
+            if (!used.has(i))
+                out.push(Object.assign({}, i, { pinned: false, launcher: false }));
+        }
+        return out;
+    }
+
+    // The pinned list with `id` added at the end, or taken out.
+    function togglePinned(list, id) {
+        const current = (list ?? []).map(String);
+        const key = String(id ?? "");
+        if (!key)
+            return current;
+        return current.indexOf(key) >= 0 ? current.filter(x => x !== key) : current.concat([key]);
+    }
+
     // What to show for a window: its title, or its application when the title
     // is empty -- some windows have none until they finish starting.
     function label(window) {

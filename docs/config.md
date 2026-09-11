@@ -337,6 +337,7 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `groupByApp` | `true` or `false` | `true` | One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows. |
+| `pinned` | a list | `[]` | Desktop entry ids ("org.kde.dolphin"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose "Pin to taskbar" rather than typing them. |
 | `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
 | `showTitles` | `true` or `false` | `false` | Off by default: a panel runs out of room after four or five titles, and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |

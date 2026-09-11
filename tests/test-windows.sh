@@ -100,6 +100,18 @@ call Update s "$WINDOW" >/dev/null
 sleep 2
 check "says nothing when nothing changed" "$(grep -c '"member":"Changed"' "$monitor_out")" "0"
 
+# Closing a window writes the id into a KWin script's source, so anything
+# that is not exactly a uuid must be refused before it gets that far -- and
+# with no session, nothing may reach KWin at all.
+echo "== closing a window =="
+nosession() { env "$NO_SESSION_VAR=1" "$REPO_ROOT/scripts/windows.sh" "$@" 2>&1; }
+out=$(nosession close 'a"); workspace.windowList().forEach(w => w.closeWindow()); ("'); status=$?
+check "a script in place of an id is refused" "$status:$(printf '%s' "$out" | grep -c 'not a window id')" "1:1"
+out=$(nosession close ''); status=$?
+check "no id is refused"                      "$status" "1"
+out=$(nosession close 1f46c057-675a-4d51-99e5-17aafdfb5b06); status=$?
+check "no session, nothing closed"            "$status:$(printf '%s' "$out" | grep -c 'no session')" "1:1"
+
 # Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
 # from another application, holds several sizes one after another, and a
 # malformed one must yield nothing rather than an exception in the daemon

@@ -5,6 +5,8 @@
 #   disable   unload and remove it
 #   status    what is installed, loaded and reporting
 #   show      the windows as the daemon currently has them
+#   close ID  close one window, by the uuid the list reports -- what the task
+#             list's "Close window" runs
 #
 # Why any of this exists is written at the top of bin/windowsd.py.in. The short
 # version: KWin is the only thing that knows what windows exist, a KWin script
@@ -102,5 +104,37 @@ case "$cmd" in
             || log_info "nothing yet"
         ;;
 
-    *) die "unknown command: $cmd (expected enable, disable, status or show)" ;;
+    close)
+        # KWin offers no call that closes a window by id, so this loads a
+        # one-shot script that finds the window and asks it to close -- the
+        # request its close button makes, so an application with unsaved work
+        # can still ask. The id goes into the script's source, which is why it
+        # must be exactly a uuid and nothing else.
+        uuid=${1:-}
+        [[ "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+            || die "not a window id: '$uuid'"
+        session_available || die "no session to close a window in"
+
+        name="${KWIN_SCRIPT_ID}-close-$uuid"
+        file=$(mktemp --suffix=.js "${XDG_RUNTIME_DIR:-/tmp}/${KWIN_SCRIPT_ID}-close.XXXXXX") \
+            || die "could not write the script"
+        trap 'rm -f "$file"' EXIT
+        cat > "$file" <<JS
+const id = "$uuid";
+for (const w of workspace.windowList()) {
+    if (String(w.internalId).replace(/[{}]/g, "") === id) {
+        w.closeWindow();
+        break;
+    }
+}
+JS
+        kwin_script unloadScript "$name" >/dev/null
+        kwin_script loadScript "$file" "$name" >/dev/null || die "KWin did not load the script"
+        kwin_script start >/dev/null
+        # Let it run before it is taken away again.
+        sleep 0.3
+        kwin_script unloadScript "$name" >/dev/null
+        ;;
+
+    *) die "unknown command: $cmd (expected enable, disable, status, show or close)" ;;
 esac
