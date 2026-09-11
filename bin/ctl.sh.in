@@ -15,7 +15,7 @@ usage: @ALIAS@ <command> [options]
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
   renderer status|list|set|revert   choose what draws the panel
-  theme apply|revert|osd|status     the look and feel, and which OSD draws
+  theme apply|revert|osd|style|status  the look and feel, the widget style, which OSD draws
   report create|list|show|remove    write a local diagnostic report
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not

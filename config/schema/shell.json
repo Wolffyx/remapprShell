@@ -246,6 +246,13 @@
             "page": "switching"
         },
         {
+            "id": "appearance",
+            "label": "Appearance",
+            "icon": "preferences-desktop-theme-global",
+            "description": "The style every Qt application is drawn in, and the parts of this shell's own theme: colour schemes, the Alt+Tab switcher, a Plasma theme and a splash. Nothing here changes your colours or icons.",
+            "page": "appearance"
+        },
+        {
             "id": "profiles",
             "label": "Profiles",
             "icon": "preferences-desktop-display",

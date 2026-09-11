@@ -123,6 +123,7 @@ FloatingWindow {
                             case "tray":      return trayPage;
                             case "edges":     return edgesPage;
                             case "switching": return switchingPage;
+                            case "appearance": return appearancePage;
                             case "profiles":  return profilesPage;
                             case "snapshots": return snapshotsPage;
                             case "about":     return aboutPage;
@@ -146,6 +147,7 @@ FloatingWindow {
                 Component { id: trayPage;      TrayPage      { width: parent.width } }
                 Component { id: edgesPage;     EdgesPage     { width: parent.width } }
                 Component { id: switchingPage; SwitchingPage { width: parent.width } }
+                Component { id: appearancePage; AppearancePage { width: parent.width } }
                 Component { id: profilesPage;  ProfilesPage  { width: parent.width } }
                 Component { id: snapshotsPage; SnapshotsPage { width: parent.width } }
                 Component { id: aboutPage;     AboutPage     { width: parent.width } }

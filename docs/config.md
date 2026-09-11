@@ -133,6 +133,13 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
+### Appearance
+
+The style every Qt application is drawn in, and the parts of this shell's own theme: colour schemes, the Alt+Tab switcher, a Plasma theme and a splash. Nothing here changes your colours or icons.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Profiles
 
 Separate configurations you can switch between, and per-monitor overrides within each.

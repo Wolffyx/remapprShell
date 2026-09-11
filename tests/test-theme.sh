@@ -40,6 +40,23 @@ cp -a "$XDG_CONFIG_HOME/." "$before/"
 kde_sums() { (cd "$XDG_CONFIG_HOME" && find . -type f -not -path "./$SLUG/*" | sort | xargs sha256sum); }
 before_sums=$(kde_sums)
 
+# Stand-ins for the session and for anything that installs a package: both
+# must be reached by nothing here.
+FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
+CALLS="$SANDBOX/calls"; : > "$CALLS"
+for t in busctl pacman sudo; do
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
+    chmod +x "$FAKEBIN/$t"
+done
+export PATH="$FAKEBIN:$PATH"
+export "$NO_SESSION_VAR=1"
+
+# Two style plugins "installed", in a directory of the test's own.
+mkdir -p "$SANDBOX/styles"
+: > "$SANDBOX/styles/breeze6.so"
+: > "$SANDBOX/styles/darkly6.so"
+export "${ENV_PREFIX}_STYLE_DIRS=$SANDBOX/styles"
+
 # A colour scheme of the user's own, sitting in the same directory. Our revert
 # removes what we installed and nothing else -- the directory is KDE's, and
 # only the files in it are ours.
@@ -93,6 +110,33 @@ check "interface kept"         "$(grep -c 'property alias osdValue' "$osd_file")
 "$REPO_ROOT/scripts/theme.sh" osd plasma >/dev/null 2>&1
 check "back to Plasma's"       "$(grep -c 'drawn as nothing' "$osd_file")" "0"
 check "the shell was told too" "$(jq -r '.osd.enabled' "$profile")" "false"
+
+echo "== a second apply keeps the OSD choice =="
+"$REPO_ROOT/scripts/theme.sh" osd ours >/dev/null 2>&1
+"$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
+check "still silenced after apply" "$(grep -c 'drawn as nothing' "$osd_file")" "1"
+"$REPO_ROOT/scripts/theme.sh" osd plasma >/dev/null 2>&1
+
+echo "== widget style =="
+th() { "$REPO_ROOT/scripts/theme.sh" "$@"; }
+tjs() { th status --json 2>/dev/null | jq -r "$1"; }
+check "every part reported"          "$(tjs '[.package, .parts.switcher, .parts.desktoptheme, .parts.splash, .parts.schemes] | map(tostring) | join(",")')" "true,true,true,true,2"
+check "an installed style offered"   "$(tjs '.styles[] | select(.id == "darkly") | .installed')" "true"
+check "a missing one is not"         "$(tjs '.styles[] | select(.id == "union") | .installed')" "false"
+check "Fusion is built into Qt"      "$(tjs '.styles[] | select(.id == "fusion") | .installed')" "true"
+check "the theme's style read back"  "$(tjs .style)" "breeze"
+th style darkly >/dev/null 2>&1
+check "written as Qt's key"          "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "Darkly"
+check "refuses one not installed"    "$(th style union >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+check "refuses an unknown one"       "$(th style nosuch >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+th style revert >/dev/null 2>&1
+check "style revert keeps the theme" "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "Breeze"
+check "install-style only prints"    "$(th install-style union 2>/dev/null)" "sudo pacman -S --needed union"
+check "--run wants a terminal"       "$(th install-style union --run </dev/null >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+th style darkly >/dev/null 2>&1
+check "nothing installed, nothing emitted" "$(wc -l < "$CALLS")" "0"
+env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/theme.sh" style fusion >/dev/null 2>&1
+check "with a session, apps are told" "$(grep -c 'emit /KGlobalSettings' "$CALLS")" "1"
 
 echo "== revert =="
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }

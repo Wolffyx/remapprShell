@@ -4,7 +4,10 @@
 #   apply [--appearance]   install the package and activate it
 #   revert                 put every key back and remove the package
 #   osd ours|plasma        which OSD draws when our package is active
-#   status                 what is active, and what would be undone
+#   style [<id>|revert]    the Qt style every application is drawn in
+#   install-style <id> [--run]
+#                          how to install a style that is missing
+#   status [--json]        what is active, and what would be undone
 #
 # A plain apply installs the package and activates it -- which is what makes
 # our OSD, splash and logout screens take effect -- and touches nothing else.
@@ -36,6 +39,80 @@ SWITCHER_SRC="$REPO_ROOT/theme/windowswitcher"
 SWITCHER_DEST="$KWIN_SWITCHER_DIR/$SLUG"
 DESKTOPTHEME_SRC="$REPO_ROOT/theme/desktoptheme"
 DESKTOPTHEME_DEST="$PLASMA_DESKTOPTHEME_DIR/$SLUG"
+
+# The Qt styles worth offering:
+#   id | the key Qt knows it by | its plugin, a glob in plugins/styles | package | what it is
+#
+# Qt matches style keys without regard to case, and KDE writes the key into
+# kdeglobals [KDE] widgetStyle. Fusion is compiled into Qt, so it has no
+# plugin. Union's plugin name and key are *not* verified -- it was not
+# installed on the machine this was written on, and pacman's file lists were
+# not synced -- so check both the first time it is.
+STYLES=(
+    "breeze|Breeze|breeze6.so|breeze|Plasma's own"
+    "fusion|Fusion||qt6-base|Qt's own, built in"
+    "darkly|Darkly|darkly6.so|darkly|Breeze, rounder and translucent"
+    "kvantum|kvantum|libkvantum.so|kvantum|drawn by Kvantum's theme engine"
+    "union|Union|*union*.so|union|KDE's new style, one for QtQuick and QtWidgets alike"
+)
+
+style_field() {   # <id> <n>
+    local s
+    for s in "${STYLES[@]}"; do
+        [ "${s%%|*}" = "$1" ] && { cut -d'|' -f"$2" <<< "$s"; return 0; }
+    done
+    return 1
+}
+style_ids() { local s; for s in "${STYLES[@]}"; do printf '%s ' "${s%%|*}"; done; }
+
+# Where Qt looks for style plugins. The tests point it at a directory of
+# their own, so what is installed on the machine running them does not
+# change the answer.
+STYLE_DIRS_VAR="${ENV_PREFIX}_STYLE_DIRS"
+style_dirs() {
+    if [ -n "${!STYLE_DIRS_VAR:-}" ]; then
+        tr ':' '\n' <<< "${!STYLE_DIRS_VAR}"
+        return
+    fi
+    local d
+    for d in $(tr ':' ' ' <<< "${QT_PLUGIN_PATH:-}") /usr/lib/qt6/plugins /usr/lib64/qt6/plugins; do
+        printf '%s/styles\n' "$d"
+    done
+}
+
+style_installed() {
+    local glob d
+    glob=$(style_field "$1" 3) || return 1
+    [ -n "$glob" ] || return 0
+    while IFS= read -r d; do
+        compgen -G "$d/$glob" >/dev/null && return 0
+    done < <(style_dirs)
+    return 1
+}
+
+# The id of the style in use, or kdeglobals' own value when it is none of ours.
+style_active_id() {
+    local current s
+    current=$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle --default '')
+    for s in "${STYLES[@]}"; do
+        [ "$(cut -d'|' -f2 <<< "$s" | tr '[:upper:]' '[:lower:]')" = "${current,,}" ] && { printf '%s' "${s%%|*}"; return; }
+    done
+    printf '%s' "$current"
+}
+
+# What System Settings' style page sends: KDE applications already running
+# change style on it, the rest when next started.
+notify_style_changed() {
+    session_available || return 0
+    busctl --user emit /KGlobalSettings org.kde.KGlobalSettings notifyChange ii 2 0 >/dev/null 2>&1 || true
+}
+
+# How to install a package here, printed for a person to run. Only pacman is
+# known; elsewhere the package names are not known either.
+install_command() {
+    command -v pacman >/dev/null 2>&1 || return 1
+    printf 'sudo pacman -S --needed %s' "$1"
+}
 
 install_package() {
     mkdir -p "$LNF_DEST/contents"
@@ -170,10 +247,14 @@ cmd=${1:-status}
 [ $# -gt 0 ] && shift
 
 WITH_APPEARANCE=0
+WITH_JSON=0
+RUN_INSTALL=0
 positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --appearance) WITH_APPEARANCE=1 ;;
+        --json) WITH_JSON=1 ;;
+        --run) RUN_INSTALL=1 ;;
         -*) die "unknown option: $1" ;;
         *) positional+=("$1") ;;
     esac
@@ -249,7 +330,19 @@ case "$cmd" in
         # A restore point before the first write outside our own directories.
         snapshot_create "before-theme" >/dev/null || die "could not take a restore point; refusing to apply"
 
+        # Installing copies Plasma's Osd.qml over the silenced one, so a
+        # second apply -- to add parts written since the first -- would
+        # quietly bring back Plasma's OSD beside ours. The choice is kept.
+        osd_was_ours=0
+        grep -q 'drawn as nothing' "$LNF_DEST/contents/osd/Osd.qml" 2>/dev/null && osd_was_ours=1
+
         install_package || die "package installation failed; nothing was activated"
+
+        if [ "$osd_was_ours" = 1 ]; then
+            cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$LNF_DEST/contents/osd/Osd.qml" \
+                || die "could not keep Plasma's OSD silenced"
+            chmod 644 "$LNF_DEST/contents/osd/Osd.qml"
+        fi
 
         if [ "$WITH_APPEARANCE" = 1 ]; then
             apply_defaults || die "could not write the defaults; run '$ALIAS theme revert'"
@@ -272,6 +365,13 @@ case "$cmd" in
         ;;
 
     revert)
+        # The style first: its record holds what the style was after the
+        # theme's own defaults, and the theme's is what gets back to the
+        # user's.
+        if jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1; then
+            kconfig_revert style
+            notify_style_changed
+        fi
         kconfig_revert theme
         remove_colors
         for d in "$SWITCHER_DEST" "$DESKTOPTHEME_DEST"; do
@@ -289,6 +389,30 @@ case "$cmd" in
         ;;
 
     status)
+        if [ "$WITH_JSON" = 1 ]; then
+            styles=$(for s in "${STYLES[@]}"; do
+                         IFS='|' read -r id key glob pkg label <<< "$s"
+                         printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$key" "$label" \
+                             "$(style_installed "$id" && echo true || echo false)" "$(install_command "$pkg" || true)"
+                     done | jq -R -s -c '[split("\n")[] | select(length > 0) | split("\t")
+                                          | {id: .[0], key: .[1], label: .[2], installed: (.[3] == "true"), install: (.[4] // "")}]')
+            has() { [ -e "$1" ] && echo true || echo false; }
+            jq -n -c \
+                --argjson package "$(has "$LNF_DEST/metadata.json")" \
+                --arg active "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')" \
+                --arg lnf "$LNF_PACKAGE_ID" \
+                --argjson schemes "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")" \
+                --argjson switcher "$(has "$SWITCHER_DEST/metadata.json")" \
+                --argjson desktoptheme "$(has "$DESKTOPTHEME_DEST/colors")" \
+                --argjson splash "$(has "$LNF_DEST/contents/splash/Splash.qml")" \
+                --arg style "$(style_active_id)" \
+                --argjson styles "$styles" \
+                --argjson styleCustomised "$(jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1 && echo true || echo false)" \
+                '{package: $package, active: ($active == $lnf),
+                  parts: {schemes: $schemes, switcher: $switcher, desktoptheme: $desktoptheme, splash: $splash},
+                  style: $style, styles: $styles, styleCustomised: $styleCustomised}'
+            exit 0
+        fi
         printf 'package:      %s\n' "$([ -d "$LNF_DEST" ] && echo "installed ($LNF_DEST)" || echo "not installed")"
         printf 'active L&F:   %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')"
         printf 'colour:       %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
@@ -307,5 +431,53 @@ case "$cmd" in
         osd_mode "${1:-status}"
         ;;
 
-    *) die "unknown command: $cmd (expected apply, revert, osd or status)" ;;
+    # Its own ledger scope, so a style tried from the settings page can be
+    # undone without taking the whole theme with it. `revert` undoes both.
+    style)
+        want=${1:-}
+        if [ -z "$want" ]; then
+            active=$(style_active_id)
+            for s in "${STYLES[@]}"; do
+                IFS='|' read -r id key glob pkg label <<< "$s"
+                printf '  %-8s %-8s %-14s %s%s\n' "$id" "$key" \
+                    "$(style_installed "$id" && echo installed || echo 'not installed')" "$label" \
+                    "$([ "$id" = "$active" ] && echo '  (in use)')"
+            done
+            exit 0
+        fi
+        if [ "$want" = revert ]; then
+            kconfig_revert style
+            notify_style_changed
+            exit 0
+        fi
+        key=$(style_field "$want" 2) || die "unknown style '$want' (one of: $(style_ids))"
+        style_installed "$want" || die "$want is not installed; '$ALIAS theme install-style $want' says how"
+        kconfig_set style kdeglobals KDE widgetStyle "$key"
+        notify_style_changed
+        log_step "widget style: $key"
+        log_info "KDE applications already open change at once; others when next started"
+        ;;
+
+    # Prints the command; runs it only when asked, in a terminal, because it
+    # installs a system package and asks for a password.
+    install-style)
+        want=${1:?usage: $ALIAS theme install-style <id> [--run]}
+        pkg=$(style_field "$want" 4) || die "unknown style '$want' (one of: $(style_ids))"
+        if style_installed "$want"; then
+            log_info "$want is already installed: $ALIAS theme style $want"
+            exit 0
+        fi
+        how=$(install_command "$pkg") || die "no package manager known here; install the package that provides the '$want' Qt style"
+        if [ "$RUN_INSTALL" = 1 ]; then
+            [ -t 0 ] || die "--run needs a terminal: the install asks for a password"
+            log_step "$how"
+            $how || die "the install did not finish"
+            log_info "now: $ALIAS theme style $want"
+            exit 0
+        fi
+        printf '%s\n' "$how"
+        log_info "run that in a terminal -- it needs root -- then: $ALIAS theme style $want"
+        ;;
+
+    *) die "unknown command: $cmd (expected apply, revert, osd, style, install-style or status)" ;;
 esac
