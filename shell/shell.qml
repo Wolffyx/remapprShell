@@ -15,6 +15,7 @@ import qs.domain.launcher
 import qs.domain.osd
 import qs.domain.config
 import qs.features.osd
+import qs.features.notifications
 import qs.features.settings
 import qs.features.wizard
 import qs.domain.notifications
@@ -71,6 +72,15 @@ ShellRoot {
         model: OsdService.enabled ? Quickshell.screens.slice(0, 1) : []
 
         OsdOverlay {}
+    }
+
+    // This shell's own notification popups: only when notifications.server
+    // is "shell" and its server really holds the name. Off by default; Plasma
+    // draws them otherwise. One screen, as the OSD.
+    Variants {
+        model: ShellNotifications.active ? Quickshell.screens.slice(0, 1) : []
+
+        NotificationPopups {}
     }
 
     // Shown once, on a machine that has never run it. The marker lives in the
@@ -298,6 +308,13 @@ ShellRoot {
         function count(): string { return String(NotificationWatch.entries.length); }
         function list(): string { return JSON.stringify(NotificationWatch.entries); }
         function clear(): void { NotificationWatch.clear(); }
+
+        // This shell's own server (notifications.server "shell").
+        function server(): string { return JSON.stringify(ShellNotifications.summary()); }
+        function dnd(state: string): string { return ShellNotifications.setDnd(state) ? "on" : "off"; }
+        function dismissAll(): void { ShellNotifications.dismissAll(); }
+        // renderer.sh, before switching to a renderer with a Plasma tray.
+        function release(): void { PlasmaServices.releaseNotifications(); }
     }
 
     IpcHandler {

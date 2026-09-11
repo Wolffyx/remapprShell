@@ -102,7 +102,10 @@
     },
     "notifications": {
         "history": false,
-        "historySize": 50
+        "historySize": 50,
+        "server": "plasma",
+        "popupTimeout": 6,
+        "popupPosition": "auto"
     },
     "services": {
         "hostPlasma": true

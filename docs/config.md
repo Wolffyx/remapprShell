@@ -69,12 +69,15 @@ The volume and brightness popup. Plasma draws it by default and works well; ours
 | `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
 | `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
 
-### Notification history
+### Notifications
 
-Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.
+Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `notifications.server` | `plasma`, `shell` | `plasma` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
+| `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
+| `notifications.popupPosition` | `auto`, `top-right`, `top-left`, `bottom-right`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. Only when this shell draws them. |
 | `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
 

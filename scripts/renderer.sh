@@ -343,6 +343,24 @@ stop_hosted_services() {
     kill "$pid" 2>/dev/null || true
 }
 
+# The same for this shell's own notification server (notifications.server
+# "shell"): it holds the name the new panel's tray is about to want, and it
+# lets go only when the shell reads the new renderer -- which is written after
+# the switch. So it is asked to let go first, and given a moment to.
+release_shell_notifications() {
+    session_available || return 0
+    ours() { busctl --user status org.freedesktop.Notifications 2>/dev/null \
+               | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; }
+    ours || return 0
+    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications release >/dev/null 2>&1 || true
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        ours || return 0
+        sleep 0.2
+    done
+    log_warn "the shell did not let go of org.freedesktop.Notifications; the new tray may not get it"
+}
+
 # Whether plasmashell itself holds the notification or Klipper name -- which,
 # once it is on our package, can only be a leftover from the previous one.
 plasmashell_holds_tray_services() {
@@ -507,6 +525,7 @@ case "$cmd" in
         hold_outgoing_layout
 
         [ "$target" != quickshell ] && stop_hosted_services
+        [ "$target" != quickshell ] && release_shell_notifications
 
         install_packages || die "could not install the shell packages; nothing was switched"
 

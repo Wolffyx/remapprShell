@@ -443,9 +443,22 @@ section "Plasma services"
 # only because the shell hosts them, and with no owner at all a notification
 # is not queued or shown anywhere: it is dropped.
 live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null)
+notif_server=$(jq -r '.notifications.server // "plasma"' <<< "$merged_cfg" 2>/dev/null)
 for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
     name=${pair%%:*}; what=${pair#*:}
     comm=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^Comm=//p')
+    # Asked to serve them itself, the shell waits for whoever holds the name
+    # rather than taking it -- so the one thing worth saying is who that is.
+    if [ "$name" = org.freedesktop.Notifications ] && [ "$notif_server" = shell ]; then
+        if busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; then
+            ok "notifications: served by this shell (notifications.server)"
+            continue
+        elif [ -n "$comm" ]; then
+            warn "notifications.server is shell, but $comm holds the notification service"
+            fix "the shell waits and takes over when it is let go of; until then $comm draws them"
+            continue
+        fi
+    fi
     # plasmashell holding one of these while it is on our package holds a
     # leftover: the service was created by the previous package's tray and
     # outlived it, because switching packages live does not restart

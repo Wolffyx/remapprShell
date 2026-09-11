@@ -27,6 +27,7 @@ QtObject {
     //   shellPackage  what plasmashell is on, from plasmashellrc
     //   ourPackage    our quickshell renderer's shell package
     //   services      [{ applet, name, owned }]
+    //   notificationServer  notifications.server: "plasma" or "shell"
     // }
     //
     // Returns { start: [applet], reason }: the applets to host, and, when
@@ -41,7 +42,33 @@ QtObject {
         // second notification server or a second Klipper beside it.
         if (!s.shellPackage || s.shellPackage !== s.ourPackage)
             return { start: [], reason: `plasmashell is on ${s.shellPackage || "an unknown package"}, which may have a tray of its own` };
-        const start = (s.services ?? []).filter(x => x && !x.owned).map(x => x.applet);
+        // A shell serving notifications itself has no use for Plasma's server
+        // beside it, and a hosted one would take the name first.
+        const start = (s.services ?? [])
+            .filter(x => x && !x.owned)
+            .filter(x => !(s.notificationServer === "shell" && x.name === "org.freedesktop.Notifications"))
+            .map(x => x.applet);
         return { start: start, reason: start.length > 0 ? "" : "every service already has an owner" };
+    }
+
+    // Whether this shell serves notifications itself. Only when asked
+    // (notifications.server "shell"), and only with the same certainty the
+    // hosting needs -- our renderer, plasmashell on our package -- that no
+    // Plasma tray is about to serve them. `released` is renderer.sh asking
+    // for the name back before a switch, which it writes into the config only
+    // after plasmashell has changed package. Turning the hosting off
+    // (`enabled`) is about Plasma's applets, and does not enter into it.
+    //
+    // Returns { serve, reason }.
+    function serveNotifications(s) {
+        if (s?.notificationServer !== "shell")
+            return { serve: false, reason: "Plasma draws them (notifications.server)" };
+        if (s.released)
+            return { serve: false, reason: "let go of for a switch to a renderer with a Plasma tray" };
+        if (s.renderer !== "quickshell")
+            return { serve: false, reason: `the ${s.renderer} renderer: Plasma's own tray serves them` };
+        if (!s.shellPackage || s.shellPackage !== s.ourPackage)
+            return { serve: false, reason: `plasmashell is on ${s.shellPackage || "an unknown package"}, which may have a tray of its own` };
+        return { serve: true, reason: "" };
     }
 }

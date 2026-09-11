@@ -87,4 +87,47 @@ TestCase {
         compare(Hosting.decide(state({ enabled: false })).start, []);
         compare(Hosting.decide(null).start, []);
     }
+
+    // ---- this shell's own notification server ---------------------------
+
+    // Plasma's server beside ours would take the name first.
+    function test_plasmas_notifications_are_not_hosted_while_the_shell_serves_them() {
+        compare(Hosting.decide(state({ notificationServer: "shell" })).start, ["org.kde.plasma.clipboard"]);
+        compare(Hosting.decide(state({ notificationServer: "plasma" })).start,
+                ["org.kde.plasma.notifications", "org.kde.plasma.clipboard"]);
+    }
+
+    function serving(over) {
+        return Object.assign({
+            notificationServer: "shell",
+            renderer: "quickshell",
+            shellPackage: "ours.desktop",
+            ourPackage: "ours.desktop"
+        }, over);
+    }
+
+    function test_the_shell_serves_notifications_only_when_asked() {
+        verify(Hosting.serveNotifications(serving({})).serve);
+        verify(!Hosting.serveNotifications(serving({ notificationServer: "plasma" })).serve);
+        verify(!Hosting.serveNotifications(serving({ notificationServer: undefined })).serve);
+        verify(!Hosting.serveNotifications(null).serve);
+    }
+
+    function test_not_where_a_plasma_tray_may_serve_them() {
+        verify(!Hosting.serveNotifications(serving({ renderer: "plasma" })).serve);
+        verify(!Hosting.serveNotifications(serving({ shellPackage: "" })).serve);
+        const d = Hosting.serveNotifications(serving({ shellPackage: "caelestia.desktop" }));
+        verify(!d.serve);
+        verify(d.reason.indexOf("caelestia.desktop") >= 0);
+    }
+
+    // renderer.sh asks for the name back before switching to a renderer with
+    // a Plasma tray; the config says so only after plasmashell has switched.
+    function test_not_once_let_go_of() {
+        verify(!Hosting.serveNotifications(serving({ released: true })).serve);
+    }
+
+    function test_serving_does_not_depend_on_the_hosting_switch() {
+        verify(Hosting.serveNotifications(serving({ enabled: false })).serve);
+    }
 }

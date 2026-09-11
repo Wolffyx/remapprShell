@@ -55,7 +55,7 @@ BarWidget {
         PanelIcon {
             anchors.centerIn: parent
             implicitSize: 18
-            iconName: NotificationWatch.enabled ? "notifications" : "notifications-disabled"
+            iconName: NotificationWatch.enabled && !ShellNotifications.dnd ? "notifications" : "notifications-disabled"
         }
 
         Rectangle {
@@ -116,13 +116,35 @@ BarWidget {
                     }
                 }
 
+                // Only while this shell draws the popups: Plasma's own
+                // do-not-disturb is in its applet.
+                Row {
+                    visible: ShellNotifications.active
+                    width: parent.width
+                    spacing: 8
+
+                    PanelText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - dndToggle.width - 8
+                        text: "Do not disturb"
+                        font.pixelSize: 11
+                    }
+
+                    Toggle {
+                        id: dndToggle
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: ShellNotifications.dnd
+                        onToggled: value => ShellNotifications.setDnd(value ? "on" : "off")
+                    }
+                }
+
                 PanelText {
                     visible: !NotificationWatch.enabled
                     width: parent.width
                     wrapMode: Text.WordWrap
                     color: PlasmaColors.foregroundInactive
                     font.pixelSize: 11
-                    text: "The history is off, so nothing is being kept. Turn it on under Notification history in the settings; Plasma keeps drawing them either way."
+                    text: `The history is off, so nothing is being kept. Turn it on under Notifications in the settings; ${ShellNotifications.active ? "this shell" : "Plasma"} keeps drawing them either way.`
                 }
 
                 PanelText {

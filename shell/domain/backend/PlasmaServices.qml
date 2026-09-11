@@ -58,6 +58,31 @@ QtObject {
     // Applets started by this run of the shell.
     property var started: ({})
 
+    // Whether this shell serves notifications itself (notifications.server
+    // "shell"). Decided here, beside the hosting and by the same rule, so the
+    // two can never both be on: see Hosting.serveNotifications.
+    readonly property string notificationServer: ConfigStore.value("notifications.server", "plasma")
+    property bool notificationsReleased: false
+    property var notifications: ({ serve: false, reason: "not checked yet" })
+
+    // Before a switch to a renderer with a Plasma tray. The switch writes
+    // panel.renderer only after plasmashell has changed package, by which
+    // time the new tray wants the name.
+    function releaseNotifications() {
+        root.notificationsReleased = true;
+        root._decideNotifications();
+    }
+
+    function _decideNotifications() {
+        root.notifications = Hosting.serveNotifications({
+            notificationServer: root.notificationServer,
+            released: root.notificationsReleased,
+            renderer: root.renderer,
+            shellPackage: root.shellPackage,
+            ourPackage: Branding.shellPackageId
+        });
+    }
+
     function reconcile() {
         probe.running = false;
         probe.running = true;
@@ -68,6 +93,7 @@ QtObject {
     // quitting a hosted applet, which is respected.
     function rehost() {
         root.started = ({});
+        root.notificationsReleased = false;
         root.reconcile();
     }
 
@@ -79,7 +105,10 @@ QtObject {
             owned: root.owned,
             inTray: root.hostedIds,
             hosting: Object.keys(root.started),
-            reason: root.decision.reason
+            reason: root.decision.reason,
+            notificationServer: root.notificationServer,
+            servingNotifications: root.notifications.serve,
+            notificationsReason: root.notifications.reason
         };
     }
 
@@ -104,12 +133,14 @@ QtObject {
             renderer: root.renderer,
             shellPackage: pkg,
             ourPackage: Branding.shellPackageId,
+            notificationServer: root.notificationServer,
             services: root.services.map(s => ({
                 applet: s.applet,
                 name: s.name,
                 owned: Hosting.provided(s, owned, hosted)
             }))
         });
+        root._decideNotifications();
         for (const applet of root.decision.start) {
             if (root.started[applet])
                 continue;
@@ -123,6 +154,7 @@ QtObject {
     }
 
     onEnabledChanged: root.reconcile()
+    onNotificationServerChanged: root.reconcile()
     onRendererChanged: {
         if (root.renderer !== "quickshell")
             root.started = ({});
