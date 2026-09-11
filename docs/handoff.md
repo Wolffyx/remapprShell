@@ -32,7 +32,7 @@ rows are what that did.
 
 | | |
 | --- | --- |
-| Shell | installed via `make link` as `remappr-shell.service`, **inactive and not enabled**. Never enabled, so the reboot took our panel away, as this file predicted. `systemctl --user enable --now remappr-shell.service` |
+| Shell | installed via `make link` as `remappr-shell.service`, **inactive and deliberately not enabled**: the user starts and stops it by hand for testing (`rmpr start` / `rmpr stop`). Do not enable it or suggest enabling it. After a reboot there is no panel of ours until `rmpr start` |
 | plasmashell | on **`caelestia.desktop`**, while the profile says `panel.renderer: plasma`. The two disagree and no session changed either -- something outside this project switched the package back. Run `rmpr renderer status` before anything else |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` -- the `windows` preset plus the history bell. The new status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
@@ -493,8 +493,13 @@ are not.
    and since superseded: plasmashell is on `remappr-shell.desktop` and the
    configured renderer agrees with it.
 
-   What replaced it: **the service is not enabled**, so the panel does not
-   survive a reboot. `systemctl --user enable remappr-shell.service`.
+   What replaced it: the service is not enabled -- **by choice**, as of
+   2026-09-11. The user runs the shell with `rmpr start` / `rmpr stop` while
+   testing, so the panel does not survive a reboot, and that is intended.
+   Worth knowing with that workflow: the Plasma applets the shell hosts under
+   the quickshell renderer are started detached, so they outlive `rmpr stop`
+   -- notifications keep working with the shell stopped -- and the next start
+   finds their names owned and does not start them again.
 2. ~~**Typing into the built-in launcher only works after clicking it.**~~
    The claim behind this was wrong, in the same way the ToplevelManager one
    was. Quickshell 0.3.1 *does* expose a layer-shell keyboard-focus mode:
@@ -884,6 +889,7 @@ now leaves it exactly as it was, compared by screenshot). The first:
   popout on the panel.
 - `panel click`, `status` and `config setRuntime` over IPC.
 
-Not touched: the service is still not enabled, and plasmashell is still on
-`caelestia.desktop` against a profile that says `plasma`. Both are the user's
-call, and both are in the table at the top.
+Not touched: plasmashell is still on `caelestia.desktop` against a profile
+that says `plasma` -- the user's call, and in the table at the top. The
+service stays disabled on purpose; the user starts and stops the shell by
+hand while testing.
