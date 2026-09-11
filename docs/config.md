@@ -161,6 +161,11 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "media",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "tray",
         "zone": "right",
         "enabled": true
@@ -211,6 +216,7 @@ when two copies of a widget should differ.
 | Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
+| Media | `media` | left, middle, right | `org.kde.plasma.mediacontroller` (in the tray) |
 | Network | `network` | left, middle, right | `org.kde.plasma.networkmanagement` (in the tray) |
 | Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` (in the tray) |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
@@ -247,6 +253,13 @@ without `tray` it stands on the panel alone.
 | --- | --- | --- | --- |
 | `icon` | text | `start-here-kde` | Icon |
 | `label` | text | `` | Shown beside the icon. Empty for icon only. |
+
+### `widgets.media`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showTitle` | `true` or `false` | `true` | Beside the icon, on a panel along the top or bottom. |
+| `maxWidth` | a number, 60 to 400 | `180` | It is elided past this. |
 
 ### `widgets.notifications`
 

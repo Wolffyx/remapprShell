@@ -1,0 +1,29 @@
+{
+    "id": "media",
+    "apiVersion": 1,
+    "name": "Media",
+    "description": "What is playing, in any player that speaks MPRIS: middle-click to pause, click for the controls. Takes no room when nothing is open.",
+    "icon": "media-playback-start",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.mediacontroller", "inSystemTray": true }
+    },
+    "config": {
+        "showTitle": {
+            "type": "bool",
+            "default": true,
+            "label": "Show the title",
+            "description": "Beside the icon, on a panel along the top or bottom."
+        },
+        "maxWidth": {
+            "type": "int",
+            "default": 180,
+            "min": 60,
+            "max": 400,
+            "label": "Widest the title gets",
+            "description": "It is elided past this."
+        }
+    }
+}

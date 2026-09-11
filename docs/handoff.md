@@ -160,6 +160,9 @@ are not.
   renderer:
   `quickshell ipc -p shell/shell.qml call config setRuntime panel.renderer '"quickshell"'`.
   `panel tooltip <widget> <screen>` shows a widget's tooltip for four seconds.
+  `panel layout <screen>` lists every shown widget's box on that screen, in
+  screen coordinates -- which answers "why is this cut off" in one call where
+  screenshots took five.
 - **Tooltips, and windows beside the panel on every edge.** A widget sets
   `tooltip` (and, if it is made of several things, `tooltipCentre`); the slot
   shows it after the pointer has rested 600 ms, never while the popout is
@@ -180,6 +183,28 @@ are not.
   Hover reaches the tooltip from wherever it actually arrives: the slot's
   MouseArea for widgets with `wantsHover`, and a HoverHandler on `BarWidget`
   (`hovered`) for the rest.
+- **Media** — `media`, the fifth applet Plasma keeps inside its tray and our
+  tray therefore never had. Reads MPRIS through Quickshell: the title beside a
+  play/pause glyph on the panel, middle-click to pause, and a popout with art,
+  artist and album, a seek bar, the three buttons, a chip per player when
+  there are several, "Show <player>" and Plasma's own media applet. Absent
+  while nothing is open. Which player is shown is `StatusIcons.pickPlayer`,
+  tested: playerctld (a proxy) is never offered, and music starting
+  elsewhere is followed without forgetting a paused choice. A browser with
+  Plasma's integration is on the bus twice, and the two do *not* report the
+  same track -- Chrome's own entry has the tab title (" - YouTube" on the end)
+  and no artist, the integration's the clean title, the artist and `kde:pid`
+  naming the browser process. The browser's `...instance<pid>` entry is
+  dropped when the integration claims that pid, the rule Plasma's own applet
+  follows; matching on the title, tried first, left the video listed twice. MPRIS
+  does not announce the position as it moves, so it is asked once a second
+  while playing. In the defaults and every preset but minimal.
+- **Side panels.** The tray, the clock and the workspace pills lay out along
+  the panel on either axis (the tray used to cut to two icons, the clock ran
+  off the side), the tray's chevron points away from whichever edge the panel
+  is on, and the launcher drops its label down the side. A widget whose
+  manifest does not list the panel's orientation -- the task list -- is left
+  off that panel and logged, rather than drawn broken.
 - **Config** — layered defaults → profile → per-monitor → runtime. Sparse
   deltas. Live reload. Refuses to write over a file that does not parse.
 - **Settings window** — schema-driven; every control is generated from a schema,
@@ -414,12 +439,8 @@ are not.
 5. **No window thumbnails in the task preview**, and this one is settled rather
    than open: see the entry under "Not built yet". It needs privileges KWin
    does not give us.
-6. **Some widgets still lay out horizontally on a vertical panel.** Seen on a
-   runtime-only `left` panel: the tray draws its icons in a Row, so only two
-   fit across 40 px and the rest are cut off, and the clock puts the time and
-   the date side by side and overflows. The panel, the zones, popouts and
-   tooltips all handle a vertical edge; these two widgets do not yet. The
-   status widgets are single icons and are fine.
+6. ~~**Some widgets still lay out horizontally on a vertical panel.**~~
+   Resolved the same day; see "Side panels" under "Working today".
 
 ## The incident worth knowing about
 
@@ -629,6 +650,11 @@ Non-obvious things that cost time to discover:
   screen until a restart. They are placed with `x`/`y` bindings now, which are
   simply re-evaluated. Found because tooltips were being clamped to the screen
   edge -- their slots had left it.
+- **Right after the panel changes edge, everything is mid-animation.** The
+  panel's thickness animates over 120 ms, and the surface is placed from the
+  window's width, so `panel layout` asked straight after a switch to the left
+  edge put every widget at x = -36; 0.13 s later all were where they belong.
+  Poll until it settles before believing a measurement -- or a screenshot.
 - **A Grid's `rows` and `columns` change one at a time.** Flipping `rows: 1,
   columns: -1` to the reverse passes through 1 x 1 and warns that the zone
   holds more than fits -- and so does swapping `rows: 1, columns: N` for
@@ -737,7 +763,8 @@ Two smaller things from the same run:
 
 ## Where the session of 2026-09-11 left off
 
-Two commits. The second: tooltips for every widget; `EdgeWindow`, which
+Three commits. The third: the media widget, and every built-in widget drawn
+properly on a side panel. The second: tooltips for every widget; `EdgeWindow`, which
 places both popouts and tooltips on any panel edge; and the panel no longer
 coming apart when its edge is changed while it runs (bottom → left → bottom
 now leaves it exactly as it was, compared by screenshot). The first:

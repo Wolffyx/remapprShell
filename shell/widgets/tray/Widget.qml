@@ -84,8 +84,13 @@ BarWidget {
     wantsHover: true
     wantsWheel: true
 
-    implicitWidth: row.implicitWidth
+    implicitWidth: Math.max(root.iconSize, row.implicitWidth)
     implicitHeight: Math.max(root.iconSize, row.implicitHeight)
+
+    // The chevron points away from the panel's edge, the way the flyout will
+    // open, and back towards it while the flyout is open.
+    readonly property string outward: ({ top: "down", left: "right", right: "left" })[root.bar?.position] ?? "up"
+    readonly property string inward: ({ up: "down", down: "up", left: "right", right: "left" })[root.outward]
 
     function itemAt(index) {
         return root.shown[index] ?? null;
@@ -181,17 +186,27 @@ BarWidget {
             root.closePopout();
     }
 
-    Row {
+    // One line along the panel, whichever way the panel runs -- a Row here
+    // cut the tray to two icons on a panel down the side of the screen. Only
+    // `columns` is set, from the cells actually shown; see ZoneRow for why
+    // setting both, or counting hidden cells, goes wrong. The hover arithmetic
+    // above works along either axis unchanged, because the panel reports the
+    // position along its own length.
+    Grid {
         id: row
         anchors.centerIn: parent
         spacing: root.spacing
+        columns: (root.bar?.horizontal ?? true)
+            ? Math.max(1, root.shown.length + (root.hasOverflow ? 1 : 0))
+            : 1
+        verticalItemAlignment: Grid.AlignVCenter
+        horizontalItemAlignment: Grid.AlignHCenter
 
         // Shown only when something is behind it.
         Item {
             visible: root.hasOverflow
             width: root.hasOverflow ? root.iconSize : 0
             height: root.iconSize
-            anchors.verticalCenter: parent.verticalCenter
 
             Rectangle {
                 anchors.fill: parent
@@ -203,7 +218,7 @@ BarWidget {
             PanelIcon {
                 anchors.centerIn: parent
                 implicitSize: Math.round(root.iconSize * 0.8)
-                iconName: root.popoutVisible ? "arrow-down" : "arrow-up"
+                iconName: `arrow-${root.popoutVisible ? root.inward : root.outward}`
             }
         }
 
@@ -218,7 +233,6 @@ BarWidget {
 
                 width: root.iconSize
                 height: root.iconSize
-                anchors.verticalCenter: parent.verticalCenter
 
                 // The hover highlight is drawn from the panel's hover
                 // position rather than a HoverHandler per icon: the panel

@@ -62,6 +62,9 @@ Item {
     // a widget with nothing to show leaves no gap and no stray spacing.
     visible: root.widget?.present ?? true
 
+    Component.onCompleted: PanelModel.addSlot(root)
+    Component.onDestruction: PanelModel.removeSlot(root)
+
     // ---- tooltip ----------------------------------------------------------
     //
     // Shown once the pointer has rested on the widget for a moment, never

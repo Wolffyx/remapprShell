@@ -168,6 +168,19 @@ ShellRoot {
         }
 
         function screens(): string { return Quickshell.screens.map(s => s.name).join("\n"); }
+
+        // Where each shown widget is on that screen's panel, in screen
+        // coordinates, in the order the zones hold them.
+        function layout(screen: string): string {
+            const name = screen || (Quickshell.screens[0]?.name ?? "");
+            return JSON.stringify(PanelModel.slots
+                .filter(s => s && s.screenName === name && s.visible)
+                .map(s => {
+                    const p = s.mapToItem(null, 0, 0);
+                    return { id: s.entry?.id ?? "", x: Math.round(p.x), y: Math.round(p.y),
+                             w: Math.round(s.width), h: Math.round(s.height) };
+                }));
+        }
     }
 
     // What the status widgets are reading, as they read it. The same question
@@ -180,6 +193,7 @@ ShellRoot {
         function network(): string { return JSON.stringify(NetworkStatus.summary()); }
         function bluetooth(): string { return JSON.stringify(BluetoothStatus.summary()); }
         function power(): string { return JSON.stringify(PowerStatus.summary()); }
+        function media(): string { return JSON.stringify(MediaStatus.summary()); }
     }
 
     // The runtime layer of the configuration: in memory only, above the

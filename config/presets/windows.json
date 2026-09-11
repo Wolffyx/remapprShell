@@ -19,6 +19,11 @@
                     "enabled": true
                 },
                 {
+                    "id": "media",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
                     "id": "tray",
                     "zone": "right",
                     "enabled": true

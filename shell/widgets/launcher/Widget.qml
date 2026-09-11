@@ -71,7 +71,9 @@ BarWidget {
 
             PanelText {
                 anchors.verticalCenter: parent.verticalCenter
-                visible: root.labelText.length > 0
+                // Icon only down the side of the screen, where a word would be
+                // wider than the panel.
+                visible: root.labelText.length > 0 && (root.bar?.horizontal ?? true)
                 text: root.labelText
             }
         }

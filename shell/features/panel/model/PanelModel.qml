@@ -33,6 +33,20 @@ QtObject {
     // rested on it.
     signal tooltipRequested(string widgetId, string screen)
 
+    // Every slot on every panel, so `panel layout` can say where each one
+    // actually is -- the question a screenshot answers badly and a person
+    // without a pointer cannot answer at all. Slots add and remove
+    // themselves; nothing binds to this.
+    property var slots: []
+
+    function addSlot(slot) {
+        root.slots = root.slots.concat([slot]);
+    }
+
+    function removeSlot(slot) {
+        root.slots = root.slots.filter(s => s !== slot);
+    }
+
     // Per-output values. A panel reads these rather than the ones above, so a
     // monitor override reaches the panel it describes; the globals remain for
     // anything not drawn per screen.
@@ -48,6 +62,7 @@ QtObject {
     }
     function entriesForScreen(name, zone) {
         const entries = ConfigStore.valueFor(name, "bar.entries", []) ?? [];
+        const way = root.horizontalFor(name) ? "horizontal" : "vertical";
         return entries.filter(e => {
             if (!e || e.enabled === false)
                 return false;
@@ -55,7 +70,19 @@ QtObject {
                 Log.warn("panel", `entry '${e.id ?? "?"}' has no zone; ignoring it`);
                 return false;
             }
-            return e.zone === zone;
+            if (e.zone !== zone)
+                return false;
+            // A manifest names the orientations a widget can be drawn in, and
+            // one that cannot be drawn this way round -- the task list is a
+            // row of buttons with titles -- is left off rather than drawn
+            // broken across a panel forty pixels wide. Until the registry has
+            // loaded there is no manifest to ask, and the entry stays.
+            const ways = WidgetRegistry.manifest(e.id)?.orientation;
+            if (Array.isArray(ways) && ways.indexOf(way) < 0) {
+                Log.info("panel", `'${e.id}' is not drawn on a ${way} panel (${name}); its manifest says ${ways.join(", ")}`);
+                return false;
+            }
+            return true;
         });
     }
 
