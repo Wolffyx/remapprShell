@@ -42,8 +42,9 @@ rows are what that did.
 | Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` would put them in place |
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours. krohnkite is installed but **not loaded** (`isScriptLoaded krohnkite` false, `krohnkiteEnabled=false`, read 2026-09-11) |
-| Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries. KWin's `Walk Through Windows` (Alt+Tab) is unbound, and caelestia holds Meta+Tab |
-| `rmpr doctor` | no problems, 5 warnings -- two of them the service being down, plus the competing shell and krohnkite |
+| Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
+| Shortcuts | Alt+Tab and Meta+Tab are caelestia's; KWin's own switcher is unbound. Ours: `settings` on Meta+Shift+R, bound for real when `75c4a6f` was written and ledgered (`shortcuts revert` removes it) |
+| `rmpr doctor` | no problems, 2 warnings (2026-09-11, shell running): caelestia's shell, and one ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left in the ledger when the Phase 6b revert purged that group; harmless. The krohnkite warning is gone: it was about installed scripts, not enabled ones |
 
 ### What to check first, before building anything
 
@@ -168,6 +169,18 @@ if they fail.
     could never do before, and after Meta+D its tooltip should say "Bring
     the windows back". Verified: the reloaded shell watches `/KWin` and reads
     `showingDesktop`. The peek itself needs a pointer.
+19. **Alt+Tab and Meta+Tab, by hand.** `rmpr settings switching`. Pick a
+    layout -- Large Icons, say -- and press Alt+Tab: nothing changes while
+    caelestia holds the key. Then "Give it to KWin" beside Alt+Tab: the
+    shortcuts service restarts, and Alt+Tab should draw KWin's switcher in
+    that layout, with caelestia's silent. The same for Meta+Tab and the
+    Overview. "Undo everything set here" hands both back to caelestia.
+    Verified: the whole round trip in the sandbox, seeded like this machine,
+    down to a byte-identical kglobalshortcutsrc after the undo; and the live
+    `switcher status` naming caelestia for both keys. Not tried live,
+    because it takes the user's Alt+Tab. **Unknown before trying:** whether
+    caelestia's shell notices losing a key when kglobalaccel restarts, or
+    asks for it back.
 
 ### The lesson this session paid for twice
 
@@ -565,6 +578,22 @@ are not.
   highlight could never have lit. The slot passes its hover down as
   `BarWidget.hostHovered`, folded into `hovered`, so `hovered` means the same
   thing for every widget.
+- **Switching windows** (§D) -- Settings -> Switching windows,
+  `rmpr switcher`. Alt+Tab's look, from every installed window-switcher
+  package (`kwin/tabbox` and `kwin-wayland/tabbox` under each data
+  directory; KWin's own `thumbnail_grid` lives in the second), and which
+  program gets Alt+Tab and Meta+Tab. `give alt-tab` binds KWin's "Walk
+  Through Windows" (and its reverse to Alt+Shift+Tab), `give meta-tab` its
+  Overview -- Windows' task view. Each *adds* to KWin's existing keys and
+  takes the key from whoever held it, all under the `switching` ledger
+  scope. The page says who holds each key before offering to move it.
+- **Shortcuts are taken, not only claimed.** `shortcuts set` warned that it
+  would take a key from its holder, then did not; kglobalaccel gives a key
+  to one action, so with two in the file the winner was down to
+  registration order. `scripts/lib/accel.sh` finds holders anywhere in a
+  multi-key binding, takes the key off them (ledgered), and writes each
+  group in its own format: `[services][x.desktop] _launch` is the key
+  alone, a component's action is `active,default,friendly`.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys
@@ -630,8 +659,9 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 173. All
-  green.
+- **Tests** — 13 shell suites in throwaway HOMEs, plus a QML suite of 173. All
+  green. Suites touching KDE put fakes for `systemctl`, `kquitapp6`,
+  `qdbus6` and `busctl` on PATH and check nothing reached them.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
   missing one. `test-crash.sh` builds dumps by hand, including one belonging to
@@ -1078,6 +1108,26 @@ Non-obvious things that cost time to discover:
   `contentItem` refuses ("item has no QML engine"). The page's processes
   still run, so it draws real data, and nothing appears on the user's
   screen -- used here because a Meet window was open.
+- **jq's `@tsv` is not a transport.** It escapes a tab inside a field as a
+  literal `\t`, and `read -r` keeps the backslash. `kconfig_revert` read
+  the ledger that way, so a two-key shortcut came back from a revert as one
+  key with a backslash in it. Fields travel base64-encoded now. Anything
+  else that round-trips values through `@tsv` and writes them back has the
+  same bug; `doctor.sh` only displays them.
+- **A sandbox HOME still reads the real kdedefaults.** kreadconfig6 falls
+  back through `XDG_CONFIG_DIRS` for an unset key, and on Plasma the first
+  entry is `~/.config/kdedefaults` -- an absolute path. The switcher suite
+  read this machine's `big_icons` as the Alt+Tab layout of an empty
+  sandbox. `scripts/test.sh` pins `XDG_CONFIG_DIRS=/etc/xdg`.
+- **kglobalaccel keeps two formats in one file**, and a line of ours was in
+  neither: `_launch=Meta+Shift+R, , Settings` is what kglobalaccel made of
+  our "key,none,label" in a `[services]` group. It worked only because it
+  took the first field. Read a line's neighbours before deciding its
+  format.
+- **kglobalaccel says what it registered.** `allComponents` on
+  `/kglobalaccel`, then `allShortcutInfos` on a component, gives each
+  action's keys as Qt key codes (301989970 is Meta+Shift+R): the way to
+  check that a binding in the file actually took, without pressing it.
 
 ## The plan
 
@@ -1260,21 +1310,27 @@ order:
 | `fd693af` | a settings page for the screen edges; the master switch reversible on its own; the dead `desktopgrid` key |
 | `604b919` | peek at the desktop, and a strip that knows whether it is showing |
 | `91cd1ca` | `rmpr reload`, for the widget edits Quickshell does not see |
+| `988c7a3` | doctor warned about KWin scripts that were not running |
+| `153a9fc` | a revert that turned a tab into a backslash; the suite reading the real kdedefaults |
+| `c594525` | shortcuts said they took a key from its holder, and did not; and wrote the wrong format |
+| `b78bb38` | Alt+Tab and Meta+Tab, and who holds them |
 
-The first and the last were found while doing the others, and both by
+The fixes were all found while building the features, and each by
 measuring: the kglobalaccel restarts were in the journal at the times of
-`make test`, and the stale widget was a monitor process that should have
-existed and did not. The shell's PID was the same before and after every
+`make test`, the stale widget was a monitor process that should have
+existed and did not, and the mangled tab was a byte comparison failing in
+the new suite. The shell's PID was the same before and after every
 test run this session (611253).
 
 Nothing was clicked and nothing was put on the user's screen: a Meet window
 was open, so the settings page was rendered offscreen instead. Items 17 and
 18 under "What to check first" are what needs a pointer.
 
-**Next, from §D:** Alt+Tab and Win+Tab. On this machine KWin's own
-`Walk Through Windows` is unbound (`none`) and caelestia holds Meta+Tab for
-its own overview, so the shortcut half is "report who holds the key, and
-bind KWin's Overview only when asked", as `shortcuts` already does for our
-actions. The switcher's look is `kwinrc [TabBox] LayoutName` (ours is
-installed by `theme apply`; `thumbnail_grid` is selected). After that, from
-§C: `theme.widgetStyle` and `rmpr theme install-style union`.
+§D is complete, apart from what needs a pointer (items 17-19).
+
+**Next, from §C:** `theme.widgetStyle` -- breeze, darkly and kvantum are
+installed here; Union is not, and is in `extra` (6.7.5) -- and `rmpr theme
+install-style union`, which must not run a package manager by itself. The
+theme's own parts are worth a page too: this machine has the L&F package
+from 2026-09-09 and none of the schemes, switcher or desktop theme added
+since (see the state table).
