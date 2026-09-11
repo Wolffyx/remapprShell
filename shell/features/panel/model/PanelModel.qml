@@ -29,6 +29,10 @@ QtObject {
     // nobody is sitting at.
     signal clickRequested(string widgetId, string screen)
 
+    // Shows that widget's tooltip for a few seconds, as if the pointer had
+    // rested on it.
+    signal tooltipRequested(string widgetId, string screen)
+
     // Per-output values. A panel reads these rather than the ones above, so a
     // monitor override reaches the panel it describes; the globals remain for
     // anything not drawn per screen.

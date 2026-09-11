@@ -7,7 +7,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import qs.core
 import qs.ui.primitives
 import qs.domain.theme
 import qs.features.panel.model
@@ -36,15 +35,22 @@ Item {
         }
     }
 
-    // The same call the MouseArea below makes, so a click asked for over IPC
-    // cannot behave differently from one made with a mouse.
+    // The same calls the pointer makes, asked for by name, so a click or a
+    // tooltip asked for over IPC cannot behave differently from a real one.
     Connections {
         target: PanelModel
         function onClickRequested(widgetId: string, screen: string): void {
             if (root.entry?.id === widgetId && screen === root.screenName)
                 root.widget?.handleActivate(Qt.LeftButton);
         }
+        function onTooltipRequested(widgetId: string, screen: string): void {
+            if (root.entry?.id !== widgetId || screen !== root.screenName)
+                return;
+            root.tooltipForced = true;
+            tooltipForceTimer.restart();
+        }
     }
+
     readonly property bool wantsHover: root.widget?.wantsHover ?? false
     readonly property bool wantsWheel: root.widget?.wantsWheel ?? false
     readonly property bool interactive: root.wantsHover || root.wantsWheel || !!root.widget?.popout
@@ -56,9 +62,41 @@ Item {
     // a widget with nothing to show leaves no gap and no stray spacing.
     visible: root.widget?.present ?? true
 
-    // A slot that moves while its popout is open -- a tray icon appearing to
-    // its left -- takes the popout with it.
-    onXChanged: if (popout.wanted) popout.place()
+    // ---- tooltip ----------------------------------------------------------
+    //
+    // Shown once the pointer has rested on the widget for a moment, never
+    // while its popout is open, and gone at the first press.
+    //
+    // Hover reaches a widget one of two ways. One that asked for it gets it
+    // through the MouseArea below, which covers the widget; the rest have their
+    // own HoverHandler, which the MouseArea leaves alone because it is not
+    // listening for hover. Each is read from where it actually arrives, so
+    // neither route can hide the pointer from the tooltip.
+    readonly property string tooltipText: root.widget?.tooltip ?? ""
+    readonly property bool pointerOver: root.wantsHover ? mouse.containsMouse : (root.widget?.hovered ?? false)
+
+    property bool tooltipDue: false
+    property bool tooltipForced: false
+
+    onPointerOverChanged: {
+        root.tooltipDue = false;
+        if (root.pointerOver)
+            tooltipDelay.restart();
+        else
+            tooltipDelay.stop();
+    }
+
+    Timer {
+        id: tooltipDelay
+        interval: 600
+        onTriggered: root.tooltipDue = true
+    }
+
+    Timer {
+        id: tooltipForceTimer
+        interval: 4000
+        onTriggered: root.tooltipForced = false
+    }
 
     WidgetHost {
         id: host
@@ -70,6 +108,7 @@ Item {
     }
 
     MouseArea {
+        id: mouse
         anchors.fill: parent
 
         // A widget that asked for nothing stays click-through, so a decorative
@@ -86,6 +125,11 @@ Item {
 
         onExited: if (root.wantsHover) root.widget.dismissPopout()
 
+        onPressed: {
+            root.tooltipDue = false;
+            root.tooltipForced = false;
+        }
+
         onWheel: event => {
             if (!root.wantsWheel) {
                 event.accepted = false;
@@ -101,10 +145,10 @@ Item {
         onClicked: event => root.widget?.handleActivate(event.button)
     }
 
-    // A widget that declares a popout gets a window for it, positioned under
-    // itself. The widget supplies the contents and never touches placement --
-    // which is what lets a plugin have a popout without knowing where on the
-    // panel it sits or which edge the panel is on.
+    // A widget that declares a popout gets a window for it, beside itself. The
+    // widget supplies the contents and never touches placement -- which is
+    // what lets a plugin have a popout without knowing where on the panel it
+    // sits or which edge the panel is on.
     //
     // A layer surface rather than an xdg popup, deliberately. Wayland only
     // grants a popup the keyboard if its parent surface has already received
@@ -112,64 +156,18 @@ Item {
     // but never by a keybinding or `rmpr launcher` -- the panel has had no
     // input in that case, and the grab is refused. A layer surface asks for
     // keyboard focus directly and works either way.
-    PanelWindow {
+    EdgeWindow {
         id: popout
 
         readonly property bool wanted: !!root.widget?.popout && !!root.widget?.popoutVisible
         readonly property Item popoutContent: content.item as Item
-        readonly property bool atTop: root.bar?.position === "top"
 
-        // Where this slot sits along the panel, in screen coordinates. The
-        // panel spans the screen, so a position within it is a position on it.
-        //
-        // Taken when the popout opens, not bound. `mapToItem` is a function
-        // call, so a binding on it has nothing to depend on and is evaluated
-        // exactly once -- when the slot is created, before the zone has laid
-        // it out -- which left it at 0 and opened every popout on the panel
-        // against the screen's left edge, whichever widget it belonged to.
-        property real slotX: 0
-
-        function place() {
-            popout.slotX = root.mapToItem(null, 0, 0).x;
-        }
-
-        // Where it went, for whoever is working out why a popout is somewhere
-        // unexpected -- which is how the slotX bug above was found. Called
-        // once the content has had a chance to size the window.
-        function report() {
-            if (popout.wanted)
-                Log.debug("panel", `popout '${root.entry?.id}' on ${popout.screen?.name}: left ${popout.margins.left}, ${popout.implicitWidth}x${popout.implicitHeight}`);
-        }
+        slot: root
+        bar: root.bar
+        label: `popout '${root.entry?.id}'`
+        centre: root.popoutCentre
 
         visible: popout.wanted
-        screen: root.bar?.screenObject ?? null
-
-        anchors {
-            top: popout.atTop
-            bottom: !popout.atTop
-            left: true
-        }
-
-        // Kept on screen: a popout under a button near the right edge would
-        // otherwise run off it.
-        //
-        // The linter cannot resolve the grouped `margins` property on a panel
-        // window and warns about it; the property is real and works at
-        // runtime. (Note for the next person: a comment whose first word is
-        // the linter's own name is parsed as a directive to it.)
-        // Centred on what the widget pointed at, then kept on screen: a popout
-        // under a button near either edge would otherwise run off it.
-        margins.left: {
-            const wanted = popout.slotX + root.popoutCentre - popout.implicitWidth / 2;
-            const limit = (popout.screen?.width ?? 0) - popout.implicitWidth - 8;
-            return Math.max(8, Math.min(wanted, Math.max(8, limit)));
-        }
-        margins.top: popout.atTop ? (root.bar?.thickness ?? 0) + 4 : 0
-        margins.bottom: popout.atTop ? 0 : (root.bar?.thickness ?? 0) + 4
-
-        // The panel already reserves its strip; this must not reserve another.
-        exclusionMode: ExclusionMode.Ignore
-        aboveWindows: true
 
         // Exclusive, not on-demand.
         //
@@ -186,8 +184,6 @@ Item {
             ? WlrKeyboardFocus.Exclusive
             : WlrKeyboardFocus.None
 
-        color: "transparent"
-
         implicitWidth: popout.popoutContent?.implicitWidth ?? 1
         implicitHeight: popout.popoutContent?.implicitHeight ?? 1
 
@@ -195,10 +191,6 @@ Item {
         // and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
-            if (popout.wanted) {
-                popout.place();
-                Qt.callLater(popout.report);
-            }
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))
@@ -227,6 +219,46 @@ Item {
                 // cost nothing, and one that is closed should not keep state.
                 active: popout.wanted
                 sourceComponent: root.widget?.popout ?? null
+            }
+        }
+    }
+
+    // The tooltip: a second window, because a tooltip has to escape the panel
+    // just as a popout does, and the popout's is spoken for.
+    EdgeWindow {
+        id: tip
+
+        slot: root
+        bar: root.bar
+        label: `tooltip '${root.entry?.id}'`
+        centre: (root.widget?.tooltipCentre ?? -1) >= 0
+            ? root.widget.tooltipCentre
+            : ((root.bar?.horizontal ?? true) ? root.width : root.height) / 2
+
+        visible: root.tooltipText.length > 0 && !popout.wanted
+                 && ((root.tooltipDue && root.pointerOver) || root.tooltipForced)
+
+        // Takes no input at all: a pointer that strays onto a tooltip must not
+        // be caught by it, and the widget under it must stay reachable.
+        mask: Region {}
+
+        implicitWidth: tipText.width + 16
+        implicitHeight: tipText.implicitHeight + 10
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 6
+            color: PlasmaColors.background
+            border.width: 1
+            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+
+            PanelText {
+                id: tipText
+                anchors.centerIn: parent
+                width: Math.min(tipText.implicitWidth, 360)
+                wrapMode: Text.Wrap
+                font.pixelSize: 11
+                text: root.tooltipText
             }
         }
     }

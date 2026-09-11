@@ -87,6 +87,10 @@ if they fail.
     2026-09-11 every one opened at the left edge of the screen (see "A binding
     on a function call" below). Over IPC they land in the right place now; by
     hand is still worth a look.
+12. **Rest the pointer on a widget.** Every tooltip has been seen drawn, with
+    the right text, but only when asked for over IPC. Whether hover reaches it
+    by the two routes described under "Tooltips" -- and in particular through
+    the tray's MouseArea -- needs a pointer.
 
 ### The lesson this session paid for twice
 
@@ -155,6 +159,27 @@ are not.
   second copy of the shell can draw a panel while the profile names another
   renderer:
   `quickshell ipc -p shell/shell.qml call config setRuntime panel.renderer '"quickshell"'`.
+  `panel tooltip <widget> <screen>` shows a widget's tooltip for four seconds.
+- **Tooltips, and windows beside the panel on every edge.** A widget sets
+  `tooltip` (and, if it is made of several things, `tooltipCentre`); the slot
+  shows it after the pointer has rested 600 ms, never while the popout is
+  open, and drops it at the first press. It is its own window, because a
+  tooltip has to escape the panel just as a popout does, and it takes no
+  input at all (an empty `mask`). The tray names the icon under the pointer in
+  the application's own words, markup stripped; the status widgets give their
+  numbers; the clock gives the whole date in the user's locale. The task list
+  keeps its hover preview instead.
+
+  The popout and the tooltip are both an `EdgeWindow`
+  (`features/panel/EdgeWindow.qml`), which owns placement for all four panel
+  edges. The popout used to place itself and assumed a horizontal panel -- on
+  a panel down the side of the screen it opened at the bottom. Verified on a
+  runtime-only `left` panel: the volume popout 44 px in from the left edge,
+  clamped above the bottom of the screen.
+
+  Hover reaches the tooltip from wherever it actually arrives: the slot's
+  MouseArea for widgets with `wantsHover`, and a HoverHandler on `BarWidget`
+  (`hovered`) for the rest.
 - **Config** — layered defaults → profile → per-monitor → runtime. Sparse
   deltas. Live reload. Refuses to write over a file that does not parse.
 - **Settings window** — schema-driven; every control is generated from a schema,
@@ -277,11 +302,8 @@ are not.
 
 ## Not built yet
 
-- **Tray tooltips.** A tray item carries `tooltipTitle` and
-  `tooltipDescription` and nothing shows them. A tooltip has to escape the
-  panel, so it needs a window, and the widget's one popout is already spoken
-  for by the menu and the overflow flyout. The honest fix is a second popout
-  slot on `BarWidget` rather than a special case in the tray.
+- ~~**Tray tooltips.**~~ Built, for every widget rather than only the tray;
+  see "Tooltips" under "Working today".
 - ~~**AI assist and the notification ring buffer.**~~ Built; see "Working
   today". What is still not built from that plan: a watcher that *notices*
   a failed unit or a core dump by itself. `rmpr ask --failed` gathers them on
@@ -392,6 +414,12 @@ are not.
 5. **No window thumbnails in the task preview**, and this one is settled rather
    than open: see the entry under "Not built yet". It needs privileges KWin
    does not give us.
+6. **Some widgets still lay out horizontally on a vertical panel.** Seen on a
+   runtime-only `left` panel: the tray draws its icons in a Row, so only two
+   fit across 40 px and the rest are cut off, and the clock puts the time and
+   the date side by side and overflows. The panel, the zones, popouts and
+   tooltips all handle a vertical edge; these two widgets do not yet. The
+   status widgets are single icons and are fine.
 
 ## The incident worth knowing about
 
@@ -587,6 +615,27 @@ Non-obvious things that cost time to discover:
   whatever else is on the screen out of the picture.
 - **`plasmawindowed` is a unique DBus service** (`org.kde.plasmawindowed`): a
   second invocation hands its request to the first and exits 0.
+- **`$(timeout 5 tail -F log | grep -m1 pattern)` always takes the full five
+  seconds.** `grep` exits at the first match, but `tail` only notices when it
+  next writes, and the substitution waits for the whole pipeline. Every
+  tooltip "failed" to appear because of it -- they were shown for four
+  seconds and the screenshot came at five. Poll the file instead.
+- **Anchors switched by bindings do not survive the panel changing edge.**
+  The zones and the panel surface used `right: horizontal ? parent.right :
+  undefined` beside `horizontalCenter: horizontal ? undefined : ...`. When
+  the orientation flips, the new anchor can be applied while the old one on
+  the same axis is still set, and it is dropped: moving the panel to the left
+  edge and back to the bottom left the right-hand widgets off the end of the
+  screen until a restart. They are placed with `x`/`y` bindings now, which are
+  simply re-evaluated. Found because tooltips were being clamped to the screen
+  edge -- their slots had left it.
+- **A Grid's `rows` and `columns` change one at a time.** Flipping `rows: 1,
+  columns: -1` to the reverse passes through 1 x 1 and warns that the zone
+  holds more than fits -- and so does swapping `rows: 1, columns: N` for
+  `rows: N, columns: 1`, whichever updates first. Only `columns` is set now,
+  so there is no second property to be out of step with. It counts the slots
+  actually *shown*: counting entries kept an empty column for the hidden
+  battery, and the zone sat ten pixels off its edge.
 
 ## The plan
 
@@ -688,7 +737,10 @@ Two smaller things from the same run:
 
 ## Where the session of 2026-09-11 left off
 
-One commit:
+Two commits. The second: tooltips for every widget; `EdgeWindow`, which
+places both popouts and tooltips on any panel edge; and the panel no longer
+coming apart when its edge is changed while it runs (bottom → left → bottom
+now leaves it exactly as it was, compared by screenshot). The first:
 
 - The four status widgets, their services, 20 QML test cases, and their
   place in the defaults and presets. Verified on the live desktop in a second

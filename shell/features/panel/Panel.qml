@@ -111,12 +111,14 @@ PanelWindow {
         width: root.horizontal ? parent.width : root.thickness
         height: root.horizontal ? root.thickness : parent.height
 
-        anchors {
-            bottom: root.position === "top" ? parent.bottom : undefined
-            top: root.position === "bottom" ? parent.top : undefined
-            right: root.position === "left" ? parent.right : undefined
-            left: root.position === "right" ? parent.left : undefined
-        }
+        // Positioned, not anchored. Anchors switched by bindings do not
+        // survive the panel changing edge while it runs: the new anchor can be
+        // applied while the old one on the same axis is still set, and is
+        // dropped. Moving the panel from the left edge back to the bottom left
+        // the right-hand widgets off the end of the screen until a restart. A
+        // plain x/y binding is simply re-evaluated.
+        x: root.position === "left" ? parent.width - width : 0
+        y: root.position === "top" ? parent.height - height : 0
 
         color: PlasmaColors.panelBackground
 
@@ -142,13 +144,9 @@ PanelWindow {
             bar: root
             screenName: root.modelData.name
             horizontal: root.horizontal
-            anchors {
-                left: root.horizontal ? parent.left : undefined
-                top: root.horizontal ? undefined : parent.top
-                margins: 8
-                verticalCenter: root.horizontal ? parent.verticalCenter : undefined
-                horizontalCenter: root.horizontal ? undefined : parent.horizontalCenter
-            }
+            // x/y rather than anchors, for the reason given on the surface.
+            x: root.horizontal ? 8 : (parent.width - width) / 2
+            y: root.horizontal ? (parent.height - height) / 2 : 8
         }
 
         ZoneRow {
@@ -166,13 +164,8 @@ PanelWindow {
             bar: root
             screenName: root.modelData.name
             horizontal: root.horizontal
-            anchors {
-                right: root.horizontal ? parent.right : undefined
-                bottom: root.horizontal ? undefined : parent.bottom
-                margins: 8
-                verticalCenter: root.horizontal ? parent.verticalCenter : undefined
-                horizontalCenter: root.horizontal ? undefined : parent.horizontalCenter
-            }
+            x: root.horizontal ? parent.width - width - 8 : (parent.width - width) / 2
+            y: root.horizontal ? (parent.height - height) / 2 : parent.height - height - 8
         }
     }
 

@@ -60,6 +60,23 @@ BarWidget {
     // handler per icon -- the same approach the task buttons take.
     property int hoveredIndex: -1
 
+    // The icon under the pointer names itself, in the application's words.
+    // A description may carry the markup the tray protocol allows; a tooltip
+    // here is plain text, so tags are dropped rather than shown.
+    tooltip: {
+        const item = root.itemAt(root.hoveredIndex);
+        if (!item)
+            return "";
+        const title = item.tooltipTitle || item.title || item.id;
+        const detail = (item.tooltipDescription ?? "")
+            .replace(/<[^>]*>/g, "")
+            .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+            .trim();
+        return detail && detail !== title ? `${title}\n${detail}` : title;
+    }
+    tooltipCentre: root.hoveredIndex < 0 ? -1
+        : root.leading + root.hoveredIndex * (root.iconSize + root.spacing) + root.iconSize / 2
+
     // The chevron sits first, as it does on Windows, so the icons do not move
     // sideways when one is pinned or unpinned.
     readonly property int leading: root.hasOverflow ? root.iconSize + root.spacing : 0

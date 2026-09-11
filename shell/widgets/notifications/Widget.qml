@@ -26,6 +26,10 @@ BarWidget {
     readonly property bool askable: ConfigStore.value("ai.enabled", false) === true
     readonly property int shown: 12
 
+    tooltip: !NotificationWatch.enabled ? "Notification history is off"
+           : NotificationWatch.unseen > 0 ? `${NotificationWatch.unseen} new since you last looked`
+           : "Notification history"
+
     implicitWidth: 24
     implicitHeight: 24
 

@@ -16,6 +16,9 @@ BarWidget {
 
     wantsHover: true
 
+    tooltip: ({ promptLogout: "Log out", promptReboot: "Restart", promptShutDown: "Shut down" })[root.action]
+             ?? "Log out, restart or shut down"
+
     implicitWidth: 24
     implicitHeight: 24
 

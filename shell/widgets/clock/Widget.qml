@@ -13,6 +13,9 @@ BarWidget {
     readonly property bool showDate: root.widgetConfig?.showDate ?? false
     readonly property string dateFormat: root.widgetConfig?.dateFormat ?? "ddd d MMM"
 
+    // The whole date, in the user's own locale, whatever the panel shows.
+    tooltip: root.clock.date.toLocaleDateString(Qt.locale(), Locale.LongFormat)
+
     // Quickshell's shared clock: one timer for the whole shell rather than one
     // per widget instance, and it ticks on the second boundary rather than
     // drifting.

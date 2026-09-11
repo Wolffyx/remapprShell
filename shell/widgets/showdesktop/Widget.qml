@@ -15,6 +15,8 @@ BarWidget {
 
     wantsHover: true
 
+    tooltip: root.showing ? "Bring the windows back" : "Show the desktop"
+
     implicitWidth: root.bar?.horizontal ? root.stripWidth : root.bar?.thickness ?? root.stripWidth
     implicitHeight: root.bar?.horizontal ? (root.bar?.thickness ?? 24) : root.stripWidth
 

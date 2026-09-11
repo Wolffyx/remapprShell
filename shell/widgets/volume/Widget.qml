@@ -25,6 +25,10 @@ BarWidget {
 
     wantsWheel: true
 
+    tooltip: AudioStatus.sink
+        ? `${AudioStatus.nameOf(AudioStatus.sink)}\n${AudioStatus.muted ? "Muted" : StatusIcons.percent(AudioStatus.volume)}`
+        : "No sound output"
+
     implicitWidth: 24
     implicitHeight: 24
 

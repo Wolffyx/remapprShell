@@ -17,6 +17,9 @@ BarWidget {
 
     wantsHover: true
 
+    // A button with a label has already said what it is.
+    tooltip: root.labelText.length > 0 ? "" : "Applications"
+
     // The built-in launcher draws in one of our own windows, so it gets a
     // popout anchored to this button. Every other provider is its own process
     // and positions itself, so there is nothing to anchor.

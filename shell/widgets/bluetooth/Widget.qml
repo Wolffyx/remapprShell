@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.status
+import qs.domain.status.icons
 import qs.domain.theme
 import qs.platform.kde
 import qs.ui.controls
@@ -18,6 +19,17 @@ BarWidget {
     id: root
 
     present: BluetoothStatus.present
+
+    tooltip: {
+        if (!BluetoothStatus.enabled)
+            return "Bluetooth is off";
+        const on = BluetoothStatus.paired.filter(d => d.connected);
+        if (on.length === 0)
+            return "Bluetooth: nothing connected";
+        return on.map(d => d.batteryAvailable
+            ? `${BluetoothStatus.nameOf(d)} · ${StatusIcons.percent(d.battery)}`
+            : BluetoothStatus.nameOf(d)).join("\n");
+    }
 
     implicitWidth: 24
     implicitHeight: 24

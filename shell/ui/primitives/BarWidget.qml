@@ -53,6 +53,21 @@ Item {
     // that is not there, which reads as broken.
     property bool present: true
 
+    // A line or two shown when the pointer rests on the widget and no popout
+    // is open. Empty for none. A widget made of several things -- the tray --
+    // changes it as the pointer moves, and says where it points with
+    // `tooltipCentre`, measured along the panel from the widget's start; -1
+    // is the middle of the widget.
+    property string tooltip: ""
+    property real tooltipCentre: -1
+
+    // Whether the pointer is over the widget. The panel times the tooltip from
+    // it for widgets that do not take hover from the panel; those that do
+    // (`wantsHover`) are timed from the panel's own hover instead.
+    readonly property bool hovered: _hover.hovered
+
+    HoverHandler { id: _hover }
+
     // ---- behaviour, overridden by the widget ---------------------------
 
     function handleHover(position, horizontal) {}

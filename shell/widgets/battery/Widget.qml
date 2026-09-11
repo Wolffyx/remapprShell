@@ -21,6 +21,9 @@ BarWidget {
 
     present: PowerStatus.present
 
+    tooltip: [StatusIcons.percent(PowerStatus.level), PowerStatus.stateLabel, PowerStatus.timeLabel]
+        .filter(s => s).join(" · ")
+
     implicitWidth: row.implicitWidth + 6
     implicitHeight: 24
 

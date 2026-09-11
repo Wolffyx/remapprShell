@@ -160,6 +160,13 @@ ShellRoot {
             return name;
         }
 
+        // Its tooltip, for a few seconds, as if the pointer had rested on it.
+        function tooltip(widgetId: string, screen: string): string {
+            const name = screen || (Quickshell.screens[0]?.name ?? "");
+            PanelModel.tooltipRequested(widgetId, name);
+            return name;
+        }
+
         function screens(): string { return Quickshell.screens.map(s => s.name).join("\n"); }
     }
 
