@@ -154,13 +154,51 @@ QtObject {
     }
 
     onEnabledChanged: root.reconcile()
-    onNotificationServerChanged: root.reconcile()
+    onNotificationServerChanged: {
+        root.handOverNotifications();
+        root.reconcile();
+    }
+
+    // Asked to serve notifications itself while Plasma's hosted applet holds
+    // the name, the shell would stand by for as long as that applet runs --
+    // on a machine with nothing else serving them, forever. The applet is
+    // ours: we started it, for exactly the job the shell is now asked to do.
+    // So it is closed, as renderer.sh's stop_hosted_services closes it for a
+    // renderer switch, and only when plasmawindowed really holds the name.
+    // The rest -- clipboard, device notifier -- is hosted again at once.
+    function handOverNotifications() {
+        if (root.notificationServer !== "shell")
+            return;
+        handOver.running = false;
+        handOver.running = true;
+    }
+
+    readonly property Process _handOver: Process {
+        id: handOver
+        command: ["sh", "-c",
+            'pw=$(busctl --user status org.kde.plasmawindowed 2>/dev/null | sed -n "s/^PID=//p"); '
+            + 'ow=$(busctl --user status org.freedesktop.Notifications 2>/dev/null | sed -n "s/^PID=//p"); '
+            + '[ -n "$pw" ] && [ "$pw" = "$ow" ] && kill "$pw" && echo "closed $pw"']
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!this.text.startsWith("closed"))
+                    return;
+                Log.info("services", `closed Plasma's hosted notifications (plasmawindowed, ${this.text.trim().split(" ")[1]}) so this shell can serve them; hosting the rest again`);
+                root.rehost();
+            }
+        }
+    }
     onRendererChanged: {
         if (root.renderer !== "quickshell")
             root.started = ({});
         root.reconcile();
     }
-    Component.onCompleted: root.reconcile()
+    Component.onCompleted: {
+        // Hosted applets outlive the shell, so one from the last run may be
+        // holding the name this run is asked to serve.
+        root.handOverNotifications();
+        root.reconcile();
+    }
 
     readonly property Process _probe: Process {
         id: probe
@@ -176,9 +214,22 @@ QtObject {
             + '| grep -o "\\"[^\\"]*\\"" | tr -d "\\"" | while read -r it; do '
             + 'id=$(busctl --user get-property "${it%%/*}" "/${it#*/}" org.kde.StatusNotifierItem Id 2>/dev/null '
             + '| sed -e "s/^s \\"//" -e "s/\\"$//"); '
-            + 'case "$id" in plasmawindowed_*) echo "hosted $id" ;; esac; done']
+            + 'case "$id" in plasmawindowed_*) echo "hosted $id" ;; esac; done; '
+            + 'echo done']
+        // Only a probe that got to the end is acted on. reconcile() restarts
+        // the probe, killing the one in flight, and its output still arrives:
+        // a list that stopped before org.kde.klipper read Klipper's name as
+        // free and would host a second Klipper beside the running one, and
+        // an empty one dropped the shell's own notification server for a
+        // moment -- seen on a private bus, serving flipping off and on --
+        // leaving the name for anything waiting to take it.
         stdout: StdioCollector {
-            onStreamFinished: root._decide(this.text.split("\n").filter(l => l.length > 0))
+            onStreamFinished: {
+                const lines = this.text.split("\n").filter(l => l.length > 0);
+                if (lines[lines.length - 1] !== "done")
+                    return;
+                root._decide(lines.slice(0, -1));
+            }
         }
     }
 
