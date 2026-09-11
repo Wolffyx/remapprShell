@@ -6,7 +6,9 @@ theme layer, the open-window list and panel auto-hide; the second added AI
 assist, the notification history, crash reporting, and a tray you can curate
 whose menus open. A third, on 2026-09-11, added volume, network, Bluetooth
 and battery widgets -- and found that every popout had been opening at the
-screen's left edge.
+screen's left edge. A fourth, the same evening, built the lock screen -- the
+last part of the plan -- and found that Plasma 6 draws it from the shell
+package, not the look-and-feel package this file had said.
 
 ## What this is
 
@@ -40,6 +42,7 @@ rows are what that did.
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` -- or "Install the missing parts" in Settings -> Appearance -- would put them in place |
+| Lock screen | **ours is built and not on**: Plasma's draws. `rmpr lockscreen try` has never been run -- it needs the person at the keyboard (item 22). faillock was empty at 19:48, after two failed logins this session's checks caused at 19:32 and 19:42 (see "A greeter stopped mid-authentication is a failed login") |
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours. krohnkite is installed but **not loaded** (`isScriptLoaded krohnkite` false, `krohnkiteEnabled=false`, read 2026-09-11) |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
@@ -208,6 +211,23 @@ if they fail.
     offscreen, including the hand-over from a stand-in for our hosted
     applet. Not seen: a popup on the real screen -- its placement, its icon
     (offscreen has no icon theme), the hover hold.
+22. **The lock screen: try it, then turn it on, with a way back ready.**
+    `rmpr lockscreen try` covers every screen and takes the keyboard, as a
+    real lock does, but nothing is locked. Type the password: it goes, and
+    the build is recorded as tried. If it will not unlock it closes by
+    itself after 90 seconds -- which PAM counts as one failed login. Then,
+    with a text console logged in and waiting (Ctrl+Alt+F3), `rmpr
+    lockscreen enable`, back to the desktop, Meta+L. Look for: the clock
+    alone until a key; the first key typed landing in the field; a wrong
+    password said, three seconds' rest, then the right one unlocking;
+    Escape hiding the prompt; typing mirrored on both monitors; the volume
+    OSD while locked. `enable` prints the way back: `loginctl
+    unlock-session <id>` from the console, then `rmpr lockscreen disable`.
+    Verified without a person: the real greeter loading it (`lockscreen
+    check`, now part of `make test`), every state drawn offscreen under a
+    stand-in authenticator, the unlock rules (21 QML cases) and the
+    commands (61 checks). Not seen: any of it on a screen, or a real
+    password through it.
 
 ### The lesson this session paid for twice
 
@@ -555,7 +575,7 @@ are not.
   Nothing is sent anywhere; no AI provider is wired up.
 - **CLI** — `rmpr` with preflight, doctor, snapshot, restore, theme, renderer,
   report, ask, crash, wizard, edges, shortcuts, launcher, search, `settings [page]`,
-  preset, profile, update, switcher, reload. A page name is a schema section id, which is also
+  preset, profile, update, switcher, reload, lockscreen. A page name is a schema section id, which is also
   its heading in the generated reference -- so `rmpr settings tray` opens the
   window where the docs say it is.
 - **Auto-hide** — `panel.autoHide`, per output like position and thickness.
@@ -651,6 +671,46 @@ are not.
   holds back all but critical. Deadlines live in the service, because the
   popup list is rebuilt on every change. IPC: `notifications
   server|dnd|dismissAll|release`.
+- **Lock screen** (Phase 8, opt-in) -- `rmpr lockscreen
+  status|check|try|enable|disable`. Plasma's greeter draws it and does all
+  the locking; only the drawing is ours. **Plasma 6 takes the lock screen
+  from the shell package, not the look-and-feel package**:
+  `lockscreenmainscript` in the package `plasmashellrc [Shell] ShellPackage`
+  names, falling back to `org.kde.plasma.desktop`'s. The plan and this file
+  said look-and-feel; the greeter's strings and source say otherwise. So
+  ours is `contents/lockscreen/` inside our two shell packages, put there by
+  `enable` and nothing else, and no KDE key is written: `disable` deletes a
+  directory carrying our marker, and needs no session -- it is meant to be
+  run from a text console. Source in `theme/lockscreen/`. Unlocking is
+  `Unlock.qml`, which draws nothing and is tested against a stand-in for
+  kscreenlocker's `PamAuthenticators`; the drawing is `LockUi.qml`, with
+  Plasma's own password field, on-screen keyboard, battery and layout
+  switcher. The gates:
+  - `check` loads it in the **real greeter** -- `kscreenlocker_greet
+    --testing --shell <path>` takes a path -- offscreen, with no display,
+    no session bus and no runtime directory, under a stand-in
+    authenticator. It fails on anything the greeter says about our files,
+    on the greeter falling back, and on authentication starting with
+    nobody there. qmllint had passed a file the greeter refused.
+  - `try` shows it for real in the greeter's testing mode. The greeter
+    exits 0 only once its authenticator says unlocked, and that is the only
+    way to the "tried" record: the build's hash and the greeter binary's
+    (its `--version` says 0.1 whatever the release).
+  - `enable` installs the tried copy, not the working tree, and refuses
+    after a kscreenlocker update until tried again; `doctor` loads an
+    enabled one in the current greeter.
+  - Should the greeter lack what unlocking needs, `LockScreen.qml` draws
+    Plasma's own lock screen instead. Should ours fail to load, the greeter
+    draws its built-in locker (seen, with the Kirigami.Avatar mistake).
+
+  Plasma's rules are kept where they decide whether anyone gets in:
+  authentication starts when the prompt shows, and again after the
+  three-second rest that follows a failure -- the authenticator goes idle on
+  a failure, and a password sent to it then goes nowhere. A fingerprint or
+  smartcard failure is not a wrong password, an empty password is never
+  sent, and a no-password unlock waits for a click. System Settings' clock
+  options are honoured. `renderer.sh` puts the lock screen back into a shell
+  package it installs afresh.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys
@@ -716,7 +776,8 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 13 shell suites in throwaway HOMEs, plus a QML suite of 196. All
+- **Tests** — 14 shell suites in throwaway HOMEs, a QML suite of 217, and the
+  lock screen loaded in Plasma's real greeter. All
   green. Suites touching KDE put fakes for `systemctl`, `kquitapp6`,
   `qdbus6` and `busctl` on PATH and check nothing reached them.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
@@ -734,13 +795,11 @@ are not.
   request, and that is as far as it goes -- a watcher that pops something up
   is a notification of our own, which is the thing this project does not do
   uninvited.
-- **The lock screen.** Deliberately not shipped. The Look-and-Feel package can
-  override `lockscreen/LockScreen.qml`, and a broken one means being unable to
-  unlock — the worst failure this project could ship, and the only one that
-  cannot be tested from inside the session it would break. Do it only with a
-  second TTY open and a tested way back (`loginctl unlock-session` from
-  Ctrl+Alt+F2, or `rmpr theme revert`), and gate it behind its own flag rather
-  than folding it into `theme apply`.
+- ~~**The lock screen.**~~ Built, and off until tried; see "Lock screen"
+  under "Working today". The premise written here was wrong -- Plasma 6's
+  greeter does not read the look-and-feel package's `lockscreen/` -- and
+  the rest held: a gate of its own rather than `theme apply`, and a way back
+  from a console.
 - ~~**Opt-in notifications.**~~ Built, opt-in and off by default; see
   "Notifications drawn by the shell" under "Working today". It takes the
   name from nobody but our own hosted Plasma applet.
@@ -1225,6 +1284,40 @@ Non-obvious things that cost time to discover:
 - **`image://icon/<name>` has no fallback.** The notification server hands
   an icon sent by name over as that URL, and a name the theme lacks drew
   Qt's magenta checkerboard. It is looked up as a name instead.
+- **`kscreenlocker_greet --testing --shell <path>` is a harness.** With
+  `QT_QPA_PLATFORM=offscreen` and no bus it loads a package from any path,
+  sets every context property and draws the real wallpaper, and
+  `grabToImage` on the root gives a picture of it. Set
+  `QT_FORCE_STDERR_LOGGING=1`, or its QML messages go to the journal and
+  the output looks empty.
+- **A greeter stopped mid-authentication is a failed login.** Twice on
+  2026-09-11 a check loaded the lock screen with the real authenticator, a
+  bug woke the prompt, the prompt started PAM, and the check's timeout
+  stopped the greeter: `pam_unix(kde:auth): authentication failure`, and
+  pam_faillock counted both -- three lock the account for ten minutes.
+  Checks now use a stand-in authenticator and fail if anything starts one.
+  `try` timing out still costs one, and says so before it starts.
+- **The greeter takes the keyboard in testing mode too.** On Wayland it is
+  a full-screen layer surface with exclusive keyboard, test or not, so
+  `try` has a hard timeout: a lock screen that could not unlock would
+  otherwise trap its own test, with the terminal out of reach.
+- **`HoverHandler.onPointChanged` fires with nothing moving** --
+  continuously, in the greeter. The lock screen woke on it, so the prompt
+  never went idle, and each wake started PAM. Compare positions.
+- **Kirigami.Avatar is not in Kirigami since KF6** (it moved to
+  kirigami-addons, not installed here). qmllint warned; the greeter refused
+  the file and drew its built-in locker.
+- **Plasma's `VirtualKeyboardLoader` needs the StackView's id to be
+  `mainStack`.** Its `PropertyChanges { mainStack.y: ... }` resolves the name
+  as an id through the creating context, not as its own property of that
+  name; with any other id it warns, and the on-screen keyboard never moves
+  the prompt out of its way.
+- **A `layer.effect` shadow on the clock drew nothing** in the offscreen
+  greeter, so the lock screen's text carries its own (`Text.Raised`).
+  Which GPUs share that was not worth learning on a lock screen.
+- **`Qt.formatDate(d, Locale.LongFormat)` is not a long date.** The second
+  argument is a `Qt.DateFormat`, and 0 is `TextDate` ("Fri Sep 11 2026").
+  `d.toLocaleDateString(Qt.locale(), Locale.LongFormat)` is the locale's.
 
 ## The plan
 
@@ -1438,7 +1531,26 @@ apart from what needs a pointer or a person (items 17-21). The
 notifications were built opt-in and off by default after the user said
 "continue"; nothing on this machine uses them yet.
 
-**What is left of the plan is the lock screen, and it should not be started
-without the user at the machine:** it needs a second TTY open and a tested
-way back (see "Not built yet"). The colours-only desktop theme already
-stands in for the "SVG desktoptheme".
+The lock screen, the last of the plan, followed in a fourth session. The
+colours-only desktop theme already stands in for the "SVG desktoptheme".
+
+## The fourth session of 2026-09-11
+
+The lock screen, built and not turned on: `try` and `enable` are the
+person's to run (item 22 under "What to check first"). The premise was
+measured before anything was written, and was wrong -- see "Lock screen"
+under "Working today". The real greeter, run offscreen, found three things
+nothing else would have: a type missing from KF6 (it drew its built-in
+locker instead), a clock whose shadow layer drew nothing, and a prompt that
+woke itself.
+
+That last one did harm. While a check held the real authenticator, the
+prompt woke, started PAM, and the check's timeout stopped the greeter: two
+failed logins recorded against the user's account, at 19:32 and 19:42, one
+short of pam_faillock's lockout. Found by reading `faillock` after the
+checks -- a precaution taken because the rule written at the start of the
+session was "never send a wrong password", and stopping a conversation
+turned out to be one. Checks cannot reach PAM now. faillock was empty
+again by 19:48.
+
+Nothing was put on the screen: every picture was taken offscreen.
