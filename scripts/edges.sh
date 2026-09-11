@@ -119,13 +119,6 @@ require_triggers_on() {
 
 snap_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default true; }
 
-reconfigure() {
-    session_available || return 0
-    qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
-      || busctl --user call org.kde.KWin /KWin org.kde.KWin reconfigure >/dev/null 2>&1 \
-      || log_warn "could not ask KWin to reload; changes apply at next login"
-}
-
 # set_edge <Edge> <action>
 #
 # The edge ends up in exactly one place: the corner's own value, or the list
@@ -224,7 +217,7 @@ case "$cmd" in
         action=${action,,}
         require_triggers_on
         set_edge "$edge" "$action"
-        reconfigure
+        kwin_reconfigure
         log_step "$edge -> $(action_field "$action" 3)"
         ;;
 
@@ -241,7 +234,7 @@ case "$cmd" in
         else
             set_edge "$edge" "$fx"
         fi
-        reconfigure
+        kwin_reconfigure
         log_step "$fx -> $edge"
         ;;
 
@@ -255,7 +248,7 @@ case "$cmd" in
         require_triggers_on
         kconfig_set edges kwinrc Windows ElectricBorderTiling "$v"
         kconfig_set edges kwinrc Windows ElectricBorderMaximize "$v"
-        reconfigure
+        kwin_reconfigure
         log_step "window snapping $state"
         ;;
 
@@ -276,7 +269,7 @@ case "$cmd" in
         done < <(effect_stores)
         kconfig_set edges-off kwinrc Windows ElectricBorderTiling false
         kconfig_set edges-off kwinrc Windows ElectricBorderMaximize false
-        reconfigure
+        kwin_reconfigure
         log_step "all mouse edge triggers disabled"
         log_info "turn them back on with: $ALIAS edges enable-all"
         ;;
@@ -287,7 +280,7 @@ case "$cmd" in
             exit 0
         fi
         kconfig_revert edges-off
-        reconfigure
+        kwin_reconfigure
         ;;
 
     revert)
@@ -296,7 +289,7 @@ case "$cmd" in
         # user's.
         triggers_off && kconfig_revert edges-off
         kconfig_revert edges
-        reconfigure
+        kwin_reconfigure
         ;;
 
     *) die "unknown command: $cmd" ;;

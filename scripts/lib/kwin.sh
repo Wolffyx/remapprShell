@@ -1,7 +1,16 @@
 # shellcheck shell=bash
-# What KWin has loaded, read from its configuration.
+# KWin: what it has loaded, and asking it to read its configuration again.
 #
-# Requires brand.sh.
+# Requires brand.sh, log.sh.
+
+# KWin reads kwinrc when asked to. The KWin is the user's own whatever HOME
+# says, so a test must not be able to ask it.
+kwin_reconfigure() {
+    session_available || return 0
+    qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
+      || busctl --user call org.kde.KWin /KWin org.kde.KWin reconfigure >/dev/null 2>&1 \
+      || log_warn "could not ask KWin to reload; changes apply at next login"
+}
 
 # Tiling scripts take a window dragged to a screen edge for themselves, and so
 # does KWin's own snapping: with both on, which one gets the drag depends on

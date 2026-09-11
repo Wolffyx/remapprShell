@@ -33,29 +33,39 @@ binding() { kreadconfig6 --file kglobalshortcutsrc --group services --group "$SL
 
 mkdir -p "$APPLICATIONS_DIR"
 for a in launcher search settings; do : > "$APPLICATIONS_DIR/$SLUG-$a.desktop"; done
+: > "$XDG_CONFIG_HOME/kglobalshortcutsrc"
 
 # Something else already owns a key, exactly as caelestia owns Meta here.
 kwriteconfig6 --file kglobalshortcutsrc --group someothershell --key take-over "Meta,none,Theirs"
 
 echo "== set =="
 sc set settings "Meta+Shift+R" >/dev/null
-check "binding written with all three fields" "$(binding settings)" "Meta+Shift+R,none,Settings"
+# A desktop file's launch shortcut is the key alone, as Plasma writes every
+# other one; the three-field form belongs to components' actions.
+check "binding written as the key alone" "$(binding settings)" "Meta+Shift+R"
 check "rejects unknown action" "$(sc set nosuchaction Meta+X >/dev/null && echo ran || echo refused)" "refused"
 
-echo "== conflicts are reported, not silently taken =="
+echo "== a key someone holds is taken from them, and named =="
 out=$("$REPO_ROOT/scripts/shortcuts.sh" set launcher "Meta" 2>&1)
-check "warns about the existing holder" "$(printf '%s' "$out" | grep -c 'already used by')" "1"
-check "still binds when asked"           "$(binding launcher)" "Meta,none,Application menu"
+check "names the holder"                "$(printf '%s' "$out" | grep -c 'taken from someothershell: Theirs')" "1"
+check "binds when asked"                "$(binding launcher)" "Meta"
+check "the holder no longer has it"     "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "none,none,Theirs"
+
+echo "== a key held second in a list is found =="
+kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Some Action" "$(printf 'Meta+Q\tMeta+J,none,Some Action')"
+sc set search "Meta+J" >/dev/null
+check "only that key is taken"          "$(kreadconfig6 --file kglobalshortcutsrc --group kwin --key 'Some Action')" "Meta+Q,none,Some Action"
 
 echo "== clear =="
 sc clear launcher >/dev/null
-check "cleared to none" "$(binding launcher)" "none,none,Application menu"
+check "cleared to none" "$(binding launcher)" "none"
 
 echo "== revert =="
 sc revert >/dev/null
 check "settings binding removed"  "$(binding settings)" "<unset>"
 check "launcher binding removed"  "$(binding launcher)" "<unset>"
-check "other component untouched" "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "Meta,none,Theirs"
+check "the holder's key given back" "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "Meta,none,Theirs"
+check "the second holder's too"     "$(kreadconfig6 --file kglobalshortcutsrc --group kwin --key 'Some Action')" "$(printf 'Meta+Q\tMeta+J,none,Some Action')"
 
 echo "== the live session =="
 check "kglobalaccel never restarted" "$(wc -l < "$CALLS")" "0"

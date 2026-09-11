@@ -10,17 +10,18 @@
 # guaranteed to notice being taken, and the obvious keys here -- Meta for the
 # menu, Meta+Space for search -- are exactly the ones another shell is most
 # likely to be holding. So this reports the situation and binds only what is
-# asked for.
+# asked for. When it is asked for a key someone else holds, it takes it from
+# them, and says so; revert gives it back.
 #
-# KDE stores each binding as "active,default,friendly". Both other fields are
-# preserved: the default is what "reset to defaults" in System Settings restores
-# to, and the friendly name is what the shortcuts editor displays.
+# Each action is a desktop file's launch shortcut, [services][<id>.desktop]
+# _launch, which kglobalaccel keeps as the key alone. See lib/accel.sh.
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/accel.sh"
 
 ACTIONS=(launcher search settings ask clipboard)
 
@@ -37,25 +38,10 @@ action_label() {
 
 valid_action() { printf '%s\n' "${ACTIONS[@]}" | grep -qxF "$1"; }
 
-# Everything currently bound to a key, so a conflict can be named rather than
-# discovered when the shortcut silently does nothing.
+# Everything currently bound to a key, as "group: name", so a conflict can be
+# named rather than discovered when the shortcut silently does nothing.
 holders_of() {
-    local key=$1
-    grep -nE "^[^=]+=${key}(,|$|\\\\t)" "$XDG_CONFIG_HOME/kglobalshortcutsrc" 2>/dev/null \
-      | sed 's/=.*//' | sed 's/^[0-9]*://' || true
-}
-
-reload_accel() {
-    # kglobalaccel reads the file at startup; without a reload a new binding
-    # does nothing until the next login, which looks exactly like a bug.
-    #
-    # A throwaway HOME does not make this a throwaway kglobalaccel: the
-    # service is the user's own, so without the check every run of the test
-    # suite restarted it -- four times, at every `make test`.
-    session_available || return 0
-    systemctl --user restart plasma-kglobalaccel.service 2>/dev/null \
-      || kquitapp6 kglobalacceld 2>/dev/null \
-      || log_warn "could not reload kglobalaccel; the binding applies at next login"
+    accel_holders "$1" | awk -F'\t' '{ print $1 ": " ($3 != "" ? $3 : $2) }'
 }
 
 cmd=${1:-status}
@@ -66,7 +52,8 @@ case "$cmd" in
         printf '%-12s %-28s %s\n' ACTION SHORTCUT ENTRY
         for a in "${ACTIONS[@]}"; do
             d=$(action_desktop "$a")
-            cur=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$d" --key _launch --default '' | cut -d, -f1)
+            cur=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$d" --key _launch --default '' | cut -d, -f1 | tr '\t' ' ')
+            [ "$cur" = none ] && cur=""
             [ -n "$cur" ] || cur='<unbound>'
             installed=$([ -f "$APPLICATIONS_DIR/$d" ] && echo installed || echo missing)
             printf '%-12s %-28s %s\n' "$a" "$cur" "$installed"
@@ -94,30 +81,25 @@ case "$cmd" in
         d=$(action_desktop "$action")
         [ -f "$APPLICATIONS_DIR/$d" ] || die "$APPLICATIONS_DIR/$d is missing; run 'make link' first"
 
-        holders=$(holders_of "$key")
-        if [ -n "$holders" ]; then
-            log_warn "$key is already used by: $(printf '%s' "$holders" | tr '\n' ' ')"
-            log_warn "binding it here will take it from them"
-        fi
-
-        # active,default,friendly -- the last two are what System Settings uses.
-        kconfig_set shortcuts kglobalshortcutsrc "services/$d" _launch "$key,none,$(action_label "$action")"
-        reload_accel
-        log_step "$action -> $key"
+        # Taken from whoever holds it, each named as it goes (accel_take), so
+        # the key does not end up claimed twice with the winner left to chance.
+        accel_take shortcuts "$key" "services/$d" _launch replace
+        accel_reload
+        log_step "$action ($(action_label "$action")) -> $key"
         ;;
 
     clear)
         action=${1:?usage: $ALIAS shortcuts clear <action>}
         valid_action "$action" || die "unknown action '$action'"
         d=$(action_desktop "$action")
-        kconfig_set shortcuts kglobalshortcutsrc "services/$d" _launch "none,none,$(action_label "$action")"
-        reload_accel
+        kconfig_set shortcuts kglobalshortcutsrc "services/$d" _launch none
+        accel_reload
         log_step "$action unbound"
         ;;
 
     revert)
         kconfig_revert shortcuts
-        reload_accel
+        accel_reload
         ;;
 
     *) die "unknown command: $cmd" ;;
