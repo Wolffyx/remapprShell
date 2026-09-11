@@ -70,6 +70,11 @@
                     "enabled": true
                 }
             ]
+        },
+        "launcher": {
+            "provider": "builtin",
+            "searchProvider": "builtin",
+            "layout": "twopane"
         }
     }
 }

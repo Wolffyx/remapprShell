@@ -104,7 +104,12 @@
         "provider": "auto",
         "searchProvider": "auto",
         "kickoffMode": "menu",
-        "command": []
+        "command": [],
+        "layout": "twopane",
+        "actionPrefix": ">",
+        "dense": false,
+        "hints": true,
+        "pinned": []
     },
     "osd": {
         "enabled": false,

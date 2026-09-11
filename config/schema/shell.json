@@ -122,6 +122,38 @@
                     "label": "Search",
                     "description": "KRunner is Plasma's own search."
                 },
+                "launcher.layout": {
+                    "type": "enum",
+                    "values": ["twopane", "grid", "list"],
+                    "default": "twopane",
+                    "label": "Start menu",
+                    "description": "How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu."
+                },
+                "launcher.actionPrefix": {
+                    "type": "enum",
+                    "values": [">", ":", "/"],
+                    "default": ">",
+                    "label": "Action prefix",
+                    "description": "Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications."
+                },
+                "launcher.dense": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Compact results",
+                    "description": "Shorter rows in the built-in search, so more fit."
+                },
+                "launcher.hints": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Key hints",
+                    "description": "The keys the built-in search answers to, under its results."
+                },
+                "launcher.pinned": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Pinned applications",
+                    "description": "Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed."
+                },
                 "launcher.kickoffMode": {
                     "type": "enum",
                     "values": [

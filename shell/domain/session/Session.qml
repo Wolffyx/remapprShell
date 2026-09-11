@@ -21,6 +21,23 @@ QtObject {
     property string avatar: ""
     property real uptimeSeconds: 0
 
+    // ---- the session -------------------------------------------------------
+    //
+    // Locking is Plasma's screen locker, asked through logind as the lock key
+    // does. Logging out, restarting and shutting down go through Plasma's own
+    // prompt, which knows about unsaved work and inhibitors -- nothing here
+    // ends a session without asking.
+
+    function lock() { Quickshell.execDetached(["loginctl", "lock-session"]); }
+    function suspend() { Quickshell.execDetached(["systemctl", "suspend"]); }
+    function hibernate() { Quickshell.execDetached(["systemctl", "hibernate"]); }
+
+    // "promptAll", "promptLogout", "promptReboot" or "promptShutDown".
+    function prompt(kind) {
+        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt",
+                                 "org.kde.LogoutPrompt", kind ?? "promptAll"]);
+    }
+
     readonly property string displayName: root.realName.length > 0 ? root.realName : root.userName
     readonly property string initial: root.displayName.charAt(0).toUpperCase()
 

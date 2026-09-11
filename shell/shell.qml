@@ -24,6 +24,7 @@ import qs.domain.status
 import qs.domain.backend
 import qs.domain.windows
 import qs.features.diagnostics
+import qs.features.launcher
 
 ShellRoot {
     id: root
@@ -64,6 +65,16 @@ ShellRoot {
             // starts fresh rather than restoring the last page.
             onVisibleChanged: if (!visible) settings.activeAsync = false
         }
+    }
+
+    // The built-in search, over the screen it was opened on -- the first one
+    // when it was opened from a key.
+    Variants {
+        model: LauncherService.builtin.visible && LauncherService.builtin.mode === "search"
+            ? Quickshell.screens.filter(s => s.name === (LauncherService.builtin.shownOn || (Quickshell.screens[0]?.name ?? "")))
+            : []
+
+        SearchOverlay {}
     }
 
     // Off unless asked for, and built only then: Plasma's OSD already works,

@@ -25,15 +25,20 @@ BarWidget {
     // The built-in launcher draws in one of our own windows, so it gets a
     // popout anchored to this button. Every other provider is its own process
     // and positions itself, so there is nothing to anchor.
-    popout: LauncherService.active.embedded ? popoutComponent : null
+    popout: LauncherService.active === LauncherService.builtin ? popoutComponent : null
 
     readonly property Component popoutComponent: Component {
-        LauncherPanel {}
+        StartMenu { provider: LauncherService.builtin }
     }
 
-    popoutVisible: LauncherService.active.visible
-                   && LauncherService.active.embedded
+    // The start menu, not the search: that one is drawn over the screen.
+    popoutVisible: LauncherService.active === LauncherService.builtin
+                   && LauncherService.builtin.visible
+                   && LauncherService.builtin.mode === "apps"
                    && LauncherService.builtin.shownOn === root.screenName
+
+    // The two-pane menu draws its own edges, to the card's.
+    popoutPadding: LauncherService.builtin.layout === "twopane" ? 0 : 22
 
     // The built-in launcher is a search field; it is useless without the
     // keyboard.

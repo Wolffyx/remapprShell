@@ -25,7 +25,11 @@ BarWidget {
     implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
-        LauncherService.toggle("search");
+        // The built-in search opens over this panel's screen.
+        if (LauncherService.searchProvider === LauncherService.builtin && !LauncherService.builtin.visible)
+            LauncherService.builtin.openOn(root.screenName, "search");
+        else
+            LauncherService.toggle("search");
     }
 
     BarButton {
