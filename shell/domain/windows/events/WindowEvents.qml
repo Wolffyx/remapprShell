@@ -40,6 +40,11 @@ QtObject {
             // Wayland client asking to be activated while it is not. KWin
             // clears it when the window is activated.
             attention: entry.demandsAttention === true,
+            // The monitor, as Quickshell names screens. Empty from a script
+            // older than this field.
+            output: String(entry.output ?? ""),
+            // KWin's stacking position, higher on top; -1 when not sent.
+            stacking: typeof entry.stacking === "number" ? entry.stacking : -1,
             // A PNG the daemon lifted out of the window itself, for windows
             // that match no installed application. Empty for the rest.
             iconPath: String(entry.iconPath ?? "")
@@ -104,6 +109,43 @@ QtObject {
             const since = previous ? previous[w.uuid] : 0;
             out[w.uuid] = since > 0 ? since : now;
         }
+        return out;
+    }
+
+    // Which window was last active on each monitor: output name -> uuid. The
+    // active window claims its monitor; every other monitor keeps the window
+    // it had, for as long as that window still exists, is still on it and is
+    // not minimised. KWin has one active window for the whole desktop, and a
+    // panel per monitor naming it would say the same thing twice and nothing
+    // about the other screen.
+    function lastActiveByOutput(previous, windows) {
+        const out = ({});
+        const byUuid = ({});
+        for (const w of windows ?? []) {
+            if (w && w.uuid)
+                byUuid[w.uuid] = w;
+        }
+        for (const output of Object.keys(previous ?? {})) {
+            const w = byUuid[previous[output]];
+            if (w && w.output === output && !w.minimized)
+                out[output] = w.uuid;
+        }
+        for (const w of windows ?? []) {
+            if (w && w.active && w.output)
+                out[w.output] = w.uuid;
+        }
+        // A monitor nothing has been activated on since the shell started --
+        // or whose window just went -- names the window on top there, rather
+        // than nothing at all.
+        const top = ({});
+        for (const w of windows ?? []) {
+            if (!w || !w.output || w.minimized || out[w.output])
+                continue;
+            if (!top[w.output] || (w.stacking ?? -1) > (top[w.output].stacking ?? -1))
+                top[w.output] = w;
+        }
+        for (const output of Object.keys(top))
+            out[output] = top[output].uuid;
         return out;
     }
 

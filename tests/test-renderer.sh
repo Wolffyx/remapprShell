@@ -84,9 +84,9 @@ before_sums=$(kde_sums)
 
 mkdir -p "$QS_CONFIG_DIR/widgets"
 jq '.widgets += [{
-        id: "activewindow",
+        id: "unrenderable",
         apiVersion: 1,
-        name: "Active window",
+        name: "Unrenderable (a widget no Plasma applet stands for)",
         zones: ["left"],
         renderers: { quickshell: { entry: "Widget.qml" } },
         config: {}
@@ -102,7 +102,7 @@ cat > "$profile" <<'PROFILE'
     "bar": {
         "entries": [
             { "id": "launcher",     "zone": "left",   "enabled": true },
-            { "id": "activewindow", "zone": "left",   "enabled": true },
+            { "id": "unrenderable", "zone": "left",   "enabled": true },
             { "id": "clock",        "zone": "middle", "enabled": true },
             { "id": "tray",         "zone": "right",  "enabled": true },
             { "id": "showdesktop",  "zone": "right",  "enabled": false }
@@ -118,7 +118,7 @@ check "no layouts of ours yet" "$(our_panels)" "0"
 echo "== set plasma =="
 out=$(rmpr_renderer set plasma --yes 2>&1) || { printf '%s\n' "$out" >&2; echo "set plasma failed" >&2; exit 1; }
 
-check "unsupported widget named"  "$(printf '%s' "$out" | grep -c 'activewindow')" "1"
+check "unsupported widget named"  "$(printf '%s' "$out" | grep -c 'unrenderable')" "1"
 check "shell package switched"    "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "$PLASMA_SHELL_PACKAGE_ID"
 check "renderer written"          "$(jq -r '.panel.renderer' "$profile")" "plasma"
 check "exactly one panel"         "$(our_panels)" "1"
@@ -136,7 +136,7 @@ check "horizontal form factor"    "$(grep -A6 '^\[Containments\]\[811\]$' "$plas
 check "thickness reached the view" "$(kreadconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 811" --group Defaults --key thickness)" "44"
 check "panel is not immutable"    "$(grep -c '^immutability=1$' "$plasma_src")" "0"
 
-# launcher, spacer, clock, spacer, tray -- activewindow has no applet and
+# launcher, spacer, clock, spacer, tray -- unrenderable has no applet and
 # showdesktop is disabled, so neither appears.
 check "applets in zone order"     "$(sed -n 's/^AppletOrder=//p' "$plasma_src")" "820;821;822;823;824"
 check "launcher first"            "$(grep -A2 '^\[Containments\]\[811\]\[Applets\]\[820\]$' "$plasma_src" | sed -n 's/^plugin=//p')" "org.kde.plasma.kickoff"

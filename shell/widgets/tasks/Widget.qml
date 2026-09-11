@@ -43,9 +43,18 @@ BarWidget {
     // One button per application when grouping, one per window otherwise. Both
     // are the same shape -- a list of {windows, appName, icon...} -- so the row
     // below does not care which it is drawing.
+    // Only the windows on this panel's own monitor, when asked -- Windows'
+    // "show taskbar apps on the taskbar where the window is open". A window
+    // with no monitor named (a script older than that field) is shown
+    // everywhere rather than nowhere.
+    readonly property bool thisScreenOnly: root.widgetConfig?.thisScreenOnly ?? false
+    readonly property var windowsHere: root.thisScreenOnly
+        ? WindowsService.windows.filter(w => !w.output || w.output === root.screenName)
+        : WindowsService.windows
+
     readonly property var items: root.groupByApp
-        ? WindowsService.groups
-        : WindowsService.windows.map(w => ({
+        ? (root.thisScreenOnly ? WindowsService.groupsOf(root.windowsHere) : WindowsService.groups)
+        : root.windowsHere.map(w => ({
             key: w.uuid,
             appName: WindowsService.appNameFor(w),
             windows: [w],

@@ -1,0 +1,34 @@
+{
+    "id": "activewindow",
+    "apiVersion": 1,
+    "name": "Active window",
+    "description": "The window you are working in on this screen, with its application's icon. On another monitor, the window last used there. Click to bring it forward. Needs the window list turned on: rmpr windows enable.",
+    "icon": "preferences-system-windows",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.windowlist" }
+    },
+    "config": {
+        "maxWidth": {
+            "type": "int",
+            "default": 320,
+            "min": 80,
+            "max": 800,
+            "label": "Widest the title gets",
+            "description": "It is elided past this."
+        },
+        "showIcon": {
+            "type": "bool",
+            "default": true,
+            "label": "Show the application's icon"
+        },
+        "showAppName": {
+            "type": "bool",
+            "default": false,
+            "label": "Name the application instead of the window",
+            "description": "\"Dolphin\" rather than the folder it has open, as a macOS menu bar does."
+        }
+    }
+}

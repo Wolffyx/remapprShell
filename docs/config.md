@@ -240,6 +240,7 @@ when two copies of a widget should differ.
 
 | Widget | id | Zones | Plasma renderer |
 | --- | --- | --- | --- |
+| Active window | `activewindow` | left, middle, right | `org.kde.plasma.windowlist` |
 | Battery | `battery` | left, middle, right | `org.kde.plasma.battery` (in the tray) |
 | Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
 | Brightness and Night Light | `brightness` | left, middle, right | `org.kde.plasma.brightness` (in the tray) |
@@ -264,6 +265,14 @@ renderer, and is named before you switch rather than discovered afterwards.
 One marked *in the tray* is an applet Plasma's system tray hosts by itself.
 With `tray` also on the panel it is left to the tray rather than drawn twice;
 without `tray` it stands on the panel alone.
+
+### `widgets.activewindow`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `maxWidth` | a number, 80 to 800 | `320` | It is elided past this. |
+| `showIcon` | `true` or `false` | `true` | Show the application's icon |
+| `showAppName` | `true` or `false` | `false` | "Dolphin" rather than the folder it has open, as a macOS menu bar does. |
 
 ### `widgets.battery`
 
@@ -328,6 +337,7 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `groupByApp` | `true` or `false` | `true` | One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows. |
+| `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
 | `showTitles` | `true` or `false` | `false` | Off by default: a panel runs out of room after four or five titles, and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |

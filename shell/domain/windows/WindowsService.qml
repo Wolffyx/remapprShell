@@ -37,11 +37,24 @@ QtObject {
     // WindowEvents.attentionSince.
     property var attentionSince: ({})
 
+    // Output name -> uuid of the window last active on it. See
+    // WindowEvents.lastActiveByOutput.
+    property var lastActiveByOutput: ({})
+
+    // The window a panel on `screenName` should name: the active one when it
+    // is on that screen, otherwise the one last active there -- which is what
+    // makes a widget naming it worth having on a second monitor.
+    function windowFor(screenName) {
+        const uuid = root.lastActiveByOutput[screenName];
+        return uuid ? (root.windows.find(w => w.uuid === uuid) ?? null) : null;
+    }
+
     function _apply(list) {
         if (list === null)
             return;   // unreadable: keep what we had rather than blanking
         root._answered = true;
         root.attentionSince = WindowEvents.attentionSince(root.attentionSince, list, Date.now());
+        root.lastActiveByOutput = WindowEvents.lastActiveByOutput(root.lastActiveByOutput, list);
         root.windows = list;
     }
 
@@ -191,11 +204,15 @@ QtObject {
     // Keyed by the matched application where there is one, so two windows of
     // the same program group even when their titles and classes differ, and by
     // the class otherwise.
-    readonly property var groups: {
+    readonly property var groups: root.groupsOf(root.windows)
+
+    // Any list of windows grouped the same way -- one monitor's, for a task
+    // list that shows only the windows on its own screen.
+    function groupsOf(windows) {
         const order = [];
         const byKey = ({});
 
-        for (const window of root.windows) {
+        for (const window of windows ?? []) {
             const entry = root.entryFor(window);
             const key = entry ? String(entry.id) : `class:${window.appId}`;
 

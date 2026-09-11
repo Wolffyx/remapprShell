@@ -136,6 +136,9 @@ if they fail.
       opens.
     - Get a message in Discord or ZapZap while another window has focus: its
       taskbar button should flash orange, then stay orange until clicked.
+    - Add `activewindow` in Settings → Widgets: each monitor's panel should
+      name a window on that monitor, dimmed on the one without the focus.
+      Clicking the dimmed one should bring that window forward.
 
     None of this could be tried here. A full-screen game had the screen, and
     popouts are now on the overlay layer, so they would have opened on top of
@@ -258,6 +261,25 @@ are not.
   Verified: the reloaded script's list carries the field. Not seen: a button
   actually flashing. Nothing asked for attention while this was built, and
   no request was faked.
+- **Active window** — `activewindow`, the last widget from Phase 2 of the
+  plan. KWin has one active window for the whole desktop, so each panel
+  names the window last active on *its own* monitor instead. That is the
+  active window wherever it is; failing that, the one last active there;
+  failing that, the topmost window on that monitor that isn't minimised. On
+  the monitor without the focus the title is dimmed, and a click brings the
+  window forward. For this, the KWin script now also sends each window's
+  `output` (named as Quickshell names screens) and its `stacking` position.
+  The rule is `WindowEvents.lastActiveByOutput`, tested. It maps to Plasma's
+  `windowlist` applet, and it is in the macOS preset. The same data gives the
+  task list a `thisScreenOnly` option, Windows' "show taskbar apps on the
+  taskbar where the window is open". `status windows` says which window each
+  monitor's panel names. Verified live: DP-2 named the focused Chrome
+  window, and DP-3 named its topmost window (Claude), passing over a
+  minimised game.
+
+  The renderer suite's fixture had used `activewindow` as its example of a
+  widget with no Plasma applet. The real widget, added to the same index,
+  won the lookup, and three checks failed. The fixture is `unrenderable` now.
 - **Media** — `media`, the fifth applet Plasma keeps inside its tray and our
   tray therefore never had. Reads MPRIS through Quickshell: the title beside a
   play/pause glyph on the panel, middle-click to pause, and a popout with art,
@@ -515,7 +537,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 164. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 168. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -1082,3 +1104,6 @@ Then the user's report: popouts too small for their contents, none closing on
 a click elsewhere, and taskbar buttons that never asked for attention. See
 "Popouts behave like menus" and "Taskbar buttons ask for attention" under
 "Working today", and item 16 under "What to check first".
+
+Then the active-window widget, which finishes Phase 2 of the plan, and the
+task list's per-monitor option that the same data made cheap.

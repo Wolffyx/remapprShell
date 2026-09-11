@@ -21,6 +21,7 @@ import qs.domain.notifications
 import qs.domain.diagnostics
 import qs.domain.status
 import qs.domain.backend
+import qs.domain.windows
 import qs.features.diagnostics
 
 ShellRoot {
@@ -212,6 +213,19 @@ ShellRoot {
         function brightness(): string { return JSON.stringify(BrightnessStatus.summary()); }
         function keyboard(): string { return JSON.stringify(KeyboardStatus.summary()); }
         function privacy(): string { return JSON.stringify(PrivacyStatus.summary()); }
+
+        // Which window each monitor's panel names, and which windows are
+        // asking for attention.
+        function windows(): string {
+            return JSON.stringify({
+                count: WindowsService.windows.length,
+                perScreen: Object.keys(WindowsService.lastActiveByOutput).map(o => ({
+                    screen: o,
+                    title: WindowsService.windowFor(o)?.title ?? ""
+                })),
+                attention: WindowsService.windows.filter(w => w.attention).map(w => w.title)
+            });
+        }
     }
 
     // What the brightness widget does on a scroll and a middle click, for

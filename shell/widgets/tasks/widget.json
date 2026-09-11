@@ -27,6 +27,12 @@
             "label": "Group windows by application",
             "description": "One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows."
         },
+        "thisScreenOnly": {
+            "type": "bool",
+            "default": false,
+            "label": "Only this screen's windows",
+            "description": "Each monitor's panel lists the windows on that monitor, as Windows does with \"show taskbar apps on the taskbar where the window is open\"."
+        },
         "showTitles": {
             "type": "bool",
             "default": false,

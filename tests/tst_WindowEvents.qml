@@ -156,6 +156,47 @@ TestCase {
         compare(Object.keys(WindowEvents.attentionSince(null, null, 1)).length, 0);
     }
 
+    function test_output_is_read() {
+        compare(WindowEvents.parseList(JSON.stringify([windowJson({ output: "DP-2" })]))[0].output, "DP-2");
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].output, "");
+    }
+
+    function on(uuid, output, props) {
+        return Object.assign({ uuid: uuid, output: output, active: false, minimized: false }, props ?? {});
+    }
+
+    // Each monitor keeps the window last used on it: focus moving to the
+    // other monitor does not blank this one.
+    function test_each_output_keeps_its_last_window() {
+        let m = WindowEvents.lastActiveByOutput({}, [on("a", "DP-2", { active: true }), on("b", "DP-3", { stacking: 9 }),
+                                                     on("c", "DP-3", { stacking: 2 })]);
+        compare(m["DP-2"], "a");
+        m = WindowEvents.lastActiveByOutput(m, [on("a", "DP-2", { stacking: 9 }), on("b", "DP-3"),
+                                                on("c", "DP-3", { active: true })]);
+        compare(m["DP-2"], "a");
+        compare(m["DP-3"], "c");
+    }
+
+    // Before anything has been activated on a monitor -- the shell has just
+    // started -- its panel names the window on top there.
+    function test_an_unvisited_output_names_its_top_window() {
+        const m = WindowEvents.lastActiveByOutput({}, [on("a", "DP-2", { active: true }),
+                                                       on("b", "DP-3", { stacking: 4 }),
+                                                       on("c", "DP-3", { stacking: 7 }),
+                                                       on("d", "DP-3", { stacking: 9, minimized: true })]);
+        compare(m["DP-3"], "c");
+    }
+
+    // Closed, minimised, or moved to the other monitor: forgotten -- and the
+    // window on top of that monitor, if any, named instead.
+    function test_a_window_gone_from_its_output_is_forgotten() {
+        const m = WindowEvents.lastActiveByOutput({ "DP-2": "a", "DP-3": "b", "HDMI-1": "c" },
+                                                  [on("a", "DP-3", { stacking: 1 }), on("b", "DP-3", { minimized: true })]);
+        compare(m["DP-2"], undefined);
+        compare(m["HDMI-1"], undefined);
+        compare(m["DP-3"], "a");
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
         // Lower-cased, which is what turns "Google-chrome" into an icon that
