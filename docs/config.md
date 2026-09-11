@@ -119,6 +119,13 @@ Which tray icons sit on the panel, which go behind the chevron, and which are le
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
+### Screen edges
+
+What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Profiles
 
 Separate configurations you can switch between, and per-monitor overrides within each.

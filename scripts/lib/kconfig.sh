@@ -77,12 +77,16 @@ kconfig_set() {
         had=true
     fi
 
-    # Recorded only the first time: the ledger must hold the state before this
-    # project touched the key, not before the most recent write.
+    # Recorded only the first time within a scope: the ledger must hold the
+    # state before this scope touched the key, not before its most recent
+    # write. A second scope writing the same key keeps a record of its own,
+    # holding what the first one left there -- which is how the screen edges'
+    # master switch can be turned back on without also undoing the corners
+    # set before it. Undoing both, newest first, arrives at the original.
     local led
     led=$(kconfig_ledger)
-    if ! jq -e --arg f "$file" --arg g "$group" --arg k "$key" \
-            '.entries[] | select(.file == $f and .group == $g and .key == $k)' "$led" >/dev/null 2>&1; then
+    if ! jq -e --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \
+            '.entries[] | select(.scope == $s and .file == $f and .group == $g and .key == $k)' "$led" >/dev/null 2>&1; then
         local tmp
         tmp=$(mktemp)
         jq --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \

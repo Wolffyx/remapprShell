@@ -232,6 +232,13 @@
             "page": "tray"
         },
         {
+            "id": "edges",
+            "label": "Screen edges",
+            "icon": "preferences-system-windows-effect-screenedge",
+            "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.",
+            "page": "edges"
+        },
+        {
             "id": "profiles",
             "label": "Profiles",
             "icon": "preferences-desktop-display",
