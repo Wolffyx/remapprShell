@@ -1,0 +1,14 @@
+{
+    "id": "bluetooth",
+    "apiVersion": 1,
+    "name": "Bluetooth",
+    "description": "Switches Bluetooth and connects devices already paired. Pairing a new one opens Plasma's own applet. Takes no room where there is no adapter.",
+    "icon": "network-bluetooth",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.bluetooth", "inSystemTray": true }
+    },
+    "config": {}
+}

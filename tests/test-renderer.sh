@@ -218,6 +218,35 @@ printf '\n[Containments][9]\nplugin=org.kde.panel\n' >> "$third_party"
 appletsrc_restore_if_gutted "someothershell.desktop" "$copy" 2 >/dev/null 2>&1
 check "an intact layout is untouched" "$(appletsrc_containment_count "$third_party")" "3"
 
+# Plasma's tray hosts volume, network, Bluetooth, battery and notifications
+# inside itself. Our tray is only the StatusNotifierItems, so a panel with
+# `tray` and `volume` is one volume icon to us -- and would be two under
+# Plasma if both were written as applets.
+echo "== applets the system tray already shows =="
+index="$QS_CONFIG_DIR/widgets/index.json"
+cfg="$SANDBOX/tray-panel.json"
+cat > "$cfg" <<'PANEL'
+{
+    "panel": { "position": "bottom" },
+    "bar": { "entries": [
+        { "id": "volume",  "zone": "right" },
+        { "id": "tray",    "zone": "right" },
+        { "id": "network", "zone": "right", "enabled": false },
+        { "id": "clock",   "zone": "right" }
+    ] }
+}
+PANEL
+appletsrc_generate "$SANDBOX/with-tray" "$cfg" "$index" plasma
+check "not drawn beside the tray"   "$(grep -c '^plugin=org.kde.plasma.volume$' "$SANDBOX/with-tray")" "0"
+check "the tray itself is there"    "$(grep -c '^plugin=org.kde.plasma.systemtray$' "$SANDBOX/with-tray")" "1"
+check "named as left to the tray"   "$(appletsrc_folded_into_tray "$index" "$cfg")" "volume"
+check "still a valid layout"        "$(appletsrc_validate "$SANDBOX/with-tray" yes >/dev/null 2>&1 && echo ok)" "ok"
+
+jq '.bar.entries |= map(select(.id != "tray"))' "$cfg" > "$cfg.new" && mv "$cfg.new" "$cfg"
+appletsrc_generate "$SANDBOX/no-tray" "$cfg" "$index" plasma
+check "on its own without a tray"   "$(grep -c '^plugin=org.kde.plasma.volume$' "$SANDBOX/no-tray")" "1"
+check "nothing left to a tray"      "$(appletsrc_folded_into_tray "$index" "$cfg")" ""
+
 echo "== revert =="
 rmpr_renderer revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
 check "package back to stock"     "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "org.kde.plasma.desktop"

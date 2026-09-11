@@ -12,6 +12,7 @@ Row {
     property real from: 0
     property real to: 100
     property real stepSize: 1
+    property bool live: false
     signal moved(real value)
 
     spacing: 8
@@ -34,7 +35,10 @@ Row {
 
         // Only on release: a settings write per pixel of drag would debounce
         // into the same result, but it would also log and re-render all the way.
-        onPressedChanged: if (!pressed) root.moved(value)
+        // A live slider -- a volume, which should follow the finger and costs
+        // nothing to write -- reports every step instead.
+        onPressedChanged: if (!pressed && !root.live) root.moved(value)
+        onMoved: if (root.live) root.moved(value)
 
         background: Rectangle {
             implicitWidth: 120

@@ -1,0 +1,21 @@
+{
+    "id": "battery",
+    "apiVersion": 1,
+    "name": "Battery",
+    "description": "Charge, time left and the power profile. Takes no room on a machine with no battery, so it is safe to leave on a desktop's panel.",
+    "icon": "battery-080",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.battery", "inSystemTray": true }
+    },
+    "config": {
+        "showPercentage": {
+            "type": "bool",
+            "default": false,
+            "label": "Show the percentage",
+            "description": "Beside the icon. The icon alone moves in steps of ten."
+        }
+    }
+}

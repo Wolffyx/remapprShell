@@ -1,12 +1,15 @@
 {
     "name": "Minimal",
-    "description": "A thin bar with the time and the system tray. Nothing else.",
+    "description": "A thin bar with the time and the system tray, volume and network included. Nothing else.",
     "config": {
         "panel": { "position": "top", "thickness": 28 },
         "bar": {
             "entries": [
-                { "id": "clock", "zone": "middle", "enabled": true },
-                { "id": "tray",  "zone": "right",  "enabled": true }
+                { "id": "clock",   "zone": "middle", "enabled": true },
+                { "id": "tray",    "zone": "right",  "enabled": true },
+                { "id": "network", "zone": "right",  "enabled": true },
+                { "id": "volume",  "zone": "right",  "enabled": true },
+                { "id": "battery", "zone": "right",  "enabled": true }
             ]
         },
         "widgets": { "clock": { "format": "HH:mm" } }

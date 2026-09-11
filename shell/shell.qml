@@ -19,6 +19,7 @@ import qs.features.settings
 import qs.features.wizard
 import qs.domain.notifications
 import qs.domain.diagnostics
+import qs.domain.status
 import qs.features.diagnostics
 
 ShellRoot {
@@ -146,6 +147,60 @@ ShellRoot {
         }
 
         function count(): string { return String(SystemTray.items?.values?.length ?? 0); }
+    }
+
+    // A left click on a widget by name: opens its popout, or does whatever
+    // that widget does when clicked. The screen defaults to the first one.
+    IpcHandler {
+        target: "panel"
+
+        function click(widgetId: string, screen: string): string {
+            const name = screen || (Quickshell.screens[0]?.name ?? "");
+            PanelModel.clickRequested(widgetId, name);
+            return name;
+        }
+
+        function screens(): string { return Quickshell.screens.map(s => s.name).join("\n"); }
+    }
+
+    // What the status widgets are reading, as they read it. The same question
+    // as the tray's: when an icon on the panel looks wrong, this says whether
+    // the widget is drawing its input wrongly or the input is what is wrong.
+    IpcHandler {
+        target: "status"
+
+        function audio(): string { return JSON.stringify(AudioStatus.summary()); }
+        function network(): string { return JSON.stringify(NetworkStatus.summary()); }
+        function bluetooth(): string { return JSON.stringify(BluetoothStatus.summary()); }
+        function power(): string { return JSON.stringify(PowerStatus.summary()); }
+    }
+
+    // The runtime layer of the configuration: in memory only, above the
+    // profile, gone when the shell stops. Nothing set here is written
+    // anywhere, which makes it the way to try a layout without committing to
+    // it -- or to have a second copy of the shell draw a panel while the
+    // profile says another renderer is in charge.
+    //
+    // `quickshell ipc call` reads an argument that starts with `[` as a list
+    // of arguments, so a JSON array must be passed with a leading space:
+    // `setRuntime bar.entries ' [{"id":"clock","zone":"middle"}]'`.
+    IpcHandler {
+        target: "config"
+
+        function get(path: string): string { return JSON.stringify(ConfigStore.value(path, null)); }
+
+        function setRuntime(path: string, json: string): string {
+            let value;
+            try {
+                value = JSON.parse(json);
+            } catch (e) {
+                return `not JSON: ${e.message}`;
+            }
+            ConfigStore.setRuntime(path, value);
+            return JSON.stringify(ConfigStore.value(path, null));
+        }
+
+        function clearRuntime(): void { ConfigStore.clearRuntime(); }
     }
 
     IpcHandler {

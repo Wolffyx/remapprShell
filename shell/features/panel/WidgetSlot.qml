@@ -7,8 +7,10 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import qs.core
 import qs.ui.primitives
 import qs.domain.theme
+import qs.features.panel.model
 
 Item {
     id: root
@@ -33,12 +35,30 @@ Item {
             root.popoutCentre = centre;
         }
     }
+
+    // The same call the MouseArea below makes, so a click asked for over IPC
+    // cannot behave differently from one made with a mouse.
+    Connections {
+        target: PanelModel
+        function onClickRequested(widgetId: string, screen: string): void {
+            if (root.entry?.id === widgetId && screen === root.screenName)
+                root.widget?.handleActivate(Qt.LeftButton);
+        }
+    }
     readonly property bool wantsHover: root.widget?.wantsHover ?? false
     readonly property bool wantsWheel: root.widget?.wantsWheel ?? false
     readonly property bool interactive: root.wantsHover || root.wantsWheel || !!root.widget?.popout
 
     implicitWidth: host.implicitWidth
     implicitHeight: host.implicitHeight
+
+    // The zone is a positioner, and a positioner skips invisible children, so
+    // a widget with nothing to show leaves no gap and no stray spacing.
+    visible: root.widget?.present ?? true
+
+    // A slot that moves while its popout is open -- a tray icon appearing to
+    // its left -- takes the popout with it.
+    onXChanged: if (popout.wanted) popout.place()
 
     WidgetHost {
         id: host
@@ -101,7 +121,25 @@ Item {
 
         // Where this slot sits along the panel, in screen coordinates. The
         // panel spans the screen, so a position within it is a position on it.
-        readonly property real slotX: root.mapToItem(null, 0, 0).x
+        //
+        // Taken when the popout opens, not bound. `mapToItem` is a function
+        // call, so a binding on it has nothing to depend on and is evaluated
+        // exactly once -- when the slot is created, before the zone has laid
+        // it out -- which left it at 0 and opened every popout on the panel
+        // against the screen's left edge, whichever widget it belonged to.
+        property real slotX: 0
+
+        function place() {
+            popout.slotX = root.mapToItem(null, 0, 0).x;
+        }
+
+        // Where it went, for whoever is working out why a popout is somewhere
+        // unexpected -- which is how the slotX bug above was found. Called
+        // once the content has had a chance to size the window.
+        function report() {
+            if (popout.wanted)
+                Log.debug("panel", `popout '${root.entry?.id}' on ${popout.screen?.name}: left ${popout.margins.left}, ${popout.implicitWidth}x${popout.implicitHeight}`);
+        }
 
         visible: popout.wanted
         screen: root.bar?.screenObject ?? null
@@ -157,6 +195,10 @@ Item {
         // and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
+            if (popout.wanted) {
+                popout.place();
+                Qt.callLater(popout.report);
+            }
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))

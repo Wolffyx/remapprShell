@@ -1,0 +1,14 @@
+{
+    "id": "network",
+    "apiVersion": 1,
+    "name": "Network",
+    "description": "What is connected, and a Wi-Fi switch. Joining a network opens Plasma's own applet, which asks for the password.",
+    "icon": "network-wired-activated",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.networkmanagement", "inSystemTray": true }
+    },
+    "config": {}
+}

@@ -116,10 +116,13 @@ key_table() {
     printf 'when two copies of a widget should differ.\n\n'
     printf '| Widget | id | Zones | Plasma renderer |\n| --- | --- | --- | --- |\n'
     jq -r '.widgets[] |
-        "| \(.name) | `\(.id)` | \(.zones | join(", ")) | \(if .renderers.plasma.applet then "`" + .renderers.plasma.applet + "`" else "**not supported**" end) |"' "$INDEX"
+        "| \(.name) | `\(.id)` | \(.zones | join(", ")) | \(if .renderers.plasma.applet then "`" + .renderers.plasma.applet + "`" + (if .renderers.plasma.inSystemTray then " (in the tray)" else "" end) else "**not supported**" end) |"' "$INDEX"
     printf '\n'
     printf 'A widget with no Plasma applet is left out of the panel under the `plasma`\n'
     printf 'renderer, and is named before you switch rather than discovered afterwards.\n\n'
+    printf 'One marked *in the tray* is an applet Plasma'"'"'s system tray hosts by itself.\n'
+    printf 'With `tray` also on the panel it is left to the tray rather than drawn twice;\n'
+    printf 'without `tray` it stands on the panel alone.\n\n'
 
     while IFS= read -r widget; do
         id=$(jq -r '.id' <<< "$widget")

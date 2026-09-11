@@ -4,7 +4,9 @@ A snapshot for picking the work up fresh. Written 2026-09-10, across two
 sessions: the first built the Plasma renderer, diagnostics, the wizard, the
 theme layer, the open-window list and panel auto-hide; the second added AI
 assist, the notification history, crash reporting, and a tray you can curate
-whose menus open.
+whose menus open. A third, on 2026-09-11, added volume, network, Bluetooth
+and battery widgets -- and found that every popout had been opening at the
+screen's left edge.
 
 ## What this is
 
@@ -24,21 +26,22 @@ for lessons — which patterns to avoid.
 
 ## The state of this machine, right now
 
-Written 2026-09-10, after a long working session. Everything below was read
-off the running system rather than remembered.
+Updated 2026-09-11. Everything below was read off the running system rather
+than remembered. The machine was rebooted between sessions, and the first two
+rows are what that did.
 
 | | |
 | --- | --- |
-| Shell | installed via `make link`, running as `remappr-shell.service` — **active but not enabled**, so it will not come back after a reboot until `systemctl --user enable remappr-shell.service` |
-| plasmashell | on `remappr-shell.desktop`, our package: it draws the desktop, we draw the panel |
-| Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` — the `windows` preset plus the new history bell, put there to try it |
+| Shell | installed via `make link` as `remappr-shell.service`, **inactive and not enabled**. Never enabled, so the reboot took our panel away, as this file predicted. `systemctl --user enable --now remappr-shell.service` |
+| plasmashell | on **`caelestia.desktop`**, while the profile says `panel.renderer: plasma`. The two disagree and no session changed either -- something outside this project switched the package back. Run `rmpr renderer status` before anything else |
+| Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` -- the `windows` preset plus the history bell. The new status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
-| `rmpr doctor` | no problems, 3 warnings (the competing shell, krohnkite, one drifted ledger key) |
+| `rmpr doctor` | no problems, 5 warnings -- two of them the service being down, plus the competing shell and krohnkite |
 
 ### What to check first, before building anything
 
@@ -67,6 +70,23 @@ if they fail.
    sandbox with every provider faked, but nobody has yet pressed Send in the
    window with a real provider behind it. The claude-code path opens a
    terminal; that was exercised only with a fake terminal.
+7. **Scroll on the volume icon, and middle-click it.** Reading PipeWire is
+   proven -- the popout showed the Scarlett at 100%, as `wpctl` does. Writing
+   to it is not: no session can scroll. Then drag a slider in its popout;
+   `NumberSlider` gained a live mode for it.
+8. **Click a paired Bluetooth device, and the Wi-Fi switch.** Each is one
+   property write, and neither has been pressed.
+9. **Any of the four on a laptop.** No battery has ever been seen by this
+   project -- this desktop has none, so the battery widget is proven only to
+   take no room. Its charge is accepted as 0..1 or 0..100, because which one
+   Quickshell hands over could not be checked here.
+10. **The "…" button at the foot of each popout.** It opens Plasma's own
+    applet with `plasmawindowed`. That the volume applet opens that way is
+    verified; the buttons themselves are not.
+11. **Open any popout, and check it appears under its widget.** Until
+    2026-09-11 every one opened at the left edge of the screen (see "A binding
+    on a function call" below). Over IPC they land in the right place now; by
+    hand is still worth a look.
 
 ### The lesson this session paid for twice
 
@@ -102,6 +122,39 @@ are not.
   cannot disagree. Left click activates, right click opens the application's
   own menu, middle click is the secondary action, the wheel scrolls the icon
   under the pointer.
+- **Status widgets** — `volume`, `network`, `bluetooth`, `battery`. Plasma's
+  volume, network, Bluetooth and battery indicators are *applets inside its
+  system tray*, not StatusNotifierItems, so under our renderer they never
+  reached our tray at all: the panel had no volume icon. Each is now a widget
+  that reads the service directly through Quickshell (PipeWire,
+  NetworkManager, BlueZ, UPower, power-profiles-daemon), with a small popout
+  for what people do daily -- volume and microphone sliders and an output
+  picker, the Wi-Fi switch, connecting a paired device, the power profile --
+  and a button that opens *Plasma's own applet* with `plasmawindowed` for
+  everything else: the Wi-Fi password prompt, a volume per application,
+  pairing. Nothing Plasma already does is rebuilt. Scroll on the volume icon
+  to change it, middle-click to mute.
+
+  Battery and Bluetooth set `present: false` (new on `BarWidget`) where there
+  is no hardware, and take no room -- which is what makes them safe in presets
+  shared by laptops and desktops. All four are in the defaults and in every
+  preset (minimal gets network, volume and battery). The rules -- which icon,
+  how far a notch scrolls, which battery scale -- are pure functions in
+  `qs.domain.status.icons`, tested; the services are singletons in
+  `qs.domain.status`.
+
+  Under the Plasma renderer each maps to its stock applet, and is **left out
+  when `tray` is also on the panel**: Plasma's tray already hosts it, and it
+  would be drawn twice (`renderers.plasma.inSystemTray` in the manifest). The
+  notification bell had the same latent duplicate and is marked too. `renderer
+  set` names what it left to the tray.
+- **IPC for working on the shell without a pointer.** `status
+  audio|network|bluetooth|power` prints what each widget is reading. `panel
+  click <widget> <screen>` does what a left click does. `config setRuntime
+  <path> <json>` writes the in-memory layer, never persisted -- which is how a
+  second copy of the shell can draw a panel while the profile names another
+  renderer:
+  `quickshell ipc -p shell/shell.qml call config setRuntime panel.renderer '"quickshell"'`.
 - **Config** — layered defaults → profile → per-monitor → runtime. Sparse
   deltas. Live reload. Refuses to write over a file that does not parse.
 - **Settings window** — schema-driven; every control is generated from a schema,
@@ -215,7 +268,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 11 shell suites in throwaway HOMEs, plus a QML suite of 92. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 113. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -510,6 +563,30 @@ Non-obvious things that cost time to discover:
   the build if it appears anywhere else.
 - Layers: `core → platform → domain → ui → features`. A layer may import from
   below, never sideways or up; `scripts/lint-layers.sh` enforces it.
+- **A binding on a function call never re-evaluates.** WidgetSlot placed its
+  popout with `readonly property real slotX: root.mapToItem(null, 0, 0).x`.
+  `mapToItem` notifies nothing, so the binding ran once -- at creation, before
+  the zone had positioned the slot -- and stayed 0. Every popout on the panel
+  opened against the screen's left edge, whichever widget it came from, for
+  as long as popouts have existed; nobody here could click, so nobody saw it.
+  `slotX` is taken when the popout opens now. Found by opening popouts over
+  IPC and asking the shell where they went (`popout '<id>' on <screen>: left
+  N, WxH`, at debug level) after screenshot diffs had failed -- see below.
+- **Quickshell's service singletons start lazily.** The first read of
+  `Pipewire`, `Bluetooth` or `Networking` comes back empty and fills in a
+  moment later. `status audio` straight after start, under the Plasma
+  renderer where no widget had touched them yet, reported no output and no
+  devices; asked again, it had everything.
+- **`quickshell ipc call` reads an argument starting with `[` as a list of
+  arguments,** so a JSON array arrives as N arguments and the call is refused.
+  A leading space avoids it: `' [{"id":"clock","zone":"middle"}]'`.
+- **Screenshots: `spectacle -b -n -f -o file.png` works here; `grim` does not**
+  (KWin has no wlr-screencopy). Diffing a closed and an open popout to find it
+  fails, because the popout background is the same dark as most windows behind
+  it. Ask the shell for the geometry and crop exactly that -- which also keeps
+  whatever else is on the screen out of the picture.
+- **`plasmawindowed` is a unique DBus service** (`org.kde.plasmawindowed`): a
+  second invocation hands its request to the first and exits 0.
 
 ## The plan
 
@@ -608,3 +685,24 @@ Two smaller things from the same run:
   can declare a static `renderers.plasma.config` block and that is written
   verbatim; our own values are deliberately not mapped, because a guessed
   mapping produces a panel that quietly disagrees with its configuration.
+
+## Where the session of 2026-09-11 left off
+
+One commit:
+
+- The four status widgets, their services, 20 QML test cases, and their
+  place in the defaults and presets. Verified on the live desktop in a second
+  copy of the shell drawing a runtime-only panel: the icons on the panel, all
+  three popouts drawn with real data -- output and microphone at 100%, three
+  outputs, wired at 2.5 Gbit/s and Wi-Fi at 80%, six paired devices with the
+  keyboard's battery -- and the battery widget taking no room. Writes are not
+  verified; see items 7-10 under "What to check first".
+- The Plasma renderer no longer draws tray applets twice. Seven new checks in
+  `test-renderer.sh`.
+- The popout placement bug, which predates this session and affected every
+  popout on the panel.
+- `panel click`, `status` and `config setRuntime` over IPC.
+
+Not touched: the service is still not enabled, and plasmashell is still on
+`caelestia.desktop` against a profile that says `plasma`. Both are the user's
+call, and both are in the table at the top.

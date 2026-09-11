@@ -307,7 +307,7 @@ write_renderer_setting() {
 # --- reporting -------------------------------------------------------------
 
 compat_report() {
-    local target=$1 config index unsupported
+    local target=$1 config index unsupported folded
     config=$(mktemp); effective_config > "$config"
     index=$(widget_index)
 
@@ -317,7 +317,14 @@ compat_report() {
     fi
 
     unsupported=$(appletsrc_unsupported "$index" "$config")
+    folded=$(appletsrc_folded_into_tray "$index" "$config")
     rm -f "$config"
+
+    # Not a loss, so not a warning: the same icons, drawn by Plasma's tray.
+    if [ -n "$folded" ]; then
+        log_info "Plasma's system tray shows these itself, so they are not added beside it:"
+        printf '%s\n' "$folded" | sed 's/^/        /' >&2
+    fi
 
     [ -n "$unsupported" ] || { log_info "every enabled widget has a Plasma applet"; return 0; }
 

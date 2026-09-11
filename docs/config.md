@@ -166,6 +166,26 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "bluetooth",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "network",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "volume",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "battery",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "power",
         "zone": "right",
         "enabled": true
@@ -187,17 +207,31 @@ when two copies of a widget should differ.
 
 | Widget | id | Zones | Plasma renderer |
 | --- | --- | --- | --- |
+| Battery | `battery` | left, middle, right | `org.kde.plasma.battery` (in the tray) |
+| Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
-| Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` |
+| Network | `network` | left, middle, right | `org.kde.plasma.networkmanagement` (in the tray) |
+| Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` (in the tray) |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
+| Volume | `volume` | left, middle, right | `org.kde.plasma.volume` (in the tray) |
 | Virtual desktops | `workspaces` | left, middle, right | `org.kde.plasma.pager` |
 
 A widget with no Plasma applet is left out of the panel under the `plasma`
 renderer, and is named before you switch rather than discovered afterwards.
+
+One marked *in the tray* is an applet Plasma's system tray hosts by itself.
+With `tray` also on the panel it is left to the tray rather than drawn twice;
+without `tray` it stands on the panel alone.
+
+### `widgets.battery`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showPercentage` | `true` or `false` | `false` | Beside the icon. The icon alone moves in steps of ten. |
 
 ### `widgets.clock`
 
@@ -248,6 +282,14 @@ renderer, and is named before you switch rather than discovered afterwards.
 | `iconSize` | a number, 12 to 48 | `18` | Icon size |
 | `pinned` | a list | `[]` | StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids. |
 | `hidden` | a list | `[]` | Ids left out altogether, not even behind the chevron. |
+
+### `widgets.volume`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
+| `maxVolume` | a number, 100 to 150 | `100` | Scrolling and the slider stop here. Above 100 is amplification, which can distort. |
+| `showMicrophone` | `true` or `false` | `true` | A second slider in the popout, for the default input. |
 
 ### `widgets.workspaces`
 

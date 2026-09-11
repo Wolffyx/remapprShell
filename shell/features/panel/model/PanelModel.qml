@@ -23,6 +23,12 @@ QtObject {
 
     readonly property bool horizontal: root.position === "top" || root.position === "bottom"
 
+    // A left click on a widget, asked for by name rather than by a pointer.
+    // Every slot holding `widgetId` on `screen` answers, exactly as it would
+    // to the click. For keybindings, and for checking a popout on a machine
+    // nobody is sitting at.
+    signal clickRequested(string widgetId, string screen)
+
     // Per-output values. A panel reads these rather than the ones above, so a
     // monitor override reaches the panel it describes; the globals remain for
     // anything not drawn per screen.

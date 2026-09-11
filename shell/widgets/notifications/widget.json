@@ -8,7 +8,7 @@
     "orientation": ["horizontal", "vertical"],
     "renderers": {
         "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.notifications" }
+        "plasma": { "applet": "org.kde.plasma.notifications", "inSystemTray": true }
     },
     "config": {
         "showCount": {

@@ -34,6 +34,26 @@
                 "enabled": true
             },
             {
+                "id": "bluetooth",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "network",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "volume",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "battery",
+                "zone": "right",
+                "enabled": true
+            },
+            {
                 "id": "power",
                 "zone": "right",
                 "enabled": true

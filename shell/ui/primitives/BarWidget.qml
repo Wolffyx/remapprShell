@@ -47,6 +47,12 @@ Item {
     // so this is opt-in rather than always on.
     property bool popoutGrabsFocus: false
 
+    // Whether there is anything to show. A battery widget on a desktop, or a
+    // Bluetooth one on a machine with no adapter, sets this false and takes no
+    // room on the panel -- rather than leaving a gap, or an icon for hardware
+    // that is not there, which reads as broken.
+    property bool present: true
+
     // ---- behaviour, overridden by the widget ---------------------------
 
     function handleHover(position, horizontal) {}

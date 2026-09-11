@@ -1,0 +1,37 @@
+{
+    "id": "volume",
+    "apiVersion": 1,
+    "name": "Volume",
+    "description": "The default output's volume. Scroll to change it, middle-click to mute, click for sliders; Plasma's own mixer is one click further.",
+    "icon": "audio-volume-high",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.volume", "inSystemTray": true }
+    },
+    "config": {
+        "step": {
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "label": "Scroll step",
+            "description": "Percent per notch of the wheel."
+        },
+        "maxVolume": {
+            "type": "int",
+            "default": 100,
+            "min": 100,
+            "max": 150,
+            "label": "Loudest by scrolling",
+            "description": "Scrolling and the slider stop here. Above 100 is amplification, which can distort."
+        },
+        "showMicrophone": {
+            "type": "bool",
+            "default": true,
+            "label": "Show the microphone",
+            "description": "A second slider in the popout, for the default input."
+        }
+    }
+}

@@ -91,6 +91,40 @@ appletsrc_unsupported() {
     done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
 }
 
+# Whether a widget's applet is one Plasma's system tray shows by itself.
+#
+# Plasma's tray is not only StatusNotifierItems: volume, network, Bluetooth,
+# battery and notifications are applets it hosts inside itself, on by default.
+# Our own renderer draws each of those as a widget of its own, because our tray
+# is only the StatusNotifierItems -- so a panel described with both `tray` and
+# `volume` means one volume icon to us and would mean two to Plasma. The
+# manifest says which applets these are (`renderers.plasma.inSystemTray`).
+appletsrc_in_tray() {
+    local index=$1 id=$2
+    [ "$(jq -r --arg id "$id" \
+        '.widgets[] | select(.id == $id) | .renderers.plasma.inSystemTray // false' "$index")" = "true" ]
+}
+
+# Whether the enabled entries include Plasma's system tray.
+appletsrc_has_tray() {
+    local index=$1 config=$2 id
+    while IFS= read -r id; do
+        [ "$(appletsrc_applet_for "$index" "$id")" = "org.kde.plasma.systemtray" ] && return 0
+    done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
+    return 1
+}
+
+# Enabled entries, in config order, left out because the tray already shows
+# them. Nothing when there is no tray: then each stands on the panel alone.
+appletsrc_folded_into_tray() {
+    local index=$1 config=$2 id
+    appletsrc_has_tray "$index" "$config" || return 0
+    while IFS= read -r id; do
+        [ -n "$id" ] || continue
+        appletsrc_in_tray "$index" "$id" && printf '%s\n' "$id"
+    done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
+}
+
 # Writes the `[Configuration]` groups a widget's manifest declares for its
 # Plasma applet. Only what the manifest states is written -- our own widget
 # settings are not translated into applet settings, because a guessed mapping
@@ -197,6 +231,9 @@ appletsrc_generate() {
     mapfile -t middle_ids < <(_zone_ids middle)
     mapfile -t right_ids  < <(_zone_ids right)
 
+    local tray=no
+    appletsrc_has_tray "$index" "$config" && tray=yes
+
     _emit_zone() {
         local -n ids=$1
         local id applet
@@ -208,6 +245,10 @@ appletsrc_generate() {
                 # here so a widget with no Plasma equivalent leaves a gap
                 # rather than a broken applet.
                 log_debug "appletsrc: '$id' has no Plasma applet, left out"
+                continue
+            fi
+            if [ "$tray" = yes ] && appletsrc_in_tray "$index" "$id"; then
+                log_debug "appletsrc: '$id' is shown by the system tray, not added beside it"
                 continue
             fi
             {
