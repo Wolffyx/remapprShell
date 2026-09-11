@@ -82,6 +82,7 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 | `notifications.server` | `plasma`, `shell` | `plasma` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
 | `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
 | `notifications.popupPosition` | `auto`, `top-right`, `top-left`, `bottom-right`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. Only when this shell draws them. |
+| `notifications.centreStyle` | `grouped`, `stream` | `grouped` | What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier. |
 | `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
 
@@ -241,27 +242,7 @@ silently landing on the left.
         "enabled": true
       },
       {
-        "id": "bluetooth",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "network",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "brightness",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "volume",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "battery",
+        "id": "status",
         "zone": "right",
         "enabled": true
       },
@@ -308,6 +289,7 @@ when two copies of a widget should differ.
 | Camera and microphone in use | `privacy` | left, middle, right | `org.kde.plasma.cameraindicator` (in the tray) |
 | Search | `search` | left, middle, right | `org.kde.milou` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
+| Quick settings | `status` | left, middle, right | **not supported** |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
 | Task view | `taskview` | left, middle, right | **not supported** |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
@@ -397,6 +379,13 @@ without `tray` it stands on the panel alone.
 | `width` | a number, 2 to 40 | `8` | Strip width |
 | `peek` | `true` or `false` | `false` | Rest the pointer on the strip to move the windows aside until it leaves. A click while peeking keeps the desktop. |
 | `peekDelay` | a number, 100 to 2000 | `500` | Peek after (ms) |
+
+### `widgets.status`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `density` | `roomy`, `dense` | `roomy` | roomy: a grid of tiles. dense: a list of rows, each with its switch. |
+| `step` | a number, 1 to 25 | `5` | Percent per notch of the wheel. |
 
 ### `widgets.tasks`
 

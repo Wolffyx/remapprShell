@@ -31,13 +31,18 @@ Column {
     // assumes a first frame with content in it.
     property var handle: null
 
+    // Over the top-level menu: the application's icon and name. A submenu,
+    // opened in place, has neither.
+    property string title: ""
+    property string iconSource: ""
+
     // Emitted once the user has chosen something, so the popout can close.
     signal chosen
 
-    readonly property int rowHeight: 26
     readonly property int indent: 16
 
-    spacing: 1
+    spacing: 0
+    width: Math.max(236, implicitWidth)
 
     QsMenuOpener {
         id: opener
@@ -46,13 +51,49 @@ Column {
 
     readonly property var entries: opener.children?.values ?? []
 
+    Item {
+        visible: root.title.length > 0
+        width: root.width
+        height: visible ? 44 : 0
+
+        Row {
+            x: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            PanelIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                implicitSize: 18
+                iconFile: root.iconSource
+            }
+
+            PanelText {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, root.width - 50)
+                elide: Text.ElideRight
+                text: root.title
+                font.weight: Font.Medium
+            }
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            x: 8
+            width: parent.width - 16
+            height: 1
+            color: Theme.out
+        }
+    }
+
+    Item { visible: root.title.length > 0; width: 1; height: 6 }
+
     PanelText {
         visible: root.entries.length === 0
         text: "…"
-        color: Theme.foregroundInactive
-        leftPadding: 8
-        topPadding: 4
-        bottomPadding: 4
+        color: Theme.mut
+        leftPadding: 12
+        topPadding: 6
+        bottomPadding: 6
     }
 
     Repeater {
@@ -65,95 +106,41 @@ Column {
             required property var modelData
 
             readonly property bool separator: entry.modelData?.isSeparator ?? false
+            readonly property bool submenu: entry.modelData?.hasChildren ?? false
+            readonly property int buttonType: entry.modelData?.buttonType ?? QsMenuButtonType.None
             property bool expanded: false
 
-            spacing: 1
+            spacing: 0
 
             // A separator is a line, not a row you can hit.
-            Rectangle {
+            MenuSeparator {
                 visible: entry.separator
-                width: Math.max(120, root.width)
-                height: 1
-                color: Theme.alpha(Theme.foreground, 0.15)
+                width: root.width
             }
 
-            Item {
+            // Check and radio states are drawn rather than dropped: an
+            // application that shows a setting in its menu is relying on the
+            // tick to say which way it is set.
+            MenuRow {
                 visible: !entry.separator
-                implicitWidth: line.implicitWidth + 24
-                implicitHeight: root.rowHeight
-                width: Math.max(implicitWidth, root.width)
+                width: root.width
+                enabled: entry.modelData?.enabled ?? false
+                text: entry.modelData?.text ?? ""
+                iconSource: entry.modelData?.icon ?? ""
+                check: entry.buttonType === QsMenuButtonType.RadioButton ? "radio"
+                     : entry.buttonType === QsMenuButtonType.CheckBox ? "check" : ""
+                checked: (entry.modelData?.checkState ?? Qt.Unchecked) !== Qt.Unchecked
+                trailingGlyph: entry.submenu ? (entry.expanded ? "expand_more" : "chevron_right") : ""
 
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.leftMargin: 2
-                    anchors.rightMargin: 2
-                    radius: 4
-                    color: (rowHover.hovered && (entry.modelData?.enabled ?? false))
-                        ? Theme.hoverBackground : "transparent"
-                }
-
-                Row {
-                    id: line
-                    anchors.left: parent.left
-                    anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
-
-                    // Check and radio states are drawn rather than dropped:
-                    // an application that shows a setting in its menu is
-                    // relying on the tick to say which way it is set.
-                    Item {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: 14
-                        implicitHeight: 14
-                        visible: (entry.modelData?.buttonType ?? QsMenuButtonType.None) !== QsMenuButtonType.None
-                              || (entry.modelData?.icon ?? "").length > 0
-
-                        PanelIcon {
-                            anchors.fill: parent
-                            visible: (entry.modelData?.icon ?? "").length > 0
-                            source: entry.modelData?.icon ?? ""
-                        }
-
-                        PanelIcon {
-                            anchors.fill: parent
-                            visible: (entry.modelData?.icon ?? "").length === 0
-                                  && (entry.modelData?.checkState ?? Qt.Unchecked) !== Qt.Unchecked
-                            iconName: (entry.modelData?.buttonType ?? 0) === QsMenuButtonType.RadioButton
-                                ? "media-record" : "checkbox"
-                        }
+                onActivated: {
+                    if (entry.submenu) {
+                        entry.expanded = !entry.expanded;
+                        return;
                     }
-
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: entry.modelData?.text ?? ""
-                        opacity: (entry.modelData?.enabled ?? false) ? 1 : 0.45
-                        font.pixelSize: 12
-                    }
-
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: entry.modelData?.hasChildren ?? false
-                        text: entry.expanded ? "⌄" : "›"
-                        color: Theme.foregroundInactive
-                        font.pixelSize: 12
-                    }
-                }
-
-                HoverHandler { id: rowHover }
-
-                TapHandler {
-                    enabled: entry.modelData?.enabled ?? false
-                    onTapped: {
-                        if (entry.modelData?.hasChildren ?? false) {
-                            entry.expanded = !entry.expanded;
-                            return;
-                        }
-                        // `triggered` is how an entry is activated; the
-                        // application does whatever it means by it.
-                        entry.modelData.triggered();
-                        root.chosen();
-                    }
+                    // `triggered` is how an entry is activated; the
+                    // application does whatever it means by it.
+                    entry.modelData.triggered();
+                    root.chosen();
                 }
             }
 
@@ -166,7 +153,7 @@ Column {
             // is resolved at runtime, which is what breaks the cycle.
             Loader {
                 id: submenu
-                active: entry.expanded && (entry.modelData?.hasChildren ?? false)
+                active: entry.expanded && entry.submenu
                 visible: active
 
                 onActiveChanged: {

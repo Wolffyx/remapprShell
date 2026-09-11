@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 // Clock: the time over the date, as the design has it.
 //
 // 24 or 12 hours, seconds or not, the date or not -- or a Qt format string of
@@ -39,6 +41,21 @@ BarWidget {
     }
 
     readonly property real k: Math.max(0.7, root.unit)
+
+    // A click opens the month.
+    popoutPadding: 22
+    popout: Component {
+        CalendarPopout {
+            clock: root.clock
+            timeFormat: root.timeFormat
+            onDone: root.popoutVisible = false
+        }
+    }
+
+    function handleActivate(button) {
+        if (button === Qt.LeftButton)
+            root.popoutVisible = !root.popoutVisible;
+    }
 
     implicitWidth: root.vertical ? root.across : layout.implicitWidth + 2 * Math.round(14 * root.k)
     implicitHeight: root.vertical ? layout.implicitHeight + 12 : Math.max(24, Math.round(44 * root.unit))

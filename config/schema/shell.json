@@ -185,6 +185,13 @@
                     "label": "Popups appear at",
                     "description": "auto is the right-hand end of the panel's edge, beside the clock. Only when this shell draws them."
                 },
+                "notifications.centreStyle": {
+                    "type": "enum",
+                    "values": ["grouped", "stream"],
+                    "default": "grouped",
+                    "label": "Notification centre",
+                    "description": "What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier."
+                },
                 "notifications.history": {
                     "type": "bool",
                     "default": false,

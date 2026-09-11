@@ -1,0 +1,29 @@
+{
+    "id": "status",
+    "apiVersion": 1,
+    "name": "Quick settings",
+    "description": "Network, Bluetooth, sound and battery in one place on the panel, and quick settings a click away: Wi-Fi and Bluetooth, the microphone, do not disturb, Night Light, and game mode and VPN where there are any, with the volume and the brightness. Scroll to change the volume, middle-click to mute.",
+    "icon": "preferences-system",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" }
+    },
+    "config": {
+        "density": {
+            "type": "enum",
+            "values": ["roomy", "dense"],
+            "default": "roomy",
+            "label": "Quick settings",
+            "description": "roomy: a grid of tiles. dense: a list of rows, each with its switch."
+        },
+        "step": {
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 25,
+            "label": "Volume step",
+            "description": "Percent per notch of the wheel."
+        }
+    }
+}

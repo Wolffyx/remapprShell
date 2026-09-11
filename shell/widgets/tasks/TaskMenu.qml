@@ -9,7 +9,6 @@ pragma ComponentBehavior: Bound
 // and the widget does it.
 
 import QtQuick
-import qs.domain.theme
 import qs.ui.primitives
 
 Column {
@@ -28,61 +27,12 @@ Column {
 
     readonly property int count: menu.item?.windows?.length ?? 0
 
-    width: 260
-    spacing: 2
+    width: 262
+    spacing: 0
 
-    component MenuRow: Rectangle {
-        id: row
-
-        property string text: ""
-        property string iconName: ""
-        signal activated
-
-        width: parent ? parent.width : 260
-        height: 28
-        radius: 5
-        color: rowHover.hovered ? Theme.hoverBackground : "transparent"
-
-        Row {
-            x: 8
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            PanelIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                implicitSize: 16
-                iconName: row.iconName
-                opacity: row.iconName.length > 0 ? 1 : 0
-            }
-
-            PanelText {
-                anchors.verticalCenter: parent.verticalCenter
-                width: row.width - 40
-                text: row.text
-                elide: Text.ElideRight
-                font.pixelSize: 12
-            }
-        }
-
-        HoverHandler { id: rowHover }
-        TapHandler { onTapped: row.activated() }
-    }
-
-    component Separator: Rectangle {
-        width: parent ? parent.width : 260
-        height: 1
-        color: Theme.alpha(Theme.foreground, 0.12)
-    }
-
-    PanelText {
-        x: 8
-        width: menu.width - 16
+    MenuTitle {
+        width: menu.width
         text: menu.item?.appName ?? ""
-        elide: Text.ElideRight
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        font.bold: true
-        bottomPadding: 2
     }
 
     Repeater {
@@ -90,6 +40,7 @@ Column {
 
         MenuRow {
             required property var modelData
+            width: menu.width
             text: modelData.name
             iconName: modelData.icon || (menu.entry?.icon ?? "")
             onActivated: menu.launch(modelData)
@@ -101,24 +52,28 @@ Column {
     // second window rather than raising the first.
     MenuRow {
         visible: !!menu.entry
+        width: menu.width
         text: menu.entry?.name ?? ""
-        iconName: menu.entry?.icon ?? ""
+        glyph: "add"
         onActivated: menu.launch(null)
     }
 
-    Separator { visible: !!menu.entry }
+    MenuSeparator { visible: !!menu.entry; width: menu.width }
 
     MenuRow {
         visible: !!menu.entry
+        width: menu.width
         text: menu.pinned ? "Unpin from taskbar" : "Pin to taskbar"
-        iconName: menu.pinned ? "window-unpin" : "window-pin"
+        glyph: menu.pinned ? "keep_off" : "push_pin"
         onActivated: menu.togglePin()
     }
 
     MenuRow {
         visible: menu.count > 0
+        width: menu.width
         text: menu.count > 1 ? `Close all ${menu.count} windows` : "Close window"
-        iconName: "window-close"
+        glyph: "close"
+        danger: true
         onActivated: menu.closeWindows()
     }
 }

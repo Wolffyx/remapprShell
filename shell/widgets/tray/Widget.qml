@@ -286,6 +286,8 @@ BarWidget {
                 active: root.popoutMode === "menu" && root.menuItem !== null
                 sourceComponent: TrayMenu {
                     handle: root.menuItem?.menu ?? null
+                    title: root.menuItem ? (root.menuItem.tooltipTitle || root.menuItem.title || root.menuItem.id) : ""
+                    iconSource: root.menuItem?.icon ?? ""
                     onChosen: root.closePopout()
                 }
             }

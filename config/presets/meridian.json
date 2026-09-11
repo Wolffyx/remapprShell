@@ -1,0 +1,75 @@
+{
+    "name": "Meridian",
+    "description": "The design's own: the start button, search, task view and the workspaces on the left, the windows in the middle, and the tray, quick settings, the clock, notifications and the session button on the right.",
+    "config": {
+        "panel": {
+            "position": "bottom",
+            "thickness": 64,
+            "style": "full"
+        },
+        "bar": {
+            "entries": [
+                {
+                    "id": "launcher",
+                    "zone": "left",
+                    "enabled": true
+                },
+                {
+                    "id": "search",
+                    "zone": "left",
+                    "enabled": true
+                },
+                {
+                    "id": "taskview",
+                    "zone": "left",
+                    "enabled": true
+                },
+                {
+                    "id": "divider",
+                    "zone": "left",
+                    "enabled": true
+                },
+                {
+                    "id": "workspaces",
+                    "zone": "left",
+                    "enabled": true
+                },
+                {
+                    "id": "tasks",
+                    "zone": "middle",
+                    "enabled": true
+                },
+                {
+                    "id": "tray",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
+                    "id": "divider",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
+                    "id": "status",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
+                    "id": "clock",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
+                    "id": "notifications",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
+                    "id": "power",
+                    "zone": "right",
+                    "enabled": true
+                }
+            ]
+        }
+    }
+}

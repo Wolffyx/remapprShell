@@ -12,6 +12,39 @@ import qs.domain.status.icons
 TestCase {
     name: "StatusIcons"
 
+    // ---- Bluetooth devices, and nmcli -------------------------------------
+
+    function test_device_glyphs() {
+        compare(StatusIcons.deviceGlyph("audio-headset"), "headphones");
+        compare(StatusIcons.deviceGlyph("audio-headphones"), "headphones");
+        compare(StatusIcons.deviceGlyph("audio-card"), "speaker");
+        compare(StatusIcons.deviceGlyph("input-keyboard"), "keyboard");
+        compare(StatusIcons.deviceGlyph("input-mouse"), "mouse");
+        compare(StatusIcons.deviceGlyph("phone"), "smartphone");
+        compare(StatusIcons.deviceGlyph("input-gaming"), "sports_esports");
+        compare(StatusIcons.deviceGlyph(""), "bluetooth");
+        compare(StatusIcons.deviceGlyph(undefined), "bluetooth");
+    }
+
+    // A colon in a connection's name arrives escaped, and stays in the name.
+    function test_nmcli_rows_keep_escaped_colons() {
+        const rows = StatusIcons.nmcliRows("home\\:5G:802-11-wireless:yes\nwork vpn:vpn:no\n");
+        compare(rows.length, 2);
+        compare(rows[0], ["home:5G", "802-11-wireless", "yes"]);
+        compare(rows[1], ["work vpn", "vpn", "no"]);
+        compare(StatusIcons.nmcliRows("").length, 0);
+    }
+
+    function test_vpn_connections_are_vpn_and_wireguard_only() {
+        const rows = StatusIcons.nmcliRows("wired:802-3-ethernet:yes\noffice:vpn:no\nwg0:wireguard:yes\n");
+        const vpns = StatusIcons.vpnConnections(rows);
+        compare(vpns.length, 2);
+        compare(vpns[0].name, "office");
+        compare(vpns[0].active, false);
+        compare(vpns[1].type, "wireguard");
+        compare(vpns[1].active, true);
+    }
+
     // ---- glyphs: the same states in Material Symbols -----------------------
 
     function test_volume_glyph_follows_the_icon_thresholds() {

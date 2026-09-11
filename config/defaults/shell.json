@@ -79,27 +79,7 @@
                 "enabled": true
             },
             {
-                "id": "bluetooth",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "network",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "brightness",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "volume",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "battery",
+                "id": "status",
                 "zone": "right",
                 "enabled": true
             },
@@ -135,7 +115,8 @@
         "historySize": 50,
         "server": "plasma",
         "popupTimeout": 6,
-        "popupPosition": "auto"
+        "popupPosition": "auto",
+        "centreStyle": "grouped"
     },
     "services": {
         "hostPlasma": true
