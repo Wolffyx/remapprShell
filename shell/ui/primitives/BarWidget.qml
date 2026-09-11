@@ -70,7 +70,13 @@ Item {
     // Whether the pointer is over the widget. The panel times the tooltip from
     // it for widgets that do not take hover from the panel; those that do
     // (`wantsHover`) are timed from the panel's own hover instead.
-    readonly property bool hovered: _hover.hovered
+    //
+    // A widget that takes hover from the panel is covered by the panel's
+    // MouseArea, which then keeps the pointer from its own HoverHandler. The
+    // panel passes what it sees down as `hostHovered`, so `hovered` means the
+    // same thing for every widget, whichever route the pointer took.
+    readonly property bool hovered: _hover.hovered || root.hostHovered
+    property bool hostHovered: false
 
     HoverHandler { id: _hover }
 

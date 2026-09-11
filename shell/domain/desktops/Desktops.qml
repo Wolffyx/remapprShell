@@ -46,6 +46,37 @@ QtObject {
 
     readonly property Process _setCurrent: Process { id: setCurrent }
 
+    // Whether KWin is showing the desktop. Read back from KWin rather than
+    // remembered from our own clicks, so Meta+D, a hot corner and a window
+    // being activated all count -- a strip that kept its own flag got out of
+    // step with the first of them and then did the opposite of what it said.
+    property bool showingDesktop: false
+
+    function showDesktop(show) {
+        showDesktopCall.running = false;
+        showDesktopCall.command = Dbus.callArgs(root.service, "/KWin", "org.kde.KWin", "showDesktop", "b",
+                                                [show ? "true" : "false"]);
+        showDesktopCall.running = true;
+    }
+
+    readonly property Process _showDesktopCall: Process { id: showDesktopCall }
+
+    readonly property DbusProperty _showing: DbusProperty {
+        service: root.service
+        path: "/KWin"
+        iface: "org.kde.KWin"
+        name: "showingDesktop"
+        onLoaded: value => root.showingDesktop = value === true
+    }
+
+    // showingDesktopChanged, and the PropertiesChanged carrying the same.
+    readonly property DbusWatch _kwinWatch: DbusWatch {
+        service: root.service
+        path: "/KWin"
+        filter: "showingDesktop"
+        onChanged: root._showing.refresh()
+    }
+
     readonly property DbusProperty _desktops: DbusProperty {
         service: root.service
         path: root.path

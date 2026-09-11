@@ -42,6 +42,15 @@ Item {
         }
     }
 
+    // A widget that takes hover from the panel gets it through the MouseArea
+    // below, which then hides the pointer from the widget's own handlers.
+    Binding {
+        target: root.widget
+        property: "hostHovered"
+        value: mouse.containsMouse
+        when: root.widget !== null && root.wantsHover
+    }
+
     // The same calls the pointer makes, asked for by name, so a click or a
     // tooltip asked for over IPC cannot behave differently from a real one.
     Connections {

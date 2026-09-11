@@ -338,6 +338,8 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `width` | a number, 2 to 40 | `8` | Strip width |
+| `peek` | `true` or `false` | `false` | Rest the pointer on the strip to move the windows aside until it leaves. A click while peeking keeps the desktop. |
+| `peekDelay` | a number, 100 to 2000 | `500` | Peek after (ms) |
 
 ### `widgets.tasks`
 

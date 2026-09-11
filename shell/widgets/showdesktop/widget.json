@@ -11,6 +11,13 @@
         "plasma": { "applet": "org.kde.plasma.showdesktop" }
     },
     "config": {
-        "width": { "type": "int", "default": 8, "min": 2, "max": 40, "label": "Strip width" }
+        "width": { "type": "int", "default": 8, "min": 2, "max": 40, "label": "Strip width" },
+        "peek": {
+            "type": "bool",
+            "default": false,
+            "label": "Peek at the desktop",
+            "description": "Rest the pointer on the strip to move the windows aside until it leaves. A click while peeking keeps the desktop."
+        },
+        "peekDelay": { "type": "int", "default": 500, "min": 100, "max": 2000, "label": "Peek after (ms)" }
     }
 }
