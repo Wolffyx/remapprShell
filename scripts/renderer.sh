@@ -113,8 +113,7 @@ caelestia_available() { session_available && systemctl --user cat "$CAELESTIA_UN
 # A throwaway HOME does not give a throwaway session bus: plasmashell is still
 # listening on the real one, and `changeShell` would switch the desktop the
 # person is using while a test believed it was working in a sandbox. So the
-# guard is explicit and the tests set it.
-session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+# guard is explicit -- `session_available`, in brand.sh -- and the tests set it.
 
 # --- package installation --------------------------------------------------
 

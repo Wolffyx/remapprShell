@@ -26,8 +26,6 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_SCRIPT_ID"
 
-session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
-
 kwin_script() {
     session_available || return 1
     qdbus6 org.kde.KWin /Scripting "org.kde.kwin.Scripting.$1" "${@:2}" 2>/dev/null

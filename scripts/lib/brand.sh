@@ -85,6 +85,12 @@ SAFE_MODE_VAR="${ENV_PREFIX}_SAFE_MODE"
 NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 
+# Asked before every call that reaches the running desktop. One definition,
+# because the scripts that each kept their own copy were the ones that
+# remembered; the two that did not restarted the user's global shortcuts and
+# reloaded KWin on every test run.
+session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+
 export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        REPO_PUSH REPO_FETCH VERSION \
        QS_CONFIG_DIR CONFIG_DIR DATA_DIR STATE_DIR BIN_DIR SYSTEMD_USER_DIR \

@@ -23,8 +23,8 @@ source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
 # A throwaway HOME does not sandbox the user's systemd instance. Without this,
 # a test updating a copy of the repo restarted the real, running shell -- and
-# every run of the suite did exactly that, until 2026-09-11.
-session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+# every run of the suite did exactly that, until 2026-09-11. Hence
+# `session_available` (brand.sh) before the restart.
 
 MODE=update
 LOCAL_SOURCE=""

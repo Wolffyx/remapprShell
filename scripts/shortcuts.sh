@@ -48,6 +48,11 @@ holders_of() {
 reload_accel() {
     # kglobalaccel reads the file at startup; without a reload a new binding
     # does nothing until the next login, which looks exactly like a bug.
+    #
+    # A throwaway HOME does not make this a throwaway kglobalaccel: the
+    # service is the user's own, so without the check every run of the test
+    # suite restarted it -- four times, at every `make test`.
+    session_available || return 0
     systemctl --user restart plasma-kglobalaccel.service 2>/dev/null \
       || kquitapp6 kglobalacceld 2>/dev/null \
       || log_warn "could not reload kglobalaccel; the binding applies at next login"
