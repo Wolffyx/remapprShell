@@ -1,0 +1,23 @@
+{
+    "id": "clipboard",
+    "apiVersion": 1,
+    "name": "Clipboard",
+    "description": "What you copied, to copy again. Reads Plasma's clipboard history when it is running; when it is not -- under this shell's own renderer -- keeps one itself, text only and in memory.",
+    "icon": "klipper",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.clipboard", "inSystemTray": true }
+    },
+    "config": {
+        "shown": {
+            "type": "int",
+            "default": 15,
+            "min": 5,
+            "max": 50,
+            "label": "Entries shown",
+            "description": "How many of the most recent entries the popout lists."
+        }
+    }
+}

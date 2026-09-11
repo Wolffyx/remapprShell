@@ -166,6 +166,11 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "clipboard",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "tray",
         "zone": "right",
         "enabled": true
@@ -214,6 +219,7 @@ when two copies of a widget should differ.
 | --- | --- | --- | --- |
 | Battery | `battery` | left, middle, right | `org.kde.plasma.battery` (in the tray) |
 | Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
+| Clipboard | `clipboard` | left, middle, right | `org.kde.plasma.clipboard` (in the tray) |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
 | Media | `media` | left, middle, right | `org.kde.plasma.mediacontroller` (in the tray) |
@@ -238,6 +244,12 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `showPercentage` | `true` or `false` | `false` | Beside the icon. The icon alone moves in steps of ten. |
+
+### `widgets.clipboard`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `shown` | a number, 5 to 50 | `15` | How many of the most recent entries the popout lists. |
 
 ### `widgets.clock`
 

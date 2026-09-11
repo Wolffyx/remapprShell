@@ -9,6 +9,7 @@
                 { "id": "workspaces", "zone": "left",   "enabled": true },
                 { "id": "clock",      "zone": "middle", "enabled": true },
                 { "id": "media",      "zone": "right",  "enabled": true },
+                { "id": "clipboard",  "zone": "right",  "enabled": true },
                 { "id": "tray",       "zone": "right",  "enabled": true },
                 { "id": "bluetooth",  "zone": "right",  "enabled": true },
                 { "id": "network",    "zone": "right",  "enabled": true },

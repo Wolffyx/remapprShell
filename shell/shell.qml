@@ -194,6 +194,21 @@ ShellRoot {
         function bluetooth(): string { return JSON.stringify(BluetoothStatus.summary()); }
         function power(): string { return JSON.stringify(PowerStatus.summary()); }
         function media(): string { return JSON.stringify(MediaStatus.summary()); }
+        function clipboard(): string { return JSON.stringify(ClipboardStatus.summary()); }
+    }
+
+    // Opens the clipboard widget's popout, for a shortcut: the first one on
+    // any panel, since a keypress has no position to say which screen.
+    IpcHandler {
+        target: "clipboard"
+
+        function toggle(): string {
+            const slot = PanelModel.slots.find(s => s && s.visible && s.entry?.id === "clipboard");
+            if (!slot)
+                return "no clipboard widget on the panel";
+            PanelModel.clickRequested("clipboard", slot.screenName);
+            return slot.screenName;
+        }
     }
 
     // The runtime layer of the configuration: in memory only, above the

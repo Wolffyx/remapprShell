@@ -213,6 +213,42 @@ TestCase {
         compare(r.current, 1);
     }
 
+    function texts(list) {
+        return list.map(e => e.text);
+    }
+
+    function test_clipboard_newest_first() {
+        let h = StatusIcons.clipboardAdd([], "a", 5);
+        h = StatusIcons.clipboardAdd(h, "b", 5);
+        compare(texts(h), ["b", "a"]);
+    }
+
+    // Copying something again moves it up; it is not listed twice.
+    function test_clipboard_copying_again_moves_it_up() {
+        const h = StatusIcons.clipboardAdd([{ text: "a" }, { text: "b" }, { text: "c" }], "c", 5);
+        compare(texts(h), ["c", "a", "b"]);
+    }
+
+    function test_clipboard_is_capped() {
+        const h = StatusIcons.clipboardAdd([{ text: "a" }, { text: "b" }, { text: "c" }], "d", 3);
+        compare(texts(h), ["d", "a", "b"]);
+    }
+
+    function test_clipboard_preview_is_one_line() {
+        compare(StatusIcons.clipboardPreview("  first\n\n  second\tthird ", 40), "first second third");
+        compare(StatusIcons.clipboardPreview("abcdefghij", 5), "abcd…");
+        compare(StatusIcons.clipboardPreview(null, 5), "");
+    }
+
+    // What Klipper really returned here: images as "▨ ..." text, and one
+    // empty entry.
+    function test_klipper_images_are_marked_and_empties_dropped() {
+        const e = StatusIcons.klipperEntries(["hello", "", "▨ 1920x1080 PNG"]);
+        compare(e.length, 2);
+        compare(e[0].image, false);
+        compare(e[1].image, true);
+    }
+
     function test_no_players() {
         compare(StatusIcons.pickPlayer([], "").current, -1);
         compare(StatusIcons.pickPlayer(null, "x").current, -1);

@@ -34,6 +34,11 @@
                     "enabled": true
                 },
                 {
+                    "id": "clipboard",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
                     "id": "tray",
                     "zone": "right",
                     "enabled": true

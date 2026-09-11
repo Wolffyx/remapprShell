@@ -87,7 +87,16 @@ if they fail.
     2026-09-11 every one opened at the left edge of the screen (see "A binding
     on a function call" below). Over IPC they land in the right place now; by
     hand is still worth a look.
-12. **Rest the pointer on a widget.** Every tooltip has been seen drawn, with
+12. **The clipboard under our own renderer.** With plasmashell on our
+    package, confirm first that `org.kde.klipper` really is gone
+    (`busctl --user status org.kde.klipper`), then copy two things and open
+    the clipboard widget: both should be listed, as "this shell keeps the
+    history". Then choose the older one and paste it. Verified here: Klipper
+    mode with the real history (49 entries, 9 of them images, counted without
+    reading them), and the fallback's `wl-paste --watch` pipeline recording
+    the current clipboard. Not verified: choosing an entry, in either mode --
+    it writes to the user's clipboard.
+13. **Rest the pointer on a widget.** Every tooltip has been seen drawn, with
     the right text, but only when asked for over IPC. Whether hover reaches it
     by the two routes described under "Tooltips" -- and in particular through
     the tray's MouseArea -- needs a pointer.
@@ -199,6 +208,30 @@ are not.
   follows; matching on the title, tried first, left the video listed twice. MPRIS
   does not announce the position as it moves, so it is asked once a second
   while playing. In the defaults and every preset but minimal.
+- **Clipboard** — `clipboard`. Under our renderer there is **no clipboard
+  history at all** without it, and Meta+V does nothing: Klipper is not a
+  program in Plasma 6 but `libklipper`, and the only thing on the system that
+  loads it is the clipboard applet's QML plugin
+  (`org/kde/plasma/private/clipboard/libklipperplugin.so`, found by scanning
+  every library's `NEEDED` entries; plasmashell does not link it). No system
+  tray, no clipboard applet, no Klipper. Established statically -- the live
+  check needs plasmashell on our package, which only the user should switch.
+
+  The widget reads Klipper over DBus when `org.kde.klipper` is on the bus
+  (following `clipboardHistoryUpdated` and the name changing hands), and
+  otherwise keeps its own history from `wl-paste --watch`: text only, 8 KB an
+  entry, 50 entries, in memory, never written, nothing offering KDE's
+  password-manager hint. Choosing an entry goes through `wl-copy` on stdin in
+  both cases, so clipboard text never sits in a process's arguments. Klipper
+  lists an image as text starting with "▨"; those are shown but not offered.
+  `status clipboard` gives counts, never contents. `rmpr clipboard` and
+  `rmpr shortcuts set clipboard <key>` open it from a key -- Meta+V is still
+  plasmashell's, doing nothing, and taking it is left to the user.
+
+  Rejected: loading Klipper's private plugin into our shell (a second Klipper
+  whenever plasmashell has one: two clipboard managers, one history file),
+  and opening Plasma's clipboard applet with `plasmawindowed` (the same, in
+  another process).
 - **Side panels.** The tray, the clock and the workspace pills lay out along
   the panel on either axis (the tray used to cut to two icons, the clock ran
   off the side), the tray's chevron points away from whichever edge the panel
@@ -763,8 +796,9 @@ Two smaller things from the same run:
 
 ## Where the session of 2026-09-11 left off
 
-Three commits. The third: the media widget, and every built-in widget drawn
-properly on a side panel. The second: tooltips for every widget; `EdgeWindow`, which
+Four commits. The fourth: the clipboard widget, after finding that our
+renderer leaves the desktop with no Klipper at all. The third: the media
+widget, and every built-in widget drawn properly on a side panel. The second: tooltips for every widget; `EdgeWindow`, which
 places both popouts and tooltips on any panel edge; and the panel no longer
 coming apart when its edge is changed while it runs (bottom → left → bottom
 now leaves it exactly as it was, compared by screenshot). The first:

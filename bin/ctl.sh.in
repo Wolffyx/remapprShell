@@ -21,6 +21,7 @@ usage: @ALIAS@ <command> [options]
   crash list|show|remove            crashes quickshell caught and systemd did not
   windows enable|disable|status     the open-window list (needs a KWin script)
   settings [page]                   open the settings window, on a page
+  clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
@@ -64,6 +65,12 @@ case "$cmd" in
     # a keybinding and the panel button always open the same thing.
     launcher)
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher toggle
+        ;;
+
+    # The clipboard widget's popout. Meta+V is Klipper's, and under our own
+    # renderer Klipper is not running, so this is what to bind it to instead.
+    clipboard)
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call clipboard toggle
         ;;
 
     settings)

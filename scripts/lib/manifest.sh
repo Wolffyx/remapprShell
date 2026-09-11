@@ -26,6 +26,7 @@ template|share/applications/launcher.desktop.in|$APPLICATIONS_DIR/$SLUG-launcher
 template|share/applications/search.desktop.in|$APPLICATIONS_DIR/$SLUG-search.desktop
 template|share/applications/settings.desktop.in|$APPLICATIONS_DIR/$SLUG-settings.desktop
 template|share/applications/ask.desktop.in|$APPLICATIONS_DIR/$SLUG-ask.desktop
+template|share/applications/clipboard.desktop.in|$APPLICATIONS_DIR/$SLUG-clipboard.desktop
 ENTRIES
 }
 
