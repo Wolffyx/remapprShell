@@ -15,7 +15,8 @@ pragma ComponentBehavior: Bound
 // `pinned` empty means "everything on the panel", so a fresh install shows the
 // tray it has rather than an empty strip and a chevron. Pin anything and the
 // rest move behind the chevron -- which is the moment the chevron first
-// appears, so it is never furniture with nothing behind it.
+// appears, so it is never furniture with nothing behind it. The chevron sits
+// after the icons, at the end of the tray, as the design has it.
 //
 // Every interaction an application expects is here. A tray icon whose menu
 // does not open is a broken tray icon, and `secondaryActivate` on right-click
@@ -30,17 +31,25 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
+import qs.core
 import qs.domain.theme
 import qs.domain.tray.layout
 import qs.ui.primitives
+import qs.ui.controls
 
 BarWidget {
     id: root
 
-    readonly property int iconSize: root.widgetConfig?.iconSize ?? 18
+    // The panel's tray icon size, unless this tray has one of its own.
+    readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
+    readonly property int size: root.configuredIconSize > 0 ? root.configuredIconSize : root.panelIconSize
     readonly property var pinned: root.widgetConfig?.pinned ?? []
     readonly property var hidden: root.widgetConfig?.hidden ?? []
-    readonly property int spacing: 6
+
+    // Each icon sits in a cell it lights up in, scaled with the panel.
+    readonly property int cell: Math.max(root.size + 6, Math.round(38 * root.unit))
+    readonly property int spacing: Math.max(2, Math.round(4 * root.unit))
+    readonly property int stride: root.cell + root.spacing
 
     // The rules live in TrayLayout, which the settings page reads too -- so
     // the page cannot show one arrangement while the panel draws another.
@@ -55,15 +64,22 @@ BarWidget {
     property string popoutMode: "overflow"
     property var menuItem: null
 
-    // Which icon the pointer is over, or -1. The panel reports a position
-    // along the widget; turning that into an index is arithmetic rather than a
-    // handler per icon -- the same approach the task buttons take.
+    popoutPadding: root.popoutMode === "menu" ? 8 : 12
+    popoutRadius: 18
+
+    // Which cell the pointer is over, or -1: an icon, or -- one past the
+    // last -- the chevron. The panel reports a position along the widget;
+    // turning that into an index is arithmetic rather than a handler per icon
+    // -- the same approach the task buttons take.
     property int hoveredIndex: -1
+    readonly property bool overChevron: root.hasOverflow && root.hoveredIndex === root.shown.length
 
     // The icon under the pointer names itself, in the application's words.
     // A description may carry the markup the tray protocol allows; a tooltip
     // here is plain text, so tags are dropped rather than shown.
     tooltip: {
+        if (root.overChevron)
+            return `${root.overflow.length} hidden icon${root.overflow.length === 1 ? "" : "s"}`;
         const item = root.itemAt(root.hoveredIndex);
         if (!item)
             return "";
@@ -74,33 +90,28 @@ BarWidget {
             .trim();
         return detail && detail !== title ? `${title}\n${detail}` : title;
     }
-    tooltipCentre: root.hoveredIndex < 0 ? -1
-        : root.leading + root.hoveredIndex * (root.iconSize + root.spacing) + root.iconSize / 2
-
-    // The chevron sits first, as it does on Windows, so the icons do not move
-    // sideways when one is pinned or unpinned.
-    readonly property int leading: root.hasOverflow ? root.iconSize + root.spacing : 0
+    tooltipCentre: root.hoveredIndex < 0 ? -1 : root.hoveredIndex * root.stride + root.cell / 2
 
     wantsHover: true
     wantsWheel: true
 
-    implicitWidth: Math.max(root.iconSize, row.implicitWidth)
-    implicitHeight: Math.max(root.iconSize, row.implicitHeight)
+    implicitWidth: Math.max(root.cell, row.implicitWidth)
+    implicitHeight: Math.max(root.cell, row.implicitHeight)
 
     // The chevron points away from the panel's edge, the way the flyout will
     // open, and back towards it while the flyout is open.
-    readonly property string outward: ({ top: "down", left: "right", right: "left" })[root.bar?.position] ?? "up"
-    readonly property string inward: ({ up: "down", down: "up", left: "right", right: "left" })[root.outward]
+    readonly property string outward: ({ top: "expand_more", left: "chevron_right", right: "chevron_left" })[root.bar?.position] ?? "expand_less"
+    readonly property string inward: ({ expand_less: "expand_more", expand_more: "expand_less",
+                                        chevron_right: "chevron_left", chevron_left: "chevron_right" })[root.outward]
 
     function itemAt(index) {
         return root.shown[index] ?? null;
     }
 
     function handleHover(position, horizontal) {
-        const stride = root.iconSize + root.spacing;
-        const index = Math.floor((position - root.leading) / stride);
-        root.hoveredIndex = (position >= root.leading && index >= 0 && index < root.shown.length)
-            ? index : -1;
+        const index = Math.floor(position / root.stride);
+        const cells = root.shown.length + (root.hasOverflow ? 1 : 0);
+        root.hoveredIndex = (position >= 0 && index >= 0 && index < cells) ? index : -1;
     }
 
     // The flyout stays open until the chevron is clicked again, so leaving the
@@ -115,14 +126,13 @@ BarWidget {
     }
 
     function handleActivate(button) {
-        if (root.hoveredIndex < 0) {
-            // The chevron, or the gap beside it.
-            if (root.hasOverflow)
-                root.showOverflow();
+        if (root.overChevron) {
+            root.showOverflow();
             return;
         }
-        root.act(root.itemAt(root.hoveredIndex), button,
-                 root.leading + root.hoveredIndex * (root.iconSize + root.spacing));
+        if (root.hoveredIndex < 0)
+            return;
+        root.act(root.itemAt(root.hoveredIndex), button, root.hoveredIndex * root.stride);
     }
 
     function showOverflow() {
@@ -133,7 +143,7 @@ BarWidget {
         root.menuItem = null;
         root.popoutMode = "overflow";
         root.popoutVisible = true;
-        root.requestPopout("tray", root.iconSize / 2);
+        root.requestPopout("tray", root.shown.length * root.stride + root.cell / 2);
     }
 
     function showMenu(item, centre) {
@@ -166,7 +176,7 @@ BarWidget {
             return;
 
         if (button === Qt.RightButton) {
-            root.showMenu(item, offset + root.iconSize / 2);
+            root.showMenu(item, offset + root.cell / 2);
             return;
         }
 
@@ -178,7 +188,7 @@ BarWidget {
         // Some items have no activate action at all and say so; for those a
         // left click is the menu, which is what the application intends.
         if (item.onlyMenu)
-            root.showMenu(item, offset + root.iconSize / 2);
+            root.showMenu(item, offset + root.cell / 2);
         else
             item.activate();
 
@@ -202,26 +212,6 @@ BarWidget {
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 
-        // Shown only when something is behind it.
-        Item {
-            visible: root.hasOverflow
-            width: root.hasOverflow ? root.iconSize : 0
-            height: root.iconSize
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 4
-                color: root.popoutVisible ? Theme.hoverBackground : "transparent"
-                Behavior on color { ColorAnimation { duration: 120 } }
-            }
-
-            PanelIcon {
-                anchors.centerIn: parent
-                implicitSize: Math.round(root.iconSize * 0.8)
-                iconName: `arrow-${root.popoutVisible ? root.inward : root.outward}`
-            }
-        }
-
         Repeater {
             model: ScriptModel { values: root.shown }
 
@@ -231,8 +221,8 @@ BarWidget {
                 required property SystemTrayItem modelData
                 required property int index
 
-                width: root.iconSize
-                height: root.iconSize
+                width: root.cell
+                height: root.cell
 
                 // The hover highlight is drawn from the panel's hover
                 // position rather than a HoverHandler per icon: the panel
@@ -240,21 +230,42 @@ BarWidget {
                 // tracker per icon would fight it.
                 Rectangle {
                     anchors.fill: parent
-                    anchors.margins: -2
-                    radius: 4
-                    color: root.hoveredIndex === entry.index
-                        ? Theme.hoverBackground : "transparent"
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    radius: Math.round(12 * Math.max(0.7, root.unit))
+                    color: root.hoveredIndex === entry.index ? Theme.s2 : "transparent"
+                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
                 }
 
                 PanelIcon {
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    implicitSize: root.size
                     // The item's own icon wins; its id is the fallback so a
                     // badly-behaved application still shows something.
                     source: entry.modelData.icon
                     fallbackName: entry.modelData.id
                     opacity: entry.modelData.status === Status.Passive ? 0.5 : 1
                 }
+            }
+        }
+
+        // Shown only when something is behind it.
+        Item {
+            visible: root.hasOverflow
+            width: root.hasOverflow ? root.cell : 0
+            height: root.cell
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Math.round(12 * Math.max(0.7, root.unit))
+                color: root.popoutVisible && root.popoutMode === "overflow" || root.overChevron ? Theme.s2 : "transparent"
+                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+            }
+
+            Glyph {
+                anchors.centerIn: parent
+                name: root.popoutVisible && root.popoutMode === "overflow" ? root.inward : root.outward
+                fallback: "arrow-up"
+                size: root.size
+                color: Theme.mut
             }
         }
     }
@@ -288,52 +299,76 @@ BarWidget {
     }
 
     readonly property Component overflowGrid: Component {
-        Grid {
-            id: flyout
+        Column {
+            spacing: 10
 
-            // As many columns as icons, up to six, then more rows. Only
-            // `columns` is set -- see ZoneRow.
-            columns: Math.min(6, Math.max(1, root.overflow.length))
-            spacing: 8
+            Grid {
+                id: flyout
 
-            Repeater {
-                model: ScriptModel { values: root.overflow }
+                // Four across, as the design has it, then more rows. Only
+                // `columns` is set -- see ZoneRow.
+                columns: Math.min(4, Math.max(1, root.overflow.length))
+                spacing: 6
 
-                Item {
-                    id: hiddenEntry
+                Repeater {
+                    model: ScriptModel { values: root.overflow }
 
-                    required property SystemTrayItem modelData
+                    Item {
+                        id: hiddenEntry
 
-                    implicitWidth: root.iconSize + 12
-                    implicitHeight: root.iconSize + 12
+                        required property SystemTrayItem modelData
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 5
-                        color: hiddenHover.hovered ? Theme.hoverBackground : "transparent"
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                    }
+                        implicitWidth: 38
+                        implicitHeight: 38
 
-                    PanelIcon {
-                        anchors.centerIn: parent
-                        implicitSize: root.iconSize
-                        source: hiddenEntry.modelData.icon
-                        fallbackName: hiddenEntry.modelData.id
-                        opacity: hiddenEntry.modelData.status === Status.Passive ? 0.5 : 1
-                    }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 12
+                            color: hiddenHover.hovered ? Theme.s2 : "transparent"
+                            Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+                        }
 
-                    HoverHandler { id: hiddenHover }
+                        PanelIcon {
+                            anchors.centerIn: parent
+                            implicitSize: root.size
+                            source: hiddenEntry.modelData.icon
+                            fallbackName: hiddenEntry.modelData.id
+                            opacity: hiddenEntry.modelData.status === Status.Passive ? 0.5 : 1
+                        }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-                        onClicked: event => root.act(hiddenEntry.modelData, event.button, 0)
-                        onWheel: event => {
-                            const delta = event.angleDelta.y !== 0 ? event.angleDelta.y
-                                                                   : event.pixelDelta.y * 2.4;
-                            hiddenEntry.modelData.scroll(Math.round(delta), false);
+                        HoverHandler { id: hiddenHover; cursorShape: Qt.PointingHandCursor }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                            onClicked: event => root.act(hiddenEntry.modelData, event.button, 0)
+                            onWheel: event => {
+                                const delta = event.angleDelta.y !== 0 ? event.angleDelta.y
+                                                                       : event.pixelDelta.y * 2.4;
+                                hiddenEntry.modelData.scroll(Math.round(delta), false);
+                            }
                         }
                     }
+                }
+            }
+
+            Rectangle {
+                width: Math.max(flyout.width, manage.implicitWidth)
+                height: 1
+                color: Theme.out
+            }
+
+            // Which icons sit where is the settings window's to change, where
+            // each can be dragged between the three lists.
+            TextButton {
+                id: manage
+                anchors.horizontalCenter: parent.horizontalCenter
+                glyph: "apps"
+                iconName: "configure"
+                text: "Manage tray icons"
+                onActivated: {
+                    Quickshell.execDetached([Branding.ctlBin, "settings", "tray"]);
+                    root.closePopout();
                 }
             }
         }

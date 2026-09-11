@@ -1,0 +1,21 @@
+{
+    "id": "taskview",
+    "apiVersion": 1,
+    "name": "Task view",
+    "description": "Opens KWin's Overview -- every window and virtual desktop at once, as Windows' task view does.",
+    "icon": "view-app-grid",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" }
+    },
+    "config": {
+        "effect": {
+            "type": "enum",
+            "values": ["Overview", "Grid View", "Expose", "ExposeAll"],
+            "default": "Overview",
+            "label": "Opens",
+            "description": "Which of KWin's views: the Overview, the grid of virtual desktops, or the windows of this desktop (Expose) or of all of them (ExposeAll)."
+        }
+    }
+}

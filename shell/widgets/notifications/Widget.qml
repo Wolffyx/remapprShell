@@ -30,8 +30,8 @@ BarWidget {
            : NotificationWatch.unseen > 0 ? `${NotificationWatch.unseen} new since you last looked`
            : "Notification history"
 
-    implicitWidth: 24
-    implicitHeight: 24
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
         root.popoutVisible = !root.popoutVisible;
@@ -46,38 +46,42 @@ BarWidget {
         return Qt.formatDateTime(d, sameDay ? "HH:mm" : "ddd HH:mm");
     }
 
+    readonly property bool quiet: !NotificationWatch.enabled || ShellNotifications.dnd
+
+    BarButton {
+        id: button
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        active: root.popoutVisible
+        size: Math.max(22, Math.round(40 * root.unit))
+        glyph: root.quiet ? "notifications_off" : "notifications"
+        fallback: root.quiet ? "notifications-disabled" : "notifications"
+    }
+
+    // Something unseen: a dot, or the count. Do not disturb silences it, as
+    // it silences the popups.
     Rectangle {
-        anchors.fill: parent
-        radius: 4
-        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
+        readonly property bool counting: root.showCount
 
-        PanelIcon {
+        visible: NotificationWatch.unseen > 0 && !root.popoutVisible && !ShellNotifications.dnd
+        x: button.width - width - Math.round(button.width * (counting ? 0.08 : 0.2))
+        y: Math.round(button.height * (counting ? 0.08 : 0.18))
+        width: counting ? Math.max(16, badge.implicitWidth + 8) : 10
+        height: counting ? 16 : 10
+        radius: height / 2
+        color: Theme.acc
+        border.width: 2
+        border.color: Theme.surface
+
+        PanelText {
+            id: badge
+            visible: parent.counting
             anchors.centerIn: parent
-            implicitSize: 18
-            iconName: NotificationWatch.enabled && !ShellNotifications.dnd ? "notifications" : "notifications-disabled"
+            text: NotificationWatch.unseen > 99 ? "99+" : String(NotificationWatch.unseen)
+            color: Theme.accFg
+            font.pixelSize: 9
+            font.bold: true
         }
-
-        Rectangle {
-            visible: root.showCount && NotificationWatch.unseen > 0 && !root.popoutVisible
-            anchors.right: parent.right
-            anchors.top: parent.top
-            width: Math.max(14, badge.implicitWidth + 6)
-            height: 14
-            radius: 7
-            color: Theme.accent
-
-            PanelText {
-                id: badge
-                anchors.centerIn: parent
-                text: NotificationWatch.unseen > 99 ? "99+" : String(NotificationWatch.unseen)
-                color: Theme.background
-                font.pixelSize: 9
-                font.bold: true
-            }
-        }
-
-        HoverHandler { id: hover }
     }
 
     popout: Component {

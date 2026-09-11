@@ -1,7 +1,9 @@
 // The Quickshell renderer: one layer-shell panel per screen.
 //
 // It knows about zones and ordering only through PanelModel, and about widgets
-// only through WidgetHost. It never asks what a widget is.
+// only through WidgetHost. It never asks what a widget is. How the panel is
+// drawn -- a strip, a floating bar, islands -- is PanelSurface's; this is the
+// window around it: where it sits, what it reserves, when it hides.
 
 import QtQuick
 import Quickshell
@@ -25,6 +27,18 @@ PanelWindow {
     readonly property int thickness: PanelModel.thicknessFor(root.screenName)
     readonly property var screenObject: root.screen
 
+    // How it is drawn, and the sizes widgets share: the gap between them and
+    // the size of a tray or status icon.
+    readonly property string style: PanelModel.styleFor(root.screenName)
+    readonly property int spacing: PanelModel.spacingFor(root.screenName)
+    readonly property int iconSize: PanelModel.iconSizeFor(root.screenName)
+
+    // A floating bar and islands keep clear of the screen edge; the whole
+    // strip, including that margin, is what the panel takes from the screen
+    // and what a popout opens beyond.
+    readonly property int edgeGap: root.style === "full" ? 0 : 14
+    readonly property int extent: root.thickness + root.edgeGap
+
     // ---- hiding ---------------------------------------------------------
     //
     // The one thing in this project that genuinely belongs to us: layer-shell
@@ -37,6 +51,7 @@ PanelWindow {
     // whole screen edge while claiming to be hidden is worse than one that
     // never hides.
     readonly property bool autoHide: PanelModel.autoHideFor(root.screenName)
+    readonly property bool revealOnHover: PanelModel.revealOnHoverFor(root.screenName)
     readonly property int revealStrip: 3
 
     property bool pointerInside: false
@@ -54,8 +69,12 @@ PanelWindow {
         onTriggered: root.pointerInside = false
     }
 
+    // With reveal on hover turned off, the sliver at the edge does nothing:
+    // the panel comes back only with a popout opened from a key.
     function setPointerInside(inside) {
         if (inside) {
+            if (!root.revealed && !root.revealOnHover)
+                return;
             root._hideTimer.stop();
             root.pointerInside = true;
         } else {
@@ -73,20 +92,30 @@ PanelWindow {
     // Per output, not the global value: a monitor override that changed the
     // widgets' idea of the thickness but not the panel's own size left the
     // widgets drawn against a strip of a different height.
-    readonly property int visibleThickness: root.revealed ? root.thickness : root.revealStrip
+    readonly property int visibleThickness: root.revealed ? root.extent : root.revealStrip
 
     implicitHeight: root.horizontal ? root.visibleThickness : 0
     implicitWidth: root.horizontal ? 0 : root.visibleThickness
 
-    Behavior on implicitHeight { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
-    Behavior on implicitWidth { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+    Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on implicitWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
     // Reserve the strip so maximised windows stop at the panel rather than
     // being covered by it -- unless it hides, in which case reserving it would
     // defeat the point.
-    exclusiveZone: root.autoHide ? 0 : root.thickness
+    exclusiveZone: root.autoHide ? 0 : root.extent
 
     color: "transparent"
+
+    // Only what is drawn takes the pointer. The margin a floating bar keeps
+    // from the edge, and the gaps between islands, let a click through to the
+    // window beneath. While hidden, the whole sliver is the target.
+    mask: root.revealed && root.style !== "full" ? surface.shape : null
+
+    // Blurred behind, where the compositor offers it -- KWin does, through
+    // ext-background-effect -- so a translucent panel reads as frosted glass
+    // rather than as a tinted hole.
+    BackgroundEffect.blurRegion: Theme.translucent && root.revealed ? surface.shape : null
 
     // Only while a popout that wants the keyboard is open.
     //
@@ -102,16 +131,16 @@ PanelWindow {
     // closes. This is what makes the forwarding below work at all.
     property Item openPopout: null
 
-    Rectangle {
-        id: surface
+    Item {
+        id: slider
 
-        // Keeps its full thickness even while the window is a sliver, and
-        // slides out of view instead of being squashed: anchoring it to the
-        // edge away from the screen edge means what stays visible is the
-        // panel's own inner edge. Squashing it would re-lay-out every widget
-        // twice per reveal, for something nobody sees.
-        width: root.horizontal ? parent.width : root.thickness
-        height: root.horizontal ? root.thickness : parent.height
+        // Keeps its full extent even while the window is a sliver, and slides
+        // out of view instead of being squashed: anchoring it to the edge away
+        // from the screen edge means what stays visible is the panel's own
+        // inner edge. Squashing it would re-lay-out every widget twice per
+        // reveal, for something nobody sees.
+        width: root.horizontal ? parent.width : root.extent
+        height: root.horizontal ? root.extent : parent.height
 
         // Positioned, not anchored. Anchors switched by bindings do not
         // survive the panel changing edge while it runs: the new anchor can be
@@ -121,8 +150,6 @@ PanelWindow {
         // plain x/y binding is simply re-evaluated.
         x: root.position === "left" ? parent.width - width : 0
         y: root.position === "top" ? parent.height - height : 0
-
-        color: Theme.panelBackground
 
         // Reveals on the way in, hides a moment after the way out.
         HoverHandler {
@@ -138,7 +165,7 @@ PanelWindow {
         Keys.forwardTo: root.openPopout ? [root.openPopout] : []
 
         // A press on the panel between widgets, or on one that takes no
-        // clicks, closes an open popout too. Beneath the zones, so a widget
+        // clicks, closes an open popout too. Beneath the surface, so a widget
         // that does take the press gets it first.
         MouseArea {
             anchors.fill: parent
@@ -146,37 +173,10 @@ PanelWindow {
             onPressed: PanelModel.pressed(null)
         }
 
-        // Three zones. Left and right hug their edges; middle is centred on the
-        // panel itself, not on the space left over between the other two, so a
-        // long window title on the left cannot shove the clock off-centre.
-        ZoneRow {
-            id: leftZone
-            zone: "left"
+        PanelSurface {
+            id: surface
+            anchors.fill: parent
             bar: root
-            screenName: root.modelData.name
-            horizontal: root.horizontal
-            // x/y rather than anchors, for the reason given on the surface.
-            x: root.horizontal ? 8 : (parent.width - width) / 2
-            y: root.horizontal ? (parent.height - height) / 2 : 8
-        }
-
-        ZoneRow {
-            id: middleZone
-            zone: "middle"
-            bar: root
-            screenName: root.modelData.name
-            horizontal: root.horizontal
-            anchors.centerIn: parent
-        }
-
-        ZoneRow {
-            id: rightZone
-            zone: "right"
-            bar: root
-            screenName: root.modelData.name
-            horizontal: root.horizontal
-            x: root.horizontal ? parent.width - width - 8 : (parent.width - width) / 2
-            y: root.horizontal ? (parent.height - height) / 2 : parent.height - height - 8
         }
     }
 
@@ -199,10 +199,10 @@ PanelWindow {
             left: true
             right: true
         }
-        margins.top: root.position === "top" ? root.thickness : 0
-        margins.bottom: root.position === "bottom" ? root.thickness : 0
-        margins.left: root.position === "left" ? root.thickness : 0
-        margins.right: root.position === "right" ? root.thickness : 0
+        margins.top: root.position === "top" ? root.extent : 0
+        margins.bottom: root.position === "bottom" ? root.extent : 0
+        margins.left: root.position === "left" ? root.extent : 0
+        margins.right: root.position === "right" ? root.extent : 0
 
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
@@ -217,6 +217,6 @@ PanelWindow {
     }
 
     Component.onCompleted: Log.info("panel",
-        `up on ${modelData.name} (${modelData.width}x${modelData.height}, ${root.position}, ${root.thickness}px`
+        `up on ${modelData.name} (${modelData.width}x${modelData.height}, ${root.position}, ${root.thickness}px, ${root.style}`
         + `${root.autoHide ? ", hidden until pointed at" : ""})`)
 }

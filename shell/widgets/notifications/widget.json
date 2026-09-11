@@ -4,18 +4,30 @@
     "name": "Notification history",
     "description": "What went past: recent notifications, readable again, and askable with AI assist on.",
     "icon": "notifications",
-    "zones": ["left", "middle", "right"],
-    "orientation": ["horizontal", "vertical"],
+    "zones": [
+        "left",
+        "middle",
+        "right"
+    ],
+    "orientation": [
+        "horizontal",
+        "vertical"
+    ],
     "renderers": {
-        "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.notifications", "inSystemTray": true }
+        "quickshell": {
+            "entry": "Widget.qml"
+        },
+        "plasma": {
+            "applet": "org.kde.plasma.notifications",
+            "inSystemTray": true
+        }
     },
     "config": {
         "showCount": {
             "type": "bool",
-            "default": true,
-            "label": "Show a count",
-            "description": "A badge with the number of notifications since the list was last opened."
+            "default": false,
+            "label": "Count rather than a dot",
+            "description": "Something unseen shows as a dot on the bell; on, as the number since the list was last opened."
         }
     }
 }

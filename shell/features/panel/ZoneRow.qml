@@ -19,6 +19,28 @@ Item {
     implicitWidth: layout.implicitWidth
     implicitHeight: layout.implicitHeight
 
+    // How long this zone may grow along the panel before it runs into the
+    // next; -1 for no limit. See PanelSurface.
+    property real room: -1
+
+    // What is left of the room for one slot once every other slot has its
+    // length: what a widget that can give way -- the task list -- fits into.
+    // Read from the others alone, so the slot shrinking changes nothing it
+    // depends on.
+    function roomFor(slot) {
+        if (root.room < 0)
+            return -1;
+        let others = 0;
+        let count = 0;
+        for (const c of layout.children) {
+            if (c === slots || c === slot || !c.visible)
+                continue;
+            others += root.horizontal ? c.implicitWidth : c.implicitHeight;
+            count++;
+        }
+        return Math.max(0, root.room - others - count * layout.spacing);
+    }
+
     // See the Repeater below for why this is a string and not the list.
     readonly property string entriesKey: JSON.stringify(PanelModel.entriesForScreen(root.screenName, root.zone))
     property var entries: []
@@ -54,7 +76,7 @@ Item {
 
         anchors.centerIn: parent
         columns: root.horizontal ? Math.max(1, layout.shown) : 1
-        spacing: 10
+        spacing: root.bar?.spacing ?? 6
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 
@@ -73,7 +95,9 @@ Item {
             model: root.entries
 
             WidgetSlot {
+                id: slot
                 required property var modelData
+                room: root.roomFor(slot)
                 entry: modelData
                 bar: root.bar
                 screenName: root.screenName

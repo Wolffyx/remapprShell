@@ -12,6 +12,79 @@ import qs.domain.status.icons
 TestCase {
     name: "StatusIcons"
 
+    // ---- glyphs: the same states in Material Symbols -----------------------
+
+    function test_volume_glyph_follows_the_icon_thresholds() {
+        compare(StatusIcons.volumeGlyph(0.8, true), "volume_off");
+        compare(StatusIcons.volumeGlyph(0, false), "volume_off");
+        compare(StatusIcons.volumeGlyph(0.2, false), "volume_mute");
+        compare(StatusIcons.volumeGlyph(0.5, false), "volume_down");
+        compare(StatusIcons.volumeGlyph(1.0, false), "volume_up");
+        compare(StatusIcons.volumeGlyph(1.4, false), "volume_up");
+    }
+
+    function test_mic_glyph() {
+        compare(StatusIcons.micGlyph(0.5, false), "mic");
+        compare(StatusIcons.micGlyph(0.5, true), "mic_off");
+        compare(StatusIcons.micGlyph(0, false), "mic_off");
+    }
+
+    function test_wifi_glyph_steps() {
+        compare(StatusIcons.wifiGlyph(0), "signal_wifi_0_bar");
+        compare(StatusIcons.wifiGlyph(0.2), "network_wifi_1_bar");
+        compare(StatusIcons.wifiGlyph(0.4), "network_wifi_2_bar");
+        compare(StatusIcons.wifiGlyph(0.7), "network_wifi_3_bar");
+        compare(StatusIcons.wifiGlyph(0.9), "signal_wifi_4_bar");
+    }
+
+    function test_network_glyph_wired_wins_and_limited_shows() {
+        compare(StatusIcons.networkGlyph({ wired: true, wifi: true, strength: 0.9 }), "lan");
+        compare(StatusIcons.networkGlyph({ wired: true, connectivity: "Limited" }), "signal_disconnected");
+        compare(StatusIcons.networkGlyph({ wifi: true, strength: 0.9, connectivity: "Portal" }), "signal_wifi_bad");
+        compare(StatusIcons.networkGlyph({ wifi: true, strength: 0.9, connectivity: "Unknown" }), "signal_wifi_4_bar");
+        compare(StatusIcons.networkGlyph({}), "signal_wifi_off");
+    }
+
+    function test_bluetooth_glyph() {
+        compare(StatusIcons.bluetoothGlyph(false, 2), "bluetooth_disabled");
+        compare(StatusIcons.bluetoothGlyph(true, 0), "bluetooth");
+        compare(StatusIcons.bluetoothGlyph(true, 1), "bluetooth_connected");
+    }
+
+    // Either scale, as the theme-icon rule accepts.
+    function test_battery_glyph_levels() {
+        compare(StatusIcons.batteryGlyph(1, false), "battery_full");
+        compare(StatusIcons.batteryGlyph(100, false), "battery_full");
+        compare(StatusIcons.batteryGlyph(0.84, false), "battery_5_bar");
+        compare(StatusIcons.batteryGlyph(84, false), "battery_5_bar");
+        compare(StatusIcons.batteryGlyph(0.12, false), "battery_1_bar");
+        compare(StatusIcons.batteryGlyph(0.05, false), "battery_alert");
+    }
+
+    function test_battery_glyph_charging() {
+        compare(StatusIcons.batteryGlyph(0.05, true), "battery_charging_20");
+        compare(StatusIcons.batteryGlyph(0.55, true), "battery_charging_50");
+        compare(StatusIcons.batteryGlyph(0.85, true), "battery_charging_80");
+        compare(StatusIcons.batteryGlyph(0.97, true), "battery_charging_full");
+    }
+
+    function test_profile_and_brightness_glyphs() {
+        compare(StatusIcons.profileGlyph("PowerSaver"), "eco");
+        compare(StatusIcons.profileGlyph("Performance"), "speed");
+        compare(StatusIcons.profileGlyph("Balanced"), "balance");
+        compare(StatusIcons.brightnessGlyph(0.2), "brightness_low");
+        compare(StatusIcons.brightnessGlyph(0.5), "brightness_medium");
+        compare(StatusIcons.brightnessGlyph(0.9), "brightness_high");
+    }
+
+    // Night Light wins while it is doing something, as the icon rule does.
+    function test_brightness_panel_glyph() {
+        compare(StatusIcons.brightnessPanelGlyph(0.9, true, "warm"), "nightlight");
+        compare(StatusIcons.brightnessPanelGlyph(0.9, true, "suspended"), "bedtime_off");
+        compare(StatusIcons.brightnessPanelGlyph(0.9, true, "day"), "brightness_high");
+        compare(StatusIcons.brightnessPanelGlyph(0.9, false, "day"), "light_mode");
+    }
+
     function test_muted_wins_over_any_volume() {
         compare(StatusIcons.volumeIcon(0.8, true), "audio-volume-muted");
         compare(StatusIcons.volumeIcon(0, false), "audio-volume-muted");

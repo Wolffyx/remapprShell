@@ -23,6 +23,7 @@ QtObject {
     readonly property bool micMuted: root.source?.audio?.muted ?? false
 
     readonly property string icon: StatusIcons.volumeIcon(root.volume, root.muted)
+    readonly property string glyph: StatusIcons.volumeGlyph(root.volume, root.muted)
 
     // Devices to play through: hardware outputs, not applications' streams.
     readonly property var sinks: (Pipewire.nodes?.values ?? [])

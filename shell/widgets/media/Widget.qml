@@ -18,6 +18,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
+    readonly property int size: Math.max(22, Math.round(40 * root.unit))
+
     readonly property bool showTitle: root.widgetConfig?.showTitle ?? true
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 180
     readonly property bool horizontal: root.bar?.horizontal ?? true
@@ -28,8 +30,8 @@ BarWidget {
     tooltip: [MediaStatus.title, MediaStatus.artist, MediaStatus.playing ? "" : "Paused"]
         .filter(s => s).join("\n")
 
-    implicitWidth: row.implicitWidth + 8
-    implicitHeight: 24
+    implicitWidth: Math.max(root.size, row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit)))
+    implicitHeight: root.size
 
     function handleActivate(button) {
         if (button === Qt.MiddleButton) {
@@ -39,33 +41,34 @@ BarWidget {
         root.popoutVisible = !root.popoutVisible;
     }
 
-    Rectangle {
+    BarButton {
         anchors.fill: parent
-        radius: 4
-        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        active: root.popoutVisible
+        size: root.size
+    }
 
-        Row {
-            id: row
-            anchors.centerIn: parent
-            spacing: 6
+    Row {
+        id: row
+        anchors.centerIn: parent
+        spacing: 8
 
-            PanelIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                implicitSize: 16
-                iconName: MediaStatus.playing ? "media-playback-playing" : "media-playback-paused"
-            }
-
-            PanelText {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.showTitle && root.horizontal && text.length > 0
-                width: Math.min(implicitWidth, root.maxWidth)
-                elide: Text.ElideRight
-                text: MediaStatus.title
-            }
+        Glyph {
+            anchors.verticalCenter: parent.verticalCenter
+            name: MediaStatus.playing ? "graphic_eq" : "pause"
+            fallback: MediaStatus.playing ? "media-playback-playing" : "media-playback-paused"
+            size: root.panelIconSize
+            color: MediaStatus.playing ? Theme.acc : Theme.mut
         }
 
-        HoverHandler { id: hover }
+        PanelText {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.showTitle && root.horizontal && text.length > 0
+            width: Math.min(implicitWidth, root.maxWidth)
+            elide: Text.ElideRight
+            text: MediaStatus.title
+        }
     }
 
     popout: Component {

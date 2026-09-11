@@ -30,6 +30,7 @@ QtObject {
     readonly property int connectedCount: root.devices.filter(d => d && d.connected).length
 
     readonly property string icon: StatusIcons.bluetoothIcon(root.enabled, root.connectedCount)
+    readonly property string glyph: StatusIcons.bluetoothGlyph(root.enabled, root.connectedCount)
 
     function nameOf(device) {
         return device?.name || device?.deviceName || device?.address || "";

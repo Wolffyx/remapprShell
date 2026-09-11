@@ -1,0 +1,21 @@
+{
+    "id": "search",
+    "apiVersion": 1,
+    "name": "Search",
+    "description": "A search field on the panel. It opens whatever searches for you: KRunner, the built-in launcher, or a command of your own (launcher.searchProvider).",
+    "icon": "search",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.milou" }
+    },
+    "config": {
+        "label": {
+            "type": "string",
+            "default": "Search",
+            "label": "Label",
+            "description": "The word in the field. Empty for the icon alone; down the side of the screen there is never room for it."
+        }
+    }
+}

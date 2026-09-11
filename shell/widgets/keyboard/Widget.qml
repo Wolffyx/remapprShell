@@ -17,6 +17,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
+    readonly property int size: Math.max(22, Math.round(40 * root.unit))
+
     present: KeyboardStatus.present
     wantsWheel: true
 
@@ -29,8 +31,8 @@ BarWidget {
         return next && next !== current ? `${current.long}\nClick for ${next.long}` : current.long;
     }
 
-    implicitWidth: Math.max(24, label.implicitWidth + 10)
-    implicitHeight: 24
+    implicitWidth: Math.max(root.size, label.implicitWidth + 20)
+    implicitHeight: root.size
 
     // A touchpad reports fractions of a notch; a layout moves only once a
     // whole one has built up, or a light swipe would spin through them all.
@@ -52,20 +54,18 @@ BarWidget {
         KeyboardStatus.next();
     }
 
-    Rectangle {
+    BarButton {
         anchors.fill: parent
-        radius: 4
-        color: hover.hovered ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        size: root.size
+    }
 
-        PanelText {
-            id: label
-            anchors.centerIn: parent
-            text: KeyboardStatus.label
-            font.bold: true
-            font.pixelSize: 11
-        }
-
-        HoverHandler { id: hover }
+    PanelText {
+        id: label
+        anchors.centerIn: parent
+        text: KeyboardStatus.label
+        font.weight: Font.Medium
+        font.pixelSize: 12
     }
 }

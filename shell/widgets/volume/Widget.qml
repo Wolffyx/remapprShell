@@ -29,8 +29,8 @@ BarWidget {
         ? `${AudioStatus.nameOf(AudioStatus.sink)}\n${AudioStatus.muted ? "Muted" : StatusIcons.percent(AudioStatus.volume)}`
         : "No sound output"
 
-    implicitWidth: 24
-    implicitHeight: 24
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     function handleWheel(delta) {
         AudioStatus.setVolume(StatusIcons.stepVolume(AudioStatus.volume, delta, root.step, root.maxVolume));
@@ -92,19 +92,15 @@ BarWidget {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 4
-        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
-
-        PanelIcon {
-            anchors.centerIn: parent
-            implicitSize: 18
-            iconName: AudioStatus.icon
-        }
-
-        HoverHandler { id: hover }
+    BarButton {
+        id: button
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        active: root.popoutVisible
+        size: Math.max(22, Math.round(40 * root.unit))
+        glyph: AudioStatus.glyph
+        fallback: AudioStatus.icon
+        glyphSize: root.panelIconSize
     }
 
     popout: Component {

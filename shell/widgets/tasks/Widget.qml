@@ -42,7 +42,7 @@ BarWidget {
     readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
     readonly property int iconSize: root.configuredIconSize > 0
         ? root.configuredIconSize
-        : Math.max(12, Math.min(48, root.bar.thickness - 14))
+        : Math.max(16, Math.min(40, Math.round(24 * root.unit)))
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
 
@@ -79,12 +79,42 @@ BarWidget {
     readonly property var items: WindowEvents.arrangeTasks(root.running, root.pinned,
                                                            id => WindowsService.launcherFor(id))
 
-    // One button's width. Square for icons only, wider when titles are shown.
-    readonly property int buttonWidth: root.showTitles ? root.maxWidth
-                                                       : Math.max(24, root.iconSize + 14)
-    readonly property int buttonHeight: Math.max(18, root.bar.thickness - 10)
-    readonly property int spacing: 4
-    readonly property int stride: root.buttonWidth + root.spacing
+    // As tall as the design's buttons at this thickness. With titles a
+    // button is as wide as its title needs, up to `maxWidth`; without, it is
+    // the icon and its padding.
+    readonly property int buttonHeight: Math.max(22, Math.round(44 * root.unit))
+    readonly property int padding: Math.round((root.showTitles ? 16 : 12) * Math.max(0.7, root.unit))
+    readonly property int spacing: Math.max(2, Math.round(6 * root.unit))
+
+    // When the row would not fit the room the panel has for it, every
+    // button is cut to an equal share of it -- titles elided first, then gone
+    // below a readable width, down to the icon alone.
+    readonly property real iconOnly: root.iconSize + 2 * root.padding
+    readonly property real share: root.room > 0 && root.items.length > 0
+        ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
+        : 1e9
+    readonly property real titleRoom: Math.min(root.maxWidth, root.share) - root.iconOnly - Math.round(10 * Math.max(0.7, root.unit))
+    readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
+
+    // Buttons differ in width once they carry titles, so the one under the
+    // pointer is found by where each actually is rather than by dividing the
+    // position by one width.
+    function indexAt(position) {
+        for (let i = 0; i < buttons.count; i++) {
+            const b = buttons.itemAt(i);
+            if (b && position >= b.x - root.spacing / 2 && position < b.x + b.width + root.spacing / 2)
+                return i;
+        }
+        return -1;
+    }
+
+    function centreOf(index) {
+        const b = buttons.itemAt(index);
+        return b ? b.x + b.width / 2 : 0;
+    }
+
+    popoutRadius: 18
+    popoutPadding: root.popoutMode === "menu" ? 8 : 14
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
@@ -109,14 +139,13 @@ BarWidget {
     implicitHeight: root.bar.thickness
 
     function handleHover(position, horizontal) {
-        const index = Math.floor(position / root.stride);
-        root.hoveredIndex = (index >= 0 && index < root.items.length) ? index : -1;
+        root.hoveredIndex = root.indexAt(position);
 
         if (root.popoutMode === "menu")
             return;
         if (root.hoveredIndex >= 0) {
             root.popoutVisible = true;
-            root.requestPopout("tasks", root.hoveredIndex * root.stride + root.buttonWidth / 2);
+            root.requestPopout("tasks", root.centreOf(root.hoveredIndex));
         } else {
             root.popoutVisible = false;
         }
@@ -175,7 +204,7 @@ BarWidget {
         root.menuItem = item;
         root.popoutMode = "menu";
         root.popoutVisible = true;
-        root.requestPopout("tasks", root.items.indexOf(item) * root.stride + root.buttonWidth / 2);
+        root.requestPopout("tasks", root.centreOf(root.items.indexOf(item)));
     }
 
     Row {
@@ -184,6 +213,7 @@ BarWidget {
         spacing: root.spacing
 
         Repeater {
+            id: buttons
             model: root.items
 
             Rectangle {
@@ -202,16 +232,17 @@ BarWidget {
                 readonly property bool isHovered: button.index === root.hoveredIndex
                 readonly property int windowCount: button.modelData.windows.length
 
-                width: root.buttonWidth
+                width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
+                                      : root.iconOnly
                 height: root.buttonHeight
-                radius: 5
+                radius: Math.round(14 * Math.max(0.7, root.unit))
 
-                // A pinned application that is not running sits on the panel
-                // itself, the way Windows draws one: no tile until hovered.
-                color: button.isActive  ? Theme.alpha(Theme.accent, 0.28)
-                     : button.isHovered ? Theme.hoverBackground
-                     : button.windowCount === 0 ? "transparent"
-                                        : Theme.backgroundAlternate
+                // Buttons sit on the panel itself, as the design draws them:
+                // no tile until hovered, and the focused window's in the
+                // accent's container colour.
+                color: button.isActive  ? Theme.accC
+                     : button.isHovered ? Theme.s2
+                                        : "transparent"
 
                 // A minimised window is still there and still clickable; it is
                 // dimmed rather than hidden, which is the whole difference
@@ -269,8 +300,9 @@ BarWidget {
                 onFlashingChanged: if (!button.flashing) attentionTint.opacity = 0.45
 
                 Row {
+                    id: content
                     anchors.centerIn: parent
-                    spacing: 6
+                    spacing: Math.round(10 * Math.max(0.7, root.unit))
 
                     PanelIcon {
                         anchors.verticalCenter: parent.verticalCenter
@@ -282,25 +314,25 @@ BarWidget {
                     PanelText {
                         id: title
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.showTitles
-                        width: Math.min(title.implicitWidth, root.maxWidth - root.iconSize - 24)
+                        visible: root.titlesFit
+                        width: Math.min(title.implicitWidth, root.titleRoom)
                         elide: Text.ElideRight
                         text: button.modelData.windows.length === 1
                             ? WindowEvents.label(button.modelData.windows[0])
                             : button.modelData.appName
-                        font.bold: button.isActive
                     }
                 }
 
-                // How many windows the application has, and which is active,
-                // in one mark: a dash per window, filled for the active one.
-                // Colour alone is the distinction a person with low vision may
-                // not see at all, so the count is shape as well as tint.
+                // Under the button, in the panel's margin: how many windows
+                // the application has, and whether one of them is focused --
+                // a long accent bar for the focused one, a short mark per
+                // other window. Colour alone is the distinction a person with
+                // low vision may not see at all, so the count is shape as
+                // well as tint.
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 2
-                    spacing: 2
+                    y: parent.height + Math.max(1, Math.round(((root.bar?.thickness ?? 40) - root.buttonHeight) / 2 - 7))
+                    spacing: 3
 
                     Repeater {
                         // Past four the marks stop being countable and start
@@ -310,11 +342,11 @@ BarWidget {
                         Rectangle {
                             required property int index
 
-                            width: button.windowCount === 1 ? button.width * 0.5 : 4
-                            height: 2
-                            radius: 1
-                            color: button.isActive ? Theme.accent
-                                                   : Theme.alpha(Theme.foreground, 0.35)
+                            width: button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, root.unit))
+                                                                 : Math.round(6 * Math.max(0.7, root.unit))
+                            height: 3
+                            radius: 1.5
+                            color: button.isActive && index === 0 ? Theme.acc : Theme.alpha(Theme.fg, 0.4)
                         }
                     }
                 }

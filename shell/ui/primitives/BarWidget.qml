@@ -16,9 +16,15 @@ Item {
 
     // ---- injected by the host -----------------------------------------
 
-    // The hosting panel. Exposes exactly three things: `position`
-    // ("top"/"bottom"/"left"/"right"), `horizontal`, and `thickness`.
+    // The hosting panel. Exposes `position` ("top"/"bottom"/"left"/"right"),
+    // `horizontal` and `thickness`, and the two sizes widgets share:
+    // `iconSize`, for a tray or status icon, and `spacing`, between widgets.
     required property var bar
+
+    // The design's proportions are for a 64 px panel; a widget scales from
+    // this rather than hardcoding sizes that only fit one thickness.
+    readonly property real unit: (root.bar?.thickness ?? 40) / 64
+    readonly property int panelIconSize: root.bar?.iconSize ?? 19
 
     // This widget's own configuration: its manifest defaults merged with the
     // user's overrides. Never the whole shell config.
@@ -52,6 +58,18 @@ Item {
     // that follows the pointer, like the task list's preview, closes by
     // itself when the pointer leaves, and turns this off.
     property bool popoutClosesOnOutsideClick: true
+
+    // How far in from the popout's edge its contents sit, and how round it
+    // is; -1 is the theme's own rounding. A menu wants less of both than a
+    // panel of controls does.
+    property int popoutPadding: 20
+    property real popoutRadius: -1
+
+    // How long the widget may be along the panel before it runs into its
+    // neighbours; -1 for no limit. Set by the panel. Most widgets have a size
+    // of their own and ignore it; one that can give way -- the task list,
+    // cutting its titles short -- fits itself into it.
+    property real room: -1
 
     // Whether there is anything to show. A battery widget on a desktop, or a
     // Bluetooth one on a machine with no adapter, sets this false and takes no

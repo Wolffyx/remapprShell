@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 // An icon from Material Symbols, drawn from its name.
 //
 // The font draws each icon as a ligature of its name ("wifi", "volume_up"),

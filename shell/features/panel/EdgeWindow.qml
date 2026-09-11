@@ -26,7 +26,13 @@ PanelWindow {
     property real centre: 0
 
     // Distance from the panel's inner edge.
-    property int gap: 4
+    property int gap: 12
+
+    // Transparent room around what is drawn, for its shadow. The window is
+    // placed so that what is drawn, not the window, sits `gap` from the panel
+    // and at least `edgeMargin` from the ends of the screen.
+    property int shadowMargin: 0
+    property int edgeMargin: 12
 
     readonly property string edge: win.bar?.position ?? "bottom"
     readonly property bool horizontal: win.edge === "top" || win.edge === "bottom"
@@ -52,10 +58,14 @@ PanelWindow {
         const size = win.horizontal ? win.implicitWidth : win.implicitHeight;
         const extent = win.horizontal ? (win.screen?.width ?? 0) : (win.screen?.height ?? 0);
         const wanted = win.slotStart + win.centre - size / 2;
-        return Math.max(8, Math.min(wanted, Math.max(8, extent - size - 8)));
+        const lo = Math.max(0, win.edgeMargin - win.shadowMargin);
+        const hi = Math.max(lo, extent - size - lo);
+        return Math.max(lo, Math.min(wanted, hi));
     }
 
-    readonly property real away: (win.bar?.thickness ?? 0) + win.gap
+    // Beyond the whole of the panel's strip -- a floating bar's margin from
+    // the screen edge included -- then the gap, less the shadow's room.
+    readonly property real away: Math.max(0, (win.bar?.extent ?? win.bar?.thickness ?? 0) + win.gap - win.shadowMargin)
 
     // Where it went, for whoever is working out why a window is somewhere
     // unexpected -- which is how the placement bug above was found. Called

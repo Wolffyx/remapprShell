@@ -1,0 +1,13 @@
+{
+    "id": "divider",
+    "apiVersion": 1,
+    "name": "Divider",
+    "description": "A thin line between groups of widgets.",
+    "icon": "distribute-horizontal-x",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" }
+    },
+    "config": {}
+}

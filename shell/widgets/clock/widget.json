@@ -4,23 +4,45 @@
     "name": "Clock",
     "description": "Current time and date.",
     "icon": "clock",
-    "zones": ["left", "middle", "right"],
-    "orientation": ["horizontal", "vertical"],
+    "zones": [
+        "left",
+        "middle",
+        "right"
+    ],
+    "orientation": [
+        "horizontal",
+        "vertical"
+    ],
     "renderers": {
-        "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.digitalclock" }
+        "quickshell": {
+            "entry": "Widget.qml"
+        },
+        "plasma": {
+            "applet": "org.kde.plasma.digitalclock"
+        }
     },
     "config": {
-        "format": {
-            "type": "string",
-            "default": "HH:mm",
-            "label": "Time format",
-            "description": "Qt date/time format string."
+        "hour12": {
+            "type": "bool",
+            "default": false,
+            "label": "12-hour clock"
+        },
+        "showSeconds": {
+            "type": "bool",
+            "default": false,
+            "label": "Show seconds"
         },
         "showDate": {
             "type": "bool",
-            "default": false,
-            "label": "Show date"
+            "default": true,
+            "label": "Show date",
+            "description": "Under the time; beside it on a thin panel, and not at all down the side of the screen."
+        },
+        "format": {
+            "type": "string",
+            "default": "",
+            "label": "Time format of your own",
+            "description": "A Qt date/time format string, which wins over the choices above. Empty for those."
         },
         "dateFormat": {
             "type": "string",

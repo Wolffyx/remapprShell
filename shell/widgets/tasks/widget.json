@@ -41,13 +41,13 @@
         },
         "showTitles": {
             "type": "bool",
-            "default": false,
+            "default": true,
             "label": "Show titles",
-            "description": "Off by default: a panel runs out of room after four or five titles, and the title is one hover away."
+            "description": "The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away."
         },
         "maxWidth": {
             "type": "int",
-            "default": 180,
+            "default": 230,
             "min": 60,
             "max": 400,
             "label": "Widest a button gets",

@@ -24,39 +24,24 @@ BarWidget {
     tooltip: [StatusIcons.percent(PowerStatus.level), PowerStatus.stateLabel, PowerStatus.timeLabel]
         .filter(s => s).join(" · ")
 
-    implicitWidth: row.implicitWidth + 6
-    implicitHeight: 24
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
         root.popoutVisible = !root.popoutVisible;
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 4
-        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
-
-        Row {
-            id: row
-            anchors.centerIn: parent
-            spacing: 4
-
-            PanelIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                implicitSize: 18
-                iconName: PowerStatus.icon
-            }
-
-            PanelText {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.showPercentage
-                text: StatusIcons.percent(PowerStatus.level)
-                font.pixelSize: 11
-            }
-        }
-
-        HoverHandler { id: hover }
+    BarButton {
+        id: button
+        thickness: root.bar?.thickness ?? 40
+        vertical: !(root.bar?.horizontal ?? true)
+        hovered: root.hovered
+        active: root.popoutVisible
+        size: Math.max(22, Math.round(40 * root.unit))
+        glyph: PowerStatus.glyph
+        fallback: PowerStatus.icon
+        glyphSize: root.panelIconSize
+        text: root.showPercentage ? StatusIcons.percent(PowerStatus.level) : ""
     }
 
     popout: Component {

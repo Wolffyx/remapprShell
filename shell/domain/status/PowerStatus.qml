@@ -43,6 +43,8 @@ QtObject {
 
     readonly property string icon: root.present ? StatusIcons.batteryIcon(root.level, root.charging)
                                                 : "battery-missing"
+    readonly property string glyph: root.present ? StatusIcons.batteryGlyph(root.level, root.charging)
+                                                 : "battery_unknown"
 
     readonly property string profile: {
         switch (PowerProfiles.profile) {

@@ -5,6 +5,7 @@
 // widgets it has never heard of and one that needs editing for each new type.
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import qs.ui.primitives
@@ -20,6 +21,17 @@ Item {
     required property var widgetConfig
 
     readonly property BarWidget widget: host.item as BarWidget
+
+    // The length this widget may take along the panel; -1 for no limit. The
+    // zone works it out; the widget decides whether it can give way.
+    property real room: -1
+
+    Binding {
+        target: root.widget
+        property: "room"
+        value: root.room
+        when: root.widget !== null
+    }
 
     // Where along this slot the popout should point, as the widget last asked.
     // A widget with one popout for the whole of itself never sets it and gets
@@ -139,6 +151,7 @@ Item {
         visible: root.interactive
         hoverEnabled: root.wantsHover
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        cursorShape: Qt.PointingHandCursor
 
         onPositionChanged: event => {
             if (root.wantsHover)
@@ -191,6 +204,7 @@ Item {
         bar: root.bar
         label: `popout '${root.entry?.id}'`
         centre: root.popoutCentre
+        shadowMargin: 28
 
         visible: popout.wanted
 
@@ -209,14 +223,18 @@ Item {
             ? WlrKeyboardFocus.Exclusive
             : WlrKeyboardFocus.None
 
-        // The contents plus the margin they sit inside. The window used to be
-        // exactly the contents' size, with the contents 8 px in from every
-        // edge -- so every popout was 16 px too small. Most hid it behind a
-        // fixed width and an extra 8 px of height; the tray's flyout, a grid
-        // of fixed-size icons, lost its last column instead.
-        readonly property int padding: 8
-        implicitWidth: (popout.popoutContent?.implicitWidth ?? 0) + 2 * popout.padding
-        implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding
+        // The contents, the padding they sit in, and room for the shadow.
+        readonly property int padding: root.widget?.popoutPadding ?? 20
+        implicitWidth: (popout.popoutContent?.implicitWidth ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
+        implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
+
+        // Only the card takes the pointer. A click in its shadow goes to
+        // whatever is beneath -- the surface that closes the popout.
+        mask: Region { item: card }
+
+        // Frosted behind, where the compositor offers it.
+        BackgroundEffect.blurRegion: Theme.translucent ? popout._blur : null
+        readonly property Region _blur: Region { item: card; radius: card.radius }
 
         // One popout open at a time, closed by a click anywhere else: see
         // PanelModel. A preview that follows the pointer closes by itself and
@@ -237,6 +255,8 @@ Item {
         // open and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
+            if (popout.wanted)
+                enter.restart();
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))
@@ -245,12 +265,46 @@ Item {
                 root.bar.openPopout = null;
         }
 
+        // It rises out of the panel as it appears.
+        property real shown: 1
+        NumberAnimation {
+            id: enter
+            target: popout
+            property: "shown"
+            from: 0
+            to: 1
+            duration: 180
+            easing.type: Easing.OutCubic
+        }
+
+        RectangularShadow {
+            anchors.fill: card
+            radius: card.radius
+            blur: 40
+            offset.y: 12
+            color: Theme.shadow
+            opacity: popout.shown
+        }
+
         Rectangle {
-            anchors.fill: parent
-            radius: 8
-            color: Theme.background
+            id: card
+
+            x: popout.shadowMargin
+            y: popout.shadowMargin
+            width: parent.width - 2 * popout.shadowMargin
+            height: parent.height - 2 * popout.shadowMargin
+            radius: Math.min((root.widget?.popoutRadius ?? -1) >= 0 ? root.widget.popoutRadius : Theme.radius,
+                             width / 2, height / 2)
+            color: Theme.glass
             border.width: 1
-            border.color: Theme.alpha(Theme.foreground, 0.15)
+            border.color: Theme.out
+            opacity: popout.shown
+
+            transform: Translate {
+                readonly property real d: (1 - popout.shown) * 14
+                x: popout.edge === "left" ? -d : popout.edge === "right" ? d : 0
+                y: popout.edge === "top" ? -d : popout.edge === "bottom" ? d : 0
+            }
 
             // The panel forwards its keys here as well, for the case where
             // the panel itself holds the keyboard because it was clicked.
@@ -270,13 +324,17 @@ Item {
     }
 
     // The tooltip: a second window, because a tooltip has to escape the panel
-    // just as a popout does, and the popout's is spoken for.
+    // just as a popout does, and the popout's is spoken for. The first line is
+    // the name of the thing, any further lines detail.
     EdgeWindow {
         id: tip
+
+        readonly property var lines: root.tooltipText.split("\n")
 
         slot: root
         bar: root.bar
         label: `tooltip '${root.entry?.id}'`
+        gap: 10
         centre: (root.widget?.tooltipCentre ?? -1) >= 0
             ? root.widget.tooltipCentre
             : ((root.bar?.horizontal ?? true) ? root.width : root.height) / 2
@@ -288,23 +346,38 @@ Item {
         // be caught by it, and the widget under it must stay reachable.
         mask: Region {}
 
-        implicitWidth: tipText.width + 16
-        implicitHeight: tipText.implicitHeight + 10
+        implicitWidth: tipColumn.width + 24
+        implicitHeight: tipColumn.implicitHeight + 14
 
         Rectangle {
             anchors.fill: parent
-            radius: 6
-            color: Theme.background
-            border.width: 1
-            border.color: Theme.alpha(Theme.foreground, 0.15)
+            radius: 10
+            color: Theme.tipBg
 
-            PanelText {
-                id: tipText
+            Column {
+                id: tipColumn
                 anchors.centerIn: parent
-                width: Math.min(tipText.implicitWidth, 360)
-                wrapMode: Text.Wrap
-                font.pixelSize: 11
-                text: root.tooltipText
+                width: Math.min(360, Math.max(tipFirst.implicitWidth, tipRest.visible ? tipRest.implicitWidth : 0))
+                spacing: 2
+
+                PanelText {
+                    id: tipFirst
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: tip.lines[0] ?? ""
+                    color: Theme.tipFg
+                    font.pixelSize: 13
+                }
+
+                PanelText {
+                    id: tipRest
+                    visible: tip.lines.length > 1
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: tip.lines.slice(1).join("\n")
+                    color: Theme.tipFgMut
+                    font.pixelSize: 12
+                }
             }
         }
     }

@@ -18,6 +18,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
+    readonly property int size: Math.max(22, Math.round(40 * root.unit))
+
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 320
     readonly property bool showIcon: root.widgetConfig?.showIcon ?? true
     readonly property bool showAppName: root.widgetConfig?.showAppName ?? false
@@ -35,8 +37,8 @@ BarWidget {
 
     tooltip: root.appName && root.appName !== root.title ? `${root.title}\n${root.appName}` : root.title
 
-    implicitWidth: row.implicitWidth + 12
-    implicitHeight: 24
+    implicitWidth: row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit))
+    implicitHeight: root.size
 
     function handleHover(position, horizontal) {
         root.pointed = true;
@@ -50,34 +52,33 @@ BarWidget {
         WindowsService.activate(root.window.uuid);
     }
 
-    Rectangle {
+    BarButton {
         anchors.fill: parent
-        radius: 4
-        color: root.pointed ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.pointed
+        size: root.size
+    }
 
-        Row {
-            id: row
-            anchors.centerIn: parent
-            spacing: 6
+    Row {
+        id: row
+        anchors.centerIn: parent
+        spacing: 8
 
-            PanelIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.showIcon
-                implicitSize: 18
-                iconName: root.window ? WindowsService.iconFor(root.window) : ""
-                iconFile: root.window ? WindowsService.iconFileFor(root.window) : ""
-            }
+        PanelIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.showIcon
+            implicitSize: Math.max(16, Math.round(22 * root.unit))
+            iconName: root.window ? WindowsService.iconFor(root.window) : ""
+            iconFile: root.window ? WindowsService.iconFileFor(root.window) : ""
+        }
 
-            PanelText {
-                id: label
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(label.implicitWidth, root.maxWidth)
-                elide: Text.ElideRight
-                text: root.showAppName ? root.appName : root.title
-                font.pixelSize: 12
-                color: root.window?.active ? Theme.foreground : Theme.foregroundInactive
-            }
+        PanelText {
+            id: label
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(label.implicitWidth, root.maxWidth)
+            elide: Text.ElideRight
+            text: root.showAppName ? root.appName : root.title
+            color: root.window?.active ? Theme.fg : Theme.mut
         }
     }
 }

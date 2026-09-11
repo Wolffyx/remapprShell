@@ -9,13 +9,32 @@
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",
-        "thickness": 40,
-        "autoHide": false
+        "thickness": 56,
+        "style": "full",
+        "spacing": 6,
+        "iconSize": 19,
+        "autoHide": false,
+        "revealOnHover": true
     },
     "bar": {
         "entries": [
             {
                 "id": "launcher",
+                "zone": "left",
+                "enabled": true
+            },
+            {
+                "id": "search",
+                "zone": "left",
+                "enabled": true
+            },
+            {
+                "id": "taskview",
+                "zone": "left",
+                "enabled": true
+            },
+            {
+                "id": "divider",
                 "zone": "left",
                 "enabled": true
             },
@@ -26,11 +45,6 @@
             },
             {
                 "id": "tasks",
-                "zone": "left",
-                "enabled": true
-            },
-            {
-                "id": "clock",
                 "zone": "middle",
                 "enabled": true
             },
@@ -60,6 +74,11 @@
                 "enabled": true
             },
             {
+                "id": "divider",
+                "zone": "right",
+                "enabled": true
+            },
+            {
                 "id": "bluetooth",
                 "zone": "right",
                 "enabled": true
@@ -85,12 +104,17 @@
                 "enabled": true
             },
             {
-                "id": "power",
+                "id": "clock",
                 "zone": "right",
                 "enabled": true
             },
             {
-                "id": "showdesktop",
+                "id": "notifications",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "power",
                 "zone": "right",
                 "enabled": true
             }

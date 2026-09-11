@@ -67,6 +67,8 @@ QtObject {
 
     readonly property string icon: StatusIcons.brightnessPanelIcon(root.level, root.displays.length > 0,
                                                                    root.nightState)
+    readonly property string glyph: StatusIcons.brightnessPanelGlyph(root.level, root.displays.length > 0,
+                                                                     root.nightState)
 
     function displayNamed(name) {
         return root.displays.find(d => d.name === name) ?? null;

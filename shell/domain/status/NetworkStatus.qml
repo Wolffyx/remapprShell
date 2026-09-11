@@ -71,6 +71,7 @@ QtObject {
     }
 
     readonly property string icon: StatusIcons.networkIcon(root.state)
+    readonly property string glyph: StatusIcons.networkGlyph(root.state)
 
     function setWifiEnabled(on) {
         Networking.wifiEnabled = on;

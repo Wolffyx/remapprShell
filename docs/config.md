@@ -39,7 +39,11 @@ Where the panel sits and how big it is.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `panel.position` | `top`, `bottom`, `left`, `right` | `bottom` | Which edge the panel is anchored to. |
-| `panel.thickness` | a number, 20 to 96 | `40` | Height of a horizontal panel, width of a vertical one. |
+| `panel.thickness` | a number, 28 to 96 | `56` | Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it. |
+| `panel.style` | `full`, `floating`, `islands` | `full` | full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own. |
+| `panel.spacing` | a number, 2 to 16 | `6` | The gap between widgets, in pixels. |
+| `panel.iconSize` | a number, 15 to 26 | `19` | The size of the tray's and the status icons, in pixels. |
+| `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |
 | `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
 
 ### Drawn by
@@ -182,17 +186,27 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "search",
+        "zone": "left",
+        "enabled": true
+      },
+      {
+        "id": "taskview",
+        "zone": "left",
+        "enabled": true
+      },
+      {
+        "id": "divider",
+        "zone": "left",
+        "enabled": true
+      },
+      {
         "id": "workspaces",
         "zone": "left",
         "enabled": true
       },
       {
         "id": "tasks",
-        "zone": "left",
-        "enabled": true
-      },
-      {
-        "id": "clock",
         "zone": "middle",
         "enabled": true
       },
@@ -222,6 +236,11 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "divider",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "bluetooth",
         "zone": "right",
         "enabled": true
@@ -247,12 +266,17 @@ silently landing on the left.
         "enabled": true
       },
       {
-        "id": "power",
+        "id": "clock",
         "zone": "right",
         "enabled": true
       },
       {
-        "id": "showdesktop",
+        "id": "notifications",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "power",
         "zone": "right",
         "enabled": true
       }
@@ -274,6 +298,7 @@ when two copies of a widget should differ.
 | Brightness and Night Light | `brightness` | left, middle, right | `org.kde.plasma.brightness` (in the tray) |
 | Clipboard | `clipboard` | left, middle, right | `org.kde.plasma.clipboard` (in the tray) |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
+| Divider | `divider` | left, middle, right | **not supported** |
 | Keyboard layout | `keyboard` | left, middle, right | `org.kde.plasma.keyboardlayout` (in the tray) |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
 | Media | `media` | left, middle, right | `org.kde.plasma.mediacontroller` (in the tray) |
@@ -281,8 +306,10 @@ when two copies of a widget should differ.
 | Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` (in the tray) |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
 | Camera and microphone in use | `privacy` | left, middle, right | `org.kde.plasma.cameraindicator` (in the tray) |
+| Search | `search` | left, middle, right | `org.kde.milou` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
+| Task view | `taskview` | left, middle, right | **not supported** |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
 | Volume | `volume` | left, middle, right | `org.kde.plasma.volume` (in the tray) |
 | Virtual desktops | `workspaces` | left, middle, right | `org.kde.plasma.pager` |
@@ -324,15 +351,18 @@ without `tray` it stands on the panel alone.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `format` | text | `HH:mm` | Qt date/time format string. |
-| `showDate` | `true` or `false` | `false` | Show date |
+| `hour12` | `true` or `false` | `false` | 12-hour clock |
+| `showSeconds` | `true` or `false` | `false` | Show seconds |
+| `showDate` | `true` or `false` | `true` | Under the time; beside it on a thin panel, and not at all down the side of the screen. |
+| `format` | text | `` | A Qt date/time format string, which wins over the choices above. Empty for those. |
 | `dateFormat` | text | `ddd d MMM` | Date format |
 
 ### `widgets.launcher`
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `icon` | text | `start-here-kde` | Icon |
+| `glyph` | text | `blur_on` | A Material Symbols name, drawn on the accent tile. Empty draws the theme icon below instead. |
+| `icon` | text | `start-here-kde` | Drawn when the glyph is empty, or where Material Symbols is not installed. |
 | `label` | text | `` | Shown beside the icon. Empty for icon only. |
 
 ### `widgets.media`
@@ -346,13 +376,19 @@ without `tray` it stands on the panel alone.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `showCount` | `true` or `false` | `true` | A badge with the number of notifications since the list was last opened. |
+| `showCount` | `true` or `false` | `false` | Something unseen shows as a dot on the bell; on, as the number since the list was last opened. |
 
 ### `widgets.power`
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `action` | `promptAll`, `promptLogout`, `promptReboot`, `promptShutDown` | `promptAll` | Action |
+
+### `widgets.search`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `label` | text | `Search` | The word in the field. Empty for the icon alone; down the side of the screen there is never room for it. |
 
 ### `widgets.showdesktop`
 
@@ -369,15 +405,21 @@ without `tray` it stands on the panel alone.
 | `groupByApp` | `true` or `false` | `true` | One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows. |
 | `pinned` | a list | `[]` | Desktop entry ids ("org.kde.dolphin"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose "Pin to taskbar" rather than typing them. |
 | `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
-| `showTitles` | `true` or `false` | `false` | Off by default: a panel runs out of room after four or five titles, and the title is one hover away. |
-| `maxWidth` | a number, 60 to 400 | `180` | Titles are elided past this. |
+| `showTitles` | `true` or `false` | `true` | The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away. |
+| `maxWidth` | a number, 60 to 400 | `230` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |
+
+### `widgets.taskview`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `effect` | `Overview`, `Grid View`, `Expose`, `ExposeAll` | `Overview` | Which of KWin's views: the Overview, the grid of virtual desktops, or the windows of this desktop (Expose) or of all of them (ExposeAll). |
 
 ### `widgets.tray`
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `iconSize` | a number, 12 to 48 | `18` | Icon size |
+| `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's tray icon size. |
 | `pinned` | a list | `[]` | StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids. |
 | `hidden` | a list | `[]` | Ids left out altogether, not even behind the chevron. |
 
@@ -393,6 +435,8 @@ without `tray` it stands on the panel alone.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `style` | `numbers`, `icons`, `dots` | `numbers` | numbers: the desktop's number. icons: the icons of the windows on it. dots: a dot. An empty desktop is always a dot. |
+| `maxShown` | a number, 1 to 20 | `8` | At most this many; the current desktop is always among them. |
 | `showNames` | `true` or `false` | `false` | Show desktop names |
 | `scrollToSwitch` | `true` or `false` | `true` | Switch by scrolling |
 

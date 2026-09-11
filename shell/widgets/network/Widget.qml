@@ -31,26 +31,22 @@ BarWidget {
         return lines.join("\n");
     }
 
-    implicitWidth: 24
-    implicitHeight: 24
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
         root.popoutVisible = !root.popoutVisible;
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 4
-        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
-
-        PanelIcon {
-            anchors.centerIn: parent
-            implicitSize: 18
-            iconName: NetworkStatus.icon
-        }
-
-        HoverHandler { id: hover }
+    BarButton {
+        id: button
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        active: root.popoutVisible
+        size: Math.max(22, Math.round(40 * root.unit))
+        glyph: NetworkStatus.glyph
+        fallback: NetworkStatus.icon
+        glyphSize: root.panelIconSize
     }
 
     popout: Component {

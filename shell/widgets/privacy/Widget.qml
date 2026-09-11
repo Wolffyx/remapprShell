@@ -16,6 +16,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
+    readonly property int size: Math.max(22, Math.round(40 * root.unit))
+
     readonly property var users: PrivacyStatus.users
     readonly property bool recordingSound: root.users.microphone.length > 0
     readonly property bool vertical: !(root.bar?.horizontal ?? true)
@@ -27,8 +29,8 @@ BarWidget {
                                                           : "Click to mute the microphone") : ""]
         .filter(s => s).join("\n")
 
-    implicitWidth: Math.max(24, icons.implicitWidth + 6)
-    implicitHeight: Math.max(24, icons.implicitHeight + 6)
+    implicitWidth: Math.max(root.size, icons.implicitWidth + 16)
+    implicitHeight: root.vertical ? Math.max(root.size, icons.implicitHeight + 16) : root.size
 
     // Muting is for the default microphone, as it is in Plasma's indicator:
     // it is the one the icon's state is read from.
@@ -38,32 +40,33 @@ BarWidget {
         AudioStatus.toggleMicMute();
     }
 
-    Rectangle {
+    BarButton {
         anchors.fill: parent
-        radius: 4
-        color: hover.hovered ? Theme.hoverBackground : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
+        thickness: root.bar?.thickness ?? 40
+        hovered: root.hovered
+        size: root.size
+    }
 
-        // Only `columns` is set -- see ZoneRow. A hidden icon takes no slot.
-        Grid {
-            id: icons
-            anchors.centerIn: parent
-            columns: root.vertical ? 1 : 2
-            spacing: 4
+    Grid {
+        id: icons
+        anchors.centerIn: parent
+        columns: root.vertical ? 1 : 2
+        spacing: 4
 
-            PanelIcon {
-                visible: root.users.camera.length > 0
-                implicitSize: 18
-                iconName: "camera-on"
-            }
-
-            PanelIcon {
-                visible: root.recordingSound
-                implicitSize: 18
-                iconName: AudioStatus.micMuted ? "microphone-sensitivity-muted" : "microphone-sensitivity-high"
-            }
+        Glyph {
+            visible: root.users.camera.length > 0
+            name: "videocam"
+            fallback: "camera-on"
+            size: root.panelIconSize
+            color: Theme.warning
         }
 
-        HoverHandler { id: hover }
+        Glyph {
+            visible: root.recordingSound
+            name: AudioStatus.micMuted ? "mic_off" : "mic"
+            fallback: AudioStatus.micMuted ? "microphone-sensitivity-muted" : "microphone-sensitivity-high"
+            size: root.panelIconSize
+            color: Theme.warning
+        }
     }
 }

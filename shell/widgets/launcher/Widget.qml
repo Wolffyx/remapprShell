@@ -13,6 +13,8 @@ BarWidget {
     id: root
 
     readonly property string iconName: root.widgetConfig?.icon ?? "start-here-kde"
+    // A Material Symbols name; cleared, the theme icon above is drawn instead.
+    readonly property string glyph: root.widgetConfig?.glyph ?? "blur_on"
     readonly property string labelText: root.widgetConfig?.label ?? ""
 
     wantsHover: true
@@ -37,8 +39,8 @@ BarWidget {
     // keyboard.
     popoutGrabsFocus: true
 
-    implicitWidth: content.implicitWidth + 12
-    implicitHeight: 26
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
         // Tell the provider which screen this button is on, so the popout is
@@ -49,35 +51,20 @@ BarWidget {
             LauncherService.toggle("apps");
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 5
-        color: LauncherService.active.visible ? Theme.pressedBackground
-             : hover.hovered ? Theme.hoverBackground
-             : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
-
-        Row {
-            id: content
-            anchors.centerIn: parent
-            spacing: 6
-
-            PanelIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                implicitSize: 18
-                iconName: root.iconName
-                fallbackName: "application-x-executable"
-            }
-
-            PanelText {
-                anchors.verticalCenter: parent.verticalCenter
-                // Icon only down the side of the screen, where a word would be
-                // wider than the panel.
-                visible: root.labelText.length > 0 && (root.bar?.horizontal ?? true)
-                text: root.labelText
-            }
-        }
-
-        HoverHandler { id: hover }
+    // A tile in the accent, as the design draws the start button. Icon only
+    // down the side of the screen, where a word would be wider than the
+    // panel.
+    BarButton {
+        id: button
+        thickness: root.bar?.thickness ?? 40
+        vertical: !(root.bar?.horizontal ?? true)
+        hovered: root.hovered
+        active: LauncherService.active.visible
+        accent: true
+        size: Math.max(24, Math.round(46 * root.unit))
+        glyph: root.glyph
+        fallback: root.iconName
+        glyphSize: Math.max(18, Math.round(26 * root.unit))
+        text: root.labelText
     }
 }

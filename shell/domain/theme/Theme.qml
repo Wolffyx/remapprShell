@@ -131,7 +131,7 @@ QtObject {
     readonly property var _families: Qt.fontFamilies()
 
     // Rubik where installed, the desktop's own font where it is not.
-    readonly property string fontFamily: root._families.indexOf("Rubik") >= 0 ? "Rubik" : Qt.application.font.family
+    readonly property string fontFamily: root._families.indexOf("Rubik") >= 0 ? "Rubik" : "sans-serif"
 
     // Material Symbols draws an icon from its name, as a ligature. Without the
     // font a name would be drawn as the word, so Glyph falls back to the icon

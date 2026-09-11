@@ -4,14 +4,52 @@
     "name": "Virtual desktops",
     "description": "Switches between KWin virtual desktops.",
     "icon": "virtual-desktops",
-    "zones": ["left", "middle", "right"],
-    "orientation": ["horizontal", "vertical"],
+    "zones": [
+        "left",
+        "middle",
+        "right"
+    ],
+    "orientation": [
+        "horizontal",
+        "vertical"
+    ],
     "renderers": {
-        "quickshell": { "entry": "Widget.qml" },
-        "plasma": { "applet": "org.kde.plasma.pager" }
+        "quickshell": {
+            "entry": "Widget.qml"
+        },
+        "plasma": {
+            "applet": "org.kde.plasma.pager"
+        }
     },
     "config": {
-        "showNames": { "type": "bool", "default": false, "label": "Show desktop names" },
-        "scrollToSwitch": { "type": "bool", "default": true, "label": "Switch by scrolling" }
+        "style": {
+            "type": "enum",
+            "values": [
+                "numbers",
+                "icons",
+                "dots"
+            ],
+            "default": "numbers",
+            "label": "Pills show",
+            "description": "numbers: the desktop's number. icons: the icons of the windows on it. dots: a dot. An empty desktop is always a dot."
+        },
+        "maxShown": {
+            "type": "int",
+            "default": 8,
+            "min": 1,
+            "max": 20,
+            "label": "Desktops shown",
+            "description": "At most this many; the current desktop is always among them."
+        },
+        "showNames": {
+            "type": "bool",
+            "default": false,
+            "label": "Show desktop names"
+        },
+        "scrollToSwitch": {
+            "type": "bool",
+            "default": true,
+            "label": "Switch by scrolling"
+        }
     }
 }

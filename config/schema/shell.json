@@ -21,12 +21,41 @@
                 },
                 "panel.thickness": {
                     "type": "int",
-                    "min": 20,
+                    "min": 28,
                     "max": 96,
                     "step": 2,
-                    "default": 40,
+                    "default": 56,
                     "label": "Thickness",
-                    "description": "Height of a horizontal panel, width of a vertical one."
+                    "description": "Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it."
+                },
+                "panel.style": {
+                    "type": "enum",
+                    "values": ["full", "floating", "islands"],
+                    "default": "full",
+                    "label": "Style",
+                    "description": "full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own."
+                },
+                "panel.spacing": {
+                    "type": "int",
+                    "min": 2,
+                    "max": 16,
+                    "default": 6,
+                    "label": "Spacing",
+                    "description": "The gap between widgets, in pixels."
+                },
+                "panel.iconSize": {
+                    "type": "int",
+                    "min": 15,
+                    "max": 26,
+                    "default": 19,
+                    "label": "Tray icon size",
+                    "description": "The size of the tray's and the status icons, in pixels."
+                },
+                "panel.revealOnHover": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Reveal on hover",
+                    "description": "With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say."
                 },
                 "panel.autoHide": {
                     "type": "bool",

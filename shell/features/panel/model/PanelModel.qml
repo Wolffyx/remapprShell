@@ -85,6 +85,16 @@ QtObject {
     // Hiding is per output as much as position is: a panel worth hiding on a
     // laptop screen is often worth keeping on a second monitor.
     function autoHideFor(name) { return ConfigStore.valueFor(name, "panel.autoHide", false) === true; }
+    function revealOnHoverFor(name) { return ConfigStore.valueFor(name, "panel.revealOnHover", true) !== false; }
+
+    // How it is drawn: a strip along the whole edge, a bar floating clear
+    // of it, or each zone as an island of its own. Anything else is "full".
+    function styleFor(name) {
+        const s = ConfigStore.valueFor(name, "panel.style", "full");
+        return s === "floating" || s === "islands" ? s : "full";
+    }
+    function spacingFor(name) { return ConfigStore.valueFor(name, "panel.spacing", 6); }
+    function iconSizeFor(name) { return ConfigStore.valueFor(name, "panel.iconSize", 19); }
     function horizontalFor(name) {
         const p = root.positionFor(name);
         return p === "top" || p === "bottom";
