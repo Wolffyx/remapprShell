@@ -117,6 +117,16 @@ if they fail.
     the right text, but only when asked for over IPC. Whether hover reaches it
     by the two routes described under "Tooltips" -- and in particular through
     the tray's MouseArea -- needs a pointer.
+15. **Brightness and the keyboard layout, by hand.** Add `brightness` in
+    Settings → Widgets (neither widget is in this profile), then drag a
+    slider in the popout: the monitor should follow it without jerking back
+    as the reads come in. Also scroll on the icon, flick the Night Light
+    switch, and middle-click. Over IPC it is all proven -- `brightness step`
+    moved both monitors 1% and back, and `brightness nightLight` suspended
+    Night Light and resumed it -- but the popout was never actually *seen*:
+    a full-screen game covered DP-2 when the screenshots were taken. The
+    keyboard widget needs a second layout in System Settings before it
+    appears at all.
 
 ### The lesson this session paid for twice
 
@@ -291,6 +301,41 @@ are not.
   whenever plasmashell has one: two clipboard managers, one history file),
   and opening Plasma's clipboard applet with `plasmawindowed` (the same, in
   another process).
+- **Brightness and Night Light** — `brightness`. Plasma keeps its brightness
+  applet in the system tray, so under our renderer there was no way to dim a
+  screen or hold Night Light off from the panel. The keys never stopped
+  working: powerdevil handles them itself. A slider per display powerdevil
+  can dim (here: both monitors, over DDC), scroll to dim every screen at
+  once, middle-click to suspend Night Light, and a switch in the popout.
+  `BrightnessStatus` reads `org.kde.ScreenBrightness` (one busctl per
+  display, in one process) and KWin's `NightLight` object. Writes pass flag 1,
+  powerdevil's SuppressIndicator, since the slider is its own indicator --
+  verified: no call reached `/org/kde/osdService`. They are queued, and only
+  the latest value per display is sent once the previous write returns, which
+  over DDC takes a while. Night Light is suspended by **invoking KWin's own
+  "Toggle Night Color" shortcut** through kglobalaccel. `NightLight.inhibit`
+  is no use from busctl: KWin drops an inhibition as soon as the connection
+  that asked for it closes. The rules -- the 1% floor that keeps a scroll
+  from blacking out a panel, the five Night Light states, which glyph the
+  panel shows -- are in `StatusIcons`, tested.
+  Present wherever there is a display to dim or Night Light is available.
+- **Keyboard layout** — `keyboard`. The same story for Plasma's layout
+  indicator: KWin still switches, but nothing on screen said which layout
+  was on. It reads `org.kde.keyboard /Layouts`, shows the short name (or the
+  user's own label), a click moves to the next layout, and the wheel cycles
+  through them, one layout per whole notch. With a single layout it sets
+  `present: false` and takes no room, as it does on this machine, so it is in
+  every preset.
+
+  **Audit, 2026-09-11: nothing else Plasma's tray hosts is silently lost
+  under our renderer.** Every applet's `NEEDED` libraries and the live
+  kglobalaccel components were checked. Volume and media keys belong to the
+  kded modules `audioshortcutsservice` and `mprisservice` (components `kmix`
+  and `mediacontrol`, both active), brightness keys to powerdevil, and layout
+  switching to KWin. The notifications applet links `libKF6GlobalAccel` for
+  its own shortcuts, and we host it. What is left is display only: the
+  Caps Lock indicator, the camera/microphone-in-use indicator, KDE Connect,
+  and weather.
 - **Side panels.** The tray, the clock and the workspace pills lay out along
   the panel on either axis (the tray used to cut to two icons, the clock ran
   off the side), the tray's chevron points away from whichever edge the panel
@@ -413,7 +458,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 113. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 155. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -790,6 +835,18 @@ Non-obvious things that cost time to discover:
   so there is no second property to be out of step with. It counts the slots
   actually *shown*: counting entries kept an empty column for the hidden
   battery, and the zone sat ten pixels off its edge.
+- **Anything a DBus service ties to the caller's connection cannot be done
+  with busctl.** KWin's `NightLight.inhibit` is the example: the inhibition
+  lasts exactly as long as busctl does. Look for a shortcut or action that
+  the service itself carries out -- kglobalaccel's `invokeShortcut` on
+  `/component/kwin` did it here -- before writing a helper whose only job is
+  to hold a connection open.
+- **Check what is on screen before taking a screenshot or clicking the
+  panel.** The first screenshots of the brightness popout caught a
+  full-screen game on DP-2, which hid the panel entirely, so they proved
+  nothing -- and the IPC clicks, the 1% dim and the Night Light toggle had all
+  happened while the user was playing. `panel layout` and `status` answer
+  most questions without putting anything on screen.
 
 ## The plan
 
@@ -922,3 +979,20 @@ so `renderer set quickshell` now restarts plasmashell when it does.
 
 The machine ended the day on our renderer, with caelestia's bar still
 running and holding notifications. See the table at the top.
+
+## The second session of 2026-09-11
+
+Two widgets, for the two indicators Plasma keeps in its tray that still had
+nothing standing in for them under our renderer: `brightness` (with Night
+Light) and `keyboard`. See "Working today". Before either was built, every
+other tray applet was audited for a service it might be quietly providing,
+as the notifications applet had been; none was.
+
+Verified live, without a pointer and without writing to disk: both services
+read the real machine (two DDC monitors, Night Light `day` with "Warmer from
+19:34", one layout); powerdevil accepted and applied the writes; the OSD
+stayed down; the Night Light toggle went round and back; the brightness
+widget laid out at 24x24 beside the tray, and the keyboard widget took no
+room. The runtime layer that put them on the panel for that check has been
+cleared. The popout has never been seen; see item 15 under "What to check
+first".

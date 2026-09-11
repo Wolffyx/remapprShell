@@ -253,4 +253,119 @@ TestCase {
         compare(StatusIcons.pickPlayer([], "").current, -1);
         compare(StatusIcons.pickPlayer(null, "x").current, -1);
     }
+
+    // ---- brightness ------------------------------------------------------
+
+    // The reply powerdevil really gave here for an ASUS monitor over DDC.
+    readonly property string asus: '{"type":"a{sv}","data":[{"Brightness":{"type":"i","data":7500},'
+        + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"ASUSTek COMPUTER INC XG32AQ"},'
+        + '"MaxBrightness":{"type":"i","data":10000}}]}'
+
+    function test_bus_props_are_flattened() {
+        compare(StatusIcons.busProps(JSON.parse(asus).data).Label, "ASUSTek COMPUTER INC XG32AQ");
+        compare(Object.keys(StatusIcons.busProps(null)).length, 0);
+        compare(Object.keys(StatusIcons.busProps([])).length, 0);
+    }
+
+    function test_displays_are_read_one_per_line() {
+        const d = StatusIcons.brightnessDisplays([`display0 ${asus}`, ""]);
+        compare(d.length, 1);
+        compare(d[0].name, "display0");
+        compare(d[0].brightness, 7500);
+        compare(d[0].max, 10000);
+        compare(d[0].internal, false);
+    }
+
+    // A reply that is not JSON, or a display with no range, is not a screen
+    // at 0% -- it is not listed at all.
+    function test_unreadable_displays_are_dropped() {
+        const noRange = '{"type":"a{sv}","data":[{"Brightness":{"type":"i","data":5},'
+            + '"MaxBrightness":{"type":"i","data":0}}]}';
+        compare(StatusIcons.brightnessDisplays(["display1 Failed to get", `display2 ${noRange}`, "lonely"]).length, 0);
+    }
+
+    function test_brightness_steps_in_percent_of_the_range() {
+        compare(StatusIcons.stepBrightness(5000, 10000, 1, 5), 5500);
+        compare(StatusIcons.stepBrightness(5000, 10000, -2, 5), 4000);
+        compare(StatusIcons.stepBrightness(9800, 10000, 1, 5), 10000);
+    }
+
+    // A laptop panel with a range of 15 still moves, and in whole steps.
+    function test_a_short_range_still_moves() {
+        compare(StatusIcons.stepBrightness(7, 15, 1, 5), 8);
+        compare(StatusIcons.stepBrightness(7, 15, -1, 5), 6);
+    }
+
+    // Scrolling down stops at 1%: the bottom of the range is a black screen
+    // on some panels.
+    function test_scrolling_never_reaches_black() {
+        compare(StatusIcons.stepBrightness(300, 10000, -5, 5), 100);
+        compare(StatusIcons.stepBrightness(1, 15, -1, 5), 1);
+        compare(StatusIcons.brightnessFloor(10000), 100);
+        compare(StatusIcons.brightnessFloor(15), 1);
+    }
+
+    // Dimmed below the floor elsewhere: scrolling down leaves it there
+    // rather than brightening it, and scrolling up starts from where it is.
+    function test_below_the_floor_is_not_snapped_up() {
+        compare(StatusIcons.stepBrightness(0, 10000, -1, 5), 0);
+        compare(StatusIcons.stepBrightness(0, 10000, 1, 5), 500);
+    }
+
+    function nl(props) {
+        return Object.assign({ available: true, enabled: true, inhibited: false, currentTemperature: 6500 }, props);
+    }
+
+    function test_night_light_states() {
+        compare(StatusIcons.nightLightState({}), "unavailable");
+        compare(StatusIcons.nightLightState(nl({ available: false })), "unavailable");
+        compare(StatusIcons.nightLightState(nl({ enabled: false })), "off");
+        compare(StatusIcons.nightLightState(nl({ inhibited: true, currentTemperature: 4500 })), "suspended");
+        compare(StatusIcons.nightLightState(nl({ currentTemperature: 4500 })), "warm");
+        compare(StatusIcons.nightLightState(nl({})), "day");
+    }
+
+    // A day temperature set below neutral is a tinted screen in daylight.
+    function test_a_warm_day_is_warm() {
+        compare(StatusIcons.nightLightState(nl({ currentTemperature: 6000 })), "warm");
+    }
+
+    function test_night_light_label_gives_the_temperature() {
+        compare(StatusIcons.nightLightLabel(nl({ currentTemperature: 4500 })), "Night Light · 4500 K");
+        compare(StatusIcons.nightLightLabel(nl({ inhibited: true })), "Night Light is suspended");
+    }
+
+    // Night Light takes the panel icon while it tints, or while the user
+    // holds it off; otherwise it is the brightness.
+    function test_panel_icon() {
+        compare(StatusIcons.brightnessPanelIcon(0.8, true, "day"), "brightness-high");
+        compare(StatusIcons.brightnessPanelIcon(0.2, true, "off"), "brightness-low");
+        compare(StatusIcons.brightnessPanelIcon(0.8, true, "warm"), "redshift-status-on");
+        compare(StatusIcons.brightnessPanelIcon(0.8, true, "suspended"), "redshift-status-off");
+        compare(StatusIcons.brightnessPanelIcon(0, false, "day"), "redshift-status-day");
+    }
+
+    // ---- keyboard --------------------------------------------------------
+
+    // What KWin returned here: a(sss), one layout, no label of the user's.
+    function test_layouts_as_kwin_gives_them() {
+        const l = StatusIcons.keyboardLayouts([["us", "", "English (US)"], ["de", "", "German"], ["bad"]]);
+        compare(l.length, 2);
+        compare(l[1].long, "German");
+        compare(StatusIcons.keyboardLayouts(null).length, 0);
+    }
+
+    function test_layout_label() {
+        compare(StatusIcons.layoutLabel({ short: "us", display: "", long: "English (US)" }), "US");
+        compare(StatusIcons.layoutLabel({ short: "ru", display: "Рус", long: "Russian" }), "Рус");
+        compare(StatusIcons.layoutLabel(null), "");
+    }
+
+    function test_cycle_wraps_both_ways() {
+        compare(StatusIcons.cycleIndex(2, 3, 1), 0);
+        compare(StatusIcons.cycleIndex(0, 3, -1), 2);
+        compare(StatusIcons.cycleIndex(1, 3, -4), 0);
+        compare(StatusIcons.cycleIndex(-1, 3, 1), 1);
+        compare(StatusIcons.cycleIndex(0, 0, 1), -1);
+    }
 }

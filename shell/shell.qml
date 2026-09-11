@@ -209,6 +209,24 @@ ShellRoot {
         function power(): string { return JSON.stringify(PowerStatus.summary()); }
         function media(): string { return JSON.stringify(MediaStatus.summary()); }
         function clipboard(): string { return JSON.stringify(ClipboardStatus.summary()); }
+        function brightness(): string { return JSON.stringify(BrightnessStatus.summary()); }
+        function keyboard(): string { return JSON.stringify(KeyboardStatus.summary()); }
+    }
+
+    // What the brightness widget does on a scroll and a middle click, for
+    // working on it without a pointer. Both go through the widget's own
+    // service, so they prove the same path a hand on the wheel would take.
+    IpcHandler {
+        target: "brightness"
+
+        function step(steps: string, percent: string): string {
+            BrightnessStatus.step(parseFloat(steps) || 0, parseInt(percent, 10) || 5);
+            return JSON.stringify(BrightnessStatus.displays.map(d => [d.name, d.brightness]));
+        }
+        function nightLight(): string {
+            BrightnessStatus.toggleNightLight();
+            return BrightnessStatus.nightState;
+        }
     }
 
     // Opens the clipboard widget's popout, for a shortcut: the first one on

@@ -184,12 +184,22 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "keyboard",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "bluetooth",
         "zone": "right",
         "enabled": true
       },
       {
         "id": "network",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "brightness",
         "zone": "right",
         "enabled": true
       },
@@ -227,8 +237,10 @@ when two copies of a widget should differ.
 | --- | --- | --- | --- |
 | Battery | `battery` | left, middle, right | `org.kde.plasma.battery` (in the tray) |
 | Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
+| Brightness and Night Light | `brightness` | left, middle, right | `org.kde.plasma.brightness` (in the tray) |
 | Clipboard | `clipboard` | left, middle, right | `org.kde.plasma.clipboard` (in the tray) |
 | Clock | `clock` | left, middle, right | `org.kde.plasma.digitalclock` |
+| Keyboard layout | `keyboard` | left, middle, right | `org.kde.plasma.keyboardlayout` (in the tray) |
 | Application launcher | `launcher` | left, middle, right | `org.kde.plasma.kickoff` |
 | Media | `media` | left, middle, right | `org.kde.plasma.mediacontroller` (in the tray) |
 | Network | `network` | left, middle, right | `org.kde.plasma.networkmanagement` (in the tray) |
@@ -252,6 +264,12 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `showPercentage` | `true` or `false` | `false` | Beside the icon. The icon alone moves in steps of ten. |
+
+### `widgets.brightness`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
 
 ### `widgets.clipboard`
 

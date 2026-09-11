@@ -44,12 +44,22 @@
                 "enabled": true
             },
             {
+                "id": "keyboard",
+                "zone": "right",
+                "enabled": true
+            },
+            {
                 "id": "bluetooth",
                 "zone": "right",
                 "enabled": true
             },
             {
                 "id": "network",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "brightness",
                 "zone": "right",
                 "enabled": true
             },

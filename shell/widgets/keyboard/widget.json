@@ -1,0 +1,14 @@
+{
+    "id": "keyboard",
+    "apiVersion": 1,
+    "name": "Keyboard layout",
+    "description": "Which keyboard layout is on; click for the next one, or scroll through them. Takes no room with only one layout configured.",
+    "icon": "input-keyboard",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.keyboardlayout", "inSystemTray": true }
+    },
+    "config": {}
+}

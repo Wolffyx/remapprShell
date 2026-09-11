@@ -21,4 +21,12 @@ QtObject {
             return;
         Quickshell.execDetached(["plasmawindowed", applet]);
     }
+
+    // A page of System Settings, by its module name ("kcm_nightlight"), for
+    // what no applet offers.
+    function openSettings(kcm) {
+        if (!kcm)
+            return;
+        Quickshell.execDetached(["systemsettings", kcm]);
+    }
 }

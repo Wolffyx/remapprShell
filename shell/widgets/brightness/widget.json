@@ -1,0 +1,23 @@
+{
+    "id": "brightness",
+    "apiVersion": 1,
+    "name": "Brightness and Night Light",
+    "description": "A slider per screen that can be dimmed -- a laptop panel, or a monitor over DDC -- and a switch to suspend Night Light. Scroll to dim every screen at once, middle-click to suspend Night Light.",
+    "icon": "brightness-high",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.brightness", "inSystemTray": true }
+    },
+    "config": {
+        "step": {
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "label": "Scroll step",
+            "description": "Percent per notch of the wheel."
+        }
+    }
+}
