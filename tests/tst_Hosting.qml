@@ -64,6 +64,25 @@ TestCase {
         compare(Hosting.decide(state({ shellPackage: "" })).start, []);
     }
 
+    function test_an_owned_name_is_provided() {
+        verify(Hosting.provided({ applet: "a", name: "org.x" }, { "org.x": true }, []));
+        verify(!Hosting.provided({ applet: "a", name: "org.x" }, { "org.x": false }, []));
+    }
+
+    // The device notifier holds no bus name; its tray item is the only sign
+    // that it is already there.
+    function test_a_nameless_applet_is_provided_by_its_tray_item() {
+        const dn = { applet: "org.kde.plasma.devicenotifier", name: "" };
+        verify(!Hosting.provided(dn, {}, []));
+        verify(Hosting.provided(dn, {}, ["plasmawindowed_org.kde.plasma.devicenotifier"]));
+    }
+
+    // Running, but its name went elsewhere: starting it again would not help.
+    function test_a_hosted_applet_counts_even_without_its_name() {
+        verify(Hosting.provided({ applet: "org.kde.plasma.notifications", name: "org.freedesktop.Notifications" },
+                                {}, ["plasmawindowed_org.kde.plasma.notifications"]));
+    }
+
     function test_not_when_turned_off() {
         compare(Hosting.decide(state({ enabled: false })).start, []);
         compare(Hosting.decide(null).start, []);

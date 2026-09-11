@@ -321,15 +321,27 @@ stop_hosted_services() {
     local pid name owner
     pid=$(busctl --user status org.kde.plasmawindowed 2>/dev/null | sed -n 's/^PID=//p')
     [ -n "$pid" ] || return 0
+    local hosting=0 it id
     for name in org.freedesktop.Notifications org.kde.klipper; do
         owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
-        if [ "$owner" = "$pid" ]; then
-            log_info "closing Plasma's applets hosted for the quickshell renderer (plasmawindowed, pid $pid);"
-            log_info "  the new panel's tray provides notifications and the clipboard"
-            kill "$pid" 2>/dev/null || true
-            return 0
-        fi
+        [ "$owner" = "$pid" ] && hosting=1
     done
+    # The device notifier holds no bus name; its tray item, which only
+    # --statusnotifier creates, says it is there.
+    if [ "$hosting" = 0 ]; then
+        while read -r it; do
+            [ -n "$it" ] || continue
+            id=$(busctl --user get-property "${it%%/*}" "/${it#*/}" org.kde.StatusNotifierItem Id 2>/dev/null \
+                 | sed -e 's/^s "//' -e 's/"$//')
+            [ "$id" = plasmawindowed_org.kde.plasma.devicenotifier ] && hosting=1
+        done < <(busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+                   org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null \
+                 | grep -o '"[^"]*"' | tr -d '"')
+    fi
+    [ "$hosting" = 1 ] || return 0
+    log_info "closing Plasma's applets hosted for the quickshell renderer (plasmawindowed, pid $pid);"
+    log_info "  the new panel's tray provides notifications, the clipboard and the device notifier"
+    kill "$pid" 2>/dev/null || true
 }
 
 # The other direction: a switch to quickshell asks the running shell to look

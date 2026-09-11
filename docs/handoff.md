@@ -232,7 +232,11 @@ are not.
 
   The fix hosts **Plasma's own applets** outside any panel:
   `plasmawindowed --statusnotifier org.kde.plasma.notifications` (and
-  `...clipboard`). The applet stays alive with its service, and shows as one
+  `...clipboard`, and `...devicenotifier`, so a USB stick being plugged in is
+  announced and has somewhere to be ejected from). The device notifier holds
+  no bus name, so "already provided" also means plasmawindowed already shows
+  the applet's tray item, whose Id is `plasmawindowed_<applet>`
+  (`Hosting.provided`). The applet stays alive with its service, and shows as one
   item in our tray -- where Plasma's notification history and do-not-disturb
   are then reached. Nothing is reimplemented. `domain/backend/PlasmaServices`
   decides with a tested pure rule (`qs.domain.backend.hosting`): only under

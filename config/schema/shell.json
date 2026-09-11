@@ -155,12 +155,12 @@
             "id": "services",
             "label": "Plasma services",
             "icon": "preferences-system",
-            "description": "Plasma's notifications and its clipboard history live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
+            "description": "Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
             "keys": {
                 "services.hostPlasma": {
                     "type": "bool",
                     "default": true,
-                    "label": "Keep Plasma's notifications and clipboard running",
+                    "label": "Keep Plasma's notifications, clipboard and device notifier running",
                     "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
                 }
             }

@@ -8,6 +8,19 @@ pragma Singleton
 import QtQuick
 
 QtObject {
+    // Whether a service is already provided: its bus name has an owner, or
+    // plasmawindowed already shows it in the tray -- whose item it names
+    // "plasmawindowed_<applet>". The second covers an applet with no name of
+    // its own to hold (the device notifier), and an applet that is running but
+    // whose name went to someone else: starting it again would not help.
+    function provided(service, ownedNames, hostedIds) {
+        if (!service)
+            return true;
+        if (service.name && (ownedNames ?? {})[service.name] === true)
+            return true;
+        return (hostedIds ?? []).indexOf(`plasmawindowed_${service.applet}`) >= 0;
+    }
+
     // s: {
     //   enabled       the user has not turned it off
     //   renderer      panel.renderer

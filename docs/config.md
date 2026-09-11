@@ -80,7 +80,7 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 
 ### Plasma services
 
-Plasma's notifications and its clipboard history live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
+Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
