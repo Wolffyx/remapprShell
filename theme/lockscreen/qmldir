@@ -1,0 +1,4 @@
+singleton PasswordSync 1.0 PasswordSync.qml
+Unlock 1.0 Unlock.qml
+LockUi 1.0 LockUi.qml
+LockOsd 1.0 LockOsd.qml

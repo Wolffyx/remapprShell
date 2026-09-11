@@ -46,7 +46,19 @@ export "$NO_SESSION_VAR=1"
 # reading an unset key was reading the real desktop's answer.
 export XDG_CONFIG_DIRS=/etc/xdg
 
-for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-switcher test-update test-renderer test-redact test-report test-windows test-ask test-crash; do
+for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-switcher test-lockscreen test-update test-renderer test-redact test-report test-windows test-ask test-crash; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
 done
+
+# The lock screen in Plasma's real greeter. The suites above use a stand-in;
+# this is the check that catches what qmllint does not -- a type that is not
+# installed, which the greeter refuses by drawing its built-in locker. It runs
+# offscreen with no session bus, so nothing reaches the desktop.
+source "$REPO_ROOT/scripts/lib/lockscreen.sh"
+if lockscreen_greeter >/dev/null; then
+    log_step "lock screen, in Plasma's greeter"
+    "$REPO_ROOT/scripts/lockscreen.sh" check || exit 1
+else
+    log_warn "Plasma's greeter is not installed; the lock screen was not loaded"
+fi

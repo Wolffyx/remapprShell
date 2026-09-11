@@ -22,6 +22,7 @@ usage: @ALIAS@ <command> [options]
   windows enable|disable|status     the open-window list (needs a KWin script)
   edges status|set|snap|disable-all the screen's corners and edges (KWin's)
   switcher status|layout|give       Alt+Tab's look, and who gets Alt+Tab and Meta+Tab
+  lockscreen status|check|try|enable|disable  our lock screen (opt-in; try it first)
   shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page]                   open the settings window, on a page
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
@@ -64,6 +65,7 @@ case "$cmd" in
     profile)   require_repo; exec "$REPO_ROOT/scripts/profile.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     switcher)  require_repo; exec "$REPO_ROOT/scripts/switcher.sh" "$@" ;;
+    lockscreen) require_repo; exec "$REPO_ROOT/scripts/lockscreen.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 
     # Both talk to the running shell rather than reimplementing the choice, so

@@ -20,6 +20,7 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
@@ -131,6 +132,12 @@ install_shell_package() {
 
     cp -a "$src/contents/layouts" "$dest/contents/" || return 1
     cp -a "$src/contents/defaults" "$dest/contents/" || return 1
+
+    # The lock screen, when it is on, lives inside the package, so one
+    # installed afresh gets it back. See lockscreen.sh.
+    if lockscreen_enabled && [ ! -e "$dest/contents/lockscreen" ]; then
+        lockscreen_install_into "$id" || log_warn "could not put the lock screen back into $id"
+    fi
     log_debug "installed $dest"
 }
 

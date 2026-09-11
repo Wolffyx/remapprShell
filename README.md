@@ -57,6 +57,7 @@ rmpr renderer set plasma             # switch, with a restore point and a rollba
 rmpr wizard             # re-run the first-run wizard
 rmpr report create      # write a local diagnostic bundle
 rmpr report show        # read the newest one
+rmpr lockscreen status  # which lock screen the next lock will draw
 rmpr status
 ```
 
@@ -130,6 +131,33 @@ rmpr theme osd plasma   # back to Plasma's
 
 `rmpr doctor` reports the combination that would show two, and the one that
 would show none.
+
+### The lock screen
+
+Plasma's greeter locks the screen, checks the password and draws the lock
+screen; that stays the default. Ours is only the drawing -- a clock over the
+wallpaper, and at a key the prompt, on a blurred copy of it -- and it is off
+until you have unlocked it yourself:
+
+```bash
+rmpr lockscreen try       # shows it for real; unlock it with your password
+rmpr lockscreen enable    # only after a successful try of this exact build
+rmpr lockscreen disable   # Plasma's again from the next lock
+```
+
+`try` covers the screens and takes the keyboard exactly as a lock does, but
+locks nothing, and closes by itself after 90 seconds if it is not unlocked.
+The greeter's own exit status is the test: it ends successfully only once the
+password was right. `enable` installs the copy that was tried, and asks for a
+new try after a kscreenlocker update. `enable` also prints the way back, for
+the case that matters: from a text console (Ctrl+Alt+F3),
+`loginctl unlock-session <id>`, then `rmpr lockscreen disable`, which needs no
+desktop to run.
+
+Plasma 6 reads the lock screen from the shell package plasmashell is on, so
+ours lives in this project's own shell packages, and no KDE setting is
+written. `rmpr lockscreen check` loads it in Plasma's real greeter, offscreen
+and without touching your session, and `make test` runs it.
 
 ### Diagnostic reports
 

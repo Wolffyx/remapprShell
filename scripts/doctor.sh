@@ -12,6 +12,7 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
+source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 
 problems=0
 warnings=0
@@ -339,6 +340,47 @@ elif [ "$osd_silenced" = yes ]; then
 else
     warn "our OSD is on and Plasma's is not silenced; you will see two"
     fix "silence Plasma's: $ALIAS theme osd ours"
+fi
+
+# ---------------------------------------------------------------- lock screen
+
+section "lock screen"
+
+if ! lockscreen_enabled; then
+    ok "Plasma's lock screen draws; ours is off ($ALIAS lockscreen status)"
+else
+    ls_hash=$(cat "$LOCKSCREEN_ENABLED")
+    for p in "${LOCKSCREEN_PACKAGES[@]}"; do
+        [ -d "$PLASMA_SHELLS_DIR/$p" ] || continue
+        d=$(lockscreen_installed_dir "$p")
+        if [ ! -f "$d/$LOCKSCREEN_MARKER" ]; then
+            warn "ours is on, but not installed in $p"
+            fix "put it back: $ALIAS lockscreen enable"
+        elif [ "$(lockscreen_hash "$d")" != "$ls_hash" ]; then
+            bad "the lock screen in $p is not the build that was tried"
+            fix "take it out ($ALIAS lockscreen disable), then try and enable it again"
+        fi
+    done
+    if greeter=$(lockscreen_greeter); then
+        if [ "$(lockscreen_greeter_id "$greeter")" != "$(jq -r '.greeter // empty' "$LOCKSCREEN_MARK" 2>/dev/null)" ]; then
+            warn "Plasma's greeter has changed since our lock screen was tried"
+            fix "to be sure it still unlocks: $ALIAS lockscreen try"
+        fi
+        if out=$(lockscreen_check "$LOCKSCREEN_TRIED" 2>&1); then
+            ok "ours is on, and loads in this greeter"
+        else
+            bad "ours is on, and does not load cleanly in this greeter:"
+            printf '%s\n' "$out" | sed 's/^/        /'
+            fix "the greeter draws its own when ours fails to load; to take ours out: $ALIAS lockscreen disable"
+        fi
+    else
+        warn "ours is on, but Plasma's greeter was not found to check it with"
+    fi
+    live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default org.kde.plasma.desktop)
+    case " ${LOCKSCREEN_PACKAGES[*]} " in
+        *" $live_pkg "*) ;;
+        *) warn "plasmashell is on $live_pkg, so its lock screen is drawn rather than ours" ;;
+    esac
 fi
 
 # --------------------------------------------------------------- diagnostics
