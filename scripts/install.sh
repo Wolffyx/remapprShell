@@ -129,16 +129,20 @@ while IFS='|' read -r kind src dest; do
     esac
 done < <(manifest_entries)
 
+# Both of these reach the user's real session whatever $HOME says, so neither
+# runs for an install into a throwaway HOME (the update suite makes one).
+in_session() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+
 # systemd caches unit files; without this the unit is invisible until the next
 # login, and `rmpr start` fails with a confusing "unit not found".
-if command -v systemctl >/dev/null 2>&1; then
+if in_session && command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload 2>/dev/null || true
 fi
 
 # The bus caches its list of activatable names the same way. Without this the
 # window daemon is "not activatable" until the next login, which looks exactly
 # like the daemon being broken.
-if [ "$MODE" != uninstall ] && command -v busctl >/dev/null 2>&1; then
+if in_session && [ "$MODE" != uninstall ] && command -v busctl >/dev/null 2>&1; then
     busctl --user call org.freedesktop.DBus / org.freedesktop.DBus ReloadConfig 2>/dev/null || true
 fi
 

@@ -21,6 +21,11 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
+# A throwaway HOME does not sandbox the user's systemd instance. Without this,
+# a test updating a copy of the repo restarted the real, running shell -- and
+# every run of the suite did exactly that, until 2026-09-11.
+session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+
 MODE=update
 LOCAL_SOURCE=""
 CHANNEL=""
@@ -79,7 +84,11 @@ if [ "$MODE" = rollback ]; then
     fi
 
     "$REPO_ROOT/scripts/install.sh" --link >/dev/null || die "reinstall failed"
-    systemctl --user restart "$SYSTEMD_UNIT" 2>/dev/null || true
+    if session_available; then
+        systemctl --user restart "$SYSTEMD_UNIT" 2>/dev/null || true
+    else
+        log_info "no session: not restarting the shell"
+    fi
     log_step "rolled back"
     exit 0
 fi
@@ -231,7 +240,9 @@ fi
 
 # --------------------------------------------------------------------- restart
 
-if systemctl --user is-active "$SYSTEMD_UNIT" >/dev/null 2>&1; then
+if ! session_available; then
+    log_info "no session: not restarting the shell"
+elif systemctl --user is-active "$SYSTEMD_UNIT" >/dev/null 2>&1; then
     log_step "restarting"
     systemctl --user restart "$SYSTEMD_UNIT"
     sleep 3

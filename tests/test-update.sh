@@ -19,6 +19,10 @@ mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$HOME/.local/bin
 source "$SOURCE_REPO/scripts/lib/log.sh"
 REPO_ROOT="$SOURCE_REPO" source "$SOURCE_REPO/scripts/lib/brand.sh"
 
+# The sandbox HOME does not sandbox systemd. Until this was set, the update
+# below restarted the user's real, running shell on every run of the suite.
+export "$NO_SESSION_VAR=1"
+
 pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
@@ -39,6 +43,7 @@ check "starts at the old version" "$(cat "$INSTALLED/VERSION")" "$(cat "$SOURCE_
 
 echo "== update --from =="
 "$INSTALLED/scripts/update.sh" --from "$NEWER" >"$SANDBOX/out" 2>&1
+check "the real shell is left running" "$(grep -c 'no session: not restarting' "$SANDBOX/out")" "1"
 rc=$?
 [ "$rc" -eq 0 ] || { echo "update failed:"; sed 's/^/    /' "$SANDBOX/out"; }
 

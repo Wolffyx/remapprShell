@@ -25,6 +25,15 @@ ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 QML_XHR_ALLOW_FILE_READ=1 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 
 # Shell-level tests, each inside its own throwaway HOME.
+#
+# A HOME is not a session. systemd and the session bus are the user's real
+# ones whatever $HOME says, so every suite runs with the switch that keeps our
+# scripts away from them -- set here once, rather than trusted to each suite.
+# One suite without it (test-update) restarted the user's running shell on
+# every run until 2026-09-11.
+source "$REPO_ROOT/scripts/lib/brand.sh"
+export "$NO_SESSION_VAR=1"
+
 for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-update test-renderer test-redact test-report test-windows test-ask test-crash; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
