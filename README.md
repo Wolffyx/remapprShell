@@ -33,7 +33,8 @@ default.
 ## Development
 
 ```bash
-make link     # symlink into ~/.config/quickshell/<slug>; edits are live
+make link     # symlink into ~/.config/quickshell/<slug>; most edits reload live,
+              # a widget's own files need `rmpr reload`
 make run      # run in the foreground against the working tree
 make lint     # slug, layer and QML lints
 make test     # QML tests, plus shell tests in a throwaway HOME

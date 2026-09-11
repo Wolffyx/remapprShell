@@ -32,8 +32,13 @@ QtObject {
     readonly property string wizardDoneFile: `${root.stateDir}/wizard-done`
 
     // Widgets the user installed, deliberately outside the Quickshell config
-    // directory: Quickshell reloads its entire config on any change beneath
-    // that directory, so editing a plugin there would restart the whole shell.
+    // directory, which belongs to the shell and is replaced by an update.
+    //
+    // (This used to say Quickshell reloads on any change beneath that
+    // directory. Measured on 2026-09-11, it does not: it reloads for files
+    // the config imported when it loaded, and not for a widget's own files,
+    // which are loaded later by a Loader, nor for a singleton only such a
+    // widget uses. `rmpr reload` is for those.)
     readonly property string userWidgetsDir: `${Branding.dataDir}/widgets`
 
     function profileDir(profile) {

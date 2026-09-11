@@ -19,7 +19,7 @@ brand: ## Regenerate all generated files (branding, qmldir, widget index)
 	@scripts/gen-widget-index.sh
 	@scripts/gen-colors.sh
 
-link: ## Symlink the shell into place (development; edits are live)
+link: ## Symlink the shell into place (development; widget edits need `rmpr reload`)
 	@scripts/install.sh --link
 
 install: ## Copy the shell into place (frozen install)

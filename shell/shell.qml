@@ -319,6 +319,18 @@ ShellRoot {
         property string name: ""
     }
 
+    // Quickshell reloads by itself only for files the config imported when it
+    // loaded. A widget's own files come in later, through a Loader, and so
+    // does a singleton only a widget uses; editing one of those changes
+    // nothing on screen until this is called. Measured, not assumed: an edit
+    // to the show-desktop widget and to Desktops.qml sat unloaded for minutes
+    // while the running shell looked current.
+    IpcHandler {
+        target: "shell"
+
+        function reload(): void { Quickshell.reload(false); }
+    }
+
     IpcHandler {
         target: "wizard"
 

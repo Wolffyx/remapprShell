@@ -28,6 +28,7 @@ usage: @ALIAS@ <command> [options]
   update [--check|--rollback]       update the shell
   log [-f]                          show the shell's journal
   start | stop | restart            control the user service
+  reload                            reload the running shell's QML (after editing a widget)
   version                           print the version
 
 Anything not listed here is not implemented yet.
@@ -83,6 +84,12 @@ case "$cmd" in
 
     wizard)
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call wizard open
+        ;;
+
+    # Quickshell notices edits only to files the config imported at load; a
+    # widget's own files are loaded later and are not watched.
+    reload)
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call shell reload
         ;;
 
     search)

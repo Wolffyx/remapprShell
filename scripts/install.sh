@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs, links or removes the shell, driven entirely by scripts/lib/manifest.sh.
 #
-#   --link       symlink source dirs into place (development; edits are live)
+#   --link       symlink source dirs into place (development; most edits reload
+#                live, a widget's own files need `rmpr reload`)
 #   --copy       copy them (frozen install)
 #   --uninstall  remove everything the manifest owns
 #
