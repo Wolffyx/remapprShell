@@ -304,6 +304,41 @@ write_renderer_setting() {
     log_debug "set panel.renderer=$target in $file"
 }
 
+# --- Plasma's tray-only services -------------------------------------------
+
+# Under the quickshell renderer the shell hosts Plasma's notifications and
+# clipboard applets with plasmawindowed, because nothing else would provide
+# them (shell/domain/backend/PlasmaServices.qml). Any other renderer has a
+# Plasma tray that is about to provide the same services, and a hosted copy
+# still holding org.freedesktop.Notifications -- or running a second Klipper
+# beside Plasma's -- would win against it. So the host goes first.
+#
+# Only when it really is hosting one of them: plasmawindowed is also what a
+# widget's "..." button opens Plasma's applets in, and a window the user
+# opened is not ours to close.
+stop_hosted_services() {
+    session_available || return 0
+    local pid name owner
+    pid=$(busctl --user status org.kde.plasmawindowed 2>/dev/null | sed -n 's/^PID=//p')
+    [ -n "$pid" ] || return 0
+    for name in org.freedesktop.Notifications org.kde.klipper; do
+        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        if [ "$owner" = "$pid" ]; then
+            log_info "closing Plasma's applets hosted for the quickshell renderer (plasmawindowed, pid $pid);"
+            log_info "  the new panel's tray provides notifications and the clipboard"
+            kill "$pid" 2>/dev/null || true
+            return 0
+        fi
+    done
+}
+
+# The other direction: a switch to quickshell asks the running shell to look
+# again at once, rather than wait for a bus name to change hands.
+rehost_services() {
+    session_available || return 0
+    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call services rehost >/dev/null 2>&1 || true
+}
+
 # --- reporting -------------------------------------------------------------
 
 compat_report() {
@@ -446,6 +481,8 @@ case "$cmd" in
 
         hold_outgoing_layout
 
+        [ "$target" != quickshell ] && stop_hosted_services
+
         install_packages || die "could not install the shell packages; nothing was switched"
 
         # Both layouts are regenerated, not only the target's. The one we are
@@ -493,6 +530,9 @@ case "$cmd" in
                 f=$(appletsrc_path "$p")
                 [ -f "$BACKUP_DIR/$(basename "$f")" ] && cp -a "$BACKUP_DIR/$(basename "$f")" "$f"
             done
+            # The hosted services were stopped for a switch that did not
+            # happen; without them, notifications would now be dropped.
+            rehost_services
             die "rolled back; nothing changed"
         fi
 
@@ -523,6 +563,10 @@ case "$cmd" in
         else
             restart_plasmashell
         fi
+
+        # No Plasma tray from here on: the shell hosts its notifications and
+        # clipboard now rather than whenever it next notices.
+        [ "$target" = quickshell ] && rehost_services
 
         if [ "$target" = caelestia ]; then
             bound=$(jq '[.entries[] | select(.scope == "shortcuts")] | length' "$(kconfig_ledger)" 2>/dev/null || echo 0)

@@ -20,6 +20,7 @@ import qs.features.wizard
 import qs.domain.notifications
 import qs.domain.diagnostics
 import qs.domain.status
+import qs.domain.backend
 import qs.features.diagnostics
 
 ShellRoot {
@@ -121,6 +122,19 @@ ShellRoot {
     // Referenced so the eavesdrop starts with the shell when it is wanted,
     // rather than the first time a widget happens to look at it.
     readonly property bool _notificationsWanted: NotificationWatch.enabled
+
+    // Referenced so Plasma's tray-only services are looked after from the
+    // moment the shell starts. Under our renderer, without this, every
+    // notification is dropped: see PlasmaServices.
+    readonly property var _plasmaServices: PlasmaServices.decision
+
+    IpcHandler {
+        target: "services"
+
+        function status(): string { return JSON.stringify(PlasmaServices.summary()); }
+        function reconcile(): void { PlasmaServices.reconcile(); }
+        function rehost(): void { PlasmaServices.rehost(); }
+    }
 
     // What the tray host can see, which is otherwise only knowable by looking
     // at the panel. `doctor` reads it, and so does anyone working out why an

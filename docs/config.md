@@ -71,12 +71,20 @@ The volume and brightness popup. Plasma draws it by default and works well; ours
 
 ### Notification history
 
-Plasma draws every notification and keeps doing so. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.
+Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
+
+### Plasma services
+
+Plasma's notifications and its clipboard history live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
 
 ### AI assist
 

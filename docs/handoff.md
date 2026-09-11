@@ -87,7 +87,14 @@ if they fail.
     2026-09-11 every one opened at the left edge of the screen (see "A binding
     on a function call" below). Over IPC they land in the right place now; by
     hand is still worth a look.
-12. **The clipboard under our own renderer.** With plasmashell on our
+12. **Notifications under our own renderer -- first.** With plasmashell on
+    our package and the shell running, `rmpr doctor` should name
+    plasmawindowed as the provider of notifications and clipboard, the tray
+    should hold two new icons, and `notify-send hello` should draw Plasma's
+    own popup. If doctor says nothing provides notifications, every
+    notification is being dropped -- which is what this renderer did until
+    2026-09-11.
+13. **The clipboard under our own renderer.** With plasmashell on our
     package, confirm first that `org.kde.klipper` really is gone
     (`busctl --user status org.kde.klipper`), then copy two things and open
     the clipboard widget: both should be listed, as "this shell keeps the
@@ -96,7 +103,7 @@ if they fail.
     reading them), and the fallback's `wl-paste --watch` pipeline recording
     the current clipboard. Not verified: choosing an entry, in either mode --
     it writes to the user's clipboard.
-13. **Rest the pointer on a widget.** Every tooltip has been seen drawn, with
+14. **Rest the pointer on a widget.** Every tooltip has been seen drawn, with
     the right text, but only when asked for over IPC. Whether hover reaches it
     by the two routes described under "Tooltips" -- and in particular through
     the tray's MouseArea -- needs a pointer.
@@ -208,6 +215,44 @@ are not.
   follows; matching on the title, tried first, left the video listed twice. MPRIS
   does not announce the position as it moves, so it is asked once a second
   while playing. In the defaults and every preset but minimal.
+- **Plasma services — notifications were being dropped.** The most serious
+  finding of 2026-09-11. Plasma's notification server is not in plasmashell:
+  it is `libnotificationmanager`, and apart from the task manager and the
+  settings page the only thing loading it is the notifications applet's QML
+  plugin (`org/kde/notificationmanager`). Our renderer's shell package has no
+  system tray, so under it **nobody owns `org.freedesktop.Notifications`**.
+  An application sending one then triggers bus activation, and here that goes
+  nowhere: dbus-broker ignores Plasma's activation file as a duplicate of
+  mako's ("Ignoring duplicate name ... org.kde.plasma.Notifications.service"),
+  and systemd skips mako on KDE (`ConditionEnvironment=!XDG_CURRENT_DESKTOP=KDE`,
+  logged as skipped). The notification is dropped. The previous boot's journal
+  has nine `WaitForName: Service was not registered within timeout` between
+  12:28 and 14:58 on 2026-09-10 -- while the quickshell renderer was being
+  worked on. Klipper is the same story (below).
+
+  The fix hosts **Plasma's own applets** outside any panel:
+  `plasmawindowed --statusnotifier org.kde.plasma.notifications` (and
+  `...clipboard`). The applet stays alive with its service, and shows as one
+  item in our tray -- where Plasma's notification history and do-not-disturb
+  are then reached. Nothing is reimplemented. `domain/backend/PlasmaServices`
+  decides with a tested pure rule (`qs.domain.backend.hosting`): only under
+  the quickshell renderer, only when plasmashell is on our own package (so no
+  Plasma tray can be about to provide them), only for a name nobody owns, and
+  each applet at most once per run -- quitting one from its tray menu is
+  respected. It looks again whenever either name changes hands.
+  `rmpr renderer set` stops the host before switching to a renderer with a
+  Plasma tray (only if plasmawindowed actually owns one of the names -- a
+  window opened from a widget's "..." button is not ours to close), and asks
+  the shell to rehost after switching to quickshell or rolling back.
+  `services.hostPlasma` turns it off. `rmpr doctor` has a "Plasma services"
+  section naming who provides each, and calls no notification owner a
+  problem. IPC: `services status|reconcile|rehost`.
+
+  Verified here: the hosting mechanism itself, with a harmless applet (one
+  tray item per applet, a second applet handed to the same process, the item
+  gone the instant the process is). Not verified: hosting the notifications
+  applet for real, which needs plasmashell on our package -- see "What to
+  check first".
 - **Clipboard** — `clipboard`. Under our renderer there is **no clipboard
   history at all** without it, and Meta+V does nothing: Klipper is not a
   program in Plasma 6 but `libklipper`, and the only thing on the system that
@@ -315,7 +360,10 @@ are not.
 - **Notification history** — `notifications.history`, off by default. A
   `busctl monitor` match on `Notify` method calls to
   `org.freedesktop.Notifications`, the OSD listener's pattern: Plasma keeps
-  the name and keeps drawing, we read what goes past. Memory only, capped by
+  the name and keeps drawing, we read what goes past. (Under our renderer
+  that was **not true** until 2026-09-11 -- nobody held the name and every
+  notification was dropped; the history recorded calls no one answered. See
+  "Plasma services".) Memory only, capped by
   `notifications.historySize`, never written to disk -- a notification body is
   the sort of thing a person would not expect to find in a file later. The
   `notifications` widget is a bell with an unseen badge and a popout list; its
@@ -375,7 +423,8 @@ are not.
   second TTY open and a tested way back (`loginctl unlock-session` from
   Ctrl+Alt+F2, or `rmpr theme revert`), and gate it behind its own flag rather
   than folding it into `theme apply`.
-- **Opt-in notifications.** Plasma owns `org.freedesktop.Notifications` and a
+- **Opt-in notifications.** Plasma owns `org.freedesktop.Notifications` --
+  its tray does, and under our renderer the applet we host does -- and a
   second owner cannot have it, so this is a genuine takeover rather than the
   listen-and-draw the OSD turned out to be. Not attempted. The eavesdrop needed
   for a notification history is verified to work (above).
@@ -683,6 +732,22 @@ Non-obvious things that cost time to discover:
   screen until a restart. They are placed with `x`/`y` bindings now, which are
   simply re-evaluated. Found because tooltips were being clamped to the screen
   edge -- their slots had left it.
+- **A Plasma service that looks like plasmashell's may belong to an applet.**
+  Notifications and Klipper both run inside plasmashell's process, and both
+  exist only because an applet in the system tray loaded them. Check with the
+  libraries' `NEEDED` entries (`readelf -d`), not with `busctl status`, which
+  only says which process holds the name today. The same question is worth
+  asking of anything else Plasma's tray hosts: device notifier, keyboard
+  layout, brightness.
+- **Seeing a method call on the bus proves nothing about who answered it.**
+  The notification history recorded every `Notify` call through a whole
+  session in which nobody owned the name; the calls went out, and nothing
+  received them. `busctl --user status <name>` at the time says whether
+  anyone could have.
+- **dbus-broker ignores a second activation file for the same name.** With
+  both mako and Plasma installed, mako's file wins -- and mako's unit refuses
+  to start on KDE. Where two activation files claim a name, read the journal
+  for "Ignoring duplicate name" before assuming either works.
 - **Right after the panel changes edge, everything is mid-animation.** The
   panel's thickness animates over 120 ms, and the surface is placed from the
   window's width, so `panel layout` asked straight after a switch to the left
@@ -796,8 +861,11 @@ Two smaller things from the same run:
 
 ## Where the session of 2026-09-11 left off
 
-Four commits. The fourth: the clipboard widget, after finding that our
-renderer leaves the desktop with no Klipper at all. The third: the media
+Five commits. The fifth, and the one that matters most: under our renderer
+nobody was receiving notifications at all; Plasma's own notifications and
+clipboard applets are now hosted outside the panel. The fourth: the
+clipboard widget, after finding that our renderer leaves the desktop with no
+Klipper at all. The third: the media
 widget, and every built-in widget drawn properly on a side panel. The second: tooltips for every widget; `EdgeWindow`, which
 places both popouts and tooltips on any panel edge; and the panel no longer
 coming apart when its edge is changed while it runs (bottom → left → bottom

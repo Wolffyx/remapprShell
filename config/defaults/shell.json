@@ -89,6 +89,9 @@
         "history": false,
         "historySize": 50
     },
+    "services": {
+        "hostPlasma": true
+    },
     "ai": {
         "enabled": false,
         "provider": "clipboard",

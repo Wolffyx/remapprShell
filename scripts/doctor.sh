@@ -432,6 +432,28 @@ else
     ok "no notification listener; nothing on the bus is read"
 fi
 
+# ------------------------------------------------------------ Plasma services
+
+section "Plasma services"
+
+# Plasma's notification server and Klipper live in its system tray, not in
+# plasmashell. Where there is no Plasma tray -- our own renderer -- they exist
+# only because the shell hosts them, and with no owner at all a notification
+# is not queued or shown anywhere: it is dropped.
+for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
+    name=${pair%%:*}; what=${pair#*:}
+    comm=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^Comm=//p')
+    if [ -n "$comm" ]; then
+        ok "$what: provided by $comm"
+    elif [ "$name" = org.freedesktop.Notifications ]; then
+        bad "nothing provides notifications: every notification sent now is dropped"
+        fix "under the quickshell renderer the shell hosts Plasma's own: $ALIAS start (and services.hostPlasma on)"
+    else
+        warn "nothing provides $what"
+        fix "the clipboard widget keeps a history of its own meanwhile; Plasma's comes back with the shell"
+    fi
+done
+
 # ------------------------------------------------------------------- optional
 
 section "optional components"

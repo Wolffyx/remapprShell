@@ -132,7 +132,7 @@
             "id": "notifications",
             "label": "Notification history",
             "icon": "notifications",
-            "description": "Plasma draws every notification and keeps doing so. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.",
+            "description": "Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts. This only remembers what went past, so a notification that disappeared can be read again -- and, with AI assist on, asked about.",
             "keys": {
                 "notifications.history": {
                     "type": "bool",
@@ -148,6 +148,20 @@
                     "default": 50,
                     "label": "Remember",
                     "description": "How many recent notifications to keep."
+                }
+            }
+        },
+        {
+            "id": "services",
+            "label": "Plasma services",
+            "icon": "preferences-system",
+            "description": "Plasma's notifications and its clipboard history live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
+            "keys": {
+                "services.hostPlasma": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Keep Plasma's notifications and clipboard running",
+                    "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
                 }
             }
         },
