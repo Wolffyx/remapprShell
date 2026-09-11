@@ -121,8 +121,17 @@ kconfig_revert() {
     count=$(jq "$filter | length" "$led")
     [ "$count" -gt 0 ] || { log_info "nothing to revert${scope:+ for $scope}"; return 0; }
 
+    # Each field travels base64-encoded. jq's @tsv escapes a tab inside a
+    # value as a literal "\t", which kwriteconfig6 then writes back as a
+    # backslash: a shortcut bound to two keys ("Alt+Tab<tab>Meta+Tab") came
+    # back from a revert as one key with a backslash in it.
     local file group key had value
     while IFS=$'\t' read -r file group key had value; do
+        file=$(printf '%s' "$file" | base64 -d)
+        group=$(printf '%s' "$group" | base64 -d)
+        key=$(printf '%s' "$key" | base64 -d)
+        had=$(printf '%s' "$had" | base64 -d)
+        value=$(printf '%s' "$value" | base64 -d)
         local -a gargs=()
         mapfile -t gargs < <(_kconfig_group_args "$group")
 
@@ -133,7 +142,7 @@ kconfig_revert() {
             kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" --delete
             log_debug "kconfig: removed $file [$group] $key (was unset)"
         fi
-    done < <(jq -r "$filter | reverse | .[] | [.file, .group, .key, (.had|tostring), .value] | @tsv" "$led")
+    done < <(jq -r "$filter | reverse | .[] | [.file, .group, .key, (.had|tostring), .value] | map(@base64) | @tsv" "$led")
 
     # Drop only what was reverted; other scopes keep their records.
     local tmp

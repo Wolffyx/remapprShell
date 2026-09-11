@@ -27,6 +27,19 @@ check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
 
 read_key() { kreadconfig6 --file "$1" --group "$2" --key "$3" --default "<unset>" 2>/dev/null; }
 
+echo "== a value with a tab or a backslash comes back exactly =="
+# A shortcut bound to two keys is stored with a tab between them. Revert used
+# to carry values through jq's @tsv, which escaped the tab as a literal "\t"
+# that kwriteconfig6 then wrote back as a backslash.
+two=$(printf 'none,Alt+Tab\tMeta+Tab,Walk Through Windows')
+kwriteconfig6 --file kglobalshortcutsrc --group kwin --key Walk "$two"
+kwriteconfig6 --file kglobalshortcutsrc --group kwin --key Slash 'Meta+\,none,Back slash'
+kconfig_set roundtrip kglobalshortcutsrc kwin Walk "Alt+Tab,none,Walk Through Windows"
+kconfig_set roundtrip kglobalshortcutsrc kwin Slash "none,none,Back slash"
+kconfig_revert roundtrip >/dev/null 2>&1
+check "tab restored as a tab"     "$(read_key kglobalshortcutsrc kwin Walk)" "$two"
+check "backslash restored as one" "$(read_key kglobalshortcutsrc kwin Slash)" 'Meta+\,none,Back slash'
+
 # A key that already exists, and one that does not.
 kwriteconfig6 --file kdeglobals --group General --key ColorScheme "TheirScheme"
 

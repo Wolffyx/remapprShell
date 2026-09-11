@@ -34,6 +34,12 @@ QML_XHR_ALLOW_FILE_READ=1 "$RUNNER" -import "$IMPORT_ROOT" -input tests "$@"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 export "$NO_SESSION_VAR=1"
 
+# The same for reads. kreadconfig6 falls back through XDG_CONFIG_DIRS for a
+# key a file does not set, and on Plasma that starts with the user's own
+# ~/.config/kdedefaults -- an absolute path no sandbox HOME changes. A suite
+# reading an unset key was reading the real desktop's answer.
+export XDG_CONFIG_DIRS=/etc/xdg
+
 for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-update test-renderer test-redact test-report test-windows test-ask test-crash; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
