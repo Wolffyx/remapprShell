@@ -748,6 +748,17 @@ Non-obvious things that cost time to discover:
   only says which process holds the name today. The same question is worth
   asking of anything else Plasma's tray hosts: device notifier, keyboard
   layout, brightness.
+- **Switching shell packages live leaves the old tray's services behind.**
+  Found by the user's first real test of the hosting: after `renderer set
+  quickshell` from caelestia's layout, plasmashell -- switched with
+  `changeShell`, not restarted -- still owned `org.freedesktop.Notifications`
+  and `org.kde.klipper`. Both are process-wide singletons the previous tray's
+  applets created, and they outlive the applets. With no notifications applet
+  loaded, plasmashell accepted `notify-send hello` into its history and drew
+  no popup; the shell, seeing the name taken, rightly refused to start a
+  second server. `renderer set quickshell` now restarts plasmashell when it
+  still holds either name, and `rmpr doctor` calls plasmashell holding them on
+  our package a problem. Owning a bus name is not the same as doing the job.
 - **Seeing a method call on the bus proves nothing about who answered it.**
   The notification history recorded every `Notify` call through a whole
   session in which nobody owned the name; the calls went out, and nothing

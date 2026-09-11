@@ -344,6 +344,20 @@ stop_hosted_services() {
     kill "$pid" 2>/dev/null || true
 }
 
+# Whether plasmashell itself holds the notification or Klipper name -- which,
+# once it is on our package, can only be a leftover from the previous one.
+plasmashell_holds_tray_services() {
+    session_available || return 1
+    local shell name owner
+    shell=$(busctl --user status org.kde.plasmashell 2>/dev/null | sed -n 's/^PID=//p')
+    [ -n "$shell" ] || return 1
+    for name in org.freedesktop.Notifications org.kde.klipper; do
+        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        [ "$owner" = "$shell" ] && return 0
+    done
+    return 1
+}
+
 # The other direction: a switch to quickshell asks the running shell to look
 # again at once, rather than wait for a bus name to change hands.
 rehost_services() {
@@ -576,6 +590,19 @@ case "$cmd" in
             restart_plasmashell
         fi
 
+        # A live switch does not restart plasmashell, and its notification
+        # server and Klipper are process-wide singletons: created by the
+        # previous package's tray, they outlive it. On our package nothing
+        # draws their popups, and while plasmashell holds the names nothing
+        # else can serve them -- notifications are accepted and never shown.
+        # Seen on 2026-09-11 switching from caelestia's layout. Only a restart
+        # lets go of them.
+        if [ "$target" = quickshell ] && [ "$CHANGESHELL_OK" = 1 ] && plasmashell_holds_tray_services; then
+            log_info "plasmashell still holds the previous panel's notification server and clipboard;"
+            log_info "  restarting it so the shell can host Plasma's own in their place"
+            restart_plasmashell
+        fi
+
         # No Plasma tray from here on: the shell hosts its notifications and
         # clipboard now rather than whenever it next notices.
         [ "$target" = quickshell ] && rehost_services
@@ -592,7 +619,9 @@ case "$cmd" in
         fi
 
         log_step "now drawing with: $target"
-        log_info "undo with: $ALIAS renderer set quickshell"
+        # Not "set <whatever came before>": the ledger knows the shell package
+        # that was really in use, which is not always the one the profile named.
+        log_info "undo with: $ALIAS renderer revert"
         ;;
 
     revert)

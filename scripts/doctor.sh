@@ -440,10 +440,24 @@ section "Plasma services"
 # plasmashell. Where there is no Plasma tray -- our own renderer -- they exist
 # only because the shell hosts them, and with no owner at all a notification
 # is not queued or shown anywhere: it is dropped.
+live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null)
 for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
     name=${pair%%:*}; what=${pair#*:}
     comm=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^Comm=//p')
-    if [ -n "$comm" ]; then
+    # plasmashell holding one of these while it is on our package holds a
+    # leftover: the service was created by the previous package's tray and
+    # outlived it, because switching packages live does not restart
+    # plasmashell. The name is taken, so nothing else can serve it -- and for
+    # notifications, the applet that draws popups is gone: they are accepted
+    # and never shown.
+    if [ "$comm" = plasmashell ] && [ "$live_pkg" = "$SHELL_PACKAGE_ID" ]; then
+        if [ "$name" = org.freedesktop.Notifications ]; then
+            bad "notifications: held by plasmashell with no notifications applet -- accepted, never shown"
+        else
+            warn "$what: held by plasmashell, left over from the previous panel"
+        fi
+        fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
+    elif [ -n "$comm" ]; then
         ok "$what: provided by $comm"
     elif [ "$name" = org.freedesktop.Notifications ]; then
         bad "nothing provides notifications: every notification sent now is dropped"
