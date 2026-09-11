@@ -291,10 +291,9 @@ BarWidget {
         Grid {
             id: flyout
 
-            readonly property int columns_: Math.min(6, Math.max(1, root.overflow.length))
-
-            columns: flyout.columns_
-            rows: -1
+            // As many columns as icons, up to six, then more rows. Only
+            // `columns` is set -- see ZoneRow.
+            columns: Math.min(6, Math.max(1, root.overflow.length))
             spacing: 8
 
             Repeater {

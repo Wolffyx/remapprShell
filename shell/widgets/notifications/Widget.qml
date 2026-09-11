@@ -87,7 +87,7 @@ BarWidget {
             readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
 
             implicitWidth: 380
-            implicitHeight: body.implicitHeight + 8
+            implicitHeight: body.implicitHeight
 
             Column {
                 id: body

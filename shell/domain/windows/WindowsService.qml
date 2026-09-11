@@ -33,10 +33,15 @@ QtObject {
 
     readonly property var activeWindow: root.windows.find(w => w.active) ?? null
 
+    // uuid -> when that window began asking for attention. See
+    // WindowEvents.attentionSince.
+    property var attentionSince: ({})
+
     function _apply(list) {
         if (list === null)
             return;   // unreadable: keep what we had rather than blanking
         root._answered = true;
+        root.attentionSince = WindowEvents.attentionSince(root.attentionSince, list, Date.now());
         root.windows = list;
     }
 
@@ -200,6 +205,11 @@ QtObject {
                     appName: root.appNameFor(window),
                     windows: [],
                     active: false,
+                    // Whether any of its windows is asking for attention,
+                    // and since when -- the earliest, so a second request
+                    // does not restart the flash.
+                    attention: false,
+                    attentionSince: 0,
                     // The first window's icon stands for the group: they are
                     // the same application, so it is the same icon.
                     iconName: root.iconFor(window),
@@ -208,9 +218,15 @@ QtObject {
                 order.push(key);
             }
 
-            byKey[key].windows.push(window);
+            const group = byKey[key];
+            group.windows.push(window);
             if (window.active)
-                byKey[key].active = true;
+                group.active = true;
+            const since = root.attentionSince[window.uuid] ?? 0;
+            if (since > 0) {
+                group.attention = true;
+                group.attentionSince = group.attentionSince > 0 ? Math.min(group.attentionSince, since) : since;
+            }
         }
 
         return order.map(key => byKey[key]);

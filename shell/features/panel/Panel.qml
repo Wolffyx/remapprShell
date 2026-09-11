@@ -5,6 +5,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import qs.core
 import qs.features.panel.model
 import qs.domain.theme
@@ -43,6 +44,7 @@ PanelWindow {
     // A popout keeps it out: the panel collapsing while a menu opened from it
     // is still on screen would drag the menu away from what opened it.
     readonly property bool revealed: !root.autoHide || root.pointerInside || root.openPopout !== null
+                                     || PanelModel.openPopoutSlot?.screenName === root.screenName
 
     // Leaving is delayed; arriving is not. A panel that vanished the instant
     // the pointer crossed its edge would flicker on the way to a widget near
@@ -135,6 +137,15 @@ PanelWindow {
         focus: true
         Keys.forwardTo: root.openPopout ? [root.openPopout] : []
 
+        // A press on the panel between widgets, or on one that takes no
+        // clicks, closes an open popout too. Beneath the zones, so a widget
+        // that does take the press gets it first.
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            onPressed: PanelModel.pressed(null)
+        }
+
         // Three zones. Left and right hug their edges; middle is centred on the
         // panel itself, not on the space left over between the other two, so a
         // long window title on the left cannot shove the clock off-centre.
@@ -166,6 +177,42 @@ PanelWindow {
             horizontal: root.horizontal
             x: root.horizontal ? parent.width - width - 8 : (parent.width - width) / 2
             y: root.horizontal ? (parent.height - height) / 2 : parent.height - height - 8
+        }
+    }
+
+    // A click anywhere off the panel closes an open popout, as a menu's does
+    // everywhere else. A layer surface has no popup grab to do that for it,
+    // so this is a transparent surface over the rest of the screen, shown
+    // only while a popout is open. It is on the top layer, beneath the popout
+    // on the overlay one (EdgeWindow), and leaves the panel's own strip
+    // uncovered, so a click on another widget still reaches that widget. One
+    // per panel, so a click on the other monitor closes it as well. The click
+    // that closes the popout goes no further -- as in Plasma, where the same
+    // click is taken by the popup's grab.
+    PanelWindow {
+        screen: root.screen
+        visible: PanelModel.openPopoutSlot !== null
+
+        anchors {
+            top: true
+            bottom: true
+            left: true
+            right: true
+        }
+        margins.top: root.position === "top" ? root.thickness : 0
+        margins.bottom: root.position === "bottom" ? root.thickness : 0
+        margins.left: root.position === "left" ? root.thickness : 0
+        margins.right: root.position === "right" ? root.thickness : 0
+
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        color: "transparent"
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            onPressed: PanelModel.closeOpenPopout()
         }
     }
 

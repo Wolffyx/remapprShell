@@ -110,7 +110,7 @@ BarWidget {
     popout: Component {
         Item {
             implicitWidth: 320
-            implicitHeight: body.implicitHeight + 8
+            implicitHeight: body.implicitHeight
 
             Column {
                 id: body

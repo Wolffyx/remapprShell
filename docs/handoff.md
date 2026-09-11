@@ -127,6 +127,19 @@ if they fail.
     a full-screen game covered DP-2 when the screenshots were taken. The
     keyboard widget needs a second layout in System Settings before it
     appears at all.
+16. **Popouts, as the user reported them.**
+    - Open the tray's chevron with several icons behind it: every icon
+      should be inside the flyout.
+    - Open it, then click the desktop or a window: it should close, and that
+      click should do nothing else.
+    - Open it, then click the launcher: the flyout closes and the launcher
+      opens.
+    - Get a message in Discord or ZapZap while another window has focus: its
+      taskbar button should flash orange, then stay orange until clicked.
+
+    None of this could be tried here. A full-screen game had the screen, and
+    popouts are now on the overlay layer, so they would have opened on top of
+    it.
 
 ### The lesson this session paid for twice
 
@@ -219,6 +232,32 @@ are not.
   Hover reaches the tooltip from wherever it actually arrives: the slot's
   MouseArea for widgets with `wantsHover`, and a HoverHandler on `BarWidget`
   (`hovered`) for the rest.
+- **Popouts behave like menus** (2026-09-11, from the user's report). Three
+  things were wrong. Every popout window was sized to its contents, with the
+  contents 8 px in from each edge, so every popout was 16 px too small. Most
+  hid it behind a fixed width and an extra 8 px of height. The tray's
+  flyout, a grid of fixed-size icons, lost its last column instead, which is
+  what "not responsive to the number of icons" was. The slot adds the margin
+  now, and the +8 workarounds are gone. Second, nothing but its own widget
+  closed a popout, because a layer surface has no popup grab to do it. Now
+  `PanelModel.openPopoutSlot` holds the one open popout. Opening another
+  closes it, and so does a press on any other widget or on the panel between
+  widgets. While one is open, each panel also shows a transparent top-layer
+  surface over the rest of its screen, and a press there closes it. Third,
+  popouts and tooltips moved to the overlay layer so they stay above that
+  surface. The task preview follows the pointer and opts out
+  (`popoutClosesOnOutsideClick: false`).
+- **Taskbar buttons ask for attention.** The KWin script now sends
+  `demandsAttention` and republishes whenever it changes. A button whose
+  window asks flashes orange (`PlasmaColors.neutral`) for six seconds, then
+  keeps a steady tint until the window is activated, which is when KWin
+  clears the request. When each request began is kept in
+  `WindowsService.attentionSince` (`WindowEvents.attentionSince`, tested),
+  because any change to the list rebuilds every button: a flash timed from
+  the button would restart whenever another window changed its title.
+  Verified: the reloaded script's list carries the field. Not seen: a button
+  actually flashing. Nothing asked for attention while this was built, and
+  no request was faked.
 - **Media** — `media`, the fifth applet Plasma keeps inside its tray and our
   tray therefore never had. Reads MPRIS through Quickshell: the title beside a
   play/pause glyph on the panel, middle-click to pause, and a popout with art,
@@ -476,7 +515,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 160. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 164. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -1038,3 +1077,8 @@ config (see "Non-obvious things"). Also worth knowing: **a `Write` that
 replaces a QML file wholesale may not trigger the live reload** -- the
 shell kept the old version until `shell.qml` was touched. Check that a
 diagnostic field you just added is there before trusting the answer.
+
+Then the user's report: popouts too small for their contents, none closing on
+a click elsewhere, and taskbar buttons that never asked for attention. See
+"Popouts behave like menus" and "Taskbar buttons ask for attention" under
+"Working today", and item 16 under "What to check first".

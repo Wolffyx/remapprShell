@@ -45,6 +45,10 @@ function describe(window) {
         pid: window.pid || 0,
         minimized: window.minimized === true,
         active: window.active === true,
+        // A message arrived, a dialog wants an answer: the window asked for
+        // attention (an X11 urgency hint, or activation requested while it
+        // was not allowed focus). KWin clears it when the window is activated.
+        demandsAttention: window.demandsAttention === true,
         // Which virtual desktop, so the panel can show only the current one if
         // asked to. `desktops` is a list; a window on all of them has none.
         desktops: (window.desktops || []).map(d => String(d.id))
@@ -75,6 +79,7 @@ function watch(window) {
     window.minimizedChanged.connect(publish);
     window.desktopsChanged.connect(publish);
     window.skipTaskbarChanged.connect(publish);
+    window.demandsAttentionChanged.connect(publish);
 }
 
 workspace.windowList().forEach(watch);

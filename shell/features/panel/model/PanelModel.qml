@@ -47,6 +47,35 @@ QtObject {
         root.slots = root.slots.filter(s => s !== slot);
     }
 
+    // The slot whose popout is open, or null. One at a time across every
+    // panel, the way menus behave everywhere else: opening one closes the
+    // last, and a press anywhere but on its own widget closes it. Popouts
+    // that follow the pointer do not take part (`popoutClosesOnOutsideClick`).
+    property var openPopoutSlot: null
+
+    function popoutOpened(slot) {
+        const previous = root.openPopoutSlot;
+        root.openPopoutSlot = slot;
+        if (previous && previous !== slot)
+            previous.closePopout();
+    }
+
+    function popoutClosed(slot) {
+        if (root.openPopoutSlot === slot)
+            root.openPopoutSlot = null;
+    }
+
+    function closeOpenPopout() {
+        root.openPopoutSlot?.closePopout();
+    }
+
+    // A press on the panel: on a widget (`slot`), or between widgets (null).
+    // The popout's own widget toggles it itself, so that press is left alone.
+    function pressed(slot) {
+        if (root.openPopoutSlot && root.openPopoutSlot !== slot)
+            root.closeOpenPopout();
+    }
+
     // Per-output values. A panel reads these rather than the ones above, so a
     // monitor override reaches the panel it describes; the globals remain for
     // anything not drawn per screen.

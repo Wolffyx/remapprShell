@@ -47,6 +47,12 @@ Item {
     // so this is opt-in rather than always on.
     property bool popoutGrabsFocus: false
 
+    // Whether a click anywhere else closes the popout, as a menu's does --
+    // and whether opening it closes whichever other popout is open. A popout
+    // that follows the pointer, like the task list's preview, closes by
+    // itself when the pointer leaves, and turns this off.
+    property bool popoutClosesOnOutsideClick: true
+
     // Whether there is anything to show. A battery widget on a desktop, or a
     // Bluetooth one on a machine with no adapter, sets this false and takes no
     // room on the panel -- rather than leaving a gap, or an icon for hardware

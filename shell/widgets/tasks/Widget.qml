@@ -50,6 +50,8 @@ BarWidget {
             appName: WindowsService.appNameFor(w),
             windows: [w],
             active: w.active === true,
+            attention: (WindowsService.attentionSince[w.uuid] ?? 0) > 0,
+            attentionSince: WindowsService.attentionSince[w.uuid] ?? 0,
             iconName: WindowsService.iconFor(w),
             iconFile: WindowsService.iconFileFor(w)
         }))
@@ -66,6 +68,14 @@ BarWidget {
     property int hoveredIndex: -1
 
     wantsHover: true
+
+    // The preview follows the pointer and closes when it leaves, so a click
+    // elsewhere has nothing to close.
+    popoutClosesOnOutsideClick: false
+
+    // How long a button flashes once its window asks for attention, before
+    // settling to a steady tint.
+    readonly property int flashMs: 6000
 
     implicitWidth: row.implicitWidth
     implicitHeight: root.bar.thickness
@@ -132,6 +142,54 @@ BarWidget {
                 opacity: button.isMinimized ? 0.55 : 1
 
                 Behavior on color { ColorAnimation { duration: 100 } }
+
+                // A window asking for attention -- a message arrived, a
+                // dialog wants an answer -- flashes its button for a few
+                // seconds and then keeps an orange tint until it is looked
+                // at, as Windows does. KWin clears the request when the window
+                // is activated, and the tint goes with it.
+                //
+                // The moment the request began is kept by WindowsService, not
+                // here: any change to the window list rebuilds every button,
+                // and a flash timed from the button would start over each
+                // time some other window changed its title.
+                readonly property bool wantsAttention: button.modelData.attention === true && !button.isActive
+                property bool flashing: false
+
+                function startFlash() {
+                    const left = root.flashMs - (Date.now() - (button.modelData.attentionSince ?? 0));
+                    button.flashing = button.wantsAttention && left > 0;
+                    if (button.flashing) {
+                        flashStop.interval = left;
+                        flashStop.restart();
+                    }
+                }
+
+                onWantsAttentionChanged: button.startFlash()
+                Component.onCompleted: button.startFlash()
+
+                Timer {
+                    id: flashStop
+                    onTriggered: button.flashing = false
+                }
+
+                Rectangle {
+                    id: attentionTint
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: PlasmaColors.neutral
+                    visible: button.wantsAttention
+                    opacity: 0.45
+
+                    SequentialAnimation on opacity {
+                        running: button.flashing
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.9; duration: 420; easing.type: Easing.InOutQuad }
+                        NumberAnimation { to: 0.15; duration: 420; easing.type: Easing.InOutQuad }
+                    }
+                }
+
+                onFlashingChanged: if (!button.flashing) attentionTint.opacity = 0.45
 
                 Row {
                     anchors.centerIn: parent

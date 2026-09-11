@@ -10,6 +10,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import qs.core
 
 PanelWindow {
@@ -83,7 +84,12 @@ PanelWindow {
 
     // The panel already reserves its strip; this must not reserve another.
     exclusionMode: ExclusionMode.Ignore
-    aboveWindows: true
+
+    // The overlay layer, above the top one. The surface that closes a popout
+    // when the screen around it is clicked (Panel.qml) is on the top layer,
+    // and the popout has to be above it: two surfaces on one layer stack in
+    // the order they were mapped, and both are mapped at the same moment.
+    WlrLayershell.layer: WlrLayer.Overlay
     color: "transparent"
 
     onVisibleChanged: {

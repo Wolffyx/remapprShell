@@ -36,6 +36,10 @@ QtObject {
             desktopFile: String(entry.desktopFile ?? ""),
             minimized: entry.minimized === true,
             active: entry.active === true,
+            // KWin's "this window wants you": an X11 urgency hint, or a
+            // Wayland client asking to be activated while it is not. KWin
+            // clears it when the window is activated.
+            attention: entry.demandsAttention === true,
             // A PNG the daemon lifted out of the window itself, for windows
             // that match no installed application. Empty for the rest.
             iconPath: String(entry.iconPath ?? "")
@@ -83,6 +87,24 @@ QtObject {
             return null;
 
         return root.parseList(String(data[0]));
+    }
+
+    // When each window began asking for attention, keyed by uuid: the moment
+    // from `previous` for a window still asking, `now` for one that has just
+    // started, and nothing for one that has stopped or is the active window.
+    // The task list flashes a button for a few seconds from that moment and
+    // then holds a steady tint; keeping the moment here rather than in the
+    // button is what stops every unrelated change to the list -- which
+    // rebuilds the buttons -- from starting the flash again.
+    function attentionSince(previous, windows, now) {
+        const out = ({});
+        for (const w of windows ?? []) {
+            if (!w || !w.attention || w.active)
+                continue;
+            const since = previous ? previous[w.uuid] : 0;
+            out[w.uuid] = since > 0 ? since : now;
+        }
+        return out;
     }
 
     // What to show for a window: its title, or its application when the title

@@ -123,6 +123,39 @@ TestCase {
         compare(groups["chrome"].length, 2);
     }
 
+    function test_attention_is_read() {
+        const list = WindowEvents.parseList(JSON.stringify([windowJson({ demandsAttention: true }), windowJson({ uuid: "b" })]));
+        compare(list[0].attention, true);
+        compare(list[1].attention, false);
+    }
+
+    function attentive(uuid, props) {
+        return Object.assign({ uuid: uuid, attention: true, active: false }, props ?? {});
+    }
+
+    // The moment a window began asking is kept while it keeps asking, so the
+    // flash is timed from the request -- not from whenever the list last
+    // changed for some other reason.
+    function test_attention_keeps_its_first_moment() {
+        let since = WindowEvents.attentionSince({}, [attentive("a")], 1000);
+        compare(since["a"], 1000);
+        since = WindowEvents.attentionSince(since, [attentive("a"), attentive("b")], 5000);
+        compare(since["a"], 1000);
+        compare(since["b"], 5000);
+    }
+
+    // Looked at, or no longer asking: forgotten, so asking again flashes again.
+    function test_attention_ends_when_answered() {
+        const since = WindowEvents.attentionSince({ a: 1000, b: 1000 },
+            [attentive("a", { active: true }), attentive("b", { attention: false })], 9000);
+        compare(Object.keys(since).length, 0);
+        compare(WindowEvents.attentionSince(since, [attentive("a")], 12000)["a"], 12000);
+    }
+
+    function test_attention_with_nothing() {
+        compare(Object.keys(WindowEvents.attentionSince(null, null, 1)).length, 0);
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
         // Lower-cased, which is what turns "Google-chrome" into an icon that

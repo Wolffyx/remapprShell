@@ -28,6 +28,13 @@ Item {
     // rather than under the start of the row.
     property real popoutCentre: 0
 
+    // Closes this slot's popout: another one has opened, or a click landed
+    // somewhere else. PanelModel decides when.
+    function closePopout() {
+        if (root.widget)
+            root.widget.popoutVisible = false;
+    }
+
     Connections {
         target: root.widget
         function onRequestPopout(name: string, centre: real): void {
@@ -63,7 +70,10 @@ Item {
     visible: root.widget?.present ?? true
 
     Component.onCompleted: PanelModel.addSlot(root)
-    Component.onDestruction: PanelModel.removeSlot(root)
+    Component.onDestruction: {
+        PanelModel.removeSlot(root);
+        PanelModel.popoutClosed(root);
+    }
 
     // ---- tooltip ----------------------------------------------------------
     //
@@ -131,6 +141,9 @@ Item {
         onPressed: {
             root.tooltipDue = false;
             root.tooltipForced = false;
+            // A press on any other widget closes the popout that is open, as
+            // clicking the taskbar closes the Start menu.
+            PanelModel.pressed(root);
         }
 
         onWheel: event => {
@@ -187,13 +200,28 @@ Item {
             ? WlrKeyboardFocus.Exclusive
             : WlrKeyboardFocus.None
 
-        implicitWidth: popout.popoutContent?.implicitWidth ?? 1
-        implicitHeight: popout.popoutContent?.implicitHeight ?? 1
+        // The contents plus the margin they sit inside. The window used to be
+        // exactly the contents' size, with the contents 8 px in from every
+        // edge -- so every popout was 16 px too small. Most hid it behind a
+        // fixed width and an extra 8 px of height; the tray's flyout, a grid
+        // of fixed-size icons, lost its last column instead.
+        readonly property int padding: 8
+        implicitWidth: (popout.popoutContent?.implicitWidth ?? 0) + 2 * popout.padding
+        implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding
 
-        // Tell the panel, so it takes the keyboard for as long as this is open
-        // and forwards what it receives here. A popout that only displays
+        // One popout open at a time, closed by a click anywhere else: see
+        // PanelModel. A preview that follows the pointer closes by itself and
+        // stays out of it.
+        //
+        // Then tell the panel, so it takes the keyboard for as long as this is
+        // open and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
+            if (popout.wanted && (root.widget?.popoutClosesOnOutsideClick ?? true))
+                PanelModel.popoutOpened(root);
+            else if (!popout.wanted)
+                PanelModel.popoutClosed(root);
+
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))
@@ -217,7 +245,7 @@ Item {
             Loader {
                 id: content
                 anchors.fill: parent
-                anchors.margins: 8
+                anchors.margins: popout.padding
                 // Built only while shown: a popout that is never opened should
                 // cost nothing, and one that is closed should not keep state.
                 active: popout.wanted
