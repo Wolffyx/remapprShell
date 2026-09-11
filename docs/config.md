@@ -126,6 +126,13 @@ What happens when the pointer is pushed into a corner or an edge of the screen, 
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
+### Switching windows
+
+What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Profiles
 
 Separate configurations you can switch between, and per-monitor overrides within each.

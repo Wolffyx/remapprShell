@@ -239,6 +239,13 @@
             "page": "edges"
         },
         {
+            "id": "switching",
+            "label": "Switching windows",
+            "icon": "preferences-system-tabbox",
+            "description": "What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked.",
+            "page": "switching"
+        },
+        {
             "id": "profiles",
             "label": "Profiles",
             "icon": "preferences-desktop-display",

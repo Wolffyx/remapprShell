@@ -39,9 +39,10 @@ rows are what that did.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | `rmpr theme apply` has been run: our Look-and-Feel package is active, colour schemes and switcher installed |
+| Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` would put them in place |
 | Window list | KWin script loaded, daemon answering, 9 windows |
-| Also running | caelestia's own Quickshell bar, alongside ours; krohnkite |
+| Also running | caelestia's own Quickshell bar, alongside ours. krohnkite is installed but **not loaded** (`isScriptLoaded krohnkite` false, `krohnkiteEnabled=false`, read 2026-09-11) |
+| Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries. KWin's `Walk Through Windows` (Alt+Tab) is unbound, and caelestia holds Meta+Tab |
 | `rmpr doctor` | no problems, 5 warnings -- two of them the service being down, plus the competing shell and krohnkite |
 
 ### What to check first, before building anything
@@ -149,6 +150,24 @@ if they fail.
     None of this could be tried here. A full-screen game had the screen, and
     popouts are now on the overlay layer, so they would have opened on top of
     it.
+17. **Screen edges, by hand.** `rmpr settings edges`. Pick the bottom-right
+    corner on the picture, choose "Show the desktop", then push the pointer
+    into that corner: the windows should go. Turn the master switch off: the
+    corner should do nothing, and dragging a window to the top of the screen
+    should not maximise it. Turn it on: both come back exactly. "Plasma's
+    screen edge settings" should open System Settings on KWin's page, and
+    after changing a corner there, the refresh button should show it.
+    Verified: every command the page runs, by the suite (53 checks) and
+    read-only against this machine's kwinrc; the page drawn offscreen with
+    the real data (see "Rendering a page without a screen"). Never clicked.
+18. **Peek, and the strip under the pointer.** Set `widgets.showdesktop.peek`
+    in Settings -> Widgets, then rest the pointer on the strip at the end of
+    the panel: after half a second the windows go, and moving away brings
+    them back. A click while peeking keeps the desktop. Separately, and with
+    peek off: the strip should now light up under the pointer, which it
+    could never do before, and after Meta+D its tooltip should say "Bring
+    the windows back". Verified: the reloaded shell watches `/KWin` and reads
+    `showingDesktop`. The peek itself needs a pointer.
 
 ### The lesson this session paid for twice
 
@@ -505,6 +524,47 @@ are not.
   click that lands on it. The content keeps its full thickness and slides,
   rather than being squashed, so a reveal does not re-lay-out every widget
   twice. It reserves no space while hiding is on.
+- **Screen edges** (2026-09-11, §D of the plan) -- Settings -> Screen edges,
+  `rmpr settings edges`. A picture of a screen with its eight corners and
+  edges and what each does, a dropdown for the one picked, window snapping,
+  and the master switch that turns every mouse trigger off at once. The page
+  runs `rmpr edges` for everything, including the new `status --json`, and
+  never writes kwinrc itself.
+
+  KWin's model is kept rather than flattened: a *border* action (show
+  desktop, search, lock, activities, Plasma's launcher) is the corner's own
+  value in `[ElectricBorders]`; an *effect* holds a list of edges in its own
+  group. `set` puts an edge in exactly one place and takes it out of every
+  other list, writing only keys whose value changes. The effect keys were
+  read out of KWin 6.7's own config modules (`strings` on
+  `kwin_overview_config.so` and `kwin_windowview_config.so`): the grid is
+  `Effect-overview GridBorderActivate`, because KWin 6.1 removed the desktop
+  grid effect, and the `Effect-desktopgrid` key `edges` used to write was
+  read by nothing. Window view has current-desktop, all-desktops and
+  this-application keys.
+
+  The master switch writes to a ledger scope of its own, `edges-off`, and
+  `enable-all` reverts exactly that scope -- which needed the ledger to
+  record a key once *per scope* rather than once overall. Before, the only
+  way back from `disable-all` was `revert`, which also undid every corner
+  set before it. A corner or snap change while the switch is off is refused,
+  since turning it on would overwrite it. `revert` undoes `edges-off` first,
+  then `edges`. Loaded tiling scripts (krohnkite, bismuth, polonium, kzones)
+  are named beside the snap switch. The trigger delay, corner size and
+  touch edges are left to KWin's own page, one button away.
+- **Show desktop follows KWin, and can peek.** The strip used to keep its own
+  flag, flipped on its own clicks, so Meta+D or a hot corner left it saying
+  the opposite of what was on screen. `Desktops.showingDesktop` reads KWin's
+  property and follows `showingDesktopChanged`. `widgets.showdesktop.peek`
+  (off by default, as in Windows) shows the desktop while the pointer rests
+  on the strip; a click while peeking keeps it. It is KWin's show-desktop
+  underneath, so the windows move away rather than turn to glass.
+
+  The strip takes hover from the panel so that it is clickable at all, and
+  the slot's MouseArea then covered the strip's own HoverHandler: its hover
+  highlight could never have lit. The slot passes its hover down as
+  `BarWidget.hostHovered`, folded into `hovered`, so `hovered` means the same
+  thing for every widget.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys
@@ -721,7 +781,8 @@ would have caught it.
 ## How to work on it
 
 ```bash
-make link     # symlink into ~/.config/quickshell/<slug>; edits are live
+make link     # symlink into ~/.config/quickshell/<slug>; most edits reload
+              # live, a widget's own files need `rmpr reload`
 make run      # foreground, against the working tree
 make lint     # slug, layer and QML lints -- do NOT pipe it, see below
 make test     # QML suite plus shell suites in throwaway HOMEs
@@ -991,6 +1052,32 @@ Non-obvious things that cost time to discover:
   nothing -- and the IPC clicks, the 1% dim and the Night Light toggle had all
   happened while the user was playing. `panel layout` and `status` answer
   most questions without putting anything on screen.
+- **Quickshell does not watch a widget's files.** It reloads for files the
+  config imported when it loaded -- touching `BarWidget.qml` reloads at once
+  -- and not for a widget's own `Widget.qml`, which `WidgetHost` loads later
+  with `Loader.setSource`, nor for a singleton only a widget uses
+  (`Desktops.qml`, first used by the show-desktop strip). Edits to both sat
+  unloaded for minutes while the shell looked current; the tell was a
+  `gdbus monitor` on `/KWin` that should have been running and was not.
+  After editing a widget, run `rmpr reload`. This is also what the previous
+  session's "a Write failed to trigger the reload" was: it was a widget
+  file, and the observation was right before it was called wrong.
+- **The shell-restart fix had a twin.** `shortcuts.sh` restarted
+  `plasma-kglobalaccel.service` after every write, with no session check,
+  and `test-shortcuts.sh` writes three times and reverts once: four restarts
+  of the user's global-shortcut server per `make test`, in the journal at
+  each run. `edges.sh` asked the real KWin to reload the same way.
+  `session_available` is now defined once, in `brand.sh`, and both suites
+  put fakes for `systemctl`, `kquitapp6`, `qdbus6` and `busctl` on PATH and
+  check that nothing reached them. The question to ask of any new script:
+  what here reaches the running desktop, and is it behind the check?
+- **Rendering a page without a screen.** Copy `shell/` into the scratchpad,
+  put a `preview.qml` at its root that shows the page in a `FloatingWindow`
+  inside a `Rectangle`, run it with `QT_QPA_PLATFORM=offscreen`, and
+  `grabToImage` the Rectangle after a few seconds. The window's
+  `contentItem` refuses ("item has no QML engine"). The page's processes
+  still run, so it draws real data, and nothing appears on the user's
+  screen -- used here because a Meet window was open.
 
 ## The plan
 
@@ -1146,9 +1233,11 @@ that Chrome was recording with nothing on screen to show it. The rule was
 right the first time and the tests passed; the live answer was still empty
 until three Quickshell PipeWire behaviours were pinned down in a throwaway
 config (see "Non-obvious things"). It was written at the time that a
-wholesale `Write` of a QML file had failed to trigger the live reload. **That
-was wrong.** The "reload" that brought the new code in was the test suite
-restarting the whole shell; see "The test suite restarted the real shell".
+wholesale `Write` of a QML file had failed to trigger the live reload, and
+then that this was wrong, because the "reload" that brought the new code in
+was the test suite restarting the whole shell. Both were true. The file was
+a widget's, and Quickshell does not watch those -- measured in the third
+session; see "Quickshell does not watch a widget's files".
 
 Then the user's report: popouts too small for their contents, none closing on
 a click elsewhere, and taskbar buttons that never asked for attention. See
@@ -1159,3 +1248,33 @@ Then the active-window widget, which finishes Phase 2 of the plan, and the
 task list's per-monitor option that the same data made cheap. Then task
 buttons that behave like Windows': minimise on the active one, middle-click
 for a new instance, a right-click jump list, and pinned applications.
+
+## The third session of 2026-09-11
+
+Picked up §D of the plan, the one part of it with a CLI and no page. In
+order:
+
+| commit | what |
+| --- | --- |
+| `37b8fc1` | the test suite restarted the user's global shortcuts |
+| `fd693af` | a settings page for the screen edges; the master switch reversible on its own; the dead `desktopgrid` key |
+| `604b919` | peek at the desktop, and a strip that knows whether it is showing |
+| `91cd1ca` | `rmpr reload`, for the widget edits Quickshell does not see |
+
+The first and the last were found while doing the others, and both by
+measuring: the kglobalaccel restarts were in the journal at the times of
+`make test`, and the stale widget was a monitor process that should have
+existed and did not. The shell's PID was the same before and after every
+test run this session (611253).
+
+Nothing was clicked and nothing was put on the user's screen: a Meet window
+was open, so the settings page was rendered offscreen instead. Items 17 and
+18 under "What to check first" are what needs a pointer.
+
+**Next, from §D:** Alt+Tab and Win+Tab. On this machine KWin's own
+`Walk Through Windows` is unbound (`none`) and caelestia holds Meta+Tab for
+its own overview, so the shortcut half is "report who holds the key, and
+bind KWin's Overview only when asked", as `shortcuts` already does for our
+actions. The switcher's look is `kwinrc [TabBox] LayoutName` (ours is
+installed by `theme apply`; `thumbnail_grid` is selected). After that, from
+§C: `theme.widgetStyle` and `rmpr theme install-style union`.

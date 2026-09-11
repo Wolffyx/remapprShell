@@ -20,6 +20,9 @@ usage: @ALIAS@ <command> [options]
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
   windows enable|disable|status     the open-window list (needs a KWin script)
+  edges status|set|snap|disable-all the screen's corners and edges (KWin's)
+  switcher status|layout|give       Alt+Tab's look, and who gets Alt+Tab and Meta+Tab
+  shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page]                   open the settings window, on a page
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   wizard                            re-run the first-run wizard
@@ -60,6 +63,7 @@ case "$cmd" in
     update)    require_repo; exec "$REPO_ROOT/scripts/update.sh" "$@" ;;
     profile)   require_repo; exec "$REPO_ROOT/scripts/profile.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
+    switcher)  require_repo; exec "$REPO_ROOT/scripts/switcher.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
 
     # Both talk to the running shell rather than reimplementing the choice, so
