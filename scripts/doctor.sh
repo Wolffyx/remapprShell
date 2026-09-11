@@ -11,6 +11,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 problems=0
 warnings=0
@@ -255,12 +256,13 @@ else
 fi
 
 if command -v kreadconfig6 >/dev/null 2>&1; then
-    scripts_loaded=$(ls "$XDG_DATA_HOME/kwin/scripts" 2>/dev/null | tr '\n' ' ' || true)
-    if [ -n "$scripts_loaded" ]; then
-        warn "KWin scripts installed: $scripts_loaded"
-        fix "a tiling script and edge tiling can both claim the same drag"
+    tilers=$(kwin_tiling_scripts | tr '\n' ' ')
+    if [ -n "$tilers" ]; then
+        warn "tiling script enabled: $tilers"
+        fix "it and KWin's edge snapping can both claim a window dragged to an edge;"
+        fix "turn snapping off in: $ALIAS settings edges"
     else
-        ok "no third-party KWin scripts"
+        ok "no tiling script enabled"
     fi
 fi
 

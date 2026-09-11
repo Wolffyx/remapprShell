@@ -23,6 +23,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 # KWin's ElectricBorder enum. 9 is ElectricNone -- a binding set to 9 is off,
 # which is why an edge can read as "configured" and still do nothing.
@@ -118,16 +119,6 @@ require_triggers_on() {
 
 snap_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default true; }
 
-# Tiling scripts take a window dragged to an edge for themselves, and so does
-# KWin's snapping. Named, so the settings page can say so beside the switch.
-TILING_SCRIPTS=(krohnkite bismuth polonium kzones)
-tiling_scripts() {
-    local s
-    for s in "${TILING_SCRIPTS[@]}"; do
-        [ "$(kreadconfig6 --file kwinrc --group Plugins --key "${s}Enabled" --default false)" = true ] && printf '%s\n' "$s"
-    done
-}
-
 reconfigure() {
     session_available || return 0
     qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
@@ -182,7 +173,7 @@ status_json() {
         --argjson maximize "$([ "$(snap_key ElectricBorderMaximize)" = true ] && echo true || echo false)" \
         --argjson customised "$customised" \
         --argjson actions "$actions" \
-        --arg scripts "$(tiling_scripts)" \
+        --arg scripts "$(kwin_tiling_scripts)" \
         '{
             triggers: $triggers,
             edges: (split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: .[1]}) | from_entries),
@@ -213,7 +204,7 @@ case "$cmd" in
         echo "window snapping:"
         printf '  %-12s %s\n' "tiling"   "$(snap_key ElectricBorderTiling)"
         printf '  %-12s %s\n' "maximise" "$(snap_key ElectricBorderMaximize)"
-        scripts=$(tiling_scripts | tr '\n' ' ')
+        scripts=$(kwin_tiling_scripts | tr '\n' ' ')
         [ -n "$scripts" ] && printf '  %-12s %s-- dragging to an edge may go to it instead\n' "tiling script" "$scripts"
         echo
         echo "ledger (what revert would undo):"
