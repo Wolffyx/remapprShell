@@ -191,6 +191,23 @@ if they fail.
     `*union*.so` glob and its key against "Union" in `scripts/theme.sh`
     before trusting the button. "Install the missing parts" is a real
     `theme apply` on this machine -- see the state table.
+21. **Notifications drawn by the shell.** Settings -> Notifications, "Drawn
+    by": shell. On this machine caelestia's bar holds the notification
+    service, so at first nothing changes: `quickshell ipc -p
+    ~/.config/quickshell/remappr-shell/shell.qml call notifications server`
+    should say `serving: true, ours: false` and name caelestia's quickshell,
+    and doctor should warn the same. Stop caelestia's bar and the shell
+    should take the name at once (`ours: true`). Then `notify-send -i
+    dialog-information hello world` should pop up beside the clock, go
+    after six seconds, stay while the pointer rests on it and close on a
+    click; `notify-send -A yes=Yes question` should print `yes` when the
+    button is pressed; with AI assist on, "Ask" should open the consent
+    window on it. The bell's popout gains a do-not-disturb switch. Back to
+    plasma, the popups stop, and the shell hosts Plasma's applet again once
+    the name is free. Verified: all of it on a private session bus,
+    offscreen, including the hand-over from a stand-in for our hosted
+    applet. Not seen: a popup on the real screen -- its placement, its icon
+    (offscreen has no icon theme), the hover hold.
 
 ### The lesson this session paid for twice
 
@@ -614,6 +631,26 @@ are not.
   names the theme parts that are not installed and offers a plain `theme
   apply` -- which now keeps a silenced OSD silenced, rather than copying
   Plasma's back over it.
+- **Notifications drawn by the shell** (Phase 8, opt-in) --
+  `notifications.server` "shell", default "plasma". A Quickshell
+  NotificationServer on org.freedesktop.Notifications and popups in a
+  corner beside the panel (`NotificationPopups`, `NotificationCard`), with
+  an "Ask" button on each when AI assist is on: the plan's second tier.
+  Whether to serve is `Hosting.serveNotifications`, beside the hosting rule
+  and tested -- only under our renderer with plasmashell on our package --
+  and while serving, Plasma's notifications applet is not hosted. It never
+  takes the name from another holder: Quickshell's server waits and
+  registers when the name is let go of (measured). The one holder it does
+  close is our own hosted Plasma applet, which it exists to replace
+  (`handOverNotifications`, only when plasmawindowed really holds the
+  name). renderer.sh asks the shell to let go before a switch to a renderer
+  with a Plasma tray, because it writes panel.renderer only after the
+  switch. The popup rules are `qs.domain.notifications.popups`, tested:
+  critical ones stay and are never pushed off, the application's timeout is
+  kept, the pointer holds a popup, the body is plain text, do-not-disturb
+  holds back all but critical. Deadlines live in the service, because the
+  popup list is rebuilt on every change. IPC: `notifications
+  server|dnd|dismissAll|release`.
 - **Generated docs** — `docs/config.md` comes from the schema and the widget
   manifests; `make lint` fails when it is stale. A schema section carrying both
   `page` and `keys` renders as the page in the settings window while its keys
@@ -679,7 +716,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 13 shell suites in throwaway HOMEs, plus a QML suite of 173. All
+- **Tests** — 13 shell suites in throwaway HOMEs, plus a QML suite of 196. All
   green. Suites touching KDE put fakes for `systemctl`, `kquitapp6`,
   `qdbus6` and `busctl` on PATH and check nothing reached them.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
@@ -704,11 +741,9 @@ are not.
   second TTY open and a tested way back (`loginctl unlock-session` from
   Ctrl+Alt+F2, or `rmpr theme revert`), and gate it behind its own flag rather
   than folding it into `theme apply`.
-- **Opt-in notifications.** Plasma owns `org.freedesktop.Notifications` --
-  its tray does, and under our renderer the applet we host does -- and a
-  second owner cannot have it, so this is a genuine takeover rather than the
-  listen-and-draw the OSD turned out to be. Not attempted. The eavesdrop needed
-  for a notification history is verified to work (above).
+- ~~**Opt-in notifications.**~~ Built, opt-in and off by default; see
+  "Notifications drawn by the shell" under "Working today". It takes the
+  name from nobody but our own hosted Plasma applet.
 - **Open-window list** — built, and no longer blocked. KWin implements
   `org_kde_plasma_window_management` and not `zwlr_foreign_toplevel_manager_v1`,
   so Quickshell's `ToplevelManager` sees nothing here and
@@ -1148,6 +1183,48 @@ Non-obvious things that cost time to discover:
   `/kglobalaccel`, then `allShortcutInfos` on a component, gives each
   action's keys as Qt key codes (301989970 is Meta+Shift+R): the way to
   check that a binding in the file actually took, without pressing it.
+- **Quickshell's NotificationServer waits for the name.** A second server
+  logs "Could not register ... Registration will be attempted again if the
+  active service is unregistered", and does. So a server can exist while
+  another program holds the name without fighting it -- which is also how
+  caelestia's bar got the name first on 2026-09-11.
+- **A private bus is not private from what it activates -- and it broke the
+  real desktop once.** `dbus-run-session` gives a throwaway session bus,
+  the right place to try a notification server. But whatever the code
+  under test starts there activates more. PlasmaServices hosted
+  plasmawindowed before the probe switched hosting off, which brought up
+  kactivitymanagerd, xdg-desktop-portal, ksecretd and the document portal;
+  four outlived the session, and a pipe they held open hung the command.
+  Worse, the user's **real** `xdg-document-portal.service` exited (status
+  21) at 18:51:42, in the same second: the document portal's FUSE
+  mountpoint, `/run/user/1000/doc`, is the same path whichever bus a copy
+  of it runs on. Flatpak apps lost portal file access until it was noticed
+  in the journal ten minutes later and restarted by hand (`systemctl
+  --user start xdg-document-portal.service`, after checking the
+  mountpoint was a clean empty directory). The rule: on a private bus,
+  nothing may start Plasma applets or anything else that activates
+  services -- a probe config sets `services.hostPlasma` false before
+  anything loads -- WAYLAND_DISPLAY is unset, and afterwards check
+  `systemctl --user --failed` and look for processes whose
+  DBUS_SESSION_BUS_ADDRESS is a /tmp/dbus-* path.
+- **`make test` opened windows on the desktop, and a locked screen made it
+  ten times slower.** On Wayland, qmltestrunner opens a real window per
+  test file and waits up to five seconds for it to be shown; with the
+  session locked it never is. The suite went from five seconds to fifty,
+  every file exactly 5.1 -- measured, with `LockedHint=yes` at the time,
+  and 39 ms per file offscreen. The QML tests run offscreen now: they are
+  pure functions, and a suite has no business drawing on the screen of the
+  person running it.
+- **A killed probe still reports.** Restarting a Process kills the one in
+  flight, and its StdioCollector still delivers what it had. PlasmaServices
+  acted on that, so a partial list could read Klipper's name as free. A
+  probe whose output decides anything ends with a sentinel line now.
+- **A test that references nothing tests nothing.** The first hand-over run
+  found nothing: the probe config never touched the singletons, so they did
+  not exist until its last IPC call. Reference what shell.qml references.
+- **`image://icon/<name>` has no fallback.** The notification server hands
+  an icon sent by name over as that URL, and a name the theme lacks drew
+  Qt's magenta checkerboard. It is looked up as a name instead.
 
 ## The plan
 
@@ -1335,24 +1412,33 @@ order:
 | `c594525` | shortcuts said they took a key from its holder, and did not; and wrote the wrong format |
 | `b78bb38` | Alt+Tab and Meta+Tab, and who holds them |
 | `e123ab6` | the application style, and the theme's missing parts |
+| `135e990` | notifications drawn by the shell itself, when asked |
+| `e749875` | a probe cut short could host a second Klipper; notifications handed over from our own hosted applet |
+| `8f0790c` | `make test` drew windows on the desktop, and stalled on a locked screen |
 
 The fixes were all found while building the features, and each by
 measuring: the kglobalaccel restarts were in the journal at the times of
 `make test`, the stale widget was a monitor process that should have
 existed and did not, and the mangled tab was a byte comparison failing in
-the new suite. The shell's PID was the same before and after every
+the new suite.
+
+One experiment did damage. A private-bus test of the notification
+hand-over took down the user's real document portal at 18:51:42; it was
+found in the journal ten minutes later and restarted. See "A private bus is
+not private from what it activates" for how, and for the rule that keeps it
+from happening again. The shell's PID was the same before and after every
 test run this session (611253).
 
 Nothing was clicked and nothing was put on the user's screen: a Meet window
 was open, so the settings page was rendered offscreen instead. Items 17 and
 18 under "What to check first" are what needs a pointer.
 
-§D, and the widget style from §C, are complete apart from what needs a
-pointer or a person (items 17-20).
+§D, the widget style from §C and Phase 8's notifications are complete
+apart from what needs a pointer or a person (items 17-21). The
+notifications were built opt-in and off by default after the user said
+"continue"; nothing on this machine uses them yet.
 
-**What is left of the plan is Phase 8, and none of it should be started
-without the user.** The lock screen needs a second TTY open and someone at
-the machine (see "Not built yet"). Notifications of our own mean taking
-`org.freedesktop.Notifications` from Plasma: a replacement, opt-in by the
-plan's own rule, and a design question before it is a coding one. The
-colours-only desktop theme already stands in for the "SVG desktoptheme".
+**What is left of the plan is the lock screen, and it should not be started
+without the user at the machine:** it needs a second TTY open and a tested
+way back (see "Not built yet"). The colours-only desktop theme already
+stands in for the "SVG desktoptheme".
