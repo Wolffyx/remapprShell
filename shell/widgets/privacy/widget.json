@@ -1,0 +1,14 @@
+{
+    "id": "privacy",
+    "apiVersion": 1,
+    "name": "Camera and microphone in use",
+    "description": "Appears while an application records from the camera or a microphone, and names it. Click to mute the microphone. Takes no room the rest of the time.",
+    "icon": "camera-on",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" },
+        "plasma": { "applet": "org.kde.plasma.cameraindicator", "inSystemTray": true }
+    },
+    "config": {}
+}

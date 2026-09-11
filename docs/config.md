@@ -184,6 +184,11 @@ silently landing on the left.
         "enabled": true
       },
       {
+        "id": "privacy",
+        "zone": "right",
+        "enabled": true
+      },
+      {
         "id": "keyboard",
         "zone": "right",
         "enabled": true
@@ -246,6 +251,7 @@ when two copies of a widget should differ.
 | Network | `network` | left, middle, right | `org.kde.plasma.networkmanagement` (in the tray) |
 | Notification history | `notifications` | left, middle, right | `org.kde.plasma.notifications` (in the tray) |
 | Session | `power` | left, middle, right | `org.kde.plasma.lock_logout` |
+| Camera and microphone in use | `privacy` | left, middle, right | `org.kde.plasma.cameraindicator` (in the tray) |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |

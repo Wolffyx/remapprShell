@@ -326,16 +326,34 @@ are not.
   through them, one layout per whole notch. With a single layout it sets
   `present: false` and takes no room, as it does on this machine, so it is in
   every preset.
+- **Camera and microphone in use** — `privacy`. This one is not cosmetic.
+  Plasma's microphone-in-use icon is `MicrophoneIndicator`, which lives only
+  in the volume applet's own plugin (`libplasma-volume-declarative`), and its
+  camera icon is the `cameraindicator` tray applet. Under our renderer both
+  were gone: Chrome was recording the Scarlett's microphone during this
+  session with nothing on screen to say so. The widget is present only while
+  something records. The tooltip names the applications, and a click mutes
+  the default microphone, as Plasma's indicator does. `PrivacyStatus`
+  describes PipeWire's links to `StatusIcons.recorders`, which counts an
+  *active* link from a microphone into an application's capture stream, or
+  from a v4l2/libcamera camera into a video stream. It leaves out a
+  speaker's monitor being read (caelestia's visualiser, here), PipeWire's own
+  `/Internal` streams, and screencasts. Verified live: `status privacy`
+  names "Google Chrome input" and neither of the others. Getting there took
+  three Quickshell surprises, recorded under "Non-obvious things".
 
   **Audit, 2026-09-11: nothing else Plasma's tray hosts is silently lost
-  under our renderer.** Every applet's `NEEDED` libraries and the live
+  under our renderer**, beyond the microphone and camera indicators above
+  (the audit first missed them, as display-only). Every applet's `NEEDED` libraries and the live
   kglobalaccel components were checked. Volume and media keys belong to the
   kded modules `audioshortcutsservice` and `mprisservice` (components `kmix`
   and `mediacontrol`, both active), brightness keys to powerdevil, and layout
   switching to KWin. The notifications applet links `libKF6GlobalAccel` for
   its own shortcuts, and we host it. What is left is display only: the
   Caps Lock indicator, the camera/microphone-in-use indicator, KDE Connect,
-  and weather.
+  and weather. (Caps Lock cannot be done from here: KWin exposes no key state
+  on DBus, and Plasma reads it through a Wayland protocol Quickshell does not
+  bind.)
 - **Side panels.** The tray, the clock and the workspace pills lay out along
   the panel on either axis (the tray used to cut to two icons, the clock ran
   off the side), the tray's chevron points away from whichever edge the panel
@@ -458,7 +476,7 @@ are not.
   checked on every path, including when an id is named by hand: the dump
   directory is shared by every quickshell on the machine, and a second shell's
   crash is not ours to read or report.
-- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 155. All
+- **Tests** — 12 shell suites in throwaway HOMEs, plus a QML suite of 160. All
   green.
   `test-ask.sh` fakes every provider, the terminal and the shell's IPC, and
   runs on a whitelisted PATH so a `claude` on the host cannot stand in for a
@@ -841,6 +859,21 @@ Non-obvious things that cost time to discover:
   the service itself carries out -- kglobalaccel's `invokeShortcut` on
   `/component/kwin` did it here -- before writing a helper whose only job is
   to hold a connection open.
+- **Quickshell's PipeWire link API is half live.** Each of these was found by
+  running a throwaway config in the scratchpad, not by reading the docs:
+  - An ObjectModel's `values` is a Qt sequence, not a JS array. Its `filter`
+    returns another sequence, and that one has no `flatMap`, so a binding
+    using it throws "is not a function" on every change and nothing lints it.
+    Use `Array.from(model.values)` first.
+  - A node's `properties` arrive only while the node is tracked, and only
+    when it is tracked as an element of `Pipewire.nodes`. Tracking the same
+    node reached through `linkGroup.source` left all 20 unbound.
+  - `PwLinkGroup.state` reads "unlinked" whatever is tracked. `PwLink.state`
+    reads active or paused once `Pipewire.links` is tracked.
+  - Once bound, a capture stream's `description` is empty; the application
+    is in `properties["application.name"]`.
+  - `type` (`AudioInStream`, `AudioSink`, `Untracked` for PipeWire's own
+    `/Internal` streams) and `name` are there without binding anything.
 - **Check what is on screen before taking a screenshot or clicking the
   panel.** The first screenshots of the brightness popout caught a
   full-screen game on DP-2, which hid the panel entirely, so they proved
@@ -996,3 +1029,12 @@ widget laid out at 24x24 beside the tray, and the keyboard widget took no
 room. The runtime layer that put them on the panel for that check has been
 cleared. The popout has never been seen; see item 15 under "What to check
 first".
+
+Then a third: `privacy`, the camera and microphone indicator, after finding
+that Chrome was recording with nothing on screen to show it. The rule was
+right the first time and the tests passed; the live answer was still empty
+until three Quickshell PipeWire behaviours were pinned down in a throwaway
+config (see "Non-obvious things"). Also worth knowing: **a `Write` that
+replaces a QML file wholesale may not trigger the live reload** -- the
+shell kept the old version until `shell.qml` was touched. Check that a
+diagnostic field you just added is there before trusting the answer.

@@ -34,6 +34,11 @@
                     "enabled": true
                 },
                 {
+                    "id": "privacy",
+                    "zone": "right",
+                    "enabled": true
+                },
+                {
                     "id": "keyboard",
                     "zone": "right",
                     "enabled": true

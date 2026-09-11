@@ -211,6 +211,7 @@ ShellRoot {
         function clipboard(): string { return JSON.stringify(ClipboardStatus.summary()); }
         function brightness(): string { return JSON.stringify(BrightnessStatus.summary()); }
         function keyboard(): string { return JSON.stringify(KeyboardStatus.summary()); }
+        function privacy(): string { return JSON.stringify(PrivacyStatus.summary()); }
     }
 
     // What the brightness widget does on a scroll and a middle click, for

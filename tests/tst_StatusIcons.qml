@@ -368,4 +368,59 @@ TestCase {
         compare(StatusIcons.cycleIndex(-1, 3, 1), 1);
         compare(StatusIcons.cycleIndex(0, 0, 1), -1);
     }
+
+    // ---- privacy ---------------------------------------------------------
+
+    function link(from, to, app, active, source) {
+        return {
+            active: active !== false,
+            source: Object.assign({ mediaClass: from, api: "", role: "" }, source ?? {}),
+            target: { mediaClass: to, app: app }
+        };
+    }
+
+    // What PipeWire really had here: Chrome recording the Scarlett's
+    // microphone (two links), caelestia reading the speakers' monitor for a
+    // visualiser, and the Scarlett's own split feeding its virtual sources.
+    // Only Chrome is recording anyone.
+    function test_only_a_microphone_being_recorded_counts() {
+        const r = StatusIcons.recorders([
+            link("Audio/Source", "Stream/Input/Audio", "Google Chrome input"),
+            link("Audio/Source", "Stream/Input/Audio", "Google Chrome input"),
+            link("Audio/Sink", "Stream/Input/Audio", "caelestia-shell"),
+            link("Audio/Source/Internal", "Stream/Input/Audio/Internal", "alsa_input.Mic1.split")
+        ]);
+        compare(r.microphone, ["Google Chrome input"]);
+        compare(r.camera, []);
+    }
+
+    // A stream opened and paused is not listening.
+    function test_a_paused_link_is_not_recording() {
+        compare(StatusIcons.recorders([link("Audio/Source", "Stream/Input/Audio", "App", false)]).microphone, []);
+    }
+
+    // A screencast is a Video/Source too; only a camera device counts.
+    function test_a_camera_is_not_a_screencast() {
+        const r = StatusIcons.recorders([
+            link("Video/Source", "Stream/Input/Video", "Zoom", true, { api: "v4l2" }),
+            link("Video/Source", "Stream/Input/Video", "OBS", true, { api: "libcamera" }),
+            link("Video/Source", "Stream/Input/Video", "Meet", true, { role: "Camera" }),
+            link("Video/Source", "Stream/Input/Video", "Screen share", true)
+        ]);
+        compare(r.camera, ["Meet", "OBS", "Zoom"]);
+        compare(r.microphone, []);
+    }
+
+    function test_nothing_recording() {
+        compare(StatusIcons.recorders(null).microphone, []);
+        compare(StatusIcons.privacyTooltip(StatusIcons.recorders([]), false), "");
+    }
+
+    function test_privacy_tooltip() {
+        const users = { microphone: ["Chrome", "Discord"], camera: ["Zoom"] };
+        compare(StatusIcons.privacyTooltip(users, false),
+                "Camera in use by Zoom\nMicrophone in use by Chrome, Discord");
+        compare(StatusIcons.privacyTooltip({ microphone: ["Chrome"], camera: [] }, true),
+                "Microphone in use by Chrome (muted)");
+    }
 }
