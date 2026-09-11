@@ -34,7 +34,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         Row {
@@ -91,7 +91,7 @@ BarWidget {
 
                         PanelText {
                             text: [PowerStatus.stateLabel, PowerStatus.timeLabel].filter(s => s).join(" · ")
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 11
                         }
                     }

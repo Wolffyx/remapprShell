@@ -58,7 +58,7 @@ Column {
     PanelText {
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "Applying a layout replaces your current panel configuration. The previous one is saved first, and the path is printed in the log."
     }
@@ -74,7 +74,7 @@ Column {
             width: root.width
             height: 56
             radius: 6
-            color: cardHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: cardHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             Row {
                 anchors.fill: parent
@@ -96,7 +96,7 @@ Column {
                         width: parent.width
                         wrapMode: Text.WordWrap
                         font.pixelSize: 11
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                     }
                 }
 
@@ -105,7 +105,7 @@ Column {
                     width: 70
                     height: 28
                     radius: 5
-                    color: PlasmaColors.alpha(PlasmaColors.accent, applyHover.hovered ? 0.4 : 0.25)
+                    color: Theme.alpha(Theme.accent, applyHover.hovered ? 0.4 : 0.25)
 
                     PanelText {
                         anchors.centerIn: parent
@@ -124,6 +124,6 @@ Column {
     PanelText {
         visible: root.presets.length === 0
         text: "No presets found."
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
     }
 }

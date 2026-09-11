@@ -41,7 +41,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -79,7 +79,7 @@ BarWidget {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: wifi.visible
                         text: "Wi-Fi"
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                         font.pixelSize: 11
                     }
 
@@ -98,7 +98,7 @@ BarWidget {
                     visible: NetworkStatus.wifiDevices.length > 0 && !NetworkStatus.wifiHardwareEnabled
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "Wi-Fi is off at the hardware: a switch, a key, or airplane mode."
                 }
@@ -139,7 +139,7 @@ BarWidget {
                                        connection.wired ? StatusIcons.linkSpeed(connection.modelData.speed)
                                                         : StatusIcons.percent(connection.modelData.strength)]
                                       .filter(s => s).join(" · ")
-                                color: PlasmaColors.foregroundInactive
+                                color: Theme.foregroundInactive
                                 font.pixelSize: 10
                             }
                         }
@@ -149,7 +149,7 @@ BarWidget {
                 PanelText {
                     visible: NetworkStatus.connections.length === 0
                     width: parent.width
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "Not connected."
                 }
@@ -158,7 +158,7 @@ BarWidget {
                     visible: NetworkStatus.connections.length > 0 && StatusIcons.isLimited(NetworkStatus.connectivity)
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.neutral
+                    color: Theme.neutral
                     font.pixelSize: 11
                     text: NetworkStatus.connectivity === "Portal"
                         ? "Connected, but a sign-in page is in the way."

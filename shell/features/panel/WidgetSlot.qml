@@ -248,9 +248,9 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: 8
-            color: PlasmaColors.background
+            color: Theme.background
             border.width: 1
-            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+            border.color: Theme.alpha(Theme.foreground, 0.15)
 
             // The panel forwards its keys here as well, for the case where
             // the panel itself holds the keyboard because it was clicked.
@@ -294,9 +294,9 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: 6
-            color: PlasmaColors.background
+            color: Theme.background
             border.width: 1
-            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+            border.color: Theme.alpha(Theme.foreground, 0.15)
 
             PanelText {
                 id: tipText

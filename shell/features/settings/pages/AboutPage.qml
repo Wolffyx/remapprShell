@@ -19,7 +19,7 @@ Column {
 
     PanelText {
         text: "A configurable desktop shell for KDE Plasma."
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         bottomPadding: 8
     }
 
@@ -41,7 +41,7 @@ Column {
             PanelText {
                 width: 120
                 text: line.modelData.label
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
             }
 
             PanelText { text: line.modelData.value }

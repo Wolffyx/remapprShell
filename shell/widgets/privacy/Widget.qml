@@ -41,7 +41,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: hover.hovered ? PlasmaColors.hoverBackground : "transparent"
+        color: hover.hovered ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         // Only `columns` is set -- see ZoneRow. A hidden icon takes no slot.

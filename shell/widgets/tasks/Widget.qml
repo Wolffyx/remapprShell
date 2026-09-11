@@ -208,10 +208,10 @@ BarWidget {
 
                 // A pinned application that is not running sits on the panel
                 // itself, the way Windows draws one: no tile until hovered.
-                color: button.isActive  ? PlasmaColors.alpha(PlasmaColors.accent, 0.28)
-                     : button.isHovered ? PlasmaColors.hoverBackground
+                color: button.isActive  ? Theme.alpha(Theme.accent, 0.28)
+                     : button.isHovered ? Theme.hoverBackground
                      : button.windowCount === 0 ? "transparent"
-                                        : PlasmaColors.backgroundAlternate
+                                        : Theme.backgroundAlternate
 
                 // A minimised window is still there and still clickable; it is
                 // dimmed rather than hidden, which is the whole difference
@@ -254,7 +254,7 @@ BarWidget {
                     id: attentionTint
                     anchors.fill: parent
                     radius: parent.radius
-                    color: PlasmaColors.neutral
+                    color: Theme.neutral
                     visible: button.wantsAttention
                     opacity: 0.45
 
@@ -313,8 +313,8 @@ BarWidget {
                             width: button.windowCount === 1 ? button.width * 0.5 : 4
                             height: 2
                             radius: 1
-                            color: button.isActive ? PlasmaColors.accent
-                                                   : PlasmaColors.alpha(PlasmaColors.foreground, 0.35)
+                            color: button.isActive ? Theme.accent
+                                                   : Theme.alpha(Theme.foreground, 0.35)
                         }
                     }
                 }
@@ -415,7 +415,7 @@ BarWidget {
                             text: preview.windows.length > 1
                                 ? `${preview.windows.length} windows — click to move through them`
                                 : preview.windows.length === 0 ? "Pinned — click to start it" : ""
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 11
                         }
                     }
@@ -440,7 +440,7 @@ BarWidget {
                             width: 3
                             height: 12
                             radius: 1.5
-                            color: line.modelData.active ? PlasmaColors.accent : "transparent"
+                            color: line.modelData.active ? Theme.accent : "transparent"
                         }
 
                         PanelText {
@@ -448,8 +448,8 @@ BarWidget {
                             width: Math.min(lineTitle.implicitWidth, 320)
                             elide: Text.ElideRight
                             text: WindowEvents.label(line.modelData)
-                            color: line.modelData.minimized ? PlasmaColors.foregroundInactive
-                                                            : PlasmaColors.foreground
+                            color: line.modelData.minimized ? Theme.foregroundInactive
+                                                            : Theme.foreground
                             font.pixelSize: 12
                             font.italic: line.modelData.minimized
                         }

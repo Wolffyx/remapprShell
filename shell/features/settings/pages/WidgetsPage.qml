@@ -104,7 +104,7 @@ Column {
             width: root.width
             height: body.implicitHeight + 12
             radius: 6
-            color: PlasmaColors.backgroundAlternate
+            color: Theme.backgroundAlternate
 
             readonly property bool dragging: root.dragIndex === entryRow.index
 
@@ -150,12 +150,12 @@ Column {
 
                         PanelText {
                             text: entryRow.manifest?.name ?? entryRow.modelData.id
-                            color: entryRow.known ? PlasmaColors.foreground : PlasmaColors.negative
+                            color: entryRow.known ? Theme.foreground : Theme.negative
                         }
 
                         PanelText {
                             font.pixelSize: 11
-                            color: entryRow.quarantined ? PlasmaColors.negative : PlasmaColors.foregroundInactive
+                            color: entryRow.quarantined ? Theme.negative : Theme.foregroundInactive
                             text: entryRow.quarantined ? `Disabled after repeated failures: ${Quarantine.reasonFor(entryRow.modelData.id)}`
                                 : !entryRow.known ? "Not installed"
                                 : (entryRow.manifest?.description ?? "")
@@ -268,13 +268,13 @@ Column {
 
                     PanelText {
                         text: "This widget was disabled automatically."
-                        color: PlasmaColors.negative
+                        color: Theme.negative
                         font.pixelSize: 11
                     }
 
                     PanelText {
                         text: "Enable it again"
-                        color: PlasmaColors.accent
+                        color: Theme.accent
                         font.pixelSize: 11
                         TapHandler { onTapped: Quarantine.release(entryRow.modelData.id) }
                     }
@@ -305,7 +305,7 @@ Column {
                 width: label.implicitWidth + 28
                 height: 28
                 radius: 6
-                color: addHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+                color: addHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
                 Row {
                     anchors.centerIn: parent

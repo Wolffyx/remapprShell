@@ -74,6 +74,20 @@ render_templates() {
 
 failed=0
 checked=0
+
+# A property named `on` and a capital letter is read as a signal handler.
+# Beside a property named for the rest (`primary` and `onPrimary`) it fails to
+# compile -- "Cannot assign a value to a signal" -- and in a singleton it was
+# instead left silently unset: every colour of the theme named that way drew
+# black, and qmllint said nothing about either.
+if [ $# -eq 0 ]; then
+    while IFS= read -r hit; do
+        log_error "${hit%%:*}: a property named on<Capital> is read as a signal handler (line ${hit#*:}); name it differently, e.g. primaryFg"
+        failed=$((failed + 1))
+    done < <(grep -rnoE '^\s*((readonly|required|default)\s+)*property\s+\S+\s+on[A-Z][A-Za-z0-9_]*' shell theme --include='*.qml' \
+             | sed -E 's/^([^:]+):([0-9]+):.*property\s+\S+\s+(\S+)$/\1:\2 \3/' || true)
+fi
+
 while IFS= read -r file; do
     checked=$((checked + 1))
     if ! out=$("$QMLLINT" -I "$IMPORT_ROOT" -I shell "$file" 2>&1); then

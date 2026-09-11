@@ -100,7 +100,7 @@ Column {
             width: root.width
             height: body.implicitHeight + 20
             radius: 6
-            color: option.active ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: option.active ? Theme.hoverBackground : Theme.backgroundAlternate
 
             Column {
                 id: body
@@ -120,7 +120,7 @@ Column {
                     PanelText {
                         visible: option.active
                         text: "in use"
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                         font.pixelSize: 11
                     }
                 }
@@ -129,7 +129,7 @@ Column {
                     width: body.width
                     wrapMode: Text.WordWrap
                     text: option.modelData.note
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                 }
 
@@ -140,7 +140,7 @@ Column {
                     width: body.width
                     wrapMode: Text.WordWrap
                     text: `Will be left out: ${option.missing.join(", ")}`
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                 }
             }
@@ -156,7 +156,7 @@ Column {
     PanelText {
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "Only one of these draws a panel at a time. Switching takes a restore point first, and puts everything back if it does not work."
     }

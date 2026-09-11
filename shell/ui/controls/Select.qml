@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import qs.ui.primitives
 import qs.domain.theme
 
 ComboBox {
@@ -14,23 +15,33 @@ ComboBox {
 
     model: root.values
     implicitWidth: 180
-    implicitHeight: 28
+    implicitHeight: 36
 
     onActivated: index => root.picked(String(root.values[index]))
 
     background: Rectangle {
-        radius: 5
-        color: PlasmaColors.backgroundAlternate
+        radius: Theme.radiusTiny + 2
+        color: root.hovered ? Theme.s3 : Theme.s1
         border.width: 1
-        border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+        border.color: root.activeFocus ? Theme.acc : Theme.out
+    }
+
+    indicator: Glyph {
+        x: root.width - width - 10
+        y: (root.height - height) / 2
+        name: "expand_more"
+        fallback: "arrow-down"
+        size: 18
+        color: Theme.mut
     }
 
     contentItem: Text {
-        leftPadding: 8
-        rightPadding: 24
+        leftPadding: 12
+        rightPadding: 30
         text: root.displayText
-        color: PlasmaColors.foreground
-        font.pixelSize: 12
+        color: Theme.fg
+        font.family: Theme.fontFamily
+        font.pixelSize: 13
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
@@ -41,35 +52,39 @@ ComboBox {
         required property var modelData
         required property int index
 
-        width: root.width
+        width: root.width - 8
+        height: 34
         highlighted: root.highlightedIndex === option.index
 
         // `parent` inside these inline components is the control's internal
         // wrapper, not the delegate, so both refer to the delegate by id.
         background: Rectangle {
-            color: option.highlighted ? PlasmaColors.hoverBackground : PlasmaColors.background
+            radius: Theme.radiusTiny
+            color: option.index === root.currentIndex ? Theme.accC
+                 : option.highlighted ? Theme.hover : "transparent"
         }
 
         contentItem: Text {
             leftPadding: 8
             text: option.modelData
-            color: PlasmaColors.foreground
-            font.pixelSize: 12
+            color: option.index === root.currentIndex ? Theme.accCFg : Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
             verticalAlignment: Text.AlignVCenter
         }
     }
 
     popup: Popup {
-        y: root.height
+        y: root.height + 4
         width: root.width
-        implicitHeight: Math.min(contentItem.implicitHeight, 240)
+        implicitHeight: Math.min(contentItem.implicitHeight + 8, 280)
         padding: 4
 
         background: Rectangle {
-            radius: 6
-            color: PlasmaColors.background
+            radius: Theme.radiusSmall
+            color: Theme.s1
             border.width: 1
-            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+            border.color: Theme.out
         }
 
         contentItem: ListView {
@@ -77,6 +92,7 @@ ComboBox {
             implicitHeight: contentHeight
             model: root.delegateModel
             currentIndex: root.highlightedIndex
+            spacing: 2
         }
     }
 }

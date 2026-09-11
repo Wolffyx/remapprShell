@@ -38,9 +38,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 8
-        color: PlasmaColors.background
+        color: Theme.background
         border.width: 1
-        border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+        border.color: Theme.alpha(Theme.foreground, 0.15)
 
         Column {
             id: layout
@@ -53,12 +53,12 @@ Item {
                 focus: true
                 width: parent.width
                 placeholderText: "Search applications"
-                color: PlasmaColors.foreground
+                color: Theme.foreground
                 text: root.provider.query
 
                 background: Rectangle {
                     radius: 5
-                    color: PlasmaColors.backgroundAlternate
+                    color: Theme.backgroundAlternate
                 }
 
                 onTextChanged: {
@@ -91,8 +91,8 @@ Item {
                     height: 34
                     radius: 5
                     color: row.index === root.provider.selectedIndex
-                        ? PlasmaColors.alpha(PlasmaColors.accent, 0.25)
-                        : (rowHover.hovered ? PlasmaColors.hoverBackground : "transparent")
+                        ? Theme.alpha(Theme.accent, 0.25)
+                        : (rowHover.hovered ? Theme.hoverBackground : "transparent")
 
                     Row {
                         anchors.fill: parent
@@ -115,7 +115,7 @@ Item {
                                 visible: (row.modelData.genericName ?? "").length > 0
                                 text: row.modelData.genericName ?? ""
                                 font.pixelSize: 11
-                                color: PlasmaColors.foregroundInactive
+                                color: Theme.foregroundInactive
                             }
                         }
                     }
@@ -137,7 +137,7 @@ Item {
             PanelText {
                 visible: root.provider.results.length === 0
                 text: root.provider.query.length > 0 ? "No matches" : "No applications found"
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
             }
         }
     }

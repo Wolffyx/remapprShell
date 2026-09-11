@@ -167,7 +167,7 @@ Column {
     PanelText {
         width: parent.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: root.items.length === 0
             ? "Nothing is in the tray at the moment. Applications appear here as they start."
@@ -221,7 +221,7 @@ Column {
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 7
                     text: root.sections[row.modelData.section].note
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 10
                 }
 
@@ -231,7 +231,7 @@ Column {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     height: 1
-                    color: PlasmaColors.alpha(PlasmaColors.foreground, 0.12)
+                    color: Theme.alpha(Theme.foreground, 0.12)
                 }
 
                 // ---- an item
@@ -241,8 +241,8 @@ Column {
                     anchors.topMargin: 2
                     anchors.bottomMargin: 2
                     radius: 5
-                    color: row.dragging ? PlasmaColors.alpha(PlasmaColors.accent, 0.25)
-                         : (rowHover.hovered ? PlasmaColors.hoverBackground : "transparent")
+                    color: row.dragging ? Theme.alpha(Theme.accent, 0.25)
+                         : (rowHover.hovered ? Theme.hoverBackground : "transparent")
 
                     Row {
                         anchors.fill: parent
@@ -278,7 +278,7 @@ Column {
                                 text: root.runningNow(row.modelData.id)
                                     ? (row.modelData.id ?? "")
                                     : `${row.modelData.id ?? ""} -- not running`
-                                color: PlasmaColors.foregroundInactive
+                                color: Theme.foregroundInactive
                                 font.pixelSize: 10
                             }
                         }
@@ -353,7 +353,7 @@ Column {
     PanelText {
         width: parent.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "One icon always stays on the panel: an empty list means 'show everything', so emptying it would bring them all back. An application that is not running keeps its place until you move it."
     }

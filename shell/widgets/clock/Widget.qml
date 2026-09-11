@@ -53,7 +53,7 @@ BarWidget {
 
         PanelText {
             visible: root.showDate
-            color: PlasmaColors.foregroundInactive
+            color: Theme.foregroundInactive
             font.pixelSize: root.vertical ? 10 : 12
             text: Qt.formatDateTime(root.clock.date, root.dateFormat)
             width: root.vertical ? root.across : implicitWidth

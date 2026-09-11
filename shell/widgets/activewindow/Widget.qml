@@ -53,7 +53,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: root.pointed ? PlasmaColors.hoverBackground : "transparent"
+        color: root.pointed ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         Row {
@@ -76,7 +76,7 @@ BarWidget {
                 elide: Text.ElideRight
                 text: root.showAppName ? root.appName : root.title
                 font.pixelSize: 12
-                color: root.window?.active ? PlasmaColors.foreground : PlasmaColors.foregroundInactive
+                color: root.window?.active ? Theme.foreground : Theme.foregroundInactive
             }
         }
     }

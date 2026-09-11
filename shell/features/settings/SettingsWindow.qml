@@ -25,7 +25,7 @@ FloatingWindow {
     title: `${Branding.displayName} settings`
     implicitWidth: 880
     implicitHeight: 560
-    color: PlasmaColors.background
+    color: Theme.background
 
     Row {
         anchors.fill: parent
@@ -34,7 +34,7 @@ FloatingWindow {
         Rectangle {
             width: 220
             height: parent.height
-            color: PlasmaColors.backgroundAlternate
+            color: Theme.backgroundAlternate
 
             Column {
                 anchors.fill: parent
@@ -53,8 +53,8 @@ FloatingWindow {
                         width: parent.width
                         height: 36
                         color: navItem.index === root.currentIndex
-                            ? PlasmaColors.alpha(PlasmaColors.accent, 0.25)
-                            : (navHover.hovered ? PlasmaColors.hoverBackground : "transparent")
+                            ? Theme.alpha(Theme.accent, 0.25)
+                            : (navHover.hovered ? Theme.hoverBackground : "transparent")
 
                         Row {
                             anchors.fill: parent
@@ -102,7 +102,7 @@ FloatingWindow {
                     text: root.currentSection?.description ?? ""
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                 }
 
                 // A section either lists keys, which the schema renderer turns

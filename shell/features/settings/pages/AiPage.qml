@@ -84,7 +84,7 @@ Column {
         width: parent.width
         x: 8
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "Not available here: " + root.providers.filter(p => !p.available)
             .map(p => `${p.id} (${p.reason})`).join(", ")
@@ -123,7 +123,7 @@ Column {
         width: parent.width
         x: 8
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: `The custom command is a list, so it is set in the profile as ai.command: ["my-tool", "%report"]. %report becomes the bundle's path; without it, the bundle arrives on standard input.`
     }
@@ -137,7 +137,7 @@ Column {
             width: tryText.implicitWidth + 24
             height: 30
             radius: 6
-            color: tryHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: tryHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             PanelText { id: tryText; anchors.centerIn: parent; text: "See what would be sent" }
             HoverHandler { id: tryHover }
@@ -148,7 +148,7 @@ Column {
             width: forgetText.implicitWidth + 24
             height: 30
             radius: 6
-            color: forgetHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: forgetHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             PanelText { id: forgetText; anchors.centerIn: parent; text: "Ask again before sending" }
             HoverHandler { id: forgetHover }
@@ -159,7 +159,7 @@ Column {
     PanelText {
         width: parent.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: `Every report is written locally first and redacted there; 'rmpr report show' prints the same text a provider receives. A provider that sends off this machine asks once, showing the whole bundle, and remembers the answer until it is withdrawn here. Bind a key to ask about the last notification with: rmpr shortcuts set ask <key>`
     }

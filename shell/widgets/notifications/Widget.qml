@@ -49,7 +49,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -65,13 +65,13 @@ BarWidget {
             width: Math.max(14, badge.implicitWidth + 6)
             height: 14
             radius: 7
-            color: PlasmaColors.accent
+            color: Theme.accent
 
             PanelText {
                 id: badge
                 anchors.centerIn: parent
                 text: NotificationWatch.unseen > 99 ? "99+" : String(NotificationWatch.unseen)
-                color: PlasmaColors.background
+                color: Theme.background
                 font.pixelSize: 9
                 font.bold: true
             }
@@ -142,7 +142,7 @@ BarWidget {
                     visible: !NotificationWatch.enabled
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: `The history is off, so nothing is being kept. Turn it on under Notifications in the settings; ${ShellNotifications.active ? "this shell" : "Plasma"} keeps drawing them either way.`
                 }
@@ -151,7 +151,7 @@ BarWidget {
                     visible: NotificationWatch.enabled && NotificationWatch.entries.length === 0
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "Nothing yet. Notifications are remembered from the moment the shell starts, and only in memory."
                 }
@@ -168,7 +168,7 @@ BarWidget {
                         width: body.width
                         height: line.implicitHeight + 12
                         radius: 6
-                        color: rowHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+                        color: rowHover.hovered ? Theme.hoverBackground : "transparent"
 
                         Row {
                             id: line
@@ -200,7 +200,7 @@ BarWidget {
                                     PanelText {
                                         id: stamp
                                         text: root.timeOf(row.modelData.when)
-                                        color: PlasmaColors.foregroundInactive
+                                        color: Theme.foregroundInactive
                                         font.pixelSize: 10
                                     }
                                 }
@@ -208,7 +208,7 @@ BarWidget {
                                 PanelText {
                                     width: parent.width
                                     text: row.modelData.appName
-                                    color: row.modelData.urgency >= 2 ? PlasmaColors.negative : PlasmaColors.foregroundInactive
+                                    color: row.modelData.urgency >= 2 ? Theme.negative : Theme.foregroundInactive
                                     font.pixelSize: 10
                                 }
 
@@ -240,7 +240,7 @@ BarWidget {
                 PanelText {
                     visible: NotificationWatch.entries.length > root.shown
                     width: parent.width
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 10
                     text: `and ${NotificationWatch.entries.length - root.shown} older`
                 }

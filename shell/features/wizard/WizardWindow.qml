@@ -53,7 +53,7 @@ FloatingWindow {
     title: `Welcome to ${Branding.displayName}`
     implicitWidth: 640
     implicitHeight: 460
-    color: PlasmaColors.background
+    color: Theme.background
 
     Component.onCompleted: {
         presetsProc.running = true;
@@ -179,7 +179,7 @@ FloatingWindow {
             PanelText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 text: "Nothing is written until the last step, and everything here can be changed afterwards in settings."
             }
         }
@@ -223,7 +223,7 @@ FloatingWindow {
             PanelText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 text: "A layout replaces your current configuration. Your existing one is kept, and 'preset apply' can be undone from the Layouts page."
             }
 
@@ -277,7 +277,7 @@ FloatingWindow {
                 visible: root.renderer !== "quickshell"
                 width: parent.width
                 wrapMode: Text.WordWrap
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 text: "This one changes KDE's own settings. A restore point is taken first, and it is put back automatically if the switch does not work."
             }
         }
@@ -302,7 +302,7 @@ FloatingWindow {
             PanelText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 text: root.aiProviders.length === 0
                     ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
                     : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
@@ -330,13 +330,13 @@ FloatingWindow {
             width: skipText.implicitWidth + 24
             height: 30
             radius: 6
-            color: skipHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+            color: skipHover.hovered ? Theme.hoverBackground : "transparent"
 
             PanelText {
                 id: skipText
                 anchors.centerIn: parent
                 text: "Skip"
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
             }
 
             HoverHandler { id: skipHover }
@@ -348,7 +348,7 @@ FloatingWindow {
             width: backText.implicitWidth + 24
             height: 30
             radius: 6
-            color: backHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: backHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             PanelText { id: backText; anchors.centerIn: parent; text: "Back" }
 
@@ -360,7 +360,7 @@ FloatingWindow {
             width: nextText.implicitWidth + 24
             height: 30
             radius: 6
-            color: nextHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: nextHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             PanelText {
                 id: nextText
@@ -385,7 +385,7 @@ FloatingWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 24
         text: `${root.step + 1} of ${root.stepCount}`
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
     }
 }

@@ -42,7 +42,7 @@ FloatingWindow {
     title: `Ask about a report`
     implicitWidth: 760
     implicitHeight: 620
-    color: PlasmaColors.background
+    color: Theme.background
 
     Component.onCompleted: root.load()
 
@@ -140,7 +140,7 @@ FloatingWindow {
             PanelText {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: root.chosen !== null
-                color: root.leaves ? PlasmaColors.negative : PlasmaColors.foregroundInactive
+                color: root.leaves ? Theme.negative : Theme.foregroundInactive
                 font.pixelSize: 11
                 text: root.leaves
                     ? "leaves this machine -- everything below, exactly as shown"
@@ -154,7 +154,7 @@ FloatingWindow {
             visible: root.providers.some(p => !p.available)
             width: parent.width
             wrapMode: Text.WordWrap
-            color: PlasmaColors.foregroundInactive
+            color: Theme.foregroundInactive
             font.pixelSize: 11
             text: "Not available here: " + root.providers.filter(p => !p.available)
                 .map(p => `${p.id} (${p.reason})`).join(", ")
@@ -164,9 +164,9 @@ FloatingWindow {
             width: parent.width
             height: parent.height - y - buttons.height - 16
             radius: 6
-            color: PlasmaColors.backgroundAlternate
+            color: Theme.backgroundAlternate
             border.width: 1
-            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+            border.color: Theme.alpha(Theme.foreground, 0.15)
 
             ScrollView {
                 anchors.fill: parent
@@ -178,7 +178,7 @@ FloatingWindow {
                     readOnly: true
                     selectByMouse: true
                     wrapMode: TextEdit.Wrap
-                    color: PlasmaColors.foreground
+                    color: Theme.foreground
                     font.family: "monospace"
                     font.pixelSize: 11
                     text: root.answer.length > 0
@@ -198,7 +198,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 wrapMode: Text.WordWrap
                 text: root.status
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 font.pixelSize: 11
             }
 
@@ -207,7 +207,7 @@ FloatingWindow {
                 width: cancelText.implicitWidth + 24
                 height: 30
                 radius: 6
-                color: cancelHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+                color: cancelHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
                 PanelText { id: cancelText; anchors.centerIn: parent; text: root.sent ? "Close" : "Cancel" }
                 HoverHandler { id: cancelHover }
@@ -220,9 +220,9 @@ FloatingWindow {
                 height: 30
                 radius: 6
                 visible: root.provider.length > 0 && !root.sent
-                color: root.busy ? PlasmaColors.backgroundAlternate
-                     : (sendHover.hovered ? PlasmaColors.alpha(PlasmaColors.accent, 0.35)
-                                          : PlasmaColors.alpha(PlasmaColors.accent, 0.25))
+                color: root.busy ? Theme.backgroundAlternate
+                     : (sendHover.hovered ? Theme.alpha(Theme.accent, 0.35)
+                                          : Theme.alpha(Theme.accent, 0.25))
 
                 PanelText {
                     id: sendText

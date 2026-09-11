@@ -138,10 +138,14 @@ list of values.
 
 ### Appearance
 
-The style every Qt application is drawn in, and the parts of this shell's own theme: colour schemes, the Alt+Tab switcher, a Plasma theme and a splash. Nothing here changes your colours or icons.
+How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto turns the shell dark whenever the Plasma colour scheme is dark: chosen in System Settings, or switched at sunset when Plasma's global theme is set to change between a light and a dark one by itself. light and dark hold it there. |
+| `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
+| `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
+| `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
 
 ### Profiles
 

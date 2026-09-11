@@ -63,7 +63,7 @@ BarWidget {
             width: parent.width
             text: channel.title
             elide: Text.ElideRight
-            color: PlasmaColors.foregroundInactive
+            color: Theme.foregroundInactive
             font.pixelSize: 11
         }
 
@@ -95,7 +95,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -161,7 +161,7 @@ BarWidget {
                             width: body.width
                             height: 26
                             radius: 5
-                            color: deviceHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+                            color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
                             Rectangle {
                                 x: 8
@@ -169,9 +169,9 @@ BarWidget {
                                 width: 8
                                 height: 8
                                 radius: 4
-                                color: device.current ? PlasmaColors.accent : "transparent"
+                                color: device.current ? Theme.accent : "transparent"
                                 border.width: 1
-                                border.color: device.current ? PlasmaColors.accent : PlasmaColors.foregroundInactive
+                                border.color: device.current ? Theme.accent : Theme.foregroundInactive
                             }
 
                             PanelText {

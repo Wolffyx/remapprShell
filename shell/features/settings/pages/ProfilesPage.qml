@@ -64,8 +64,8 @@ Column {
             width: root.width
             height: 46
             radius: 6
-            color: card.modelData.active ? PlasmaColors.alpha(PlasmaColors.accent, 0.2)
-                                         : PlasmaColors.backgroundAlternate
+            color: card.modelData.active ? Theme.alpha(Theme.accent, 0.2)
+                                         : Theme.backgroundAlternate
 
             Row {
                 anchors.fill: parent
@@ -81,7 +81,7 @@ Column {
                     PanelText {
                         text: card.modelData.detail
                         font.pixelSize: 11
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                     }
                 }
 
@@ -91,7 +91,7 @@ Column {
                     width: 70
                     height: 26
                     radius: 5
-                    color: PlasmaColors.alpha(PlasmaColors.accent, useHover.hovered ? 0.4 : 0.25)
+                    color: Theme.alpha(Theme.accent, useHover.hovered ? 0.4 : 0.25)
 
                     PanelText { anchors.centerIn: parent; text: "Use" }
                     HoverHandler { id: useHover }
@@ -111,7 +111,7 @@ Column {
         width: root.width
         wrapMode: Text.WordWrap
         font.pixelSize: 11
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         text: `Anything in the panel settings can differ per screen. Create a file named after the output in ${Paths.profileDir(ConfigStore.profile)}/monitors/, holding only the keys that differ.`
     }
 
@@ -129,7 +129,7 @@ Column {
             }
 
             PanelText {
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 font.pixelSize: 11
                 text: ConfigStore.monitorData[mon.modelData.name]
                     ? `${Object.keys(ConfigStore.monitorData[mon.modelData.name]).length} override group(s)`

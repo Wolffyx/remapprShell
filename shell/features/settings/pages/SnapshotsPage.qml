@@ -69,7 +69,7 @@ Column {
             width: create.implicitWidth + 24
             height: 30
             radius: 6
-            color: createHover.hovered ? PlasmaColors.hoverBackground : PlasmaColors.backgroundAlternate
+            color: createHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
 
             PanelText {
                 id: create
@@ -91,7 +91,7 @@ Column {
     PanelText {
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "Restore points are never removed automatically -- not when reverting, not when uninstalling, not to save space. Removing one is permanent."
     }
@@ -107,7 +107,7 @@ Column {
             width: root.width
             height: 44
             radius: 6
-            color: PlasmaColors.backgroundAlternate
+            color: Theme.backgroundAlternate
 
             Row {
                 anchors.fill: parent
@@ -124,7 +124,7 @@ Column {
                     PanelText {
                         text: `${snap.modelData.created}   ${snap.modelData.paths}   ${snap.modelData.size}`
                         font.pixelSize: 11
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                     }
                 }
 
@@ -146,6 +146,6 @@ Column {
     PanelText {
         visible: root.snapshots.length === 0
         text: "No restore points yet."
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
     }
 }

@@ -49,7 +49,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -90,7 +90,7 @@ BarWidget {
                             width: parent.width
                             text: screen.display.label || screen.modelData
                             elide: Text.ElideRight
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 11
                         }
 
@@ -148,7 +148,7 @@ BarWidget {
                             width: parent.width
                             text: BrightnessStatus.nightDetail
                             elide: Text.ElideRight
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 11
                         }
                     }

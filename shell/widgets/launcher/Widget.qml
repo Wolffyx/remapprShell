@@ -31,7 +31,7 @@ BarWidget {
 
     popoutVisible: LauncherService.active.visible
                    && LauncherService.active.embedded
-                   && LauncherService.builtin.onScreen === root.screenName
+                   && LauncherService.builtin.shownOn === root.screenName
 
     // The built-in launcher is a search field; it is useless without the
     // keyboard.
@@ -52,8 +52,8 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 5
-        color: LauncherService.active.visible ? PlasmaColors.pressedBackground
-             : hover.hovered ? PlasmaColors.hoverBackground
+        color: LauncherService.active.visible ? Theme.pressedBackground
+             : hover.hovered ? Theme.hoverBackground
              : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 

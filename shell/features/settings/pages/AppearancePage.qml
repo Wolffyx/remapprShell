@@ -14,7 +14,9 @@ import QtQuick
 import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.domain.config
 import qs.domain.theme
+import qs.domain.theme.palette
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -95,10 +97,256 @@ Column {
         }
     }
 
-    PanelText {
-        text: "Application style"
-        font.pixelSize: 13
+    // ---- the shell's own colours -------------------------------------------
+    //
+    // Straight to the configuration: these are the shell's own look, and
+    // change nothing outside it, so there is nothing to ledger or undo beyond
+    // the value itself.
+
+    SectionLabel { text: "Colour scheme" }
+
+    Row {
+        id: modes
+        width: root.width
+        spacing: 12
+
+        Repeater {
+            model: [
+                { id: "auto", label: "Auto", sub: "Follows Plasma" },
+                { id: "light", label: "Light", sub: "Always light" },
+                { id: "dark", label: "Dark", sub: "Always dark" }
+            ]
+
+            Rectangle {
+                id: modeCard
+
+                required property var modelData
+                readonly property bool chosen: Theme.modeSetting === modeCard.modelData.id
+                readonly property var light: Scheme.scheme(Theme.seed, false)
+                readonly property var dark: Scheme.scheme(Theme.seed, true)
+
+                width: (modes.width - 2 * modes.spacing) / 3
+                height: 112
+                radius: Theme.radiusSmall + 2
+                color: modeCard.chosen ? Theme.accC : (modeHover.hovered ? Theme.s3 : Theme.s2)
+                border.width: 1
+                border.color: modeCard.chosen ? Theme.acc : Theme.out
+
+                // A picture of the scheme, in the scheme's own colours: the
+                // automatic one is half of each.
+                Rectangle {
+                    id: swatch
+                    x: 14; y: 14
+                    width: parent.width - 28
+                    height: 50
+                    radius: 10
+                    clip: true
+                    color: "transparent"
+
+                    Row {
+                        anchors.fill: parent
+
+                        Repeater {
+                            model: modeCard.modelData.id === "auto" ? [modeCard.light, modeCard.dark]
+                                 : [modeCard.modelData.id === "dark" ? modeCard.dark : modeCard.light]
+
+                            Rectangle {
+                                id: half
+
+                                required property var modelData
+
+                                width: swatch.width / (modeCard.modelData.id === "auto" ? 2 : 1)
+                                height: swatch.height
+                                color: half.modelData.surfaceContainerLow
+
+                                Row {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 6
+
+                                    Rectangle { width: 22; height: 22; radius: 11; color: half.modelData.primary }
+                                    Rectangle { width: 38; height: 22; radius: 11; color: half.modelData.surfaceContainerHighest }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    x: 14
+                    anchors.top: swatch.bottom
+                    anchors.topMargin: 10
+                    spacing: 1
+
+                    PanelText {
+                        text: modeCard.modelData.label
+                        font.pixelSize: 14
+                        color: modeCard.chosen ? Theme.accCFg : Theme.fg
+                    }
+                    PanelText {
+                        text: modeCard.modelData.sub
+                        font.pixelSize: 12
+                        color: modeCard.chosen ? Theme.accCFg : Theme.mut
+                    }
+                }
+
+                HoverHandler { id: modeHover; cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: ConfigStore.set("theme.mode", modeCard.modelData.id) }
+            }
+        }
     }
+
+    PanelText {
+        width: root.width
+        wrapMode: Text.WordWrap
+        color: Theme.mut
+        font.pixelSize: 12
+        text: {
+            const now = `The shell is ${Theme.mode} now`;
+            if (Theme.modeSetting !== "auto")
+                return `${now}, whatever Plasma does.`;
+            const plasma = PlasmaColors.loaded ? `, because Plasma's colour scheme is ${Scheme.isDark(PlasmaColors.background.toString()) ? "dark" : "light"}` : "";
+            return PlasmaColors.automaticLookAndFeel
+                ? `${now}${plasma}. Plasma switches between its light and dark theme by itself, and the shell follows it.`
+                : `${now}${plasma}. Plasma can also switch between a light and a dark theme by itself at sunset, and the shell will follow it: that is in Plasma's global theme settings.`;
+        }
+    }
+
+    TextButton {
+        glyph: "routine"
+        iconName: "preferences-desktop-theme-global"
+        text: "Plasma's global theme settings"
+        onActivated: PlasmaApplets.openSettings("kcm_lookandfeel")
+    }
+
+    Item { width: 1; height: 4 }
+    SectionLabel { text: "Accent" }
+
+    Row {
+        spacing: 16
+
+        Repeater {
+            model: [
+                { id: "plasma", label: "Plasma" },
+                { id: "blue", label: "Blue" },
+                { id: "teal", label: "Teal" },
+                { id: "magenta", label: "Magenta" },
+                { id: "orange", label: "Orange" }
+            ]
+
+            Column {
+                id: accentChoice
+
+                required property var modelData
+                readonly property bool chosen: Theme.accentSetting === accentChoice.modelData.id
+
+                spacing: 6
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 44
+                    height: 44
+                    radius: 22
+                    color: "transparent"
+                    border.width: accentChoice.chosen ? 2 : 0
+                    border.color: Theme.fg
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 36
+                        height: 36
+                        radius: 18
+                        color: Scheme.scheme(Scheme.seed(accentChoice.modelData.id, PlasmaColors.accent.toString()), Theme.dark).primary
+
+                        Glyph {
+                            anchors.centerIn: parent
+                            visible: accentChoice.modelData.id === "plasma"
+                            name: "wallpaper"
+                            size: 18
+                            color: Scheme.scheme(Scheme.seed("plasma", PlasmaColors.accent.toString()), Theme.dark).onPrimary
+                        }
+                    }
+
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: ConfigStore.set("theme.accent", accentChoice.modelData.id) }
+                }
+
+                PanelText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: accentChoice.modelData.label
+                    font.pixelSize: 12
+                    color: accentChoice.chosen ? Theme.fg : Theme.mut
+                }
+            }
+        }
+    }
+
+    PanelText {
+        width: root.width
+        wrapMode: Text.WordWrap
+        color: Theme.mut
+        font.pixelSize: 12
+        text: "Plasma is Plasma's own accent colour -- which System Settings can take from the wallpaper. Every other colour here is worked out from the accent, in Material Design's roles."
+    }
+
+    Item { width: 1; height: 4 }
+    SectionLabel { text: "Shape" }
+
+    Card {
+        width: root.width
+
+        Column {
+            width: parent.width
+            spacing: 6
+
+            Row {
+                width: parent.width
+                PanelText { text: "Corner rounding"; font.pixelSize: 14; width: parent.width - roundingValue.width }
+                PanelText { id: roundingValue; text: `${Theme.rounding} px`; color: Theme.mut }
+            }
+
+            NumberSlider {
+                width: parent.width
+                showReadout: false
+                from: 0
+                to: 36
+                stepSize: 2
+                value: Theme.rounding
+                onMoved: value => ConfigStore.set("theme.rounding", Math.round(value))
+            }
+        }
+
+        Row {
+            width: parent.width
+
+            Column {
+                width: parent.width - translucency.width
+                anchors.verticalCenter: parent.verticalCenter
+                PanelText { text: "Translucent surfaces"; font.pixelSize: 14 }
+                PanelText { text: "The panel and its popouts let a little of the wallpaper through."; font.pixelSize: 12; color: Theme.mut }
+            }
+
+            Toggle {
+                id: translucency
+                anchors.verticalCenter: parent.verticalCenter
+                checked: Theme.translucent
+                onToggled: value => ConfigStore.set("theme.translucent", value)
+            }
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            font.pixelSize: 12
+            color: Theme.mut
+            text: `Type: ${Theme.fontFamily}${Theme.fontFamily === "Rubik" ? "" : " (Rubik is not installed)"} · icons: ${Theme.hasIconFont ? Theme.iconFont : "the icon theme (Material Symbols Rounded is not installed)"}`
+        }
+    }
+
+    Item { width: 1; height: 10 }
+
+    SectionLabel { text: "Application style" }
 
     Flow {
         width: root.width
@@ -123,7 +371,7 @@ Column {
     PanelText {
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: {
             const s = root.styles.find(x => x.id === root.themeState?.style);
@@ -140,7 +388,7 @@ Column {
 
             width: root.width
             wrapMode: Text.WordWrap
-            color: PlasmaColors.foregroundInactive
+            color: Theme.foregroundInactive
             font.pixelSize: 11
             text: modelData.install.length > 0
                 ? `${modelData.key} is not installed. In a terminal: ${modelData.install}`
@@ -158,7 +406,7 @@ Column {
     PanelText {
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: {
             if (!root.themeState)
@@ -183,7 +431,7 @@ Column {
         visible: root.missing.length > 0
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: "A restore point is taken first. Your colours, icons and style are left as they are; the new parts appear in System Settings for you to choose."
     }

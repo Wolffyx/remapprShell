@@ -21,22 +21,25 @@ Item {
 
     default property alias control: controlSlot.data
 
-    implicitHeight: Math.max(text.implicitHeight, controlSlot.implicitHeight) + 16
+    implicitHeight: Math.max(text.implicitHeight, controlSlot.implicitHeight) + 20
 
     Row {
         anchors.fill: parent
-        anchors.margins: 8
-        spacing: 12
+        anchors.leftMargin: 4
+        anchors.rightMargin: 4
+        anchors.topMargin: 10
+        anchors.bottomMargin: 10
+        spacing: 14
 
         Column {
             id: text
             width: parent.width - controlSlot.width - resetButton.width - parent.spacing * 2
-            spacing: 2
+            spacing: 3
             anchors.verticalCenter: parent.verticalCenter
 
             PanelText {
                 text: root.label
-                font.pixelSize: 13
+                font.pixelSize: 14
             }
 
             PanelText {
@@ -44,37 +47,40 @@ Item {
                 text: root.description
                 width: parent.width
                 wrapMode: Text.WordWrap
-                font.pixelSize: 11
-                color: PlasmaColors.foregroundInactive
+                font.pixelSize: 12
+                lineHeight: 1.15
+                color: Theme.mut
             }
         }
 
         Item {
             id: resetButton
-            width: root.overridden ? 22 : 0
-            height: 22
+            width: root.overridden ? 30 : 0
+            height: 30
             anchors.verticalCenter: parent.verticalCenter
             visible: root.overridden
 
             Rectangle {
                 anchors.fill: parent
-                radius: 4
-                color: resetHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+                radius: width / 2
+                color: resetHover.hovered ? Theme.hover : "transparent"
 
-                PanelIcon {
+                Glyph {
                     anchors.centerIn: parent
-                    implicitSize: 14
-                    iconName: "edit-undo"
+                    name: "undo"
+                    fallback: "edit-undo"
+                    size: 18
+                    color: Theme.mut
                 }
 
-                HoverHandler { id: resetHover }
+                HoverHandler { id: resetHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: root.resetRequested() }
             }
         }
 
         Item {
             id: controlSlot
-            width: Math.min(200, parent.width * 0.4)
+            width: Math.min(220, parent.width * 0.4)
             implicitHeight: childrenRect.height
             height: implicitHeight
             anchors.verticalCenter: parent.verticalCenter

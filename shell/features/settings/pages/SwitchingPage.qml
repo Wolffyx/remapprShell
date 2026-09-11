@@ -118,7 +118,7 @@ Column {
         visible: root.switcherState !== null && !root.layouts.some(l => l.id === Branding.slug)
         width: root.width
         wrapMode: Text.WordWrap
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
     }

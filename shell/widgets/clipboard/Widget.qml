@@ -32,7 +32,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -79,7 +79,7 @@ BarWidget {
                     visible: ClipboardStatus.source === "own"
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 10
                     text: "Plasma's clipboard manager is not running, so this shell keeps the history: text only, in memory, gone when the shell stops. Nothing a password manager marks secret is kept."
                 }
@@ -95,7 +95,7 @@ BarWidget {
                         width: body.width
                         height: 26
                         radius: 5
-                        color: rowHover.hovered && !row.modelData.image ? PlasmaColors.hoverBackground : "transparent"
+                        color: rowHover.hovered && !row.modelData.image ? Theme.hoverBackground : "transparent"
                         opacity: row.modelData.image ? 0.5 : 1
 
                         PanelIcon {
@@ -129,7 +129,7 @@ BarWidget {
                 PanelText {
                     visible: ClipboardStatus.entries.length === 0
                     width: parent.width
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "Nothing copied yet."
                 }
@@ -137,7 +137,7 @@ BarWidget {
                 PanelText {
                     visible: ClipboardStatus.entries.length > root.shown
                     width: parent.width
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 10
                     text: `and ${ClipboardStatus.entries.length - root.shown} older`
                 }

@@ -25,9 +25,9 @@ Rectangle {
 
     implicitHeight: body.implicitHeight + 24
     radius: 10
-    color: PlasmaColors.panelBackground
+    color: Theme.panelBackground
     border.width: card.critical ? 1 : 0
-    border.color: PlasmaColors.negative
+    border.color: Theme.negative
 
     HoverHandler {
         onHoveredChanged: if (card.notification) ShellNotifications.hold(card.notification.id, hovered)
@@ -81,7 +81,7 @@ Rectangle {
                     width: parent.width - close.width - 6
                     text: card.notification?.appName ?? ""
                     textFormat: Text.PlainText
-                    color: card.critical ? PlasmaColors.negative : PlasmaColors.foregroundInactive
+                    color: card.critical ? Theme.negative : Theme.foregroundInactive
                     font.pixelSize: 11
                     elide: Text.ElideRight
                 }

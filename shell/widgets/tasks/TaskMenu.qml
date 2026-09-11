@@ -41,7 +41,7 @@ Column {
         width: parent ? parent.width : 260
         height: 28
         radius: 5
-        color: rowHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+        color: rowHover.hovered ? Theme.hoverBackground : "transparent"
 
         Row {
             x: 8
@@ -71,7 +71,7 @@ Column {
     component Separator: Rectangle {
         width: parent ? parent.width : 260
         height: 1
-        color: PlasmaColors.alpha(PlasmaColors.foreground, 0.12)
+        color: Theme.alpha(Theme.foreground, 0.12)
     }
 
     PanelText {
@@ -79,7 +79,7 @@ Column {
         width: menu.width - 16
         text: menu.item?.appName ?? ""
         elide: Text.ElideRight
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         font.pixelSize: 11
         font.bold: true
         bottomPadding: 2

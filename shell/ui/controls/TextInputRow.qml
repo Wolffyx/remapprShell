@@ -9,9 +9,15 @@ TextField {
 
     signal committed(string value)
 
-    implicitHeight: 28
-    color: PlasmaColors.foreground
-    font.pixelSize: 12
+    implicitHeight: 36
+    color: Theme.fg
+    placeholderTextColor: Theme.mut
+    selectionColor: Theme.accC
+    selectedTextColor: Theme.accCFg
+    font.family: Theme.fontFamily
+    font.pixelSize: 13
+    leftPadding: 12
+    rightPadding: 12
     selectByMouse: true
 
     // Committed on Enter or on losing focus, never on every keystroke: writing
@@ -20,10 +26,9 @@ TextField {
     onEditingFinished: root.committed(text)
 
     background: Rectangle {
-        radius: 5
-        color: PlasmaColors.backgroundAlternate
-        border.width: 1
-        border.color: root.activeFocus ? PlasmaColors.accent
-                                       : PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+        radius: Theme.radiusTiny + 2
+        color: Theme.s1
+        border.width: root.activeFocus ? 2 : 1
+        border.color: root.activeFocus ? Theme.acc : Theme.out
     }
 }

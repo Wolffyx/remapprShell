@@ -122,7 +122,7 @@ PanelWindow {
         x: root.position === "left" ? parent.width - width : 0
         y: root.position === "top" ? parent.height - height : 0
 
-        color: PlasmaColors.panelBackground
+        color: Theme.panelBackground
 
         // Reveals on the way in, hides a moment after the way out.
         HoverHandler {

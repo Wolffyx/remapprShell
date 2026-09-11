@@ -19,14 +19,14 @@ QtObject {
                                     && root.device.type === UPowerDeviceType.Battery
 
     readonly property real level: StatusIcons.fraction(root.device?.percentage ?? 0)
-    readonly property bool onBattery: UPower.onBattery
+    readonly property bool batteryPowered: UPower.onBattery
     readonly property bool charging: root.device?.state === UPowerDeviceState.Charging
                                      || root.device?.state === UPowerDeviceState.PendingCharge
     readonly property bool full: root.device?.state === UPowerDeviceState.FullyCharged
 
     readonly property string stateLabel: root.charging ? "Charging"
                                        : root.full ? "Fully charged"
-                                       : root.onBattery ? "On battery"
+                                       : root.batteryPowered ? "On battery"
                                        : "Plugged in, not charging"
 
     readonly property string timeLabel: {
@@ -34,7 +34,7 @@ QtObject {
             const t = StatusIcons.duration(root.device?.timeToFull ?? 0);
             return t ? `${t} until full` : "";
         }
-        if (root.onBattery) {
+        if (root.batteryPowered) {
             const t = StatusIcons.duration(root.device?.timeToEmpty ?? 0);
             return t ? `${t} left` : "";
         }
@@ -73,7 +73,7 @@ QtObject {
             level: root.level,
             state: root.stateLabel,
             time: root.timeLabel,
-            onBattery: root.onBattery,
+            onBattery: root.batteryPowered,
             profile: root.profile,
             profiles: root.profiles,
             icon: root.icon

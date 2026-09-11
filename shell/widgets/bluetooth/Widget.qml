@@ -41,7 +41,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         PanelIcon {
@@ -88,7 +88,7 @@ BarWidget {
                     visible: BluetoothStatus.blocked
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "Bluetooth is blocked: a hardware switch, a key, or airplane mode."
                 }
@@ -104,7 +104,7 @@ BarWidget {
                         width: body.width
                         height: line.implicitHeight + 10
                         radius: 6
-                        color: deviceHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+                        color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
                         Row {
                             id: line
@@ -135,7 +135,7 @@ BarWidget {
                                 PanelText {
                                     width: parent.width
                                     text: BluetoothStatus.describe(device.modelData)
-                                    color: PlasmaColors.foregroundInactive
+                                    color: Theme.foregroundInactive
                                     font.pixelSize: 10
                                 }
                             }
@@ -149,7 +149,7 @@ BarWidget {
                 PanelText {
                     visible: BluetoothStatus.enabled && BluetoothStatus.paired.length === 0
                     width: parent.width
-                    color: PlasmaColors.foregroundInactive
+                    color: Theme.foregroundInactive
                     font.pixelSize: 11
                     text: "No paired devices."
                 }

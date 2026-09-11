@@ -73,7 +73,7 @@ BarWidget {
 
     Rectangle {
         anchors.fill: parent
-        color: root.hovered || root.showing ? PlasmaColors.hoverBackground : "transparent"
+        color: root.hovered || root.showing ? Theme.hoverBackground : "transparent"
 
         Behavior on color { ColorAnimation { duration: 120 } }
 
@@ -83,7 +83,7 @@ BarWidget {
             anchors.centerIn: parent
             width: root.bar?.horizontal ? 1 : parent.width * 0.5
             height: root.bar?.horizontal ? parent.height * 0.5 : 1
-            color: PlasmaColors.alpha(PlasmaColors.foreground, 0.3)
+            color: Theme.alpha(Theme.foreground, 0.3)
         }
     }
 }

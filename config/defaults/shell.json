@@ -1,5 +1,11 @@
 {
     "schemaVersion": 1,
+    "theme": {
+        "mode": "auto",
+        "accent": "plasma",
+        "translucent": true,
+        "rounding": 28
+    },
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",

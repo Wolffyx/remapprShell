@@ -56,9 +56,9 @@ BarWidget {
                 implicitHeight: root.vertical ? pill.length : 14
                 radius: Math.min(width, height) / 2
 
-                color: pill.active ? PlasmaColors.accent
-                                   : (hover.hovered ? PlasmaColors.hoverBackground
-                                                    : PlasmaColors.alpha(PlasmaColors.foreground, 0.25))
+                color: pill.active ? Theme.accent
+                                   : (hover.hovered ? Theme.hoverBackground
+                                                    : Theme.alpha(Theme.foreground, 0.25))
 
                 Behavior on implicitWidth { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                 Behavior on implicitHeight { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
@@ -70,7 +70,7 @@ BarWidget {
                     visible: root.showNames && !root.vertical
                     text: pill.modelData.name ?? ""
                     font.pixelSize: 11
-                    color: pill.active ? PlasmaColors.background : PlasmaColors.foreground
+                    color: pill.active ? Theme.background : Theme.foreground
                 }
 
                 HoverHandler { id: hover }

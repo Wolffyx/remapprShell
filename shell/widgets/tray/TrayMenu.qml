@@ -49,7 +49,7 @@ Column {
     PanelText {
         visible: root.entries.length === 0
         text: "…"
-        color: PlasmaColors.foregroundInactive
+        color: Theme.foregroundInactive
         leftPadding: 8
         topPadding: 4
         bottomPadding: 4
@@ -74,7 +74,7 @@ Column {
                 visible: entry.separator
                 width: Math.max(120, root.width)
                 height: 1
-                color: PlasmaColors.alpha(PlasmaColors.foreground, 0.15)
+                color: Theme.alpha(Theme.foreground, 0.15)
             }
 
             Item {
@@ -89,7 +89,7 @@ Column {
                     anchors.rightMargin: 2
                     radius: 4
                     color: (rowHover.hovered && (entry.modelData?.enabled ?? false))
-                        ? PlasmaColors.hoverBackground : "transparent"
+                        ? Theme.hoverBackground : "transparent"
                 }
 
                 Row {
@@ -135,7 +135,7 @@ Column {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: entry.modelData?.hasChildren ?? false
                         text: entry.expanded ? "⌄" : "›"
-                        color: PlasmaColors.foregroundInactive
+                        color: Theme.foregroundInactive
                         font.pixelSize: 12
                     }
                 }

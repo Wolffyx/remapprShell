@@ -135,9 +135,9 @@ Column {
             width: Math.min(460, picture.width - 16)
             height: Math.round(width * 9 / 16)
             radius: 8
-            color: PlasmaColors.backgroundAlternate
+            color: Theme.backgroundAlternate
             border.width: 1
-            border.color: PlasmaColors.alpha(PlasmaColors.foreground, 0.2)
+            border.color: Theme.alpha(Theme.foreground, 0.2)
 
             Repeater {
                 model: root.places
@@ -156,11 +156,11 @@ Column {
                     x: chip.margin + chip.modelData.x * (screenFrame.width - 2 * chip.margin - chip.width)
                     y: chip.margin + chip.modelData.y * (screenFrame.height - 2 * chip.margin - chip.height)
                     radius: 5
-                    color: chip.current ? PlasmaColors.alpha(PlasmaColors.accent, 0.3)
-                         : chipHover.hovered ? PlasmaColors.hoverBackground
-                         : PlasmaColors.alpha(PlasmaColors.foreground, chip.action === "none" ? 0.04 : 0.1)
+                    color: chip.current ? Theme.alpha(Theme.accent, 0.3)
+                         : chipHover.hovered ? Theme.hoverBackground
+                         : Theme.alpha(Theme.foreground, chip.action === "none" ? 0.04 : 0.1)
                     border.width: chip.current ? 1 : 0
-                    border.color: PlasmaColors.accent
+                    border.color: Theme.accent
 
                     PanelText {
                         id: chipText
@@ -169,7 +169,7 @@ Column {
                         elide: Text.ElideRight
                         text: root.labelOf(chip.action)
                         font.pixelSize: 11
-                        color: chip.action === "none" ? PlasmaColors.foregroundInactive : PlasmaColors.foreground
+                        color: chip.action === "none" ? Theme.foregroundInactive : Theme.foreground
                     }
 
                     HoverHandler { id: chipHover }

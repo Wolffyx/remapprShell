@@ -30,6 +30,13 @@ QtObject {
 
     property bool loaded: false
 
+    // Whether Plasma switches between a light and a dark global theme by
+    // itself (System Settings > Global Theme; kded's lookandfeelautoswitcher
+    // does it, on knighttimed's day and night). The shell does not need it to
+    // follow -- the colour scheme changing is what it follows -- but the
+    // settings page says which of the two is happening.
+    property bool automaticLookAndFeel: false
+
     // Derived, so widgets never hand-roll an alpha.
     function alpha(c, a) {
         return Qt.rgba(c.r, c.g, c.b, a);
@@ -97,6 +104,7 @@ QtObject {
             root.positive = root._colour(win.ForegroundPositive, root.positive);
             root.selectionBackground = root._colour(sel.BackgroundNormal, root.selectionBackground);
             root.selectionForeground = root._colour(sel.ForegroundNormal, root.selectionForeground);
+            root.automaticLookAndFeel = (g["KDE"] ?? {}).AutomaticLookAndFeel === "true";
 
             root.loaded = true;
             Log.info("theme", "colour scheme loaded from kdeglobals");

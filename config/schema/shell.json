@@ -271,8 +271,39 @@
             "id": "appearance",
             "label": "Appearance",
             "icon": "preferences-desktop-theme-global",
-            "description": "The style every Qt application is drawn in, and the parts of this shell's own theme: colour schemes, the Alt+Tab switcher, a Plasma theme and a splash. Nothing here changes your colours or icons.",
-            "page": "appearance"
+            "description": "How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.",
+            "page": "appearance",
+            "keys": {
+                "theme.mode": {
+                    "type": "enum",
+                    "values": ["auto", "light", "dark"],
+                    "default": "auto",
+                    "label": "Colour scheme",
+                    "description": "auto turns the shell dark whenever the Plasma colour scheme is dark: chosen in System Settings, or switched at sunset when Plasma's global theme is set to change between a light and a dark one by itself. light and dark hold it there."
+                },
+                "theme.accent": {
+                    "type": "enum",
+                    "values": ["plasma", "blue", "teal", "magenta", "orange"],
+                    "default": "plasma",
+                    "label": "Accent",
+                    "description": "plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too."
+                },
+                "theme.translucent": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Translucent surfaces",
+                    "description": "The panel and its popouts let a little of what is behind them through. Off draws them solid."
+                },
+                "theme.rounding": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 36,
+                    "step": 2,
+                    "default": 28,
+                    "label": "Corner rounding",
+                    "description": "The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion."
+                }
+            }
         },
         {
             "id": "profiles",

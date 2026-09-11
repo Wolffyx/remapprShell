@@ -13,21 +13,24 @@ Row {
     property real to: 100
     property real stepSize: 1
     property bool live: false
+    // The number beside the track. Off where the value is shown elsewhere.
+    property bool showReadout: true
+    property string unit: ""
     signal moved(real value)
 
-    spacing: 8
+    spacing: 12
 
     Slider {
         id: slider
         anchors.verticalCenter: parent.verticalCenter
-        width: root.width - readout.width - root.spacing
+        width: root.width - (root.showReadout ? readout.width + root.spacing : 0)
 
         // Explicit, and this is not cosmetic. A Controls Slider takes its
         // implicit height from its background and handle, and replacing both
         // with plain Rectangles that have no implicit size of their own
         // collapses the whole control to zero height: it drew nothing, and
         // there was nothing to drag. The setting looked broken because it was.
-        height: 20
+        height: 22
         from: root.from
         to: root.to
         stepSize: root.stepSize
@@ -42,40 +45,45 @@ Row {
 
         background: Rectangle {
             implicitWidth: 120
-            implicitHeight: 4
+            implicitHeight: 6
             x: slider.leftPadding
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
             width: slider.availableWidth
-            height: 4
-            radius: 2
-            color: PlasmaColors.alpha(PlasmaColors.foreground, 0.2)
+            height: 6
+            radius: 3
+            color: Theme.alpha(Theme.fg, 0.14)
 
             Rectangle {
                 width: slider.visualPosition * parent.width
                 height: parent.height
                 radius: parent.radius
-                color: PlasmaColors.accent
+                color: Theme.acc
             }
         }
 
         handle: Rectangle {
-            implicitWidth: 14
-            implicitHeight: 14
+            implicitWidth: 18
+            implicitHeight: 18
             x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
             y: slider.topPadding + slider.availableHeight / 2 - height / 2
-            width: 14
-            height: 14
-            radius: 7
-            color: PlasmaColors.foreground
+            width: 18
+            height: 18
+            radius: 9
+            color: Theme.acc
+            border.width: slider.pressed ? 4 : 0
+            border.color: Theme.alpha(Theme.accFg, 0.35)
         }
     }
 
     PanelText {
         id: readout
+        visible: root.showReadout
         anchors.verticalCenter: parent.verticalCenter
-        width: 32
+        width: 44
         horizontalAlignment: Text.AlignRight
-        text: Math.round(slider.value)
-        color: PlasmaColors.foregroundInactive
+        text: Math.round(slider.value) + root.unit
+        color: Theme.mut
+        font.family: Theme.monoFamily
+        font.pixelSize: 12
     }
 }

@@ -42,7 +42,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: 4
-        color: (hover.hovered || root.popoutVisible) ? PlasmaColors.hoverBackground : "transparent"
+        color: (hover.hovered || root.popoutVisible) ? Theme.hoverBackground : "transparent"
         Behavior on color { ColorAnimation { duration: 120 } }
 
         Row {
@@ -86,7 +86,7 @@ BarWidget {
                         width: 64
                         height: 64
                         radius: 6
-                        color: PlasmaColors.alpha(PlasmaColors.foreground, 0.08)
+                        color: Theme.alpha(Theme.foreground, 0.08)
                         clip: true
 
                         Image {
@@ -132,7 +132,7 @@ BarWidget {
                             visible: text.length > 0
                             text: root.player?.trackAlbum ?? ""
                             elide: Text.ElideRight
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 10
                         }
                     }
@@ -150,13 +150,13 @@ BarWidget {
                         width: parent.width
                         height: 4
                         radius: 2
-                        color: PlasmaColors.alpha(PlasmaColors.foreground, 0.2)
+                        color: Theme.alpha(Theme.foreground, 0.2)
 
                         Rectangle {
                             width: parent.width * Math.min(1, (root.player?.position ?? 0) / Math.max(1, root.player?.length ?? 1))
                             height: parent.height
                             radius: parent.radius
-                            color: PlasmaColors.accent
+                            color: Theme.accent
                         }
 
                         TapHandler {
@@ -175,14 +175,14 @@ BarWidget {
                         PanelText {
                             id: elapsed
                             text: StatusIcons.trackTime(root.player?.position ?? 0)
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 10
                         }
 
                         PanelText {
                             anchors.right: parent.right
                             text: StatusIcons.trackTime(root.player?.length ?? 0)
-                            color: PlasmaColors.foregroundInactive
+                            color: Theme.foregroundInactive
                             font.pixelSize: 10
                         }
                     }

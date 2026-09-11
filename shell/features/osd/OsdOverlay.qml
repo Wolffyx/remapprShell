@@ -47,7 +47,7 @@ PanelWindow {
         implicitWidth: Math.max(240, content.implicitWidth + 40)
         implicitHeight: content.implicitHeight + 28
         radius: 12
-        color: PlasmaColors.panelBackground
+        color: Theme.panelBackground
 
         opacity: OsdService.showing ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 120 } }
@@ -85,13 +85,13 @@ PanelWindow {
                 width: 200
                 height: 4
                 radius: 2
-                color: PlasmaColors.backgroundAlternate
+                color: Theme.backgroundAlternate
 
                 Rectangle {
                     width: parent.width * Math.max(0, Math.min(1, OsdService.value / OsdService.maxValue))
                     height: parent.height
                     radius: parent.radius
-                    color: PlasmaColors.accent
+                    color: Theme.accent
 
                     Behavior on width { NumberAnimation { duration: 80 } }
                 }
@@ -101,7 +101,7 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: OsdService.showingProgress && OsdService.text.length > 0
                 text: OsdService.text
-                color: PlasmaColors.foregroundInactive
+                color: Theme.foregroundInactive
                 font.pixelSize: 11
             }
         }

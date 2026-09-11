@@ -211,7 +211,7 @@ BarWidget {
             Rectangle {
                 anchors.fill: parent
                 radius: 4
-                color: root.popoutVisible ? PlasmaColors.hoverBackground : "transparent"
+                color: root.popoutVisible ? Theme.hoverBackground : "transparent"
                 Behavior on color { ColorAnimation { duration: 120 } }
             }
 
@@ -243,7 +243,7 @@ BarWidget {
                     anchors.margins: -2
                     radius: 4
                     color: root.hoveredIndex === entry.index
-                        ? PlasmaColors.hoverBackground : "transparent"
+                        ? Theme.hoverBackground : "transparent"
                     Behavior on color { ColorAnimation { duration: 120 } }
                 }
 
@@ -310,7 +310,7 @@ BarWidget {
                     Rectangle {
                         anchors.fill: parent
                         radius: 5
-                        color: hiddenHover.hovered ? PlasmaColors.hoverBackground : "transparent"
+                        color: hiddenHover.hovered ? Theme.hoverBackground : "transparent"
                         Behavior on color { ColorAnimation { duration: 120 } }
                     }
 
