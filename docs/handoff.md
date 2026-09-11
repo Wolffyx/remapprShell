@@ -33,7 +33,8 @@ rows are what that did.
 | | |
 | --- | --- |
 | Shell | installed via `make link` as `remappr-shell.service`, **inactive and deliberately not enabled**: the user starts and stops it by hand for testing (`rmpr start` / `rmpr stop`). Do not enable it or suggest enabling it. After a reboot there is no panel of ours until `rmpr start` |
-| plasmashell | on **`caelestia.desktop`**, while the profile says `panel.renderer: plasma`. The two disagree and no session changed either -- something outside this project switched the package back. Run `rmpr renderer status` before anything else |
+| plasmashell | on **`remappr-shell.desktop`**, profile `panel.renderer: quickshell` -- the user switched at 14:12 on 2026-09-11 with `rmpr renderer set quickshell`, then restarted plasmashell. Our shell draws the panel; caelestia's bar still runs beside it |
+| Plasma services | notifications: **caelestia's Quickshell** (it took the name the moment the plasmashell restart freed it, before our hosted applet could; the user is fine with that for now). Clipboard: our hosted `plasmawindowed` (Klipper). Device notifier: hosted too |
 | Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` -- the `windows` preset plus the history bell. The new status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
@@ -94,6 +95,15 @@ if they fail.
     own popup. If doctor says nothing provides notifications, every
     notification is being dropped -- which is what this renderer did until
     2026-09-11.
+
+    **Run once, by the user, 2026-09-11.** First attempt: no popup --
+    plasmashell still held the old tray's notification server after the live
+    switch (fixed: `renderer set` now restarts it). After a restart: Klipper
+    and the device notifier hosted in `plasmawindowed` (the first real proof
+    of the hosting); notifications taken by caelestia's still-running
+    Quickshell bar, which registers a server whenever the name is free and
+    got there first. With caelestia gone, the hosted Plasma applet should get
+    the name -- that is the case still to see.
 13. **The clipboard under our own renderer.** With plasmashell on our
     package, confirm first that `org.kde.klipper` really is gone
     (`busctl --user status org.kde.klipper`), then copy two things and open
@@ -904,7 +914,11 @@ now leaves it exactly as it was, compared by screenshot). The first:
   popout on the panel.
 - `panel click`, `status` and `config setRuntime` over IPC.
 
-Not touched: plasmashell is still on `caelestia.desktop` against a profile
-that says `plasma` -- the user's call, and in the table at the top. The
-service stays disabled on purpose; the user starts and stops the shell by
-hand while testing.
+After those, three more: the device notifier hosted too; the service left
+disabled on purpose (the user starts and stops the shell by hand while
+testing); and the fix the user's first real test turned up -- a live switch
+to our renderer left plasmashell holding the old tray's notification server,
+so `renderer set quickshell` now restarts plasmashell when it does.
+
+The machine ended the day on our renderer, with caelestia's bar still
+running and holding notifications. See the table at the top.

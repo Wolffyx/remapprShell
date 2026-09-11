@@ -457,6 +457,11 @@ for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipb
             warn "$what: held by plasmashell, left over from the previous panel"
         fi
         fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
+    elif [ "$comm" = quickshell ]; then
+        # Ours is Quickshell too, and so is caelestia's bar: name the config.
+        cfg=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' \
+              | grep -o -- '-p [^ ]*' | sed 's/^-p //; s|/shell.qml$||; s|.*/||')
+        ok "$what: provided by quickshell (${cfg:-unknown config})"
     elif [ -n "$comm" ]; then
         ok "$what: provided by $comm"
     elif [ "$name" = org.freedesktop.Notifications ]; then
