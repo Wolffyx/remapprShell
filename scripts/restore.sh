@@ -67,7 +67,7 @@ grep -h '^created=' "$target/meta" 2>/dev/null | sed 's/^/    taken /' >&2
 
 # Restoring overwrites live configuration, so the shell must not be running and
 # holding files open -- and the user should be told before, not after.
-if pgrep -f "quickshell/$SLUG" >/dev/null 2>&1; then
+if shell_running; then
     log_warn "$DISPLAY_NAME appears to be running; stop it first:"
     log_warn "  systemctl --user stop $SYSTEMD_UNIT"
     [ "$ASSUME_YES" = 1 ] || die "refusing to restore over a running shell (pass --yes to override)"

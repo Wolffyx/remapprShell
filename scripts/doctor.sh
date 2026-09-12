@@ -233,7 +233,7 @@ fi
 # is the finding -- reporting "no panel at all" while one is plainly on screen
 # teaches people to ignore this output.
 if [ "$configured_renderer" = "quickshell" ] && [ "$shell_pkg" = "$SHELL_PACKAGE_ID" ]; then
-    if pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1; then
+    if shell_running; then
         ok "the shell is running and drawing the panel"
     elif systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1; then
         warn "the shell is not running, so nothing is drawing a panel"
@@ -465,7 +465,7 @@ else
 fi
 
 if [ "$ai_enabled" = true ] || [ "$history_on" = true ]; then
-    if pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1; then
+    if shell_running; then
         n=$(quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications count 2>/dev/null || echo '?')
         ok "the notification listener is wanted and the shell is running ($n remembered)"
     else

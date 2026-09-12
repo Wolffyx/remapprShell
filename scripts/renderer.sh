@@ -101,7 +101,7 @@ shell_will_draw() {
     # answer depend on which HOME is in play -- which is what lets a test in a
     # throwaway HOME get a deterministic answer instead of inheriting whatever
     # the developer happens to be running.
-    pgrep -f "$QS_CONFIG_DIR" >/dev/null 2>&1 && return 0
+    shell_running && return 0
     session_available && systemctl --user is-active "$SYSTEMD_UNIT" >/dev/null 2>&1 && return 0
     session_available && systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1 && return 0
     return 1

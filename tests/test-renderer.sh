@@ -157,6 +157,23 @@ check "no stock panel template"   "$(grep -vE '^\s*//' "$PLASMA_SHELLS_DIR/$PLAS
 # The switch that once left a real desktop with no panel: the quickshell
 # renderer's package ships no Plasma panel because our shell draws it, so
 # switching to it with our shell absent leaves nothing at all.
+echo "== what counts as the shell running =="
+# `make run` starts the shell from a checkout, and its command line has none
+# of the installed config directory in it. Matching only that directory made
+# every check answer "not running" during exactly the session someone runs
+# while working on the shell: status said no with a panel on screen, and
+# `renderer set quickshell` refused because it believed nothing would draw.
+# The replacement reads a plain variable: a local of the calling function is
+# not reliably in scope by the time process substitution forks to run it.
+FAKE_PROC=""
+_shell_processes() { [ -n "$FAKE_PROC" ] && printf '%s\n' "$FAKE_PROC"; return 0; }
+running_with() { FAKE_PROC=$1; shell_running_from || echo none; }
+
+check "the installed copy"    "$(running_with "42 /usr/bin/quickshell -n -p $QS_CONFIG_DIR/shell.qml")" "installed"
+check "a run from a checkout" "$(running_with "42 /usr/bin/quickshell -n -p $REPO_ROOT/shell/shell.qml")" "working tree"
+check "somebody else's shell" "$(running_with '42 /usr/bin/quickshell -n -p /home/other/.config/quickshell/caelestia/shell.qml')" "none"
+check "nothing running"       "$(running_with '')" "none"
+
 echo "== refusing to leave the desktop with no panel =="
 out=$(rmpr_renderer set quickshell --yes 2>&1)
 check "refused"               "$?" "1"

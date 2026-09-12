@@ -119,7 +119,17 @@ case "$cmd" in
         printf 'installed:  '
         [ -e "@QS_CONFIG_DIR@" ] && echo "yes (@QS_CONFIG_DIR@)" || echo "no"
         printf 'running:    '
-        pgrep -f "quickshell/@SLUG@" >/dev/null 2>&1 && echo "yes" || echo "no"
+        # Either copy counts: the installed one, or `make run` from a
+        # checkout, whose command line names the source tree instead. Saying
+        # "no" to a shell that is plainly on screen is how an afternoon goes
+        # missing.
+        if pgrep -a -x quickshell 2>/dev/null | grep -qF "@QS_CONFIG_DIR@"; then
+            echo "yes"
+        elif pgrep -a -x quickshell 2>/dev/null | grep -qF "@REPO_ROOT@/shell/shell.qml"; then
+            echo "yes (from the working tree at @REPO_ROOT@)"
+        else
+            echo "no"
+        fi
         printf 'service:    '
         systemctl --user is-active "@SYSTEMD_UNIT@" 2>/dev/null || true
         printf 'config:     %s\n' "@CONFIG_DIR@"

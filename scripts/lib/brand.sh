@@ -82,6 +82,36 @@ SAFE_MODE_VAR="${ENV_PREFIX}_SAFE_MODE"
 # restarts, no package cache rebuild. Tests run against a throwaway HOME but
 # share the real session bus, so without this a test switching shell packages
 # would switch the desktop the person is sitting in front of.
+# Is this shell's Quickshell running -- installed, or straight from a checkout?
+#
+# `make run` starts it from the working tree ("quickshell -n -p
+# shell/shell.qml"), whose command line has nothing of the installed config
+# directory in it. Matching only that directory made every "is it running?"
+# answer no during exactly the kind of session someone runs while working on
+# it: `rmpr status` said no with a panel on screen, and `renderer set` refused
+# to switch because it believed nothing would draw.
+#
+# `pgrep -x` matches the process name, so this cannot match the script asking
+# the question -- the trap that killed a session's own shell once already.
+# The candidate processes, as "pid command". Its own function so a test can
+# put known lines in front of the matching without inventing a process.
+_shell_processes() { pgrep -a -x quickshell 2>/dev/null; }
+
+shell_running() { [ -n "$(shell_running_from)" ]; }
+
+# Which of the two it is, for output that has to say something to a person.
+# Prints "installed" or "working tree", and nothing at all when neither.
+shell_running_from() {
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            *"$QS_CONFIG_DIR"*)             printf 'installed'; return 0 ;;
+            *"$REPO_ROOT/shell/shell.qml"*) printf 'working tree'; return 0 ;;
+        esac
+    done < <(_shell_processes)
+    return 1
+}
+
 NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 

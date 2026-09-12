@@ -270,10 +270,19 @@ if they fail.
     status` afterwards either way. **Left to the user**, because both write
     KDE keys and change what is on their screen.
 
-    The flash in the log -- "panel: up on DP-2" a line before "profile loaded"
-    -- was a second bug, and is fixed on `meridian` (`f094923`): the defaults
-    name this shell as what draws the panel, so a profile naming Plasma got a
-    panel for one frame. `ConfigStore.profileLoaded` now gates it.
+    Confirmed by the user on 2026-09-12: `rmpr renderer set quickshell` was
+    what made the panel appear, under `rmpr start`.
+
+    The run exposed two bugs of ours, both fixed on `meridian`. The flash in
+    the log -- "panel: up on DP-2" a line before "profile loaded" -- is
+    `f094923`: the defaults name this shell as what draws the panel, so a
+    profile naming Plasma got a panel for one frame; `ConfigStore.profileLoaded`
+    gates it now. And **every "is the shell running?" check missed a shell
+    started by `make run`**, because it matched only the installed config
+    directory while a working-tree run names the source tree instead -- so
+    `rmpr status` said "no" with a panel on screen, and `renderer set` refused
+    on the grounds that nothing would draw. `shell_running` in `brand.sh`
+    answers for both copies now, and `rmpr status` says which one it found.
 
 ### The lesson this session paid for twice
 
