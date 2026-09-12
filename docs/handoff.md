@@ -1,7 +1,8 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions: the first built the Plasma renderer, diagnostics, the wizard, the
+sessions, and added to since -- most recently on 2026-09-12, when the
+Meridian redesign was finished on its own branch: the first built the Plasma renderer, diagnostics, the wizard, the
 theme layer, the open-window list and panel auto-hide; the second added AI
 assist, the notification history, crash reporting, and a tray you can curate
 whose menus open. A third, on 2026-09-11, added volume, network, Bluetooth
@@ -25,6 +26,17 @@ and never the default.
 
 **Clean-room.** No code is taken from caelestia-dots-kde. It is referenced only
 for lessons — which patterns to avoid.
+
+## The redesign, on a branch
+
+Since 2026-09-11 a second line of work has been running in the worktree
+`~/Projects/remappr-shell-meridian`, branch **`meridian`**: the user's Claude
+Design mockup "Meridian Shell" implemented as this shell's look, with Material
+Design colours and a light and a dark scheme. **None of it reaches the screen
+until that branch is merged, which is the user's call.** Everything below
+describes `main` unless it says otherwise; what the branch changes is under
+"The Meridian redesign" further down, and `docs/meridian-handoff.md` in the
+worktree carries the detail.
 
 ## The state of this machine, right now
 
@@ -228,6 +240,31 @@ if they fail.
     stand-in authenticator, the unlock rules (21 QML cases) and the
     commands (61 checks). Not seen: any of it on a screen, or a real
     password through it.
+
+23. **The redesign, once it is merged -- everything in it needs eyes.** No
+    part of `meridian` has ever been on a screen: every picture of it was
+    drawn offscreen. Worth going through in order: the panel in its three
+    styles on each edge; the start menu in its three layouts and the search
+    overlay; quick settings, the calendar and the notification centre; the
+    sidebar (`rmpr sidebar`) and the key sheet (`rmpr keys`); the session
+    screen (Settings -> Lock & session -> "Show it"); a notification popup in
+    each position; the settings window's new pages; the rounded screen border
+    and the desktop clock (Settings -> Desktop, both off by default).
+24. **The lock screen, again, on the merged build.** The Meridian lock screen
+    is a different build from the one `try` recorded on 2026-09-11, so
+    `lockscreen status` will say "changed since it was tried" and `enable`
+    will refuse until `rmpr lockscreen try` has unlocked the new one. Same
+    rules as item 22, and the same way back.
+25. **The taskbar, reported missing on 2026-09-12.** Running `make run` from
+    the main tree, the user reported that the taskbar was not displayed. The
+    shell's own log for that run is clean -- panels up on DP-2 and DP-3
+    (bottom, 40px), 18 widgets loaded, no errors -- and nothing of ours was
+    running by the time it could be looked at, so nothing was measured.
+    What to do when it happens again, in this order: `rmpr status` (is ours
+    running at all), then `quickshell ipc -p ~/.config/quickshell/remappr-shell/shell.qml
+    call panel layout DP-2`, which prints every widget's box in screen
+    coordinates and settles "not drawn" against "drawn underneath caelestia's
+    bar" without a screenshot. Both bars are at the bottom on this machine.
 
 ### The lesson this session paid for twice
 
@@ -785,6 +822,64 @@ are not.
   missing one. `test-crash.sh` builds dumps by hand, including one belonging to
   another shell.
 
+## The Meridian redesign
+
+On `meridian`, nine commits, none of it merged. The mockup is the user's
+Claude Design project (file "Meridian Shell.dc.html"), read with DesignSync;
+the two standing asks were Material Design colours and a light and a dark
+scheme that follow the system.
+
+| commit | what |
+| --- | --- |
+| `2ba2c82` | the colours: Material 3 roles from one seed, light and dark |
+| `1e2bc4a` | the panel: full, floating or islands, on every edge |
+| `27cb96f` | quick settings, the calendar, the notification centre |
+| `19ffc64` | the built-in start menu in three layouts, and search |
+| `877c60b` | the sidebar, the key sheet, the session screen, the OSD, toasts |
+| `8323eac` | the settings window, and five new pages |
+| `85f465c` | the lock screen |
+| `f80456e` | the rounded screen border and the desktop clock |
+| `8ef209a` | KDE's colour schemes generated from the same palette |
+
+What it adds, in the terms the rest of this file uses:
+
+- **One palette for everything.** `qs.domain.theme.palette.Scheme` computes
+  Material 3 roles from a seed in CIELAB and OKLCH (pure, tested), `Theme`
+  turns them into the names every file draws with, and
+  `scripts/gen-palette.sh` runs that same scheme offscreen to generate the
+  palette Plasma's colour schemes are built from. KDE's applications and this
+  shell are drawn from one set of colours rather than two that drift.
+  `theme.mode` auto follows the active colour scheme's darkness, live.
+- **New surfaces**, each a layer-shell window of its own, each opt-in or
+  opened deliberately: the sidebar, the key sheet (read from
+  kglobalshortcutsrc, so it shows only what is really bound), the session
+  screen (behind `session.prompt`, ending the session through Plasma's own
+  session manager), notification popups with two new centred positions, and
+  the desktop's rounded border and clock (`desktop.*`, both off).
+- **A settings window in the design's shape**, still driven entirely by the
+  schema: the navigation is `Schema.sections` in order, so `rmpr settings
+  <id>` and the generated reference cannot disagree with the window. Sections
+  `panel` and `session` were renamed `taskbar` and `lock`.
+- **`rmpr windows behaviour`** (status/set/revert): KWin's focus policy, its
+  delays, auto-raise, placement and borderless-maximised keys, ledgered like
+  every other KDE key. What KWin does not have -- window gaps, rounded window
+  corners, tiling layouts -- is named as absent rather than offered.
+- **`rmpr lockscreen set`** and a lock screen in the new look. Plasma's three
+  lock settings stay Plasma's; this shell's own live in
+  `~/.config/<slug>/lockscreen.conf`, because the greeter's `config` object is
+  built from the *desktop* package's config.xml and cannot carry ours.
+- **`rmpr sidebar`, `rmpr keys`**, with a desktop entry each, bindable through
+  `rmpr shortcuts set`.
+
+What it does not add, deliberately: notifications on the lock screen (the
+greeter has none of the shell's memory, and bodies are never written to disk),
+window thumbnails (unchanged -- see "Not built yet"), and light and dark
+look-and-feel packages (Plasma 6.7.5 has no automatic theme switching to feed
+them; its day/night belongs to the wallpaper).
+
+Everything in it was drawn offscreen and nothing has been clicked; see items
+23 to 25 under "What to check first".
+
 ## Not built yet
 
 - ~~**Tray tooltips.**~~ Built, for every widget rather than only the tray;
@@ -1319,6 +1414,40 @@ Non-obvious things that cost time to discover:
   argument is a `Qt.DateFormat`, and 0 is `TextDate` ("Fri Sep 11 2026").
   `d.toLocaleDateString(Qt.locale(), Locale.LongFormat)` is the locale's.
 
+- **`font.pixelSize` must be an integer, and qmllint does not say so.** A
+  `12.5` refused the whole file at load ("Invalid property assignment: int
+  expected") and took every page that imported it with it. The linter passed
+  it; the first offscreen render caught it.
+- **A Loader resizes what it loads.** A switch put straight into one is
+  stretched across the whole control slot and reads as a bar rather than a
+  switch. Wrap anything with a size of its own, and let sliders and text
+  fields fill it.
+- **quickshell does not act on `Qt.quit()`** -- the engine logs "Signal
+  QQmlEngine::quit() emitted, but no receivers connected" and keeps running.
+  A script that reads a value out of QML has to stop it with a timeout, and
+  must write to a file rather than a pipe: `timeout N quickshell ... | grep`
+  waits out the whole timeout and then fails on it under `pipefail`.
+- **The greeter's settings are not the drawn package's.** kscreenlocker builds
+  the `config` object from `org.kde.plasma.desktop`'s `lockscreen/config.xml`,
+  whatever package it is drawing, so a key added to ours never appears. Its
+  values live in kscreenlockerrc under **`[Greeter][LnF][General]`** -- the
+  kcfg's own group nested inside the greeter's -- which was found by giving a
+  throwaway HOME a config and asking the real greeter what it got. Anything of
+  ours has to be read from a file of our own instead.
+- **The lock screen package must be a verbatim copy of its source.** `try`
+  records the hash of the copy it showed and `status` compares it with the
+  source, so rendering a template into the package -- which seemed a tidy way
+  to give the greeter a path -- made `enable` refuse every build. Generated
+  files belong in the source tree, beside Branding.qml.
+- **`lint-slug.sh` only sees tracked files.** A test with the project's name
+  hardcoded passed the lint for as long as it was untracked, and failed the
+  build the moment it was committed.
+- **A preview of the settings window reads the installed schema.** `Schema` and
+  `Paths` name `Branding.dataDir`, which is the installed copy, so a preview
+  run against a worktree shows the *other* tree's pages until those two paths
+  are repointed. The same goes for `Branding.ctlBin`: a page that shells out
+  runs the installed CLI unless the preview points it at the worktree's.
+
 ## The plan
 
 `~/.claude/plans/in-this-project-i-cryptic-horizon.md` holds the full approved
@@ -1554,3 +1683,33 @@ turned out to be one. Checks cannot reach PAM now. faillock was empty
 again by 19:48.
 
 Nothing was put on the screen: every picture was taken offscreen.
+
+## The redesign sessions, 2026-09-11 to 2026-09-12
+
+Six sessions, all in the worktree `~/Projects/remappr-shell-meridian` on
+branch `meridian`, cut from `main` at `1a0b10c`. The main tree was not
+touched, and nothing was merged: the user asked for one commit per phase and
+keeps the merge for themselves.
+
+The shape of it: the mockup was read with DesignSync rather than described,
+each phase ended green (`make lint`, `make test`, and for the lock screen
+`lockscreen check` in Plasma's real greeter), and every screen was rendered
+offscreen and looked at before being called done -- the panel and its popouts
+through `dev/preview/preview.sh`, the lock screen through the greeter itself
+with a stand-in authenticator. Nothing was put on the user's screen, and no
+notification, password or KDE key was written outside a sandbox except the
+two colour-scheme files the build generates.
+
+Four things were measured that contradicted an assumption, and each changed
+what got built rather than being worked around: the greeter cannot be given
+settings through its own package; a lock screen package must stay a verbatim
+copy or the try gate refuses it; Plasma has no automatic light/dark theme
+switching, so no packages were built for one; and `font.pixelSize` refuses a
+fraction at load, which qmllint does not catch. They are all under
+"Non-obvious things".
+
+What is left is a person's: none of it has been on a screen, the lock screen
+needs `try` again on the new build, and the merge is the user's decision. See
+items 23 to 25 under "What to check first" -- item 25 is a taskbar the user
+reported missing on `main` on 2026-09-12, which no session has yet been able
+to measure.
