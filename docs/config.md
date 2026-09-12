@@ -100,6 +100,21 @@ This shell's own lock screen -- off until it has been tried -- and which screen 
 | --- | --- | --- | --- |
 | `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
 
+### Desktop
+
+What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `desktop.border` | `true` or `false` | `false` | Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that. |
+| `desktop.borderInset` | a number, 0 to 40 | `10` | How far in from each edge the frame is painted, in pixels. |
+| `desktop.borderRadius` | a number, 0 to 48 | `26` | How round the painted corners are, in pixels. |
+| `desktop.clock` | `true` or `false` | `false` | The time and date on the wallpaper, under every window. |
+| `desktop.clockPosition` | `top-left`, `top-right`, `bottom-left`, `bottom-right` | `bottom-right` | Where it sits |
+| `desktop.clockSize` | a number, 40 to 200 | `92` | The height of the time, in pixels; the date follows it. |
+| `desktop.clockDate` | `true` or `false` | `true` | Show the date |
+| `desktop.clockInk` | `auto`, `light`, `dark` | `auto` | auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed. |
+
 ### Plasma services
 
 Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.

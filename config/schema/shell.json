@@ -307,6 +307,78 @@
       }
     },
     {
+      "id": "desktop",
+      "label": "Desktop",
+      "icon": "preferences-desktop-wallpaper",
+      "glyph": "wallpaper",
+      "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
+      "keys": {
+        "desktop.border": {
+          "type": "bool",
+          "default": false,
+          "label": "Rounded screen border",
+          "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
+        },
+        "desktop.borderInset": {
+          "type": "int",
+          "min": 0,
+          "max": 40,
+          "default": 10,
+          "label": "Border width",
+          "description": "How far in from each edge the frame is painted, in pixels."
+        },
+        "desktop.borderRadius": {
+          "type": "int",
+          "min": 0,
+          "max": 48,
+          "default": 26,
+          "label": "Corner radius",
+          "description": "How round the painted corners are, in pixels."
+        },
+        "desktop.clock": {
+          "type": "bool",
+          "default": false,
+          "label": "Clock on the desktop",
+          "description": "The time and date on the wallpaper, under every window."
+        },
+        "desktop.clockPosition": {
+          "type": "enum",
+          "values": [
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right"
+          ],
+          "default": "bottom-right",
+          "label": "Where it sits"
+        },
+        "desktop.clockSize": {
+          "type": "int",
+          "min": 40,
+          "max": 200,
+          "default": 92,
+          "label": "How big",
+          "description": "The height of the time, in pixels; the date follows it."
+        },
+        "desktop.clockDate": {
+          "type": "bool",
+          "default": true,
+          "label": "Show the date"
+        },
+        "desktop.clockInk": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "label": "Ink",
+          "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed."
+        }
+      }
+    },
+    {
       "id": "services",
       "label": "Plasma services",
       "icon": "preferences-system",

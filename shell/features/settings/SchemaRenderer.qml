@@ -72,20 +72,37 @@ Column {
             // One component per schema type, not per setting. A type that has
             // no component falls back to a text field rather than rendering
             // nothing, so an unrecognised setting is still editable.
+            // A Loader resizes what it loads, so a switch put straight into
+            // one is stretched across the whole control slot and reads as a
+            // bar. The ones that have a size of their own are wrapped and
+            // pushed to the right; a slider and a text field keep filling it.
             Component {
                 id: boolControl
-                Toggle {
-                    checked: row.current === true
-                    onToggled: value => root.writeValue(row.path, value)
+                Item {
+                    implicitHeight: 26
+
+                    Toggle {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: row.current === true
+                        onToggled: value => root.writeValue(row.path, value)
+                    }
                 }
             }
 
             Component {
                 id: enumControl
-                Select {
-                    values: row.spec.values ?? []
-                    currentIndex: Math.max(0, (row.spec.values ?? []).indexOf(row.current))
-                    onPicked: value => root.writeValue(row.path, value)
+                Item {
+                    implicitHeight: 36
+
+                    Select {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(parent.width, 200)
+                        values: row.spec.values ?? []
+                        currentIndex: Math.max(0, (row.spec.values ?? []).indexOf(row.current))
+                        onPicked: value => root.writeValue(row.path, value)
+                    }
                 }
             }
 

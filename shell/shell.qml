@@ -25,6 +25,7 @@ import qs.domain.backend
 import qs.domain.windows
 import qs.features.diagnostics
 import qs.features.launcher
+import qs.features.desktop
 import qs.features.overlays
 import qs.domain.surfaces
 
@@ -94,6 +95,21 @@ ShellRoot {
     Variants {
         model: Surfaces.session ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
         SessionOverlay {}
+    }
+
+    // The desktop's own two: a rounded frame over the screen's corners, and a
+    // clock on the wallpaper. Both off by default, both drawn only where they
+    // are asked for, and neither takes a click or reserves a pixel.
+    Variants {
+        model: ConfigStore.value("desktop.border", false) === true ? Quickshell.screens : []
+
+        ScreenBorder {}
+    }
+
+    Variants {
+        model: ConfigStore.value("desktop.clock", false) === true ? Quickshell.screens : []
+
+        DesktopClock {}
     }
 
     // Off unless asked for, and built only then: Plasma's OSD already works,
