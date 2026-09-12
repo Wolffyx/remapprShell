@@ -81,6 +81,19 @@ QtObject {
 
     readonly property bool defaultsLoaded: Object.keys(root.defaults).length > 0
 
+    // True once the profile has been read, or found not to be there, or found
+    // unreadable -- in every case, once the answer is as good as it is going
+    // to get. Anything whose *existence* depends on a setting must wait for
+    // this: the defaults say the panel is drawn by this shell, so a profile
+    // that hands the panel to Plasma made one appear at startup and vanish a
+    // frame later, which is what "the panel is not displayed" looked like.
+    //
+    // Set only once the profile has been *applied*, never merely read. Set at
+    // the top of the handler instead, it promised a merged config that was
+    // still one statement away -- which a probe caught reading the defaults
+    // through a flag that already said the profile was in.
+    property bool profileLoaded: false
+
     // Writes are blocked while the profile file is unparseable. Without this,
     // a typo in the user's JSON plus one slider drag would overwrite their
     // whole file with a config built from defaults -- silently destroying the
@@ -246,6 +259,7 @@ QtObject {
             root.lastError = res.error;
             Log.error("config", `${root._profileView.path}: ${res.error}`);
             Log.error("config", "writes are blocked until the file parses");
+            root.profileLoaded = true;
             return;
         }
 
@@ -259,6 +273,7 @@ QtObject {
                 root.writable = false;
                 root.lastError = m.error;
                 Log.error("config", m.error);
+                root.profileLoaded = true;
                 return;
             }
             root.profileData = m.config;
@@ -266,6 +281,7 @@ QtObject {
             root.writable = true;
             root.lastError = "";
             root._scheduleWrite();   // persist the migrated shape
+            root.profileLoaded = true;
             root.changed();
             return;
         }
@@ -275,6 +291,7 @@ QtObject {
         root.writable = true;
         root.lastError = "";
         Log.info("config", `profile loaded (${Object.keys(data).length} top-level override(s))`);
+        root.profileLoaded = true;
         root.changed();
     }
 
@@ -357,6 +374,7 @@ QtObject {
                 // fresh install is every profile. Seeding also answers "where do
                 // I configure this?" with a real path.
                 Log.info("config", "no profile file yet; creating one");
+                root.profileLoaded = true;
                 root.profileData = ({});
                 root._lastParsed = ({});
                 root.writable = true;
@@ -364,6 +382,10 @@ QtObject {
                 root._seedTimer.restart();
                 root.changed();
             } else {
+                // Unreadable is an answer too: the defaults are what there is,
+                // and waiting for a file that cannot be read would leave the
+                // desktop with no panel at all.
+                root.profileLoaded = true;
                 root.writable = false;
                 root.lastError = `cannot read ${path} (error ${err})`;
                 Log.error("config", root.lastError);

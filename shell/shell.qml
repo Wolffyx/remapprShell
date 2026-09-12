@@ -43,7 +43,11 @@ ShellRoot {
     // the check lives here, where the panels are created, rather than in
     // anything that could be forgotten.
     Variants {
-        model: PanelModel.renderer === "quickshell" ? Quickshell.screens : []
+        // Not until the profile has been read: the defaults name this shell
+        // as what draws the panel, so a profile that names Plasma instead
+        // would otherwise get a panel for one frame and then lose it.
+        model: ConfigStore.profileLoaded && PanelModel.renderer === "quickshell"
+            ? Quickshell.screens : []
 
         Panel {}
     }
