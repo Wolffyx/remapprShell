@@ -255,16 +255,25 @@ if they fail.
     `lockscreen status` will say "changed since it was tried" and `enable`
     will refuse until `rmpr lockscreen try` has unlocked the new one. Same
     rules as item 22, and the same way back.
-25. **The taskbar, reported missing on 2026-09-12.** Running `make run` from
-    the main tree, the user reported that the taskbar was not displayed. The
-    shell's own log for that run is clean -- panels up on DP-2 and DP-3
-    (bottom, 40px), 18 widgets loaded, no errors -- and nothing of ours was
-    running by the time it could be looked at, so nothing was measured.
-    What to do when it happens again, in this order: `rmpr status` (is ours
-    running at all), then `quickshell ipc -p ~/.config/quickshell/remappr-shell/shell.qml
-    call panel layout DP-2`, which prints every widget's box in screen
-    coordinates and settles "not drawn" against "drawn underneath caelestia's
-    bar" without a screenshot. Both bars are at the bottom on this machine.
+25. **The taskbar reported missing on 2026-09-12 -- answered, and it needs
+    one command.** Nothing is drawing a panel on this machine, and both halves
+    of the reason are in `rmpr renderer status`: the profile says
+    `panel.renderer: plasma`, so this shell deliberately draws none, while
+    plasmashell is on `caelestia.desktop` rather than the expected
+    `remappr-shell-plasma.desktop`, so the generated Plasma panel is not
+    loaded either. Something moved plasmashell back after the last switch --
+    the ledger still holds `ShellPackage (was: caelestia.desktop)`.
+
+    The way out is `rmpr renderer set quickshell` (this shell draws it, which
+    is what `make run` and `rmpr start` are for) or `rmpr renderer set plasma`
+    again, which actually moves plasmashell onto our package; check `renderer
+    status` afterwards either way. **Left to the user**, because both write
+    KDE keys and change what is on their screen.
+
+    The flash in the log -- "panel: up on DP-2" a line before "profile loaded"
+    -- was a second bug, and is fixed on `meridian` (`f094923`): the defaults
+    name this shell as what draws the panel, so a profile naming Plasma got a
+    panel for one frame. `ConfigStore.profileLoaded` now gates it.
 
 ### The lesson this session paid for twice
 
