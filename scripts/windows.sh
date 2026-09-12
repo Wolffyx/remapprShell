@@ -8,6 +8,19 @@
 #   close ID  close one window, by the uuid the list reports -- what the task
 #             list's "Close window" runs
 #
+#   behaviour status [--json]     what KWin does with windows: how focus is
+#                                 given, whether hovering raises, whether a
+#                                 maximised window keeps its border
+#   behaviour set <key> <value>   one of those, written to kwinrc through the
+#                                 ledger, and KWin asked to read it again
+#   behaviour revert              put every one of them back
+#
+# The behaviour half configures KWin and reimplements nothing: these are the
+# keys System Settings' "Window Behaviour" page writes, and the ones a shell
+# can honestly offer. What KWin does not have -- window gaps, rounded window
+# corners, a tiling layout -- is not offered here, however much a mockup of
+# another desktop's shell may show it.
+#
 # Why any of this exists is written at the top of bin/windowsd.py.in. The short
 # version: KWin is the only thing that knows what windows exist, a KWin script
 # is the only supported way to read that without a C++ effect, and a script can
@@ -22,6 +35,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_SCRIPT_ID"
@@ -134,5 +148,92 @@ JS
         kwin_script unloadScript "$name" >/dev/null
         ;;
 
-    *) die "unknown command: $cmd (expected enable, disable, status, show or close)" ;;
+
+    # KWin's own window behaviour: the keys System Settings writes, through
+    # the ledger so every one of them can be put back.
+    #
+    # id | group | key | kind | choices (for an enum) | default when unset
+    behaviour)
+        BEHAVIOUR_KEYS=(
+            "focus|Windows|FocusPolicy|enum|ClickToFocus FocusFollowsMouse FocusUnderMouse FocusStrictlyUnderMouse|ClickToFocus"
+            "focusDelay|Windows|DelayFocusInterval|int|0 3000|300"
+            "autoRaise|Windows|AutoRaise|bool||false"
+            "autoRaiseDelay|Windows|AutoRaiseInterval|int|0 3000|750"
+            "borderlessMaximized|Windows|BorderlessMaximizedWindows|bool||false"
+            "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Smart"
+        )
+
+        behaviour_spec() {
+            local want=$1 spec
+            for spec in "${BEHAVIOUR_KEYS[@]}"; do
+                [ "${spec%%|*}" = "$want" ] && { printf '%s' "$spec"; return 0; }
+            done
+            return 1
+        }
+
+        behaviour_read() {
+            local spec=$1
+            IFS='|' read -r _id group key _kind _choices fallback <<< "$spec"
+            kreadconfig6 --file kwinrc --group "$group" --key "$key" --default "$fallback"
+        }
+
+        sub=${1:-status}
+        [ $# -gt 0 ] && shift
+
+        case "$sub" in
+            status)
+                if [ "${1:-}" = "--json" ]; then
+                    entries=""
+                    for spec in "${BEHAVIOUR_KEYS[@]}"; do
+                        IFS='|' read -r id group key kind choices fallback <<< "$spec"
+                        entries+=$(jq -n --arg id "$id" --arg key "$key" --arg kind "$kind" \
+                                         --arg value "$(behaviour_read "$spec")" --arg default "$fallback" \
+                                         --arg choices "$choices" \
+                            '{id: $id, key: $key, kind: $kind, value: $value, default: $default,
+                              choices: ($choices | split(" ") | map(select(length > 0)))}')
+                    done
+                    printf '%s' "$entries" | jq -s --arg scripts "$(kwin_tiling_scripts)" \
+                        '{settings: ., tilingScripts: ($scripts | split("\n") | map(select(length > 0)))}'
+                else
+                    for spec in "${BEHAVIOUR_KEYS[@]}"; do
+                        printf '%-20s %s\n' "${spec%%|*}" "$(behaviour_read "$spec")"
+                    done
+                    scripts=$(kwin_tiling_scripts | tr '\n' ' ')
+                    if [ -n "$scripts" ]; then
+                        printf '%-20s %s\n' "tiling script" "$scripts"
+                    fi
+                fi
+                ;;
+
+            set)
+                id=${1:-}; value=${2:-}
+                spec=$(behaviour_spec "$id") || die "unknown setting: '$id' (expected: $(printf '%s ' "${BEHAVIOUR_KEYS[@]%%|*}"))"
+                IFS='|' read -r _id group key kind choices fallback <<< "$spec"
+                case "$kind" in
+                    bool) [ "$value" = true ] || [ "$value" = false ] || die "$id takes true or false" ;;
+                    int)  [[ "$value" =~ ^[0-9]+$ ]] || die "$id takes a number of milliseconds"
+                          lo=${choices%% *}; hi=${choices##* }
+                          [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
+                    enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
+                esac
+                [ "$(kreadconfig6 --file kwinrc --group "$group" --key "$key" --default "$fallback")" = "$value" ] && {
+                    log_info "$id is already $value"
+                    exit 0
+                }
+                kconfig_set windows-behaviour kwinrc "$group" "$key" "$value"
+                kwin_reconfigure
+                log_step "$id: $value"
+                ;;
+
+            revert)
+                kconfig_revert windows-behaviour
+                kwin_reconfigure
+                log_step "KWin's window behaviour is back as it was"
+                ;;
+
+            *) die "unknown command: behaviour $sub (expected status, set or revert)" ;;
+        esac
+        ;;
+
+    *) die "unknown command: $cmd (expected enable, disable, status, show, close or behaviour)" ;;
 esac

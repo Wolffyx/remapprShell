@@ -34,6 +34,42 @@ pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 
+# KWin's own window behaviour: kwinrc keys, written through the ledger. What
+# matters is that a bad value never reaches kwinrc, that a write is recorded
+# with what was there before, and that revert puts it back exactly -- an
+# unset key deleted again rather than left empty.
+echo "== KWin's window behaviour =="
+BEHAVE=("$REPO_ROOT/scripts/windows.sh" behaviour)
+behave() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${BEHAVE[@]}" "$@" 2>&1; }
+kwinrc_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default '<unset>'; }
+
+FAKES="$SANDBOX/fakes"
+mkdir -p "$FAKES"
+for cmd in qdbus6 busctl systemctl kquitapp6; do
+    printf '#!/usr/bin/env bash\necho "$0 $*" >> %s/reached-kde.txt\nexit 0\n' "$SANDBOX" > "$FAKES/$cmd"
+    chmod +x "$FAKES/$cmd"
+done
+
+check "an unknown setting is refused"    "$(behave set nosuch true >/dev/null 2>&1; echo $?)" "1"
+check "a bool takes only true or false"  "$(behave set autoRaise sometimes >/dev/null 2>&1; echo $?)" "1"
+check "an enum takes only its values"    "$(behave set focus Whatever >/dev/null 2>&1; echo $?)" "1"
+check "a number outside the range"       "$(behave set focusDelay 99999 >/dev/null 2>&1; echo $?)" "1"
+check "nothing was written by a refusal" "$(kwinrc_key FocusPolicy)" "<unset>"
+
+behave set focus FocusFollowsMouse >/dev/null
+check "focus policy written"             "$(kwinrc_key FocusPolicy)" "FocusFollowsMouse"
+behave set borderlessMaximized true >/dev/null
+check "borderless maximised written"     "$(kwinrc_key BorderlessMaximizedWindows)" "true"
+check "status reads them back"           "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .value')" "FocusFollowsMouse"
+check "and says what the default was"    "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .default')" "ClickToFocus"
+check "the ledger has both"              "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+
+behave revert >/dev/null
+check "revert deletes a key that was unset" "$(kwinrc_key FocusPolicy)" "<unset>"
+check "and the other one too"               "$(kwinrc_key BorderlessMaximizedWindows)" "<unset>"
+check "the ledger is empty again"           "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "0"
+check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
+
 command -v busctl >/dev/null 2>&1 || { echo "  SKIP  busctl not available"; exit 0; }
 [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || { echo "  SKIP  no session bus"; exit 0; }
 python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo "  SKIP  python-gobject not installed"; exit 0; }

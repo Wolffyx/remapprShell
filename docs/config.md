@@ -32,9 +32,20 @@ typo cannot cost you the rest of the file.
 
 ## Settings
 
-### Panel
+### Appearance
 
-Where the panel sits and how big it is.
+How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto turns the shell dark whenever the Plasma colour scheme is dark: chosen in System Settings, or switched at sunset when Plasma's global theme is set to change between a light and a dark one by itself. light and dark hold it there. |
+| `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
+| `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
+| `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
+
+### Taskbar
+
+The panel: where it sits, how big it is, and the widgets that are parts of it -- the clock, the workspace pills and the window buttons. Every one of these is a configuration key, so a profile can set them by hand as well.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
@@ -46,13 +57,12 @@ Where the panel sits and how big it is.
 | `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |
 | `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
 
-### Drawn by
+### Windows
 
-What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
 
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `panel.renderer` | `quickshell`, `plasma`, `caelestia`, `none` | `quickshell` | Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
+No individual settings: this is a page in the settings window rather than a
+list of values.
 
 ### Launcher
 
@@ -69,15 +79,6 @@ What opens when you press the start button, and what opens when you search.
 | `launcher.pinned` | a list | `[]` | Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed. |
 | `launcher.kickoffMode` | `menu`, `windowed` | `menu` | Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus. |
 
-### On-screen display
-
-The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
-| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
-
 ### Notifications
 
 Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.
@@ -91,9 +92,9 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 | `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
 
-### Session
+### Lock & session
 
-What asks before the session ends, and what the lock screen shows.
+This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
@@ -106,25 +107,6 @@ Plasma's notifications, its clipboard history and its device notifier live insid
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
-
-### AI assist
-
-When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `ai.enabled` | `true` or `false` | `false` | Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about. |
-| `ai.provider` | `clipboard`, `claude-code`, `ollama`, `custom` | `clipboard` | `clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered. |
-| `ai.command` | a list | `[]` | For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input. |
-| `ai.ollamaUrl` | text | `http://127.0.0.1:11434` | Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other. |
-| `ai.ollamaModel` | text | `` | Empty picks the first model Ollama lists. |
-
-### Layouts
-
-Shipped panel layouts. Applying one replaces your current configuration.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
 
 ### Widgets
 
@@ -154,16 +136,21 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
-### Appearance
+### On-screen display
 
-How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.
+The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto turns the shell dark whenever the Plasma colour scheme is dark: chosen in System Settings, or switched at sunset when Plasma's global theme is set to change between a light and a dark one by itself. light and dark hold it there. |
-| `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
-| `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
-| `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
+| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
+| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
+
+### Layouts
+
+Shipped panel layouts. Applying one replaces your current configuration.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
 
 ### Profiles
 
@@ -178,6 +165,26 @@ Snapshots of your KDE configuration. Nothing here is ever deleted automatically.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.
+
+### Drawn by
+
+What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `panel.renderer` | `quickshell`, `plasma`, `caelestia`, `none` | `quickshell` | Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
+
+### AI assist
+
+When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `ai.enabled` | `true` or `false` | `false` | Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about. |
+| `ai.provider` | `clipboard`, `claude-code`, `ollama`, `custom` | `clipboard` | `clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered. |
+| `ai.command` | a list | `[]` | For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input. |
+| `ai.ollamaUrl` | text | `http://127.0.0.1:11434` | Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other. |
+| `ai.ollamaModel` | text | `` | Empty picks the first model Ollama lists. |
 
 ### About
 

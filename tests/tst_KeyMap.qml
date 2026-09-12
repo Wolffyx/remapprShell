@@ -17,9 +17,9 @@ TestCase {
         + "Window Maximize=Meta+PgUp,Meta+PgUp,Maximize Window\n"
         + "\n[services][org.kde.krunner.desktop]\n"
         + "_launch=Alt+Space,Alt+Space,KRunner\n"
-        + "\n[services][remappr-shell-settings.desktop]\n"
+        + "\n[services][testshell-settings.desktop]\n"
         + "_launch=Meta+Shift+R, , Settings\n"
-        + "\n[services][remappr-shell-clipboard.desktop]\n"
+        + "\n[services][testshell-clipboard.desktop]\n"
         + "_launch=none\n"
 
     function test_parse_keeps_the_current_keys() {
@@ -42,7 +42,7 @@ TestCase {
     }
 
     function test_sections_leave_out_what_is_not_bound() {
-        const s = KeyMap.sections(KeyMap.parse(file), "remappr-shell");
+        const s = KeyMap.sections(KeyMap.parse(file), "testshell");
         compare(s.length, 2);
         compare(s[0].title, "Shell");
         const labels = s[0].rows.map(r => r.label);
@@ -55,13 +55,13 @@ TestCase {
     }
 
     function test_the_shells_own_keys_are_listed() {
-        const rows = KeyMap.shellRows(KeyMap.parse(file), "remappr-shell");
+        const rows = KeyMap.shellRows(KeyMap.parse(file), "testshell");
         compare(rows.length, 1);
         compare(rows[0].keys, ["Meta+Shift+R"]);
         compare(rows[0].label, "Settings");
     }
 
     function test_an_empty_file_has_nothing() {
-        compare(KeyMap.sections(KeyMap.parse(""), "remappr-shell").length, 0);
+        compare(KeyMap.sections(KeyMap.parse(""), "testshell").length, 0);
     }
 }

@@ -42,7 +42,11 @@ Column {
 
             required property string modelData
 
-            readonly property var spec: root.keys[row.modelData]
+            // The model updates a moment before the delegates do, so a page
+            // change is briefly a key of the previous section against the keys
+            // of the next one. Without a fallback that is a handful of
+            // TypeErrors on every page switch.
+            readonly property var spec: root.keys[row.modelData] ?? ({})
             readonly property string path: root.prefix + row.modelData
             readonly property var current: root.readValue(row.path, row.spec.default)
 

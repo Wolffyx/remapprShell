@@ -1,0 +1,254 @@
+pragma ComponentBehavior: Bound
+
+// Windows: what KWin does with them.
+//
+// Nothing here is this shell's own behaviour -- KWin decides how focus is
+// given, when a window is raised and where a new one lands, and it has kept
+// those settings in kwinrc for twenty years. This page reads and writes them
+// through `rmpr windows behaviour`, so every change is ledgered and
+// `revert` puts the desktop back.
+//
+// What the mockup showed and KWin does not have -- window gaps, rounded
+// window corners, a tiling layout of its own -- is not offered. Saying so is
+// more use than a control that writes a key nothing reads.
+
+import QtQuick
+import Quickshell.Io
+import qs.core
+import qs.platform.kde
+import qs.domain.theme
+import qs.domain.windows
+import qs.ui.primitives
+import qs.ui.controls
+
+Column {
+    id: root
+
+    // `windows behaviour status --json`, parsed. Null until the first read.
+    property var info: null
+    property string status: ""
+    property bool busy: false
+
+    readonly property var settings: root.info?.settings ?? []
+    readonly property var tilingScripts: root.info?.tilingScripts ?? []
+
+    function valueOf(id, fallback) {
+        return (root.settings.find(s => s.id === id)?.value) ?? fallback;
+    }
+
+    function boolOf(id) { return String(root.valueOf(id, "false")) === "true"; }
+    function numberOf(id, fallback) { return Number(root.valueOf(id, fallback)); }
+
+    spacing: 14
+
+    Component.onCompleted: root.refresh()
+
+    function refresh() {
+        readProc.running = false;
+        readProc.running = true;
+    }
+
+    function set(id, value) {
+        if (root.busy)
+            return;
+        root.status = "";
+        setProc.command = [Branding.ctlBin, "windows", "behaviour", "set", id, String(value)];
+        setProc.running = true;
+    }
+
+    readonly property Process _read: Process {
+        id: readProc
+        command: [Branding.ctlBin, "windows", "behaviour", "status", "--json"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.info = JSON.parse(text);
+                } catch (e) {
+                    root.status = "Could not read KWin's window settings.";
+                    Log.warn("settings", `windows behaviour: ${e}`);
+                }
+            }
+        }
+    }
+
+    readonly property Process _set: Process {
+        id: setProc
+        onRunningChanged: {
+            root.busy = running;
+            if (!running)
+                root.refresh();
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const errors = text.split("\n").filter(l => /error/i.test(l));
+                if (errors.length > 0)
+                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
+            }
+        }
+    }
+
+    PanelText {
+        visible: root.status.length > 0
+        width: root.width
+        wrapMode: Text.WordWrap
+        text: root.status
+        font.pixelSize: 12
+        color: Theme.error
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "Focus" }
+
+        Segmented {
+            width: parent.width
+            values: ["ClickToFocus", "FocusFollowsMouse", "FocusStrictlyUnderMouse"]
+            labels: ["Click to focus", "Follows the mouse", "Strictly under the mouse"]
+            current: root.valueOf("focus", "ClickToFocus")
+            onPicked: value => root.set("focus", value)
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Strictly under the mouse gives focus to nothing at all when the pointer is over the desktop."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+        }
+
+        SliderRow {
+            visible: root.valueOf("focus", "ClickToFocus") !== "ClickToFocus"
+            label: "Wait before following"
+            unit: "ms"
+            from: 0
+            to: 3000
+            stepSize: 50
+            value: root.numberOf("focusDelay", 300)
+            onMoved: value => root.set("focusDelay", Math.round(value))
+        }
+
+        ToggleRow {
+            label: "Raise the window under the pointer"
+            description: "KWin's auto-raise, which needs focus to follow the mouse to do anything."
+            enabled: root.valueOf("focus", "ClickToFocus") !== "ClickToFocus"
+            checked: root.boolOf("autoRaise")
+            onToggled: value => root.set("autoRaise", value)
+        }
+
+        SliderRow {
+            visible: root.boolOf("autoRaise")
+            label: "Wait before raising"
+            unit: "ms"
+            from: 0
+            to: 3000
+            stepSize: 50
+            value: root.numberOf("autoRaiseDelay", 750)
+            onMoved: value => root.set("autoRaiseDelay", Math.round(value))
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "New windows" }
+
+        Segmented {
+            width: parent.width
+            values: ["Smart", "Centered", "Maximizing", "UnderMouse"]
+            labels: ["Smart", "Centred", "Maximised", "Under the mouse"]
+            current: root.valueOf("placement", "Smart")
+            onPicked: value => root.set("placement", value)
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "Decoration" }
+
+        ToggleRow {
+            label: "No border when maximised"
+            description: "A maximised window loses its frame and gives the room back to the window."
+            checked: root.boolOf("borderlessMaximized")
+            onToggled: value => root.set("borderlessMaximized", value)
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Title bars, their buttons and the corner radius belong to the window decoration, which is Plasma's own page and applies to every application."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+        }
+
+        TextButton {
+            glyph: "top_panel_close"
+            iconName: "preferences-system-windows"
+            text: "Window decorations…"
+            onActivated: PlasmaApplets.openSettings("kcm_kwindecoration")
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "Tiling" }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.tilingScripts.length > 0
+                ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge may go to it rather than to KWin's snapping.`
+                : "KWin has no tiling layouts of its own: it has snapping at the edges, and custom tiles under Meta+T. Gaps between windows and rounded window corners come from a tiling script, not from a shell, so nothing here pretends to set them."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+        }
+
+        TextButton {
+            glyph: "tune"
+            iconName: "preferences-system-windows-actions"
+            text: "Plasma's window behaviour…"
+            onActivated: PlasmaApplets.openSettings("kcm_kwinoptions")
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "Open windows" }
+
+        Item {
+            width: parent.width
+            height: 22
+
+            PanelText {
+                anchors.verticalCenter: parent.verticalCenter
+                text: WindowsService.available ? "Windows the shell can see" : "The window list is not running"
+                font.pixelSize: 13
+            }
+
+            PanelText {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: `${WindowsService.windows.length}`
+                font.family: Theme.monoFamily
+                font.pixelSize: 13
+                color: Theme.mut
+            }
+        }
+
+        PanelText {
+            width: parent.width
+            visible: !WindowsService.available
+            wrapMode: Text.WordWrap
+            text: "The task list and the window title need a small KWin script, which `rmpr windows enable` installs."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+        }
+    }
+}
