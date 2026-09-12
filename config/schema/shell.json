@@ -18,7 +18,7 @@
           ],
           "default": "auto",
           "label": "Colour scheme",
-          "description": "auto turns the shell dark whenever the Plasma colour scheme is dark: chosen in System Settings, or switched at sunset when Plasma's global theme is set to change between a light and a dark one by itself. light and dark hold it there."
+          "description": "auto turns the shell dark whenever the Plasma colour scheme is dark, and follows it the moment it changes -- so whatever switches KDE's scheme switches this shell with it. Plasma 6.7 has no day/night switch of its own for themes (its sunset switching is for wallpapers), so nothing here changes at sunset unless something else changes the scheme. light and dark hold it where they say."
         },
         "theme.accent": {
           "type": "enum",
