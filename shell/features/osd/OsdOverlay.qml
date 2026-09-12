@@ -1,7 +1,9 @@
 // The OSD surface.
 //
 // A layer-shell overlay with no exclusive zone: it floats over whatever is on
-// screen and reserves nothing, so a volume change never moves a window.
+// screen and reserves nothing, so a volume change never moves a window. It
+// takes no input either -- it is a glance, and a click on what is beneath it
+// must land.
 //
 // One screen, not one per screen. Plasma shows its OSD on the active screen;
 // showing ours on every monitor at once turns a glance into three glances, and
@@ -9,8 +11,10 @@
 // clicked.
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import qs.domain.osd
+import qs.domain.status.icons
 import qs.domain.theme
 import qs.ui.primitives
 
@@ -20,7 +24,7 @@ PanelWindow {
     required property var modelData
     screen: modelData
 
-    visible: OsdService.showing
+    visible: OsdService.showing || body.opacity > 0
 
     anchors {
         left: true
@@ -32,77 +36,107 @@ PanelWindow {
     // Reserves nothing: an OSD that pushed maximised windows around for a
     // second and a half would be worse than no OSD.
     exclusiveZone: 0
-    implicitHeight: body.implicitHeight + 24
+    mask: Region {}
+    implicitHeight: body.implicitHeight + 64
     color: "transparent"
 
+    readonly property real fraction: OsdService.maxValue > 0
+        ? Math.max(0, Math.min(1, OsdService.value / OsdService.maxValue)) : 0
+    readonly property string glyph: StatusIcons.osdGlyph(OsdService.icon, root.fraction)
+
+    RectangularShadow {
+        anchors.fill: body
+        radius: body.radius
+        blur: 36
+        offset.y: 10
+        color: Theme.shadow
+        opacity: body.opacity
+    }
+
     // Layer-shell surfaces cannot be sized to their content in one dimension
-    // only, so the window spans the screen and the visible panel is centred
-    // inside it.
+    // only, so the window spans the screen and the pill is centred inside it.
     Rectangle {
         id: body
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
 
-        implicitWidth: Math.max(240, content.implicitWidth + 40)
-        implicitHeight: content.implicitHeight + 28
-        radius: 12
-        color: Theme.panelBackground
+        implicitWidth: content.implicitWidth + 52
+        implicitHeight: content.implicitHeight + 32
+        radius: Math.min(Theme.radius, height / 2)
+        color: Theme.glass
+        border.width: 1
+        border.color: Theme.out
 
         opacity: OsdService.showing ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
+        Behavior on opacity { NumberAnimation { duration: 140 } }
 
-        Column {
+        transform: Translate { y: OsdService.showing ? 0 : 10; Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } } }
+
+        Row {
             id: content
-
             anchors.centerIn: parent
-            spacing: 10
+            spacing: 18
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 10
+            Item {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+
+                Glyph {
+                    anchors.centerIn: parent
+                    visible: root.glyph.length > 0
+                    name: root.glyph
+                    size: 30
+                    color: Theme.acc
+                }
 
                 PanelIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    implicitSize: 22
+                    anchors.centerIn: parent
+                    visible: root.glyph.length === 0 && OsdService.icon.length > 0
+                    implicitSize: 26
                     iconName: OsdService.icon
-                    visible: OsdService.icon.length > 0
+                }
+            }
+
+            // A level: the bar and its number, with any words beside them.
+            Row {
+                visible: OsdService.showingProgress
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 18
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 260
+                    height: 10
+                    radius: 5
+                    color: Theme.alpha(Theme.fg, 0.12)
+
+                    Rectangle {
+                        width: parent.width * root.fraction
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.acc
+                        Behavior on width { NumberAnimation { duration: 80 } }
+                    }
                 }
 
                 PanelText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: OsdService.showingProgress
-                        ? `${Math.round(OsdService.value)}%`
-                        : OsdService.text
-                    font.pixelSize: 15
+                    width: 40
+                    text: `${Math.round(OsdService.value)}`
+                    font.family: Theme.monoFamily
+                    font.pixelSize: 18
                 }
             }
 
-            // Drawn only for a value, not for a message: a bar under "Caps
-            // Lock on" would be showing a number that does not exist.
-            Rectangle {
-                visible: OsdService.showingProgress
-                width: 200
-                height: 4
-                radius: 2
-                color: Theme.backgroundAlternate
-
-                Rectangle {
-                    width: parent.width * Math.max(0, Math.min(1, OsdService.value / OsdService.maxValue))
-                    height: parent.height
-                    radius: parent.radius
-                    color: Theme.accent
-
-                    Behavior on width { NumberAnimation { duration: 80 } }
-                }
-            }
-
+            // A message, and nothing to measure: no bar.
             PanelText {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: OsdService.showingProgress && OsdService.text.length > 0
+                visible: !OsdService.showingProgress || OsdService.text.length > 0
+                anchors.verticalCenter: parent.verticalCenter
                 text: OsdService.text
-                color: Theme.foregroundInactive
-                font.pixelSize: 11
+                font.pixelSize: OsdService.showingProgress ? 13 : 16
+                color: OsdService.showingProgress ? Theme.mut : Theme.fg
             }
         }
     }

@@ -25,6 +25,8 @@ import qs.domain.backend
 import qs.domain.windows
 import qs.features.diagnostics
 import qs.features.launcher
+import qs.features.overlays
+import qs.domain.surfaces
 
 ShellRoot {
     id: root
@@ -75,6 +77,23 @@ ShellRoot {
             : []
 
         SearchOverlay {}
+    }
+
+    // The sidebar, the key sheet and the session screen: one at a time, on
+    // the screen they were asked for on (Surfaces).
+    Variants {
+        model: Surfaces.sidebar ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
+        Sidebar {}
+    }
+
+    Variants {
+        model: Surfaces.keys ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
+        KeysOverlay {}
+    }
+
+    Variants {
+        model: Surfaces.session ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
+        SessionOverlay {}
     }
 
     // Off unless asked for, and built only then: Plasma's OSD already works,
@@ -357,6 +376,17 @@ ShellRoot {
         target: "shell"
 
         function reload(): void { Quickshell.reload(false); }
+    }
+
+    // The sidebar, the key sheet and the session screen, from a key: `rmpr
+    // sidebar`, `rmpr keys`, bound with `rmpr shortcuts set`.
+    IpcHandler {
+        target: "surfaces"
+
+        function sidebar(): void { Surfaces.toggleSidebar(""); }
+        function keys(): void { Surfaces.toggleKeys(""); }
+        function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
+        function close(): void { Surfaces.closeAll(); }
     }
 
     IpcHandler {

@@ -16,6 +16,7 @@ import qs.domain.launcher
 import qs.domain.launcher.actions
 import qs.domain.launcher.apps
 import qs.domain.session
+import qs.domain.surfaces
 import qs.platform.kde
 
 Provider {
@@ -125,9 +126,6 @@ Provider {
         return out.concat(root.rank(root._lower(parsed.text)).map(root.appItem));
     }
 
-    // Asked of the shell for things only a feature can show.
-    signal overlayRequested(string name)
-
     function open(mode) {
         root.mode = mode === "search" || mode === "run" ? "search" : "apps";
         root.query = "";
@@ -204,6 +202,7 @@ Provider {
             root.query = `${root.prefix}`;
             return;
         }
+        const screen = root.shownOn;
         root.close();
         switch (id) {
         case "scheme":
@@ -227,8 +226,10 @@ Provider {
                                      "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Overview"]);
             break;
         case "sidebar":
+            Surfaces.toggleSidebar(screen);
+            break;
         case "keys":
-            root.overlayRequested(id);
+            Surfaces.toggleKeys(screen);
             break;
         case "lock":
             Session.lock();

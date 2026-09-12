@@ -2,7 +2,8 @@
 # Global shortcuts.
 #
 #   status              what is bound, and what would conflict
-#   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard)
+#   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard,
+#                                     sidebar, keys)
 #   clear <action>      unbind one
 #   revert              undo everything this project bound
 #
@@ -23,7 +24,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 
-ACTIONS=(launcher search settings ask clipboard)
+ACTIONS=(launcher search settings ask clipboard sidebar keys)
 
 action_desktop() { printf '%s-%s.desktop' "$SLUG" "$1"; }
 action_label() {
@@ -33,6 +34,8 @@ action_label() {
         settings) printf 'Settings' ;;
         ask)      printf 'Ask about the last notification' ;;
         clipboard) printf 'Clipboard history' ;;
+        sidebar)  printf 'Sidebar' ;;
+        keys)     printf 'Keyboard shortcuts' ;;
     esac
 }
 

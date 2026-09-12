@@ -12,6 +12,19 @@ import qs.domain.status.icons
 TestCase {
     name: "StatusIcons"
 
+    // ---- the OSD ----------------------------------------------------------
+
+    function test_osd_glyphs() {
+        compare(StatusIcons.osdGlyph("audio-volume-high", 0.9), "volume_up");
+        compare(StatusIcons.osdGlyph("audio-volume-low", 0.1), "volume_mute");
+        compare(StatusIcons.osdGlyph("audio-volume-muted", 0.6), "volume_off");
+        compare(StatusIcons.osdGlyph("microphone-sensitivity-muted", 0), "mic_off");
+        compare(StatusIcons.osdGlyph("video-display-brightness", 0.2), "brightness_low");
+        compare(StatusIcons.osdGlyph("input-keyboard-brightness", 0.5), "keyboard");
+        compare(StatusIcons.osdGlyph("input-touchpad-off", 0), "touchpad_mouse_off");
+        compare(StatusIcons.osdGlyph("something-else", 0), "");
+    }
+
     // ---- Bluetooth devices, and nmcli -------------------------------------
 
     function test_device_glyphs() {

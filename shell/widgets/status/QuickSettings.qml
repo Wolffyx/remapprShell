@@ -409,9 +409,8 @@ Item {
                         glyph: "power_settings_new"
                         iconName: "system-shutdown"
                         onActivated: {
-                            Quickshell.execDetached(["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt",
-                                                     "org.kde.LogoutPrompt", "promptAll"]);
                             qs.close();
+                            Session.prompt("promptAll");
                         }
                     }
                 }

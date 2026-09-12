@@ -1,11 +1,12 @@
 // Session control.
 //
-// Opens Plasma's own logout prompt rather than reimplementing one. It already
-// handles inhibitors, unsaved-work warnings and the session manager -- all
-// things a hand-rolled dialog gets wrong.
+// Opens Plasma's own logout prompt rather than reimplementing one -- it
+// already handles inhibitors, unsaved-work warnings and the session manager --
+// or, with session.prompt "shell", the shell's session screen, which ends the
+// session through the same session manager.
 
 import QtQuick
-import Quickshell.Io
+import qs.domain.session
 import qs.ui.primitives
 import qs.domain.theme
 
@@ -22,15 +23,10 @@ BarWidget {
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
+    // Plasma's prompt, or the shell's session screen: Session decides, from
+    // session.prompt.
     function handleActivate(button) {
-        prompt.running = false;
-        prompt.running = true;
-    }
-
-    readonly property Process _prompt: Process {
-        id: prompt
-        command: ["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt",
-                  "org.kde.LogoutPrompt", root.action]
+        Session.prompt(root.action);
     }
 
     BarButton {

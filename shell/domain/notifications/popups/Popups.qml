@@ -75,10 +75,11 @@ QtObject {
                                           && e.summary === n.summary && e.body === n.body);
     }
 
-    // Which corner popups appear in. "auto" is the right-hand end of the
-    // panel's edge, beside the clock, where Windows and Plasma put them; the
-    // top right when the panel runs down a side.
-    readonly property var corners: ["top-right", "top-left", "bottom-right", "bottom-left"]
+    // Where popups appear: a corner, or the middle of the top or the bottom
+    // edge. "auto" is the right-hand end of the panel's edge, beside the
+    // clock, where Windows and Plasma put them; the top right when the panel
+    // runs down a side.
+    readonly property var corners: ["top-right", "top-left", "top-center", "bottom-right", "bottom-left", "bottom-center"]
 
     function corner(position, panelEdge) {
         if (root.corners.indexOf(position) >= 0)

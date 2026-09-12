@@ -86,10 +86,18 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 | --- | --- | --- | --- |
 | `notifications.server` | `plasma`, `shell` | `plasma` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
 | `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
-| `notifications.popupPosition` | `auto`, `top-right`, `top-left`, `bottom-right`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. Only when this shell draws them. |
+| `notifications.popupPosition` | `auto`, `top-right`, `top-center`, `top-left`, `bottom-right`, `bottom-center`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them. |
 | `notifications.centreStyle` | `grouped`, `stream` | `grouped` | What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier. |
 | `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
+
+### Session
+
+What asks before the session ends, and what the lock screen shows.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
 
 ### Plasma services
 

@@ -95,6 +95,8 @@ TestCase {
         compare(Popups.corner("auto", "top"), "top-right");
         compare(Popups.corner("auto", "left"), "top-right");
         compare(Popups.corner("top-left", "bottom"), "top-left");
+        compare(Popups.corner("top-center", "bottom"), "top-center");
+        compare(Popups.corner("bottom-center", "top"), "bottom-center");
         compare(Popups.corner("nonsense", "bottom"), "bottom-right");
     }
 

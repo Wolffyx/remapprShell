@@ -10,6 +10,8 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.domain.config
+import qs.domain.surfaces
 
 QtObject {
     id: root
@@ -32,10 +34,43 @@ QtObject {
     function suspend() { Quickshell.execDetached(["systemctl", "suspend"]); }
     function hibernate() { Quickshell.execDetached(["systemctl", "hibernate"]); }
 
+    // Whose screen asks before a session ends: Plasma's own prompt (the
+    // default), or the shell's -- the design's, opt-in. Either way it is
+    // Plasma's session manager that ends it.
+    readonly property string promptStyle: ConfigStore.value("session.prompt", "plasma") === "shell" ? "shell" : "plasma"
+
     // "promptAll", "promptLogout", "promptReboot" or "promptShutDown".
     function prompt(kind) {
+        if (root.promptStyle === "shell") {
+            Surfaces.openSession(kind ?? "promptAll");
+            return;
+        }
         Quickshell.execDetached(["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt",
                                  "org.kde.LogoutPrompt", kind ?? "promptAll"]);
+    }
+
+    // What the shell's session screen does once a choice is made. ksmserver
+    // ends the session exactly as it does from Plasma's screen: applications
+    // are asked to close, and one with unsaved work can say so.
+    function _shutdown(method) {
+        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.Shutdown", "/Shutdown",
+                                 "org.kde.Shutdown", method]);
+    }
+    function logout() { root._shutdown("logout"); }
+    function reboot() { root._shutdown("logoutAndReboot"); }
+    function shutdown() { root._shutdown("logoutAndShutdown"); }
+
+    // logind's word on whether this machine can hibernate: "yes", or "na"
+    // where it has no swap to hibernate into.
+    property bool canHibernate: false
+
+    readonly property Process _canHibernate: Process {
+        command: ["busctl", "call", "org.freedesktop.login1", "/org/freedesktop/login1",
+                  "org.freedesktop.login1.Manager", "CanHibernate"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: root.canHibernate = /"yes"/.test(text)
+        }
     }
 
     readonly property string displayName: root.realName.length > 0 ? root.realName : root.userName

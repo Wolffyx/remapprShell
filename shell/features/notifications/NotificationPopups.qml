@@ -30,16 +30,18 @@ PanelWindow {
 
     visible: ShellNotifications.popups.length > 0
 
+    // A centred stack anchors to neither side, and the compositor centres it
+    // on that edge.
     anchors {
         top: !root.fromBottom
         bottom: root.fromBottom
         left: root.corner.endsWith("left")
         right: root.corner.endsWith("right")
     }
-    margins.top: 10
-    margins.bottom: 10
-    margins.left: 10
-    margins.right: 10
+    margins.top: 20
+    margins.bottom: 20
+    margins.left: 20
+    margins.right: 20
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Top

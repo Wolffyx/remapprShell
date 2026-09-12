@@ -26,6 +26,8 @@ usage: @ALIAS@ <command> [options]
   shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page]                   open the settings window, on a page
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
+  sidebar                           open or close the sidebar (bind: shortcuts set sidebar)
+  keys                              open or close the key sheet (bind: shortcuts set keys)
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
@@ -78,6 +80,12 @@ case "$cmd" in
     # renderer Klipper is not running, so this is what to bind it to instead.
     clipboard)
         exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call clipboard toggle
+        ;;
+
+    # The sidebar and the key sheet: each opens on the first screen, and a
+    # second press closes it.
+    sidebar|keys)
+        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call surfaces "$cmd"
         ;;
 
     settings)
