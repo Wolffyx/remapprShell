@@ -1,14 +1,23 @@
 /*
     SPDX-License-Identifier: GPL-3.0-or-later
 
-    What the lock screen draws. Idle, the wallpaper and a clock; at a key,
-    a touch or the pointer moving, the wallpaper blurs and the prompt comes
-    up: who is locked out, the password field, what went wrong, and sleep,
-    hibernate and switch user.
+    What the lock screen draws: the wallpaper and a big clock while nothing is
+    happening; at a key, a touch or the pointer moving, the wallpaper blurs and
+    the prompt comes up -- who is locked out, the password, what went wrong,
+    what is playing, and sleep, hibernate and switch user.
 
-    Whether to unlock is decided in Unlock.qml, never here. The controls are
-    Plasma's own -- its password field, its on-screen keyboard, its battery
-    and layout indicators -- rethemed by the colour scheme and laid out by us.
+    Whether to unlock is decided in Unlock.qml, never here. The controls that
+    decide anything are Plasma's own -- its password field, its on-screen
+    keyboard, its battery and layout indicators, its media players -- laid out
+    and coloured by us.
+
+    Settings come from two places, because the greeter offers only one and it
+    is not ours. Plasma's three (a clock at all, a clock while idle, media
+    controls) arrive as `config`; this shell's own are read from a file by
+    Options.qml, since the `config` object is built from the desktop package's
+    config.xml rather than from the package being drawn -- measured, on 6.7.5.
+    Nothing here can read the shell's configuration: none of the shell runs in
+    the greeter.
 
     The password field keeps the keyboard even while the prompt is hidden,
     so the first key pressed is the first character of the password rather
@@ -20,7 +29,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Effects
-import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
@@ -39,7 +47,7 @@ Item {
     // to blur.
     required property Item wallpaper
     // Plasma's lock screen settings (System Settings -> Screen Locking ->
-    // Appearance), kept rather than duplicated.
+    // Appearance), kept rather than duplicated, plus this package's own.
     required property var config
     // SessionManagement: sleep, hibernate, switch user.
     required property var session
@@ -51,6 +59,16 @@ Item {
 
     readonly property bool showClock: ui.setting("alwaysShowClock", true)
         && (ui.unlock.shown || !ui.setting("hideClockWhenIdle", false))
+    readonly property bool clockLeft: Options.clockPosition !== "center"
+    readonly property int blurAmount: Options.wallpaperBlur
+
+    // The design's proportions are drawn at 1920x1080; a smaller screen gets
+    // the same layout, scaled down, rather than a clock running off the edge.
+    readonly property real unit: Math.max(0.62, Math.min(1, ui.height / 1080))
+    readonly property int edge: Math.round(96 * ui.unit)
+
+    readonly property color fg: "#ffffff"
+    readonly property color fgDim: Qt.rgba(1, 1, 1, 0.82)
 
     function focusPassword() {
         passwordBox.forceActiveFocus();
@@ -108,12 +126,12 @@ Item {
     MultiEffect {
         anchors.fill: parent
         source: ui.wallpaper
-        visible: ui.wallpaper !== null && opacity > 0
+        visible: ui.wallpaper !== null && opacity > 0 && ui.blurAmount > 0
         opacity: ui.unlock.shown ? 1 : 0
         autoPaddingEnabled: false
         blurEnabled: true
         blurMax: 64
-        blur: 1
+        blur: ui.blurAmount / 40
         brightness: -0.12
         Behavior on opacity {
             NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad }
@@ -125,9 +143,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, ui.unlock.shown ? 0.35 : 0.25) }
-            GradientStop { position: 0.45; color: Qt.rgba(0, 0, 0, ui.unlock.shown ? 0.35 : 0.0) }
-            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, ui.unlock.shown ? 0.45 : 0.3) }
+            GradientStop { position: 0.0; color: Qt.rgba(0.04, 0.03, 0.03, ui.unlock.shown ? 0.34 : 0.26) }
+            GradientStop { position: 0.5; color: Qt.rgba(0.04, 0.03, 0.03, ui.unlock.shown ? 0.42 : 0.24) }
+            GradientStop { position: 1.0; color: Qt.rgba(0.04, 0.03, 0.03, ui.unlock.shown ? 0.62 : 0.44) }
         }
     }
 
@@ -141,50 +159,96 @@ Item {
         onTriggered: clock.now = new Date()
     }
 
-    ColumnLayout {
+    Column {
         id: clock
+
         property date now: new Date()
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: ui.unlock.shown ? ui.height * 0.08 : ui.height * 0.3 - height / 2
+        x: ui.clockLeft ? ui.edge : (ui.width - width) / 2
+        y: ui.unlock.shown ? Math.round(ui.height * 0.1) : Math.round(ui.height * 0.3)
         spacing: 0
-        scale: ui.unlock.shown ? 0.55 : 1
-        transformOrigin: Item.Top
         opacity: ui.showClock ? 1 : 0
 
         Behavior on y { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic } }
-        Behavior on scale { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
 
         // The shadow is the text's own. A layer effect on the clock drew
         // nothing at all in the greeter, offscreen -- and a lock screen is
         // no place to find out which GPUs share that.
-        PlasmaComponents3.Label {
+        Text {
+            anchors.horizontalCenter: ui.clockLeft ? undefined : parent.horizontalCenter
             text: clock.now.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-            color: Kirigami.Theme.textColor
-            style: Text.Raised
-            styleColor: Qt.rgba(0, 0, 0, 0.45)
-            font.pixelSize: Kirigami.Units.gridUnit * 6
-            font.weight: Font.Light
             textFormat: Text.PlainText
-            Layout.alignment: Qt.AlignHCenter
+            color: ui.fg
+            style: Text.Raised
+            styleColor: Qt.rgba(0, 0, 0, 0.4)
+            font.family: "Rubik"
+            font.pixelSize: Math.round(132 * ui.unit)
+            font.weight: Font.ExtraLight
+            font.letterSpacing: -Math.round(4 * ui.unit)
         }
 
-        PlasmaComponents3.Label {
+        Text {
+            anchors.horizontalCenter: ui.clockLeft ? undefined : parent.horizontalCenter
+            topPadding: Math.round(14 * ui.unit)
             text: clock.now.toLocaleDateString(Qt.locale(), Locale.LongFormat)
-            color: Kirigami.Theme.textColor
-            style: Text.Raised
-            styleColor: Qt.rgba(0, 0, 0, 0.45)
-            font.pixelSize: Kirigami.Units.gridUnit * 1.4
             textFormat: Text.PlainText
-            Layout.alignment: Qt.AlignHCenter
+            color: Qt.rgba(1, 1, 1, 0.86)
+            style: Text.Raised
+            styleColor: Qt.rgba(0, 0, 0, 0.4)
+            font.family: "Rubik"
+            font.pixelSize: Math.round(22 * ui.unit)
+        }
+
+        Item {
+            width: pill.width
+            height: pill.height + Math.round(20 * ui.unit)
+            anchors.horizontalCenter: ui.clockLeft ? undefined : parent.horizontalCenter
+
+            Rectangle {
+                id: pill
+
+                y: Math.round(20 * ui.unit)
+                width: pillRow.width + 26
+                height: 34
+                radius: height / 2
+                color: Qt.rgba(1, 1, 1, 0.16)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.22)
+
+                Row {
+                    id: pillRow
+
+                    anchors.centerIn: parent
+                    spacing: 10
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "lock"
+                        font.family: "Material Symbols Rounded"
+                        font.pixelSize: 17
+                        color: ui.fg
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: ui.unlock.resting ? "Locked · wait a moment" : "Locked"
+                        textFormat: Text.PlainText
+                        font.family: "Rubik"
+                        font.pixelSize: 13
+                        color: ui.fg
+                    }
+                }
+            }
         }
     }
 
     // --- the prompt ------------------------------------------------------
 
     // Plasma's on-screen keyboard moves this up out of its way, which is why
-    // the prompt sits in a StackView of one page.
+    // the prompt sits in a StackView of one page -- and why the StackView's id
+    // must be `mainStack`: VirtualKeyboardLoader resolves that name as an id
+    // through the creating context.
     QQC2.StackView {
         id: mainStack
         width: ui.width
@@ -197,240 +261,328 @@ Item {
         id: promptPage
 
         // How far down the prompt must stay visible above the keyboard.
-        readonly property int visibleBoundary: card.y + card.height + Kirigami.Units.largeSpacing
+        readonly property int visibleBoundary: promptColumn.y + promptColumn.height + Kirigami.Units.largeSpacing
 
         opacity: ui.unlock.shown ? 1 : 0
         Behavior on opacity {
             NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad }
         }
 
-        Rectangle {
-            id: card
+        // What is playing, bottom left, from Plasma's own players.
+        MediaCard {
+            id: media
 
-            width: Math.min(ui.width - Kirigami.Units.gridUnit * 2, Kirigami.Units.gridUnit * 22)
-            height: column.implicitHeight + Kirigami.Units.gridUnit * 2.5
+            x: ui.edge
+            y: ui.height - height - Math.round(64 * ui.unit)
+            width: Math.round(392 * ui.unit)
+            visible: media.hasPlayer && ui.setting("showMediaControls", true) && ui.unlock.shown
+            textColor: ui.fg
+        }
+
+        Column {
+            id: promptColumn
+
             x: (ui.width - width) / 2
-            y: ui.height * 0.56 - height / 2
-            radius: Kirigami.Units.gridUnit
-            color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g,
-                           Kirigami.Theme.backgroundColor.b, 0.55)
-            border.width: 1
-            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                  Kirigami.Theme.textColor.b, 0.08)
+            y: ui.height - height - Math.round(110 * ui.unit)
+            width: Math.round(392 * ui.unit)
+            spacing: Math.round(18 * ui.unit)
 
-            ColumnLayout {
-                id: column
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    verticalCenter: parent.verticalCenter
-                    margins: Kirigami.Units.gridUnit * 1.25
-                }
-                spacing: Kirigami.Units.largeSpacing
+            // The account's picture, or its initial. Kirigami's Avatar
+            // is not in Kirigami since KF6, and the greeter draws Plasma's
+            // built-in locker instead of a file that names it.
+            Item {
+                id: face
 
-                // The account's picture, or its initial. Kirigami's Avatar
-                // is not in Kirigami since KF6, and the greeter draws Plasma's
-                // built-in locker instead of a file that names it.
-                Item {
-                    id: face
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 4.5
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 4.5
-                    Layout.alignment: Qt.AlignHCenter
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.round(96 * ui.unit)
+                height: width
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: Kirigami.Theme.highlightColor
-                        visible: picture.status !== Image.Ready
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: Qt.rgba(1, 1, 1, 0.2)
+                    border.width: 3
+                    border.color: Qt.rgba(1, 1, 1, 0.5)
+                    visible: picture.status !== Image.Ready
 
-                        PlasmaComponents3.Label {
-                            anchors.centerIn: parent
-                            text: ui.userName.length > 0 ? ui.userName[0].toUpperCase() : ""
-                            color: Kirigami.Theme.highlightedTextColor
-                            font.pixelSize: parent.height * 0.45
-                            textFormat: Text.PlainText
-                        }
-                    }
-
-                    Image {
-                        id: picture
-                        anchors.fill: parent
-                        source: ui.userImage !== ""
-                            ? "file://" + ui.userImage.split("/").map(encodeURIComponent).join("/")
-                            : ""
-                        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-                        fillMode: Image.PreserveAspectCrop
-                        visible: false
-                    }
-
-                    MultiEffect {
-                        anchors.fill: parent
-                        source: picture
-                        visible: picture.status === Image.Ready
-                        maskEnabled: true
-                        maskSource: faceMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin: 1.0
-                    }
-
-                    Rectangle {
-                        id: faceMask
-                        anchors.fill: parent
-                        radius: width / 2
-                        visible: false
-                        layer.enabled: true
+                    Text {
+                        anchors.centerIn: parent
+                        text: ui.userName.length > 0 ? ui.userName[0].toUpperCase() : ""
+                        textFormat: Text.PlainText
+                        color: ui.fg
+                        font.family: "Rubik"
+                        font.pixelSize: Math.round(parent.height * 0.38)
                     }
                 }
 
-                Kirigami.Heading {
-                    level: 2
-                    text: ui.userName
-                    color: Kirigami.Theme.textColor
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
+                Image {
+                    id: picture
+                    anchors.fill: parent
+                    source: ui.userImage !== ""
+                        ? "file://" + ui.userImage.split("/").map(encodeURIComponent).join("/")
+                        : ""
+                    sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+                    fillMode: Image.PreserveAspectCrop
+                    visible: false
                 }
 
-                RowLayout {
-                    id: passwordRow
-                    visible: !ui.unlock.unlockedWithoutPassword
-                    spacing: Kirigami.Units.smallSpacing
-                    Layout.fillWidth: true
-                    Layout.topMargin: Kirigami.Units.smallSpacing
+                MultiEffect {
+                    anchors.fill: parent
+                    source: picture
+                    visible: picture.status === Image.Ready
+                    maskEnabled: true
+                    maskSource: faceMask
+                    maskThresholdMin: 0.5
+                    maskSpreadAtMin: 1.0
+                }
 
-                    transform: Translate { id: shakeOffset }
+                Rectangle {
+                    id: faceMask
+                    anchors.fill: parent
+                    radius: width / 2
+                    visible: false
+                    layer.enabled: true
+                }
+            }
 
-                    PlasmaExtras.PasswordField {
-                        id: passwordBox
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: ui.userName
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: ui.fg
+                font.family: "Rubik"
+                font.pixelSize: Math.round(20 * ui.unit)
+                font.weight: Font.Medium
+            }
 
-                        focus: true
-                        text: PasswordSync.password
-                        enabled: !ui.unlock.resting
-                        placeholderText: "Password"
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
-                        Layout.fillWidth: true
+            // The password, in the design's pill. Everything inside it is
+            // Plasma's field: what is typed, what is sent and when, and the
+            // reveal button are all its own behaviour.
+            Rectangle {
+                id: passwordPill
 
-                        // Only while the prompt shows: the cursor blinking is a
-                        // redraw a second behind a hidden prompt.
-                        cursorVisible: ui.unlock.shown
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: !ui.unlock.unlockedWithoutPassword
+                width: parent.width
+                height: Math.round(58 * ui.unit)
+                radius: height / 2
+                color: Qt.rgba(1, 1, 1, 0.16)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.28)
+                opacity: ui.unlock.resting ? 0.6 : 1
 
-                        onTextChanged: {
-                            if (text.length > 0)
-                                ui.unlock.poke();
-                        }
+                transform: Translate { id: shakeOffset }
 
-                        Keys.onPressed: event => {
-                            const woke = !ui.unlock.shown;
+                Text {
+                    id: pwGlyph
+                    x: 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "lock"
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 20
+                    color: Qt.rgba(1, 1, 1, 0.8)
+                }
+
+                PlasmaExtras.PasswordField {
+                    id: passwordBox
+
+                    anchors.left: pwGlyph.right
+                    anchors.leftMargin: 12
+                    anchors.right: unlockButton.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    focus: true
+                    text: PasswordSync.password
+                    enabled: !ui.unlock.resting
+                    placeholderText: "Password"
+                    placeholderTextColor: Qt.rgba(1, 1, 1, 0.6)
+                    color: ui.fg
+                    font.family: "Rubik"
+                    font.pixelSize: Math.round(17 * ui.unit)
+                    background: null
+
+                    // Only while the prompt shows: the cursor blinking is a
+                    // redraw a second behind a hidden prompt.
+                    cursorVisible: ui.unlock.shown
+
+                    onTextChanged: {
+                        if (text.length > 0)
                             ui.unlock.poke();
-                            if (woke && [Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape].includes(event.key)) {
-                                event.accepted = true;
-                                return;
-                            }
-                            if (event.key === Qt.Key_Escape) {
-                                ui.unlock.dismiss();
-                                event.accepted = true;
-                            }
+                    }
+
+                    Keys.onPressed: event => {
+                        const woke = !ui.unlock.shown;
+                        ui.unlock.poke();
+                        if (woke && [Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape].includes(event.key)) {
+                            event.accepted = true;
+                            return;
                         }
-
-                        onAccepted: unlockButton.clicked()
-                    }
-
-                    Binding {
-                        target: PasswordSync
-                        property: "password"
-                        value: passwordBox.text
-                    }
-
-                    PlasmaComponents3.Button {
-                        id: unlockButton
-
-                        icon.name: LayoutMirroring.enabled ? "go-previous" : "go-next"
-                        enabled: !ui.unlock.resting
-                        Accessible.name: "Unlock"
-                        Layout.preferredHeight: passwordBox.implicitHeight
-                        Layout.preferredWidth: passwordBox.implicitHeight
-
-                        // Focus leaves the text field before the password is
-                        // sent, as in Plasma's: a Qt bug once crashed an
-                        // application quitting with a text field focused
-                        // (QTBUG-55460), and here that application is the
-                        // greeter, at the moment of unlocking.
-                        onClicked: {
-                            const password = passwordBox.text;
-                            if (ui.unlock.submit(password))
-                                unlockButton.forceActiveFocus();
+                        if (event.key === Qt.Key_Escape) {
+                            ui.unlock.dismiss();
+                            event.accepted = true;
                         }
-                        Keys.onReturnPressed: clicked()
-                        Keys.onEnterPressed: clicked()
                     }
+
+                    onAccepted: unlockButton.clicked()
+                }
+
+                Binding {
+                    target: PasswordSync
+                    property: "password"
+                    value: passwordBox.text
                 }
 
                 PlasmaComponents3.Button {
-                    visible: ui.unlock.unlockedWithoutPassword
-                    text: "Unlock"
-                    icon.name: "unlock"
-                    Layout.alignment: Qt.AlignHCenter
-                    onClicked: ui.unlock.confirm()
+                    id: unlockButton
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.round(34 * ui.unit)
+                    height: width
+                    flat: false
+                    icon.name: LayoutMirroring.enabled ? "go-previous" : "go-next"
+                    enabled: !ui.unlock.resting
+                    Accessible.name: "Unlock"
+
+                    // Focus leaves the text field before the password is
+                    // sent, as in Plasma's: a Qt bug once crashed an
+                    // application quitting with a text field focused
+                    // (QTBUG-55460), and here that application is the
+                    // greeter, at the moment of unlocking.
+                    onClicked: {
+                        const password = passwordBox.text;
+                        if (ui.unlock.submit(password))
+                            unlockButton.forceActiveFocus();
+                    }
                     Keys.onReturnPressed: clicked()
                     Keys.onEnterPressed: clicked()
-                    onVisibleChanged: if (visible) forceActiveFocus()
+                }
+            }
+
+            PlasmaComponents3.Button {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: ui.unlock.unlockedWithoutPassword
+                text: "Unlock"
+                icon.name: "unlock"
+                onClicked: ui.unlock.confirm()
+                Keys.onReturnPressed: clicked()
+                Keys.onEnterPressed: clicked()
+                onVisibleChanged: if (visible) forceActiveFocus()
+            }
+
+            Text {
+                readonly property var parts: [
+                    capsLock.locked ? "Caps Lock is on" : "",
+                    ui.unlock.message,
+                ].filter(p => p)
+
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: parts.join("\n")
+                visible: parts.length > 0
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+                color: ui.unlock.message ? ui.fg : Qt.rgba(1, 0.86, 0.6, 1)
+                font.family: "Rubik"
+                font.pixelSize: Math.round(13 * ui.unit)
+            }
+
+            // What else would unlock this, when the greeter says so: a
+            // fingerprint reader that is actually there, a smartcard that is
+            // actually in.
+            Row {
+                readonly property var ways: [
+                    (ui.unlock.alternatives & ui.unlock.fingerprint) ? "fingerprint" : "",
+                    (ui.unlock.alternatives & ui.unlock.smartcard) ? "badge" : "",
+                ].filter(w => w)
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: ways.length > 0 && !ui.unlock.unlockedWithoutPassword
+                spacing: 10
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: parent.ways[0] ?? ""
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 18
+                    color: ui.fgDim
                 }
 
-                PlasmaComponents3.Label {
-                    readonly property var parts: [
-                        capsLock.locked ? "Caps Lock is on" : "",
-                        ui.unlock.message,
-                    ].filter(p => p)
-
-                    text: parts.join("\n")
-                    visible: parts.length > 0
-                    color: ui.unlock.message ? Kirigami.Theme.textColor : Kirigami.Theme.neutralTextColor
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (parent.ways[0] === "fingerprint" ? "Touch the sensor" : "Use your smartcard") + ", or type your password"
                     textFormat: Text.PlainText
-                    wrapMode: Text.Wrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
-
-                PlasmaComponents3.Label {
-                    readonly property var ways: [
-                        (ui.unlock.alternatives & ui.unlock.fingerprint) ? "scan your fingerprint" : "",
-                        (ui.unlock.alternatives & ui.unlock.smartcard) ? "use your smartcard" : "",
-                    ].filter(w => w)
-
-                    visible: ways.length > 0 && !ui.unlock.unlockedWithoutPassword
-                    text: "Or " + ways.join(", or ")
-                    opacity: 0.7
-                    textFormat: Text.PlainText
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
+                    font.family: "Rubik"
+                    font.pixelSize: Math.round(13 * ui.unit)
+                    color: ui.fgDim
                 }
             }
-        }
 
-        RowLayout {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: card.y + card.height + Kirigami.Units.gridUnit
-            spacing: Kirigami.Units.gridUnit
-            enabled: ui.unlock.shown
+            // Sleep, hibernate, switch user -- the three the greeter can
+            // actually do. Ending the session is not among them: the screen
+            // is locked, and nobody has said who is asking.
+            Row {
+                id: sessionButtons
 
-            Breeze.ActionButton {
-                text: "Sleep"
-                icon.name: "system-suspend"
-                visible: ui.session.canSuspend
-                onClicked: ui.session.suspend()
-            }
-            Breeze.ActionButton {
-                text: "Hibernate"
-                icon.name: "system-suspend-hibernate"
-                visible: ui.session.canHibernate
-                onClicked: ui.session.hibernate()
-            }
-            Breeze.ActionButton {
-                text: "Switch User"
-                icon.name: "system-switch-user"
-                visible: ui.session.canSwitchUser
-                onClicked: ui.session.switchUser()
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: Options.showSessionButtons
+                enabled: ui.unlock.shown
+                spacing: 10
+
+                component RoundAction: Item {
+                    id: action
+
+                    property string glyph: ""
+                    property string label: ""
+                    signal activated
+
+                    width: Math.round(46 * ui.unit)
+                    height: width
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: actionHover.hovered ? Qt.rgba(1, 1, 1, 0.26) : Qt.rgba(1, 1, 1, 0.14)
+                        border.width: 1
+                        border.color: Qt.rgba(1, 1, 1, 0.22)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: action.glyph
+                            font.family: "Material Symbols Rounded"
+                            font.pixelSize: Math.round(21 * ui.unit)
+                            color: "#ffffff"
+                        }
+                    }
+
+                    HoverHandler { id: actionHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: action.activated() }
+                    Accessible.name: action.label
+                }
+
+                RoundAction {
+                    visible: ui.session.canSuspend
+                    glyph: "bedtime"
+                    label: "Sleep"
+                    onActivated: ui.session.suspend()
+                }
+
+                RoundAction {
+                    visible: ui.session.canHibernate
+                    glyph: "downloading"
+                    label: "Hibernate"
+                    onActivated: ui.session.hibernate()
+                }
+
+                RoundAction {
+                    visible: ui.session.canSwitchUser
+                    glyph: "group"
+                    label: "Switch user"
+                    onActivated: ui.session.switchUser()
+                }
             }
         }
     }
@@ -458,49 +610,71 @@ Item {
         value: passwordBox.text.length > 0 || inputPanel.keyboardActive || ui.unlock.unlockedWithoutPassword
     }
 
-    // --- the footer ------------------------------------------------------
+    // --- the status pill -------------------------------------------------
 
-    RowLayout {
-        anchors {
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-            margins: Kirigami.Units.smallSpacing
-        }
-        spacing: Kirigami.Units.smallSpacing
+    Rectangle {
+        id: statusPill
+
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: Math.round(44 * ui.unit)
+        anchors.bottomMargin: Math.round(38 * ui.unit)
+        width: statusRow.width + 32
+        height: 44
+        radius: height / 2
+        color: Qt.rgba(1, 1, 1, 0.14)
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.2)
         opacity: ui.unlock.shown ? 1 : 0
         enabled: ui.unlock.shown
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
 
-        PlasmaComponents3.ToolButton {
-            focusPolicy: Qt.TabFocus
-            text: "On-screen keyboard"
-            display: QQC2.AbstractButton.IconOnly
-            icon.name: inputPanel.keyboardActive ? "input-keyboard-virtual-on" : "input-keyboard-virtual-off"
-            visible: inputPanel.status === Loader.Ready
-            onClicked: {
-                ui.focusPassword();
-                inputPanel.showHide();
+        Row {
+            id: statusRow
+
+            anchors.centerIn: parent
+            spacing: 14
+
+            PlasmaComponents3.ToolButton {
+                anchors.verticalCenter: parent.verticalCenter
+                focusPolicy: Qt.TabFocus
+                text: "On-screen keyboard"
+                display: QQC2.AbstractButton.IconOnly
+                icon.name: inputPanel.keyboardActive ? "input-keyboard-virtual-on" : "input-keyboard-virtual-off"
+                visible: inputPanel.status === Loader.Ready
+                onClicked: {
+                    ui.focusPassword();
+                    inputPanel.showHide();
+                }
+            }
+
+            // The keyboard layout, named as the person set it up, and one
+            // press away from the next one.
+            Item {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: layouts.hasMultipleKeyboardLayouts
+                width: layoutText.width
+                height: layoutText.height
+
+                Text {
+                    id: layoutText
+                    text: layouts.layoutNames.shortName
+                    textFormat: Text.PlainText
+                    font.family: "monospace"
+                    font.pixelSize: 12
+                    color: ui.fg
+                }
+
+                PW.KeyboardLayoutSwitcher {
+                    id: layouts
+                    anchors.fill: parent
+                }
+            }
+
+            Breeze.Battery {
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
-
-        PlasmaComponents3.ToolButton {
-            focusPolicy: Qt.TabFocus
-            icon.name: "input-keyboard"
-            text: layouts.layoutNames.longName
-            visible: layouts.hasMultipleKeyboardLayouts
-            onClicked: layouts.keyboardLayout.switchToNextLayout()
-
-            PW.KeyboardLayoutSwitcher {
-                id: layouts
-                anchors.fill: parent
-                acceptedButtons: Qt.NoButton
-            }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        Breeze.Battery {}
     }
 
     LockOsd {

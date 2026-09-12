@@ -9,6 +9,13 @@
 #   enable            put it in this shell's packages; refused until `try`
 #                     has unlocked this exact build, in this greeter
 #   disable           take it out; Plasma's lock screen from the next lock
+#   set <key> <value> how it looks: clock, blur, media, session, idleClock
+#
+# The look settings go into kscreenlockerrc under the greeter's own group,
+# because the greeter is where they are read: it runs as its own process with
+# none of this shell's configuration, and builds its `config` object from the
+# package's config.xml. Written through the ledger, like every other KDE key
+# this project touches.
 #
 # A lock screen is the one thing this project ships that cannot be put right
 # from inside the session it breaks. So nothing reaches the screen locker
@@ -25,6 +32,8 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/render.sh"
+source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 
 # How long `try` leaves the lock screen up. The greeter covers every screen
@@ -67,6 +76,84 @@ If it ever will not let you in:
 EOF
 }
 
+# What the lock screen's look is made of, and where each setting is kept.
+#
+# Two stores, because the greeter reads two things. Plasma's own settings
+# reach it as its `config` object, out of kscreenlockerrc -- and only Plasma's:
+# measured on 6.7.5, that object is built from the *desktop* package's
+# lockscreen/config.xml, not from the package being drawn, so a key of ours
+# added there would never arrive. This shell's own settings therefore live in
+# a file of their own, which the lock screen reads directly (Options.qml).
+#
+# id | key | kind | choices | default | store | inverted
+LOOK_KEYS=(
+    "clock|clockPosition|enum|left center|left|ours|"
+    "blur|wallpaperBlur|int|0 40|26|ours|"
+    "session|showSessionButtons|bool||true|ours|"
+    "media|showMediaControls|bool||true|plasma|"
+    "idleClock|hideClockWhenIdle|bool||true|plasma|invert"
+)
+# KConfigLoader nests the kcfg's own group inside the greeter's, so the keys
+# Plasma reads are under [Greeter][LnF][General] -- found by giving the real
+# greeter a config and asking it what it got, not by guessing.
+PLASMA_LOOK_GROUP=(--group Greeter --group LnF --group General)
+PLASMA_LOOK_LEDGER_GROUP="Greeter/LnF/General"
+OURS_FILE="$CONFIG_DIR/lockscreen.conf"
+
+look_spec() {
+    local want=$1 spec
+    for spec in "${LOOK_KEYS[@]}"; do
+        [ "${spec%%|*}" = "$want" ] && { printf '%s' "$spec"; return 0; }
+    done
+    return 1
+}
+
+# The stored value, as a person set it: an inverted key (Plasma asks whether
+# to *hide* the clock; this asks whether to show it) is turned back here.
+look_read() {
+    local spec=$1 id key kind choices fallback store invert raw stored
+    IFS='|' read -r id key kind choices fallback store invert <<< "$spec"
+    raw=$fallback
+    [ "$invert" = invert ] && raw=$([ "$fallback" = true ] && echo false || echo true)
+    if [ "$store" = plasma ]; then
+        stored=$(kreadconfig6 --file kscreenlockerrc "${PLASMA_LOOK_GROUP[@]}" --key "$key" --default "$raw")
+    else
+        stored=$(kreadconfig6 --file "$OURS_FILE" --group Lock --key "$key" --default "$raw")
+    fi
+    if [ "$invert" = invert ]; then
+        [ "$stored" = true ] && printf 'false' || printf 'true'
+    else
+        printf '%s' "$stored"
+    fi
+}
+
+look_write() {
+    local spec=$1 value=$2 id key kind choices fallback store invert written
+    IFS='|' read -r id key kind choices fallback store invert <<< "$spec"
+    written=$value
+    [ "$invert" = invert ] && written=$([ "$value" = true ] && echo false || echo true)
+    if [ "$store" = plasma ]; then
+        # Plasma's own key, so through the ledger like every other KDE key.
+        kconfig_set lockscreen kscreenlockerrc "$PLASMA_LOOK_LEDGER_GROUP" "$key" "$written"
+    else
+        mkdir -p "$(dirname "$OURS_FILE")"
+        kwriteconfig6 --file "$OURS_FILE" --group Lock --key "$key" "$written"
+    fi
+}
+
+look_json() {
+    local spec id key kind choices fallback store invert out=""
+    for spec in "${LOOK_KEYS[@]}"; do
+        IFS='|' read -r id key kind choices fallback store invert <<< "$spec"
+        out+=$(jq -n -c --arg id "$id" --arg key "$key" --arg kind "$kind" --arg store "$store" \
+                        --arg value "$(look_read "$spec")" --arg default "$fallback" \
+                        --arg choices "$choices" \
+            '{id: $id, key: $key, kind: $kind, store: $store, value: $value, default: $default,
+              choices: ($choices | split(" ") | map(select(length > 0)))}')
+    done
+    printf '%s' "$out" | jq -s -c .
+}
+
 status_json() {
     local greeter="" gid="" pkgs="" p dest h live
     greeter=$(lockscreen_greeter) && gid=$(lockscreen_greeter_id "$greeter")
@@ -88,7 +175,8 @@ status_json() {
         --argjson packages "$(printf '%s' "$pkgs" | jq -s -c .)" \
         --arg live "$live" \
         --argjson liveIsOurs "$(is_ours "$live" && echo true || echo false)" \
-        '{source: $source, tried: $tried, greeter: $greeter, greeterId: $greeterId, enabled: $enabled,
+        --argjson look "$(look_json)" \
+        '{source: $source, look: $look, tried: $tried, greeter: $greeter, greeterId: $greeterId, enabled: $enabled,
           packages: $packages, live: $live, liveIsOurs: $liveIsOurs,
           triedIsSource: ($tried != null and $tried.hash == $source),
           triedWithThisGreeter: ($tried != null and $tried.greeter == $greeterId),
@@ -227,6 +315,27 @@ EOF
             log_info "installed, but plasmashell is on $live, and that package's lock screen is the one drawn"
         fi
         way_back
+        ;;
+
+    set)
+        id=${1:-}; value=${2:-}
+        spec=$(look_spec "$id") || die "unknown setting: '$id' (expected: $(printf '%s ' "${LOOK_KEYS[@]%%|*}"))"
+        IFS='|' read -r _id key kind choices fallback store invert <<< "$spec"
+        case "$kind" in
+            bool) [ "$value" = true ] || [ "$value" = false ] || die "$id takes true or false" ;;
+            int)  [[ "$value" =~ ^[0-9]+$ ]] || die "$id takes a number"
+                  lo=${choices%% *}; hi=${choices##* }
+                  [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
+            enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
+        esac
+
+        if [ "$(look_read "$spec")" = "$value" ]; then
+            log_info "$id is already $value"
+            exit 0
+        fi
+        look_write "$spec" "$value"
+        log_step "$id: $value"
+        lockscreen_enabled || log_info "  it applies when this lock screen is turned on"
         ;;
 
     disable)

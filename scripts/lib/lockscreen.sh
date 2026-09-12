@@ -102,7 +102,13 @@ lockscreen_package() {   # <dest dir> <lockscreen dir>
         '{KPackageStructure: "Plasma/Shell", KPlugin: {Id: $id, Name: $id}, "X-Plasma-APIVersion": "2"}' \
         > "$1/metadata.json" || return 1
     rm -rf "$1/contents/lockscreen"
-    cp -a "$2" "$1/contents/lockscreen"
+    cp -a "$2" "$1/contents/lockscreen" || return 1
+
+    # A verbatim copy, deliberately. `try` records the hash of what it showed
+    # and `enable` installs only that, so anything rendered or dropped here
+    # would make the tried copy differ from the source and refuse every
+    # enable. Options.qml -- which names this shell's directories -- is
+    # generated into the source instead, by scripts/gen-branding.sh.
 }
 
 # The same, arranged for `check`: the lock screen is loaded under a stand-in

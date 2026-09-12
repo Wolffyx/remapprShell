@@ -1,0 +1,40 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    This lock screen's own settings.
+
+    GENERATED FILE -- the source is Options.qml.in, rendered when the package
+    is built.
+
+    Plasma's three lock screen settings (a clock at all, a clock while idle,
+    media controls) reach the greeter as its `config` object. **Ours cannot**:
+    measured on Plasma 6.7.5, the greeter builds that object from the *desktop*
+    package's `lockscreen/config.xml`, not from the package it is drawing, so a
+    key added to ours never appears. So this shell's own settings live in a
+    small file of their own, read here and written by `rmpr lockscreen set`.
+
+    A file rather than something baked into the installed copy, because the
+    installed copy is the one `try` unlocked: changing a setting must not
+    change the build, or every change would have to be tried again.
+*/
+pragma Singleton
+
+import QtCore
+import QtQuick
+
+QtObject {
+    id: root
+
+    readonly property Settings file: Settings {
+        id: settings
+        category: "Lock"
+        // KConfig's own format, so `rmpr lockscreen set` can write it with
+        // kwriteconfig6 and a person can read it. `location` rather than the
+        // `fileName` Qt.labs.settings had: QtCore's Settings takes a url.
+        location: "file://@CONFIG_DIR@/lockscreen.conf"
+    }
+
+    readonly property string clockPosition: settings.value("clockPosition", "left")
+    readonly property int wallpaperBlur: Math.max(0, Math.min(40, Number(settings.value("wallpaperBlur", 26))))
+    readonly property bool showSessionButtons: String(settings.value("showSessionButtons", "true")) !== "false"
+}

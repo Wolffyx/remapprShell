@@ -254,6 +254,39 @@ mkdir -p "$QS_PKG/contents"
 )
 check "gets the lock screen back"       "$(js '.packages[] | select(.id == "'"$SHELL_PACKAGE_ID"'") | .installed')" "true"
 
+echo "== how it looks =="
+# The look is kept in two places, because the greeter reads two. Plasma's own
+# settings go to kscreenlockerrc under the group its config loader actually
+# reads -- [Greeter][LnF][General], found by asking the real greeter what it
+# got -- and through the ledger. This shell's own go to a file of its own,
+# because the greeter's config object is built from the desktop package's
+# config.xml and a key of ours added there never arrives.
+plasmakey() { kreadconfig6 --file kscreenlockerrc --group Greeter --group LnF --group General --key "$1" --default '<unset>'; }
+ourkey() { kreadconfig6 --file "$XDG_CONFIG_HOME/$SLUG/lockscreen.conf" --group Lock --key "$1" --default '<unset>'; }
+lookval() { "$LS" status --json | jq -r --arg id "$1" '.look[] | select(.id == $id) | .value'; }
+
+check "an unknown setting is refused"    "$("$LS" set nosuch left >/dev/null 2>&1; echo $?)" "1"
+check "the clock takes left or center"   "$("$LS" set clock sideways >/dev/null 2>&1; echo $?)" "1"
+check "the blur takes a number in range" "$("$LS" set blur 400 >/dev/null 2>&1; echo $?)" "1"
+check "and nothing was written"          "$(ourkey clockPosition)" "<unset>"
+
+"$LS" set clock center >/dev/null
+check "ours goes in our own file"        "$(ourkey clockPosition)" "center"
+check "and not into Plasma's"            "$(plasmakey clockPosition)" "<unset>"
+check "read back"                        "$(lookval clock)" "center"
+"$LS" set blur 0 >/dev/null
+check "the blur is written"              "$(ourkey wallpaperBlur)" "0"
+check "zero is kept, not taken as unset" "$(lookval blur)" "0"
+
+"$LS" set media false >/dev/null
+check "Plasma's key goes to Plasma"      "$(plasmakey showMediaControls)" "false"
+# hideClockWhenIdle is Plasma's and asks the opposite question.
+"$LS" set idleClock false >/dev/null
+check "an inverted key is stored inverted" "$(plasmakey hideClockWhenIdle)" "true"
+check "and read back as it was set"        "$(lookval idleClock)" "false"
+check "defaults where nothing is set"      "$(lookval session)" "true"
+check "only Plasma's keys are ledgered"    "$(jq '[.entries[] | select(.scope == "lockscreen")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+
 echo "== nothing reached the session =="
 check "no DBus call, restart or quit" "$(cat "$CALLS")" ""
 

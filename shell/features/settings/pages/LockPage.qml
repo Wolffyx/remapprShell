@@ -33,6 +33,13 @@ Column {
     // greeter. A build that was tried before the last edit -- or before a
     // kscreenlocker update -- does not count, and the script refuses it.
     readonly property bool tried: (root.info?.tried ?? null) !== null
+    // The look, as `lockscreen status --json` reports it: these are keys in
+    // the greeter's own config group, because the greeter cannot read this
+    // shell's configuration at all.
+    readonly property var look: root.info?.look ?? []
+    function lookValue(id, fallback) { return (root.look.find(l => l.id === id)?.value) ?? fallback; }
+    function lookBool(id) { return String(root.lookValue(id, "false")) === "true"; }
+
     readonly property bool ready: root.info?.triedIsSource === true && root.info?.triedWithThisGreeter === true
 
     spacing: 14
@@ -164,6 +171,74 @@ Column {
             text: "The way back, from a text console (Ctrl+Alt+F3): loginctl unlock-session, then `rmpr lockscreen disable`."
             font.family: Theme.monoFamily
             font.pixelSize: 12
+            color: Theme.mut
+        }
+    }
+
+    Card {
+        width: root.width
+        opacity: root.installed ? 1 : 0.7
+
+        SectionLabel { text: "How it looks" }
+
+        PanelText {
+            width: parent.width
+            visible: !root.installed
+            wrapMode: Text.WordWrap
+            text: "Saved now, and drawn when this lock screen is turned on."
+            font.pixelSize: 12
+            color: Theme.mut
+        }
+
+        SettingRow {
+            width: parent.width
+            label: "The clock"
+
+            Segmented {
+                width: parent.width
+                values: ["left", "center"]
+                labels: ["Left", "Centred"]
+                current: root.lookValue("clock", "left")
+                onPicked: value => root.run(["set", "clock", value])
+            }
+        }
+
+        SliderRow {
+            label: "Wallpaper blur behind the prompt"
+            from: 0
+            to: 40
+            stepSize: 2
+            value: Number(root.lookValue("blur", 26))
+            onMoved: value => root.run(["set", "blur", Math.round(value)])
+        }
+
+        ToggleRow {
+            label: "Show the clock while nothing is happening"
+            description: "Off, the screen is dark until a key or the pointer wakes the prompt."
+            checked: root.lookBool("idleClock")
+            onToggled: value => root.run(["set", "idleClock", value])
+        }
+
+        ToggleRow {
+            label: "What is playing"
+            description: "The media card, from the same players Plasma's lock screen controls. This is Plasma's own setting."
+            checked: root.lookBool("media")
+            onToggled: value => root.run(["set", "media", value])
+        }
+
+        ToggleRow {
+            label: "Sleep, hibernate and switch user"
+            description: "The round buttons under the password."
+            checked: root.lookBool("session")
+            onToggled: value => root.run(["set", "session", value])
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Notifications are not shown on the lock screen. The greeter is a separate program with none of this shell's memory, and notification bodies are never written to disk for something else to read -- so there is nothing there to draw, and a switch that promised otherwise would be a lie."
+            font.pixelSize: 12
+            lineHeight: 1.35
             color: Theme.mut
         }
     }

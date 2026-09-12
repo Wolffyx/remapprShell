@@ -8,6 +8,7 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/render.sh"
 
 out="$REPO_ROOT/shell/core/Branding.qml"
 
@@ -53,3 +54,9 @@ QtObject {
 EOF
 
 log_step "generated $out"
+
+# The lock screen's own settings singleton. It names this shell's config
+# directory, which is branding, and it is generated here for the same reason
+# Branding.qml is: nothing in a QML file may spell the project's name.
+render_template "$REPO_ROOT/theme/lockscreen/Options.qml.in" "$REPO_ROOT/theme/lockscreen/Options.qml"
+log_step "generated $REPO_ROOT/theme/lockscreen/Options.qml"

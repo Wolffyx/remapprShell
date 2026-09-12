@@ -1,5 +1,6 @@
 # Generated - never committed
 shell/core/Branding.qml
+theme/lockscreen/Options.qml
 
 # Build / scratch
 /build/
