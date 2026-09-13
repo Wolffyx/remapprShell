@@ -209,6 +209,17 @@ accel_keycode() {
         esac
         total=$(( total | mod ))
     done
+    # A modifier on its own is a key in its own right -- kglobalaccel accepts
+    # "Meta" as a binding, which is how a bare Super key opens a launcher.
+    if [ -z "$base" ] && [ "$bases" = 0 ]; then
+        case "$spec" in
+            Meta|Super|Win) printf '16777250'; return 0 ;;
+            Ctrl|Control)   printf '16777249'; return 0 ;;
+            Shift)          printf '16777248'; return 0 ;;
+            Alt)            printf '16777251'; return 0 ;;
+        esac
+    fi
+
     [ -n "$base" ] && [ "$bases" = 1 ] || return 1
     local code
     code=$(_accel_base_code "$base") || return 1
@@ -237,6 +248,13 @@ _accel_push_live() {   # <group> <action>
         code=$(accel_keycode "$key") || return 1
         codes+=("$code")
     done < <(_accel_keys "$ACCEL_ACTIVE")
+
+    # Register before setting. A component kglobalaccel has not seen accepts
+    # the call and keeps nothing: it reads [services] entries when it starts,
+    # so an action added afterwards -- which is every action this project
+    # binds -- is unknown to it until something says so.
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        doRegister as 4 "$component" "$action" "$component" "$friendly" >/dev/null 2>&1
 
     local -a args=("asa(ai)" 4 "$component" "$action" "$component" "$friendly" "${#codes[@]}")
     for code in "${codes[@]}"; do args+=(1 "$code"); done
