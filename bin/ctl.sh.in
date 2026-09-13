@@ -41,6 +41,22 @@ Anything not listed here is not implemented yet.
 USAGE
 }
 
+# The IPC socket is keyed by the config path the shell was started with, so a
+# command has to name the copy that is actually running. `make run` from a
+# checkout names the source tree, and every one of these calls asked for the
+# installed path -- so `@ALIAS@ settings` answered "No running instances" with
+# the settings window's own shell on screen. The installed copy wins when both
+# are somehow up: it is the one a person who did not build anything is using.
+shell_ipc_path() {
+    local procs
+    procs=$(pgrep -a -x quickshell 2>/dev/null) || true
+    case "$procs" in
+        *"@QS_CONFIG_DIR@/shell.qml"*)   printf '%s' "@QS_CONFIG_DIR@/shell.qml" ;;
+        *"@REPO_ROOT@/shell/shell.qml"*) printf '%s' "@REPO_ROOT@/shell/shell.qml" ;;
+        *)                               printf '%s' "@QS_CONFIG_DIR@/shell.qml" ;;
+    esac
+}
+
 require_repo() {
     [ -d "$REPO_ROOT/scripts" ] || {
         echo "error: the source tree is missing at $REPO_ROOT" >&2
@@ -73,44 +89,44 @@ case "$cmd" in
     # Both talk to the running shell rather than reimplementing the choice, so
     # a keybinding and the panel button always open the same thing.
     launcher)
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher toggle
+        exec quickshell ipc --path "$(shell_ipc_path)" call launcher toggle
         ;;
 
     # The clipboard widget's popout. Meta+V is Klipper's, and under our own
     # renderer Klipper is not running, so this is what to bind it to instead.
     clipboard)
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call clipboard toggle
+        exec quickshell ipc --path "$(shell_ipc_path)" call clipboard toggle
         ;;
 
     # The sidebar and the key sheet: each opens on the first screen, and a
     # second press closes it.
     sidebar|keys)
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call surfaces "$cmd"
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces "$cmd"
         ;;
 
     settings)
         # `settings <page>` opens straight to one, by its schema section id.
         if [ $# -gt 0 ]; then
-            exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings page "$1"
+            exec quickshell ipc --path "$(shell_ipc_path)" call settings page "$1"
         fi
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call settings toggle
+        exec quickshell ipc --path "$(shell_ipc_path)" call settings toggle
         ;;
 
     wizard)
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call wizard open
+        exec quickshell ipc --path "$(shell_ipc_path)" call wizard open
         ;;
 
     # Quickshell notices edits only to files the config imported at load; a
     # widget's own files are loaded later and are not watched.
     reload)
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call shell reload
+        exec quickshell ipc --path "$(shell_ipc_path)" call shell reload
         ;;
 
     search)
         if [ $# -gt 0 ]; then
-            exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher query "$*"
+            exec quickshell ipc --path "$(shell_ipc_path)" call launcher query "$*"
         fi
-        exec quickshell ipc --path "@QS_CONFIG_DIR@/shell.qml" call launcher search
+        exec quickshell ipc --path "$(shell_ipc_path)" call launcher search
         ;;
 
     snapshot)  require_repo; exec "$REPO_ROOT/scripts/snapshot.sh" "$@" ;;
