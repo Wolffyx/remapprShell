@@ -49,9 +49,17 @@ PanelWindow {
         const wins = (WindowsService.windows ?? []).slice();
         wins.sort((a, b) => (b.stacking ?? -1) - (a.stacking ?? -1));
         win.entries = wins;
-        // The second window, not the first: Alt+Tab means "the one before
-        // this", and the first is the one in front.
-        win.index = wins.length > 1 ? 1 : 0;
+        if (wins.length === 0) {
+            win.index = 0;
+        } else if (Surfaces.windowSwitcherDelta < 0) {
+            // Opened by the backwards key: the last one, as Alt+Shift+Tab
+            // means "the one at the other end".
+            win.index = wins.length - 1;
+        } else {
+            // The second window, not the first: Alt+Tab means "the one before
+            // this", and the first is the one in front.
+            win.index = wins.length > 1 ? 1 : 0;
+        }
     }
 
     property int index: 0
@@ -96,6 +104,18 @@ PanelWindow {
                 win.commit(); event.accepted = true; break;
             case Qt.Key_Escape:
                 Surfaces.closeAll(); event.accepted = true; break;
+            }
+        }
+
+        // Another press of the switcher's own key. It never arrives as a key
+        // event -- KWin grabs the shortcut before any client sees it -- so it
+        // comes back through the shell as another call to open the switcher,
+        // and this is where that becomes a step.
+        Connections {
+            target: Surfaces
+
+            function onWindowSwitcherTickChanged(): void {
+                win.step(Surfaces.windowSwitcherDelta);
             }
         }
 

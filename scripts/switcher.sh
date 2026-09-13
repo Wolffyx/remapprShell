@@ -4,7 +4,7 @@
 #   status [--json]         Alt+Tab's look, and who holds Alt+Tab and Meta+Tab
 #   layout <id>             choose Alt+Tab's look, from the installed switchers
 #   use plasma|shell        who draws Alt+Tab, and who gets the key for it
-#   show                    put this shell's own switcher on screen, for the
+#   show [--reverse]        put this shell's own switcher on screen, for the
 #                           key bound to it when `switching.windows` is "shell"
 #   give alt-tab|meta-tab   hand a key to KWin -- Alt+Tab to its window
 #                           switcher, Meta+Tab to its Overview -- taking it from
@@ -159,8 +159,13 @@ case "$cmd" in
         mv "$tmp" "$profile"
 
         if [ "$who" = shell ]; then
-            accel_take switching "Alt+Tab" "services/$SLUG-switcher.desktop" _launch replace
-            accel_take switching "Alt+Shift+Tab" "services/$SLUG-switcher.desktop" _launch add
+            # This project's own component, not a desktop file: only a
+            # component with a running owner is ever grabbed. See
+            # scripts/shortcuts.sh.
+            ACCEL_FRIENDLY_HINT="Window switcher"
+            accel_take switching "Alt+Tab" "$SLUG" switcher replace
+            ACCEL_FRIENDLY_HINT="Window switcher (backwards)"
+            accel_take switching "Alt+Shift+Tab" "$SLUG" switcher-reverse replace
             accel_reload
             log_step "Alt+Tab -> $DISPLAY_NAME's own switcher"
         else
@@ -176,6 +181,13 @@ case "$cmd" in
     # and the key that ran it is still held: the switcher itself watches for
     # the release.
     show)
+        # --reverse is Alt+Shift+Tab. It is a separate action because KWin
+        # takes both keys before any client sees them: a switcher that is
+        # already up never learns which of the two was pressed unless the key
+        # brings it here.
+        if [ "${1:-}" = "--reverse" ]; then
+            exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcherReverse
+        fi
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcher
         ;;
 
