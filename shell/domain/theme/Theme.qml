@@ -2,13 +2,14 @@ pragma Singleton
 
 // The colours, type and shape the shell draws itself in.
 //
-// Material Design 3 roles in a light and a dark scheme, from one accent. Which
-// scheme is on is Plasma's to say unless the user says otherwise: with
-// `theme.mode` at "auto" the shell turns dark exactly when the Plasma colour
-// scheme does -- chosen by hand in System Settings, or switched at sunset by
-// Plasma itself when its global theme is set to change automatically between a
-// light and a dark one. So Breeze and the panel change together, and there is
-// no second clock deciding when night is.
+// Material Design 3 roles in a light and a dark scheme, from one accent.
+//
+// With `theme.mode` at "auto" the shell is light by day and dark by night, on
+// KWin's Night Light schedule -- the same sunset that warms the screen, so
+// there is no second clock deciding when night is. Plasma itself has no
+// automatic light/dark switching; its sunset belongs to the wallpaper. With
+// Night Light off there is no schedule to follow, and auto falls back to
+// turning dark exactly when the Plasma colour scheme is dark.
 //
 // PlasmaColors is still what reads the desktop; this turns what it read into
 // the shell's own palette. The arithmetic is in Scheme, where it is tested.
@@ -16,6 +17,7 @@ pragma Singleton
 import QtQuick
 import qs.domain.config
 import qs.domain.theme.palette
+import qs.platform.kde
 
 QtObject {
     id: root
@@ -29,7 +31,11 @@ QtObject {
 
     // ---- which scheme ------------------------------------------------------
 
-    readonly property string mode: Scheme.resolveMode(root.modeSetting, PlasmaColors.background.toString())
+    // "auto" follows Night Light's day and night when Night Light is on, and
+    // the Plasma colour scheme's own darkness when it is not.
+    readonly property string mode: Scheme.resolveMode(root.modeSetting,
+                                                      PlasmaColors.background.toString(),
+                                                      NightLight.known ? NightLight.daylight : undefined)
     readonly property bool dark: root.mode === "dark"
     readonly property string seed: Scheme.seed(root.accentSetting, PlasmaColors.accent.toString())
     readonly property var roles: Scheme.scheme(root.seed, root.dark)

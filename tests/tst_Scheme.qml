@@ -185,6 +185,28 @@ TestCase {
         compare(Scheme.resolveMode("auto", ""), "light");
     }
 
+    // Night Light's schedule, when it has one: the shell is light while the
+    // sun is up and dark after sunset, on the same schedule that warms the
+    // screen. Plasma has no light/dark switching of its own, so without this
+    // "auto" never changed at sunset at all.
+    function test_daylight_decides_when_it_is_known() {
+        compare(Scheme.resolveMode("auto", "#1b1e20", true), "light");   // dark scheme, sun up
+        compare(Scheme.resolveMode("auto", "#eff0f1", false), "dark");   // light scheme, after sunset
+    }
+
+    // Off, missing, or a KWin too old to say: there is no schedule to follow,
+    // so auto means what it meant before.
+    function test_without_an_answer_the_colour_scheme_decides() {
+        compare(Scheme.resolveMode("auto", "#1b1e20", undefined), "dark");
+        compare(Scheme.resolveMode("auto", "#eff0f1", undefined), "light");
+    }
+
+    // Chosen by hand beats every schedule.
+    function test_light_and_dark_ignore_the_sun() {
+        compare(Scheme.resolveMode("light", "#1b1e20", false), "light");
+        compare(Scheme.resolveMode("dark", "#eff0f1", true), "dark");
+    }
+
     function test_the_seed() {
         compare(Scheme.seed("plasma", "61,174,233"), "#3daee9");
         compare(Scheme.seed("plasma", ""), Scheme.seed("blue", ""));

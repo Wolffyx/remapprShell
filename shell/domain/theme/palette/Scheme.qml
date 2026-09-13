@@ -178,9 +178,19 @@ QtObject {
     // does -- by hand in System Settings, or at sunset when Plasma switches
     // between a light and a dark global theme by itself. Anything else is
     // "auto".
-    function resolveMode(mode, systemBackground) {
+    // `daylight` is KWin's Night Light, when it has an opinion: true while the
+    // sun is up, false after sunset, undefined when Night Light is off or not
+    // there. With one, "auto" means day and night on the schedule the desktop
+    // already warms the screen by. Without one there is no schedule to follow,
+    // so it falls back to the colour scheme's own darkness -- which is what
+    // auto meant before, and still means on a desktop with Night Light off.
+    function resolveMode(mode, systemBackground, daylight) {
         if (mode === "light" || mode === "dark")
             return mode;
+        if (daylight === true)
+            return "light";
+        if (daylight === false)
+            return "dark";
         return root.isDark(root.normalise(systemBackground, "#ffffff")) ? "dark" : "light";
     }
 

@@ -38,7 +38,7 @@ How the shell itself looks -- light or dark, its accent, its corners -- and the 
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto turns the shell dark whenever the Plasma colour scheme is dark, and follows it the moment it changes -- so whatever switches KDE's scheme switches this shell with it. Plasma 6.7 has no day/night switch of its own for themes (its sunset switching is for wallpapers), so nothing here changes at sunset unless something else changes the scheme. light and dark hold it where they say. |
+| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto is light by day and dark by night, on KWin's Night Light schedule -- the same sunset that warms your screen, set in System Settings under Display and Monitor. Plasma has no light/dark switching of its own (its sunset switching is for wallpapers), so with Night Light turned off there is no schedule to follow and auto instead turns dark whenever the Plasma colour scheme is dark, following it the moment it changes. light and dark hold it where they say. |
 | `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
 | `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
 | `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
