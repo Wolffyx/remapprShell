@@ -14,6 +14,12 @@
 # landed beside the OSD parser, once when the crash watcher landed beside the
 # redaction. The fix both times was to move the pure part into a leaf module of
 # its own, and that is what this enforces.
+#
+# Singletons only, which is what the paragraph above actually says. An ordinary
+# component is compiled with the module and instantiated only where a test
+# writes it down, so a component that touches the runtime costs nothing to the
+# tests that never build one -- qs.ui.primitives has no singletons at all, and
+# the wider rule refused a test of BarWidget that runs perfectly well.
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -32,14 +38,19 @@ for test in tests/tst_*.qml; do
         [ -d "$dir" ] || continue
         checked=$((checked + 1))
 
+        # The qmldir names the singletons: "singleton <Type> <version> <file>".
+        [ -f "$dir/qmldir" ] || continue
+
         while IFS= read -r qml; do
+            [ -f "$qml" ] || continue
             if grep -qE '^\s*import\s+Quickshell' "$qml"; then
                 log_error "$test imports $module, which cannot load outside a running shell"
-                log_error "  $qml imports Quickshell, so qmltestrunner cannot instantiate the module"
+                log_error "  $qml is a singleton of that module and imports Quickshell,"
+                log_error "  so qmltestrunner instantiates it and the whole module fails"
                 log_error "  move the pure code into a leaf module of its own, as qs.domain.osd.events is"
                 fail=1
             fi
-        done < <(find "$dir" -maxdepth 1 -name '*.qml' -type f | sort)
+        done < <(awk '$1 == "singleton" { print "'"$dir"'/" $NF }' "$dir/qmldir" | sort)
     done < <(grep -oE '^\s*import\s+qs\.[a-zA-Z0-9_.]+' "$test" | awk '{print $2}')
 done
 
