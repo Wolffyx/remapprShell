@@ -276,214 +276,224 @@ BarWidget {
     }
 
     popout: Component {
-        Column {
-            id: centre
+        // An Item that knows its own width, like every other widget's popout.
+        // The window is sized from the content's implicit size on the frame it
+        // is shown, and a bare Column has none until its children have been laid
+        // out: opened cold this drew the card a few pixels square -- a round blob
+        // with nothing in it -- and only the second opening looked right.
+        Item {
+            implicitWidth: 384
+            implicitHeight: centre.implicitHeight
 
-            readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
-            property real now: Date.now()
-
-            width: 384
-            spacing: 14
-
-            Timer {
-                interval: 30000
-                running: true
-                repeat: true
-                onTriggered: centre.now = Date.now()
-            }
-
-            Item {
-                width: parent.width
-                height: 34
-
-                PanelText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Notifications"
-                    font.pixelSize: 18
-                    font.weight: Font.Medium
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 6
-
-                    TextButton {
-                        text: "Do not disturb"
-                        checked: DoNotDisturb.active
-                        onActivated: DoNotDisturb.toggle()
-                    }
-
-                    TextButton {
-                        visible: NotificationWatch.entries.length > 0
-                        text: "Clear all"
-                        onActivated: NotificationWatch.clear()
-                    }
-                }
-            }
-
-            // Off: say so, and offer to start it.
             Column {
-                visible: !NotificationWatch.enabled
+                id: centre
+
+                readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
+                property real now: Date.now()
+
                 width: parent.width
-                spacing: 12
+                spacing: 14
+
+                Timer {
+                    interval: 30000
+                    running: true
+                    repeat: true
+                    onTriggered: centre.now = Date.now()
+                }
+
+                Item {
+                    width: parent.width
+                    height: 34
+
+                    PanelText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Notifications"
+                        font.pixelSize: 18
+                        font.weight: Font.Medium
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+
+                        TextButton {
+                            text: "Do not disturb"
+                            checked: DoNotDisturb.active
+                            onActivated: DoNotDisturb.toggle()
+                        }
+
+                        TextButton {
+                            visible: NotificationWatch.entries.length > 0
+                            text: "Clear all"
+                            onActivated: NotificationWatch.clear()
+                        }
+                    }
+                }
+
+                // Off: say so, and offer to start it.
+                Column {
+                    visible: !NotificationWatch.enabled
+                    width: parent.width
+                    spacing: 12
+
+                    PanelText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        color: Theme.mut
+                        font.pixelSize: 13
+                        lineHeight: 1.2
+                        text: `The history is off, so nothing is being kept. ${DoNotDisturb.shellDraws ? "This shell" : "Plasma"} draws every notification either way; the history remembers them, in memory only, until the shell stops.`
+                    }
+
+                    TextButton {
+                        primary: true
+                        glyph: "history"
+                        iconName: "view-history"
+                        text: "Keep a history"
+                        onActivated: ConfigStore.set("notifications.history", true)
+                    }
+                }
 
                 PanelText {
+                    visible: NotificationWatch.enabled && NotificationWatch.entries.length === 0
                     width: parent.width
                     wrapMode: Text.WordWrap
                     color: Theme.mut
                     font.pixelSize: 13
-                    lineHeight: 1.2
-                    text: `The history is off, so nothing is being kept. ${DoNotDisturb.shellDraws ? "This shell" : "Plasma"} draws every notification either way; the history remembers them, in memory only, until the shell stops.`
+                    text: "Nothing yet. Notifications are remembered from the moment the shell starts, and only in memory."
                 }
 
-                TextButton {
-                    primary: true
-                    glyph: "history"
-                    iconName: "view-history"
-                    text: "Keep a history"
-                    onActivated: ConfigStore.set("notifications.history", true)
-                }
-            }
+                Flickable {
+                    id: scroller
+                    visible: centre.entries.length > 0
+                    width: parent.width
+                    height: Math.min(contentHeight, 560)
+                    contentHeight: list.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
 
-            PanelText {
-                visible: NotificationWatch.enabled && NotificationWatch.entries.length === 0
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.mut
-                font.pixelSize: 13
-                text: "Nothing yet. Notifications are remembered from the moment the shell starts, and only in memory."
-            }
+                    Column {
+                        id: list
+                        width: scroller.width
+                        spacing: 12
 
-            Flickable {
-                id: scroller
-                visible: centre.entries.length > 0
-                width: parent.width
-                height: Math.min(contentHeight, 560)
-                contentHeight: list.implicitHeight
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
+                        Repeater {
+                            model: root.style === "grouped" ? Centre.groups(centre.entries) : []
 
-                Column {
-                    id: list
-                    width: scroller.width
-                    spacing: 12
+                            GroupCard { now: centre.now }
+                        }
 
-                    Repeater {
-                        model: root.style === "grouped" ? Centre.groups(centre.entries) : []
+                        Repeater {
+                            model: root.style === "stream" ? Centre.buckets(centre.entries, centre.now) : []
 
-                        GroupCard { now: centre.now }
-                    }
+                            Column {
+                                id: bucket
 
-                    Repeater {
-                        model: root.style === "stream" ? Centre.buckets(centre.entries, centre.now) : []
+                                required property var modelData
 
-                        Column {
-                            id: bucket
+                                width: list.width
 
-                            required property var modelData
+                                MenuTitle {
+                                    leftPadding: 0
+                                    text: bucket.modelData.label
+                                }
 
-                            width: list.width
+                                Repeater {
+                                    model: bucket.modelData.entries
 
-                            MenuTitle {
-                                leftPadding: 0
-                                text: bucket.modelData.label
-                            }
+                                    Item {
+                                        id: line
 
-                            Repeater {
-                                model: bucket.modelData.entries
+                                        required property var modelData
+                                        required property int index
 
-                                Item {
-                                    id: line
+                                        width: bucket.width
+                                        height: lineBody.implicitHeight + 24
 
-                                    required property var modelData
-                                    required property int index
+                                        NoteIcon {
+                                            y: 13
+                                            size: 20
+                                            source: line.modelData.appIcon ?? ""
+                                        }
 
-                                    width: bucket.width
-                                    height: lineBody.implicitHeight + 24
+                                        Column {
+                                            id: lineBody
+                                            x: 34
+                                            y: 12
+                                            width: parent.width - 34
 
-                                    NoteIcon {
-                                        y: 13
-                                        size: 20
-                                        source: line.modelData.appIcon ?? ""
-                                    }
+                                            Item {
+                                                width: parent.width
+                                                height: summary.implicitHeight
 
-                                    Column {
-                                        id: lineBody
-                                        x: 34
-                                        y: 12
-                                        width: parent.width - 34
+                                                PanelText {
+                                                    id: summary
+                                                    width: parent.width - stamp.width - 8
+                                                    elide: Text.ElideRight
+                                                    text: line.modelData.summary
+                                                    font.pixelSize: 14
+                                                    font.weight: Font.Medium
+                                                    color: line.modelData.urgency >= 2 ? Theme.error : Theme.fg
+                                                }
 
-                                        Item {
-                                            width: parent.width
-                                            height: summary.implicitHeight
-
-                                            PanelText {
-                                                id: summary
-                                                width: parent.width - stamp.width - 8
-                                                elide: Text.ElideRight
-                                                text: line.modelData.summary
-                                                font.pixelSize: 14
-                                                font.weight: Font.Medium
-                                                color: line.modelData.urgency >= 2 ? Theme.error : Theme.fg
+                                                PanelText {
+                                                    id: stamp
+                                                    anchors.right: parent.right
+                                                    text: Qt.formatDateTime(new Date(line.modelData.when), "HH:mm")
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.mut
+                                                }
                                             }
 
                                             PanelText {
-                                                id: stamp
-                                                anchors.right: parent.right
-                                                text: Qt.formatDateTime(new Date(line.modelData.when), "HH:mm")
-                                                font.family: Theme.monoFamily
-                                                font.pixelSize: 11
+                                                visible: line.modelData.body.length > 0
+                                                width: parent.width
+                                                topPadding: 2
+                                                text: line.modelData.body
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                                font.pixelSize: 13
                                                 color: Theme.mut
                                             }
                                         }
 
-                                        PanelText {
-                                            visible: line.modelData.body.length > 0
+                                        Rectangle {
+                                            anchors.bottom: parent.bottom
                                             width: parent.width
-                                            topPadding: 2
-                                            text: line.modelData.body
-                                            wrapMode: Text.WordWrap
-                                            maximumLineCount: 2
-                                            elide: Text.ElideRight
-                                            font.pixelSize: 13
-                                            color: Theme.mut
+                                            height: 1
+                                            color: Theme.out
+                                            visible: line.index < bucket.modelData.entries.length - 1
                                         }
-                                    }
 
-                                    Rectangle {
-                                        anchors.bottom: parent.bottom
-                                        width: parent.width
-                                        height: 1
-                                        color: Theme.out
-                                        visible: line.index < bucket.modelData.entries.length - 1
-                                    }
+                                        HoverHandler { id: lineHover }
 
-                                    HoverHandler { id: lineHover }
-
-                                    IconButton {
-                                        anchors.right: parent.right
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 4
-                                        visible: root.askable && lineHover.hovered
-                                        size: 30
-                                        glyph: "help"
-                                        iconName: "help-hint"
-                                        onActivated: root.ask(line.modelData)
+                                        IconButton {
+                                            anchors.right: parent.right
+                                            anchors.bottom: parent.bottom
+                                            anchors.bottomMargin: 4
+                                            visible: root.askable && lineHover.hovered
+                                            size: 30
+                                            glyph: "help"
+                                            iconName: "help-hint"
+                                            onActivated: root.ask(line.modelData)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            PanelText {
-                visible: NotificationWatch.entries.length > root.shown
-                width: parent.width
-                color: Theme.mut
-                font.pixelSize: 12
-                text: `and ${NotificationWatch.entries.length - root.shown} older`
+                PanelText {
+                    visible: NotificationWatch.entries.length > root.shown
+                    width: parent.width
+                    color: Theme.mut
+                    font.pixelSize: 12
+                    text: `and ${NotificationWatch.entries.length - root.shown} older`
+                }
             }
         }
     }
