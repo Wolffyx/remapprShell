@@ -1895,6 +1895,39 @@ binding re-evaluated between the two statements said "night" on every start.
   (18 widgets, 52 qmldirs) beside the redesign running from the worktree (22
   and 69).
 
+### The switchers, and where they stand
+
+**Alt+Tab has two implementations now, and a setting that picks.**
+`switching.windows` is `plasma` (the default, and what the machine is left on)
+or `shell`; `rmpr switcher use plasma|shell` writes it and moves the key with
+it.
+
+- **plasma** is KWin's own switcher drawn by `theme/windowswitcher`, rewritten
+  to the Meridian design this session. It is the only one that can show a
+  picture of each window: `KWin.WindowThumbnail` is rendered by KWin for its
+  own layouts and is available to nothing else. **Its box has never been seen
+  on this machine** -- Alt+Tab switches windows silently. `ShowTabBox` is now
+  explicitly `true`, KPackage lists the package, the metadata is right, KWin
+  logs no QML error, and `dev/preview/switcher.sh` loads the file cleanly
+  against a stub of KWin's own type. Unexplained; the next thing to try is a
+  stock layout (`kwriteconfig6 --file kwinrc --group TabBox --key LayoutName
+  big_icons`) and a press, to find out whether any layout draws.
+- **shell** is `shell/features/switchers/WindowSwitcher.qml`, the design's
+  card row drawn by this shell, which **works**: `rmpr switcher show` puts it
+  on screen, and there is a screenshot of it in this session's scratch. It
+  cannot show window pictures -- that needs the screencast protocol bound in
+  C++ and fed to PipeWire, which is what caelestia's
+  `libcaelestia-servicesplugin.so` does. What stops it being usable is the
+  shortcut, above: the key never reaches it.
+
+**Meta+Tab is KWin's Overview and cannot be restyled.** Overview is compiled
+into KWin -- `/usr/share/kwin/effects/` holds one scripted effect, `cube`, and
+nothing else -- and KWin 6.7 removed desktop TabBox layouts, so there is no
+`desktoptabbox` directory to put a package in. The design's Desktops switcher
+has to be an overlay of ours, on the same pattern as the window one. Not
+built. Everything it needs exists: each window record carries `desktops`, and
+KWin publishes the desktop list on `org.kde.KWin.VirtualDesktopManager`.
+
 ### The sweep at the end of the session
 
 Every read-only CLI command (17), every IPC function (53, across 14 handlers),
@@ -1921,6 +1954,62 @@ What is built, works, and is simply **not turned on here**:
   profile; Settings → Widgets lists them. Quick settings was rendered and is
   live -- Wi-Fi "Leo 5G", Bluetooth "1 device", Night Light "Suspended".
 - **The desktop clock and the rounded screen border**, both off by default.
+
+### Global shortcuts: what was wrong, and what is still unproven
+
+**Nothing this project binds has ever reached a key press on this machine**,
+and most of one evening went into finding out why. The chain, measured end to
+end:
+
+- The key reaches KDE. Meta+D (KWin's own "Show Desktop") works.
+- The command works. `rmpr switcher show` run from a terminal puts the
+  switcher on screen.
+- The action works. `invokeShortcut` over D-Bus runs it.
+- The record is right. `getGlobalShortcutsByKey` shows our key against our
+  action.
+- **The component is not active, so the key is never grabbed.**
+
+```
+kwin                             active=true    its shortcuts work
+org_kde_spectacle_desktop        active=true
+remappr_shell_switcher_desktop   active=false   ours
+```
+
+`setShortcutKeys` takes a flags word. Passing `0` files a perfect record and
+grabs nothing. **`SetPresent` is bit 2**, and the KF6 client library passes
+`SetPresent | NoAutoloading` = 6; measured, by registering the same shortcut
+seven times with different flags and reading `isActive` back:
+
+```
+flags=0 active=False    flags=2 active=True     flags=6 active=True
+flags=1 active=False    flags=3 active=True     flags=7 active=True
+flags=4 active=False
+```
+
+**This is not yet confirmed to fix anything.** The last step -- pressing
+Meta+F2 with an owning client registered at flags=6 -- was never run. Do that
+first: `dev/` has no harness for it, but the throwaway client used is worth
+rewriting, because the only way to test a global shortcut here is for a person
+to press the key. There is no `ydotool`, `wtype`, `dotool` or `xdotool` on
+this machine.
+
+Two further things follow from it, neither done:
+
+- **A shortcut needs an owner, and ours have none.** Every action this project
+  binds is a `[services][<id>.desktop] _launch` entry -- KDE launches a program
+  when the key is pressed -- and those are only active when kglobalaccel loads
+  them from the file at startup, which means a re-login. Caelestia does not do
+  this: `Caelestia.GlobalShortcut` is a compiled C++ type in its Services
+  plugin that registers a *component action* owned by the running shell, which
+  is why its bindings live under `[caelestia-shell]`. The same thing is
+  available over plain D-Bus -- `doRegister`, `setShortcutKeys` with flags 6,
+  and the `globalShortcutPressed` signal -- and `bin/windowsd.py.in` is
+  already a Python process on the session bus that could own them.
+- **`accel_reload` is still wrong.** It pushes keys live, which was a real fix
+  for the service-restart no-op, but a key pushed without `SetPresent` is a
+  key nobody grabbed. Whatever replaces it has to pass the flag, and the
+  claim that a shortcut "applies immediately" should not be repeated until a
+  person has pressed one.
 
 ### Two papercuts left, both small
 
