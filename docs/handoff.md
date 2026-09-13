@@ -1061,6 +1061,15 @@ rmpr doctor   # what is wrong with the installation right now
 
 Non-obvious things that cost time to discover:
 
+- **A layer surface cannot take the keyboard AND mask its input region.** On
+  KWin 6.7.5, a surface with `WlrKeyboardFocus.Exclusive` *and* a
+  `mask: Region` is mapped and then drawn as nothing at all: the window is
+  there, the right size on the right screen, the log says so, and the screen
+  stays empty. Either alone is fine. The start menu was the only thing in the
+  shell that asked for both, and it had never once appeared on a screen. **Any
+  offscreen render will hide this from you**: `dev/preview/preview.sh` strips
+  both properties to make a layer surface renderable offscreen at all, so the
+  menu looked perfect in every picture taken of it across six sessions.
 - **`/usr/bin/qmllint` is Qt5's** and exits 255 silently on Qt6 files. Use
   `/usr/lib/qt6/bin/qmllint`; `scripts/lint-qml.sh` resolves it.
 - **Never pipe `make lint`** — `make lint | tail` reports tail's exit status, so
@@ -1760,7 +1769,10 @@ The redesign was fast-forwarded onto `main` and run on the user's two monitors.
 suite was green throughout: 306 QML cases passed before the session and passed
 after every one of these was fixed. That is the whole lesson of the day.
 
-Eight fixes, in the order they were found:
+Eleven fixes, in the order they were found. The last three came from a sweep
+of every command, every IPC call and every surface, run at the end of the
+session because "what else has never been looked at?" is a question worth
+asking once the answer stops being "all of it":
 
 1. **`make run` named no tree, so nothing counted it as running** (`fe58850`).
    `1eae99a`, the session before, had taught every check to recognise a shell
@@ -1839,6 +1851,25 @@ Eight fixes, in the order they were found:
    look-and-feel `defaults`, so the checkbox, the key written and what `theme
    status` prints cannot drift. In Settings → Appearance and in the wizard.
 
+9. **The start menu opened a window and drew nothing in it** (`31286ef`). It
+   had never worked on a screen, in any session. See the first entry under
+   "Non-obvious things": exclusive keyboard focus and an input mask on one
+   layer surface, and KWin maps it and paints nothing.
+
+10. **The session screen could only be opened from the settings window**
+    (`73dde8e`). Its IPC takes a required argument, so `ipc call surfaces
+    session` is refused outright and the `kind || "promptAll"` inside the
+    handler never runs -- which looks exactly like a broken session screen
+    from a terminal. `rmpr session [kind]` now exists and always passes one.
+    The overlays log when they come up, which is how "it never appears" was
+    told apart from "it appears and something closes it".
+
+11. **The preview harness pointed at a worktree that no longer exists**
+    (`6cb1aad`). It had the path hardcoded, so removing the worktree broke
+    every offscreen render, and it never deleted the copy of the shell it
+    makes per run -- 550 files of leftovers. It is committed now rather than
+    living untracked in a directory that nearly went with the worktree.
+
 And one feature, asked for by the user after the theme work (`d7f5147`):
 **`theme.mode: auto` is light by day and dark by night**, on KWin's Night Light
 schedule -- `daylight` on `org.kde.KWin.NightLight`, the same sunset that warms
@@ -1863,6 +1894,33 @@ binding re-evaluated between the two statements said "night" on every start.
   in `~/Projects/remappr-shell` before the merge built the pre-redesign shell
   (18 widgets, 52 qmldirs) beside the redesign running from the worktree (22
   and 69).
+
+### The sweep at the end of the session
+
+Every read-only CLI command (17), every IPC function (53, across 14 handlers),
+`rmpr doctor`, and all 19 settings pages were exercised, and every surface the
+shell can draw was either put on the screen or rendered offscreen. Two things
+were broken and are fixed above; everything else drew what it should.
+
+Worth knowing when reading a status source: **the first read of one is cold**.
+`status audio` answered `ready: false` with empty fields, and a second read a
+moment later had the Scarlett 2i2, every output, and the levels. Same for
+bluetooth (`present: false`, then "1 device") and the DDC displays. They poll
+on demand. A script that reads one once and believes it will be wrong.
+
+What is built, works, and is simply **not turned on here**:
+
+- **The shell's own notification popups.** `notifications.server` is `plasma`,
+  so Plasma draws them and ours are unused. They render correctly -- actions,
+  a critical border, the lot. Turning them on takes the bus name from Plasma's
+  own applet, which is why it is opt-in.
+- **Fifteen status widgets.** Quick settings, volume, network, Bluetooth,
+  battery, brightness and night light, keyboard layout, media, clipboard,
+  search, session, task view, virtual desktops, active window, camera and
+  microphone in use. All in the defaults and the presets, none in this
+  profile; Settings → Widgets lists them. Quick settings was rendered and is
+  live -- Wi-Fi "Leo 5G", Bluetooth "1 device", Night Light "Suspended".
+- **The desktop clock and the rounded screen border**, both off by default.
 
 ### Two papercuts left, both small
 
