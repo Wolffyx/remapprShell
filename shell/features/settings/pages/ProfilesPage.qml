@@ -10,13 +10,14 @@ import qs.domain.config
 import qs.domain.theme
 import qs.ui.primitives
 
-Column {
+CardGrid {
     id: root
 
     property var profiles: []
     readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
-    spacing: 8
+    count: 2
+
     Component.onCompleted: root.reload()
 
     function reload() {
@@ -54,86 +55,127 @@ Column {
         runProc.running = true;
     }
 
-    Repeater {
-        model: root.profiles
+    Card {
+        id: profileCard
 
-        Rectangle {
-            id: card
-            required property var modelData
+        width: root.cellWidth
+        spacing: 6
 
-            width: root.width
-            height: 46
-            radius: 6
-            color: card.modelData.active ? Theme.alpha(Theme.accent, 0.2)
-                                         : Theme.backgroundAlternate
+        SectionLabel { text: "Profiles" }
 
-            Row {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 10
-                spacing: 10
+        Repeater {
+            model: root.profiles
 
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 100
+            Rectangle {
+                id: profile
 
-                    PanelText { text: card.modelData.name }
-                    PanelText {
-                        text: card.modelData.detail
-                        font.pixelSize: 11
-                        color: Theme.foregroundInactive
+                required property var modelData
+
+                width: profileCard.width - 2 * profileCard.padding
+                height: 50
+                radius: Theme.radiusOf(12)
+                color: profile.modelData.active ? Theme.accC : Theme.s1
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - use.width - parent.spacing
+                        spacing: 1
+
+                        PanelText {
+                            text: profile.modelData.name
+                            font.pixelSize: 14
+                            color: profile.modelData.active ? Theme.accCFg : Theme.fg
+                        }
+
+                        PanelText {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: profile.modelData.detail
+                            font.pixelSize: 12
+                            color: profile.modelData.active ? Theme.accCFg : Theme.mut
+                            opacity: profile.modelData.active ? 0.8 : 1
+                        }
                     }
-                }
 
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: !card.modelData.active
-                    width: 70
-                    height: 26
-                    radius: 5
-                    color: Theme.alpha(Theme.accent, useHover.hovered ? 0.4 : 0.25)
+                    Rectangle {
+                        id: use
 
-                    PanelText { anchors.centerIn: parent; text: "Use" }
-                    HoverHandler { id: useHover }
-                    TapHandler { onTapped: root.run(["profile", "use", card.modelData.name]) }
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !profile.modelData.active
+                        width: visible ? 66 : 0
+                        height: 28
+                        radius: Theme.radiusOf(10)
+                        color: useHover.hovered ? Theme.acc : Theme.accC
+
+                        PanelText {
+                            anchors.centerIn: parent
+                            text: "Use"
+                            font.pixelSize: 13
+                            color: useHover.hovered ? Theme.primaryFg : Theme.accCFg
+                        }
+
+                        HoverHandler { id: useHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: root.run(["profile", "use", profile.modelData.name]) }
+                    }
                 }
             }
         }
+
+        PanelText {
+            visible: root.profiles.length === 0
+            text: "No profiles found."
+            font.pixelSize: 13
+            color: Theme.mut
+        }
     }
 
-    PanelText {
-        text: "Per-monitor overrides"
-        font.pixelSize: 14
-        topPadding: 10
-    }
+    Card {
+        id: monitors
 
-    PanelText {
-        width: root.width
-        wrapMode: Text.WordWrap
-        font.pixelSize: 11
-        color: Theme.foregroundInactive
-        text: `Anything in the panel settings can differ per screen. Create a file named after the output in ${Paths.profileDir(ConfigStore.profile)}/monitors/, holding only the keys that differ.`
-    }
+        width: root.cellWidth
+        spacing: 8
 
-    Repeater {
-        model: Quickshell.screens
+        SectionLabel { text: "Per-monitor overrides" }
 
-        Row {
-            id: mon
-            required property var modelData
-            spacing: 10
+        PanelText {
+            width: monitors.width - 2 * monitors.padding
+            wrapMode: Text.WordWrap
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+            text: `Anything in the panel settings can differ per screen. Create a file named after the output in ${Paths.profileDir(ConfigStore.profile)}/monitors/, holding only the keys that differ.`
+        }
 
-            PanelText {
-                width: 120
-                text: mon.modelData.name
-            }
+        Repeater {
+            model: Quickshell.screens
 
-            PanelText {
-                color: Theme.foregroundInactive
-                font.pixelSize: 11
-                text: ConfigStore.monitorData[mon.modelData.name]
-                    ? `${Object.keys(ConfigStore.monitorData[mon.modelData.name]).length} override group(s)`
-                    : "no overrides"
+            Row {
+                id: mon
+
+                required property var modelData
+
+                width: monitors.width - 2 * monitors.padding
+                spacing: 10
+
+                PanelText {
+                    width: 120
+                    text: mon.modelData.name
+                    font.pixelSize: 13
+                }
+
+                PanelText {
+                    color: Theme.mut
+                    font.pixelSize: 12
+                    text: ConfigStore.monitorData[mon.modelData.name]
+                        ? `${Object.keys(ConfigStore.monitorData[mon.modelData.name]).length} override group(s)`
+                        : "no overrides"
+                }
             }
         }
     }

@@ -22,7 +22,7 @@ import qs.domain.widgets
 import qs.features.panel.model
 import qs.ui.primitives
 
-Column {
+CardGrid {
     id: root
 
     readonly property string current: ConfigStore.value("panel.renderer", "quickshell")
@@ -59,7 +59,7 @@ Column {
         }
     ]
 
-    spacing: 8
+    count: 1
 
     function unsupportedBy(rendererId) {
         return WidgetRegistry.unsupportedBy(rendererId, root.enabledIds);
@@ -86,86 +86,101 @@ Column {
         switchProc.running = true;
     }
 
-    Repeater {
-        model: root.options
+    Card {
+        id: card
 
-        Rectangle {
-            id: option
+        width: root.cellWidth
+        spacing: 8
 
-            required property var modelData
+        SectionLabel { text: "What draws the panel" }
 
-            readonly property bool active: option.modelData.id === root.current
-            readonly property var missing: root.unsupportedBy(option.modelData.id)
+        Repeater {
+            model: root.options
 
-            width: root.width
-            height: body.implicitHeight + 20
-            radius: 6
-            color: option.active ? Theme.hoverBackground : Theme.backgroundAlternate
+            Rectangle {
+                id: option
 
-            Column {
-                id: body
-                x: 12
-                y: 10
-                width: parent.width - 24
-                spacing: 4
+                required property var modelData
 
-                Row {
-                    spacing: 8
+                readonly property bool active: option.modelData.id === root.current
+                readonly property var missing: root.unsupportedBy(option.modelData.id)
 
-                    PanelText {
-                        text: option.modelData.label
-                        font.bold: option.active
+                width: card.width - 2 * card.padding
+                height: body.implicitHeight + 20
+                radius: Theme.radiusOf(12)
+                color: option.active ? Theme.accC : Theme.s1
+
+                Column {
+                    id: body
+                    x: 12
+                    y: 10
+                    width: parent.width - 24
+                    spacing: 4
+
+                    Row {
+                        spacing: 8
+
+                        PanelText {
+                            text: option.modelData.label
+                            font.pixelSize: 14
+                            font.weight: option.active ? Font.Medium : Font.Normal
+                            color: option.active ? Theme.accCFg : Theme.fg
+                        }
+
+                        PanelText {
+                            visible: option.active
+                            text: "in use"
+                            color: option.active ? Theme.accCFg : Theme.mut
+                            opacity: 0.7
+                            font.pixelSize: 12
+                        }
                     }
 
                     PanelText {
-                        visible: option.active
-                        text: "in use"
-                        color: Theme.foregroundInactive
-                        font.pixelSize: 11
+                        width: body.width
+                        wrapMode: Text.WordWrap
+                        text: option.modelData.note
+                        color: option.active ? Theme.accCFg : Theme.mut
+                        opacity: option.active ? 0.8 : 1
+                        font.pixelSize: 12
+                        lineHeight: 1.3
+                    }
+
+                    // Named individually rather than counted. "Some widgets are
+                    // unsupported" is not something a person can act on.
+                    PanelText {
+                        visible: option.missing.length > 0
+                        width: body.width
+                        wrapMode: Text.WordWrap
+                        text: `Will be left out: ${option.missing.join(", ")}`
+                        color: option.active ? Theme.accCFg : Theme.mut
+                        font.pixelSize: 12
                     }
                 }
 
-                PanelText {
-                    width: body.width
-                    wrapMode: Text.WordWrap
-                    text: option.modelData.note
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
+                HoverHandler { enabled: !option.active && !root.busy }
+                TapHandler {
+                    enabled: !option.active && !root.busy
+                    onTapped: root.apply(option.modelData.id)
                 }
-
-                // Named individually rather than counted. "Some widgets are
-                // unsupported" is not something a person can act on.
-                PanelText {
-                    visible: option.missing.length > 0
-                    width: body.width
-                    wrapMode: Text.WordWrap
-                    text: `Will be left out: ${option.missing.join(", ")}`
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
-                }
-            }
-
-            HoverHandler { enabled: !option.active && !root.busy }
-            TapHandler {
-                enabled: !option.active && !root.busy
-                onTapped: root.apply(option.modelData.id)
             }
         }
-    }
 
-    PanelText {
-        width: root.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: "Only one of these draws a panel at a time. Switching takes a restore point first, and puts everything back if it does not work."
-    }
+        PanelText {
+            width: card.width - 2 * card.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: "Only one of these draws a panel at a time. Switching takes a restore point first, and puts everything back if it does not work."
+        }
 
-    PanelText {
-        visible: root.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
-        text: root.status
-        font.pixelSize: 11
+        PanelText {
+            visible: root.status.length > 0
+            width: card.width - 2 * card.padding
+            wrapMode: Text.WordWrap
+            text: root.status
+            font.pixelSize: 12
+        }
     }
 }

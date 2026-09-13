@@ -15,7 +15,7 @@ import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
-Column {
+CardGrid {
     id: root
 
     property var snapshots: []
@@ -23,7 +23,7 @@ Column {
 
     readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
-    spacing: 8
+    count: 2
 
     Component.onCompleted: root.refresh()
 
@@ -62,90 +62,107 @@ Column {
         runProc.running = true;
     }
 
-    Row {
-        spacing: 8
+    Card {
+        id: take
 
-        Rectangle {
-            width: create.implicitWidth + 24
-            height: 30
-            radius: 6
-            color: createHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
+        width: root.cellWidth
+        spacing: 12
 
-            PanelText {
-                id: create
-                anchors.centerIn: parent
-                text: "Take a restore point now"
+        SectionLabel { text: "Restore points" }
+
+        Flow {
+            width: take.width - 2 * take.padding
+            spacing: 8
+
+            TextButton {
+                glyph: "history"
+                iconName: "document-save"
+                text: "Take one now"
+                onActivated: root.run(["snapshot", "create", "manual"])
             }
 
-            HoverHandler { id: createHover }
-            TapHandler { onTapped: root.run(["snapshot", "create", "manual"]) }
+            IconButton {
+                iconName: "view-refresh"
+                onActivated: root.refresh()
+            }
         }
 
-        IconButton {
-            anchors.verticalCenter: parent.verticalCenter
-            iconName: "view-refresh"
-            onActivated: root.refresh()
+        PanelText {
+            width: take.width - 2 * take.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: "Restore points are never removed automatically -- not when reverting, not when uninstalling, not to save space. Removing one is permanent."
         }
     }
 
-    PanelText {
-        width: root.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: "Restore points are never removed automatically -- not when reverting, not when uninstalling, not to save space. Removing one is permanent."
-    }
+    Card {
+        id: saved
 
-    Repeater {
-        model: root.snapshots
+        width: root.cellWidth
+        spacing: 6
 
-        Rectangle {
-            id: snap
+        SectionLabel { text: "Saved" }
 
-            required property var modelData
+        Repeater {
+            model: root.snapshots
 
-            width: root.width
-            height: 44
-            radius: 6
-            color: Theme.backgroundAlternate
+            Rectangle {
+                id: snap
 
-            Row {
-                anchors.fill: parent
-                anchors.leftMargin: 10
-                anchors.rightMargin: 6
-                spacing: 10
+                required property var modelData
 
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 90
+                width: saved.width - 2 * saved.padding
+                height: 48
+                radius: Theme.radiusOf(12)
+                color: Theme.s1
 
-                    PanelText { text: snap.modelData.name }
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 8
+                    spacing: 8
 
-                    PanelText {
-                        text: `${snap.modelData.created}   ${snap.modelData.paths}   ${snap.modelData.size}`
-                        font.pixelSize: 11
-                        color: Theme.foregroundInactive
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 90
+                        spacing: 1
+
+                        PanelText {
+                            text: snap.modelData.name
+                            font.pixelSize: 14
+                        }
+
+                        PanelText {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: `${snap.modelData.created}   ${snap.modelData.paths}   ${snap.modelData.size}`
+                            font.pixelSize: 12
+                            color: Theme.mut
+                        }
+                    }
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        iconName: "document-revert"
+                        onActivated: root.run(["restore", "--snapshot", snap.modelData.name, "--yes"])
+                    }
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        iconName: "edit-delete"
+                        onActivated: root.run(["snapshot", "remove", snap.modelData.name, "--yes"])
                     }
                 }
-
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconName: "document-revert"
-                    onActivated: root.run(["restore", "--snapshot", snap.modelData.name, "--yes"])
-                }
-
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconName: "edit-delete"
-                    onActivated: root.run(["snapshot", "remove", snap.modelData.name, "--yes"])
-                }
             }
         }
-    }
 
-    PanelText {
-        visible: root.snapshots.length === 0
-        text: "No restore points yet."
-        color: Theme.foregroundInactive
+        PanelText {
+            visible: root.snapshots.length === 0
+            text: "No restore points yet."
+            font.pixelSize: 13
+            color: Theme.mut
+        }
     }
 }

@@ -13,14 +13,14 @@ import qs.core
 import qs.domain.theme
 import qs.ui.primitives
 
-Column {
+CardGrid {
     id: root
 
     property var presets: []
 
     readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
-    spacing: 8
+    count: 1
 
     Component.onCompleted: root.reload()
 
@@ -55,75 +55,91 @@ Column {
         applyProc.running = true;
     }
 
-    PanelText {
-        width: root.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: "Applying a layout replaces your current panel configuration. The previous one is saved first, and the path is printed in the log."
-    }
+    Card {
+        id: card
 
-    Repeater {
-        model: root.presets
+        width: root.cellWidth
+        spacing: 8
 
-        Rectangle {
-            id: card
+        SectionLabel { text: "Shipped layouts" }
 
-            required property var modelData
-
-            width: root.width
-            height: 56
-            radius: 6
-            color: cardHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
-
-            Row {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 10
-                spacing: 10
-
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 90
-
-                    PanelText {
-                        text: card.modelData.id
-                        font.pixelSize: 14
-                    }
-
-                    PanelText {
-                        text: card.modelData.description
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 11
-                        color: Theme.foregroundInactive
-                    }
-                }
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 70
-                    height: 28
-                    radius: 5
-                    color: Theme.alpha(Theme.accent, applyHover.hovered ? 0.4 : 0.25)
-
-                    PanelText {
-                        anchors.centerIn: parent
-                        text: "Apply"
-                    }
-
-                    HoverHandler { id: applyHover }
-                    TapHandler { onTapped: root.apply(card.modelData.id) }
-                }
-            }
-
-            HoverHandler { id: cardHover }
+        PanelText {
+            width: card.width - 2 * card.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: "Applying a layout replaces your current panel configuration. The previous one is saved first, and the path is printed in the log."
         }
-    }
 
-    PanelText {
-        visible: root.presets.length === 0
-        text: "No presets found."
-        color: Theme.foregroundInactive
+        Repeater {
+            model: root.presets
+
+            Rectangle {
+                id: preset
+
+                required property var modelData
+
+                width: card.width - 2 * card.padding
+                height: 58
+                radius: Theme.radiusOf(12)
+                color: presetHover.hovered ? Theme.hover : Theme.s1
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - applyButton.width - parent.spacing
+                        spacing: 1
+
+                        PanelText {
+                            text: preset.modelData.id
+                            font.pixelSize: 14
+                        }
+
+                        PanelText {
+                            text: preset.modelData.description
+                            width: parent.width
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                            color: Theme.mut
+                        }
+                    }
+
+                    Rectangle {
+                        id: applyButton
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 74
+                        height: 30
+                        radius: Theme.radiusOf(10)
+                        color: applyHover.hovered ? Theme.acc : Theme.accC
+
+                        PanelText {
+                            anchors.centerIn: parent
+                            text: "Apply"
+                            font.pixelSize: 13
+                            color: applyHover.hovered ? Theme.primaryFg : Theme.accCFg
+                        }
+
+                        HoverHandler { id: applyHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: root.apply(preset.modelData.id) }
+                    }
+                }
+
+                HoverHandler { id: presetHover }
+            }
+        }
+
+        PanelText {
+            visible: root.presets.length === 0
+            text: "No presets found."
+            font.pixelSize: 13
+            color: Theme.mut
+        }
     }
 }

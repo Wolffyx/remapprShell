@@ -18,7 +18,7 @@ import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
-Column {
+CardGrid {
     id: root
 
     // `switcher status --json`, parsed. Null until the first read returns.
@@ -29,7 +29,7 @@ Column {
     readonly property var layouts: root.switcherState?.layouts ?? []
     readonly property var keys: root.switcherState?.keys ?? []
 
-    spacing: 10
+    count: 2
 
     Component.onCompleted: root.refresh()
 
@@ -91,90 +91,103 @@ Column {
         }
     }
 
-    PanelText {
-        text: "Alt+Tab looks like"
-        font.pixelSize: 13
+    Card {
+        id: look
+
+        width: root.cellWidth
+
+        SectionLabel { text: "Alt+Tab looks like" }
+
+        Flow {
+            width: look.width - 2 * look.padding
+            spacing: 6
+            enabled: !root.busy
+
+            Repeater {
+                model: root.layouts
+
+                TextButton {
+                    required property var modelData
+
+                    text: modelData.name
+                    checked: modelData.id === (root.switcherState?.layout ?? "")
+                    onActivated: if (!checked) root.run(["layout", modelData.id])
+                }
+            }
+        }
+
+        PanelText {
+            visible: root.switcherState !== null && !root.layouts.some(l => l.id === Branding.slug)
+            width: look.width - 2 * look.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
+        }
     }
 
-    Flow {
-        width: root.width
-        spacing: 6
-        enabled: !root.busy
+    Card {
+        id: keyCard
+
+        width: root.cellWidth
+        spacing: 4
+
+        SectionLabel { text: "Who holds the key" }
 
         Repeater {
-            model: root.layouts
+            model: root.keys
 
-            TextButton {
+            SettingRow {
+                id: keyRow
+
                 required property var modelData
 
-                text: modelData.name
-                checked: modelData.id === (root.switcherState?.layout ?? "")
-                onActivated: if (!checked) root.run(["layout", modelData.id])
+                width: keyCard.width - 2 * keyCard.padding
+                enabled: !root.busy
+                label: `${keyRow.modelData.key}: ${keyRow.modelData.label.toLowerCase()}`
+                description: root.describe(keyRow.modelData)
+
+                TextButton {
+                    visible: !keyRow.modelData.kwin || keyRow.modelData.holders.length > 1
+                    text: "Give it to KWin"
+                    onActivated: root.run(["give", keyRow.modelData.id])
+                }
             }
         }
-    }
 
-    PanelText {
-        visible: root.switcherState !== null && !root.layouts.some(l => l.id === Branding.slug)
-        width: root.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
-    }
-
-    Repeater {
-        model: root.keys
-
-        SettingRow {
-            id: keyRow
-
-            required property var modelData
-
-            width: root.width
+        Flow {
+            width: keyCard.width - 2 * keyCard.padding
+            spacing: 8
             enabled: !root.busy
-            label: `${keyRow.modelData.key}: ${keyRow.modelData.label.toLowerCase()}`
-            description: root.describe(keyRow.modelData)
 
             TextButton {
-                visible: !keyRow.modelData.kwin || keyRow.modelData.holders.length > 1
-                text: "Give it to KWin"
-                onActivated: root.run(["give", keyRow.modelData.id])
+                visible: root.switcherState?.customised ?? false
+                iconName: "edit-undo"
+                text: "Undo everything set here"
+                onActivated: root.run(["revert"])
+            }
+
+            // Plasma's own page has the rest: the switcher's second shortcut
+            // set, which windows it lists, the order they come in.
+            TextButton {
+                iconName: "configure"
+                text: "Plasma's task switcher settings"
+                onActivated: PlasmaApplets.openSettings("kcm_kwintabbox")
+            }
+
+            IconButton {
+                iconName: "view-refresh"
+                onActivated: root.refresh()
             }
         }
-    }
 
-    Row {
-        spacing: 8
-        enabled: !root.busy
-
-        TextButton {
-            visible: root.switcherState?.customised ?? false
-            iconName: "edit-undo"
-            text: "Undo everything set here"
-            onActivated: root.run(["revert"])
+        PanelText {
+            visible: root.status.length > 0
+            width: keyCard.width - 2 * keyCard.padding
+            wrapMode: Text.WordWrap
+            text: root.status
+            font.pixelSize: 12
         }
-
-        // Plasma's own page has the rest: the switcher's second shortcut set,
-        // which windows it lists, the order they come in.
-        TextButton {
-            iconName: "configure"
-            text: "Plasma's task switcher settings"
-            onActivated: PlasmaApplets.openSettings("kcm_kwintabbox")
-        }
-
-        IconButton {
-            anchors.verticalCenter: parent.verticalCenter
-            iconName: "view-refresh"
-            onActivated: root.refresh()
-        }
-    }
-
-    PanelText {
-        visible: root.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
-        text: root.status
-        font.pixelSize: 11
     }
 }

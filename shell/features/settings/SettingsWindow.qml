@@ -93,8 +93,8 @@ FloatingWindow {
                             readonly property bool current: navItem.index === root.currentIndex
 
                             width: parent.width
-                            height: 44
-                            radius: Theme.radiusTiny + 2
+                            height: 42
+                            radius: Theme.radiusOf(12)
                             color: navItem.current ? Theme.accC
                                  : (navHover.hovered ? Theme.hover : "transparent")
 
@@ -139,7 +139,7 @@ FloatingWindow {
                 height: versionText.implicitHeight + 24
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 12
-                radius: Theme.radiusTiny + 4
+                radius: Theme.radiusOf(14)
                 color: Theme.s1
 
                 Column {
@@ -220,8 +220,10 @@ FloatingWindow {
                 clip: true
 
                 Column {
+                    id: page
+
                     width: root.width - nav.width - 76
-                    spacing: 14
+                    spacing: 16
 
                     PanelText {
                         visible: (root.currentSection?.description ?? "").length > 0
@@ -269,6 +271,7 @@ FloatingWindow {
                         id: keysPage
                         SchemaRenderer {
                             width: parent.width
+                            title: root.currentSection?.label ?? ""
                             keys: root.currentSection?.keys ?? ({})
                         }
                     }

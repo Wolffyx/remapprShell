@@ -17,7 +17,7 @@ import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
-Column {
+CardGrid {
     id: root
 
     readonly property bool assistOn: ConfigStore.value("ai.enabled", false) === true
@@ -26,7 +26,7 @@ Column {
     property var providers: []
     readonly property var available: root.providers.filter(p => p.available).map(p => p.id)
 
-    spacing: 4
+    count: 3
 
     Component.onCompleted: listProc.running = true
 
@@ -47,120 +47,140 @@ Column {
         command: [Branding.ctlBin, "ask", "--forget"]
     }
 
-    SettingRow {
-        width: parent.width
-        label: "AI assist"
-        description: "Turns on the ask actions: in the notification history, as a global shortcut, and as `rmpr ask`. The notification listener runs while this is on."
-        overridden: ConfigStore.isOverridden("ai.enabled")
-        onResetRequested: ConfigStore.reset("ai.enabled")
-        Toggle {
-            checked: root.assistOn
-            onToggled: value => ConfigStore.set("ai.enabled", value)
+    Card {
+        id: what
+
+        width: root.cellWidth
+        spacing: 4
+
+        SectionLabel { text: "Assist" }
+
+        SettingRow {
+            width: what.width - 2 * what.padding
+            label: "AI assist"
+            description: "Turns on the ask actions: in the notification history, as a global shortcut, and as `rmpr ask`. The notification listener runs while this is on."
+            overridden: ConfigStore.isOverridden("ai.enabled")
+            onResetRequested: ConfigStore.reset("ai.enabled")
+            Toggle {
+                checked: root.assistOn
+                onToggled: value => ConfigStore.set("ai.enabled", value)
+            }
+        }
+
+        SettingRow {
+            width: what.width - 2 * what.padding
+            label: "Provider"
+            description: {
+                const p = root.providers.find(x => x.id === root.provider);
+                if (!p) return "Where a report goes.";
+                if (!p.available) return `'${root.provider}' cannot run here: ${p.reason}.`;
+                return p.leavesMachine
+                    ? `'${root.provider}' sends the report off this machine, after you have seen it.`
+                    : `'${root.provider}' keeps the report on this machine.`;
+            }
+            overridden: ConfigStore.isOverridden("ai.provider")
+            onResetRequested: ConfigStore.reset("ai.provider")
+            Select {
+                values: root.available
+                currentIndex: Math.max(0, root.available.indexOf(root.provider))
+                onPicked: value => ConfigStore.set("ai.provider", value)
+            }
+        }
+
+        PanelText {
+            visible: root.providers.some(p => !p.available)
+            width: what.width - 2 * what.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: "Not available here: " + root.providers.filter(p => !p.available)
+                .map(p => `${p.id} (${p.reason})`).join(", ")
         }
     }
 
-    SettingRow {
-        width: parent.width
-        label: "Provider"
-        description: {
-            const p = root.providers.find(x => x.id === root.provider);
-            if (!p) return "Where a report goes.";
-            if (!p.available) return `'${root.provider}' cannot run here: ${p.reason}.`;
-            return p.leavesMachine
-                ? `'${root.provider}' sends the report off this machine, after you have seen it.`
-                : `'${root.provider}' keeps the report on this machine.`;
-        }
-        overridden: ConfigStore.isOverridden("ai.provider")
-        onResetRequested: ConfigStore.reset("ai.provider")
-        Select {
-            values: root.available
-            currentIndex: Math.max(0, root.available.indexOf(root.provider))
-            onPicked: value => ConfigStore.set("ai.provider", value)
-        }
-    }
+    Card {
+        id: providerCard
 
-    PanelText {
-        visible: root.providers.some(p => !p.available)
-        width: parent.width
-        x: 8
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: "Not available here: " + root.providers.filter(p => !p.available)
-            .map(p => `${p.id} (${p.reason})`).join(", ")
-    }
+        width: root.cellWidth
+        spacing: 4
+        visible: root.provider === "ollama" || root.provider === "custom"
 
-    SettingRow {
-        visible: root.provider === "ollama"
-        width: parent.width
-        label: "Ollama address"
-        description: "An address that is not this machine is confirmed like any other."
-        overridden: ConfigStore.isOverridden("ai.ollamaUrl")
-        onResetRequested: ConfigStore.reset("ai.ollamaUrl")
-        TextInputRow {
-            width: parent.width
-            text: ConfigStore.value("ai.ollamaUrl", "http://127.0.0.1:11434")
-            onCommitted: value => ConfigStore.set("ai.ollamaUrl", value)
+        SectionLabel { text: root.provider === "ollama" ? "Ollama" : "Custom command" }
+
+        SettingRow {
+            visible: root.provider === "ollama"
+            width: providerCard.width - 2 * providerCard.padding
+            label: "Address"
+            description: "An address that is not this machine is confirmed like any other."
+            overridden: ConfigStore.isOverridden("ai.ollamaUrl")
+            onResetRequested: ConfigStore.reset("ai.ollamaUrl")
+            TextInputRow {
+                width: parent.width
+                text: ConfigStore.value("ai.ollamaUrl", "http://127.0.0.1:11434")
+                onCommitted: value => ConfigStore.set("ai.ollamaUrl", value)
+            }
         }
-    }
 
-    SettingRow {
-        visible: root.provider === "ollama"
-        width: parent.width
-        label: "Ollama model"
-        description: "Empty picks the first model Ollama lists."
-        overridden: ConfigStore.isOverridden("ai.ollamaModel")
-        onResetRequested: ConfigStore.reset("ai.ollamaModel")
-        TextInputRow {
-            width: parent.width
-            text: ConfigStore.value("ai.ollamaModel", "")
-            onCommitted: value => ConfigStore.set("ai.ollamaModel", value)
+        SettingRow {
+            visible: root.provider === "ollama"
+            width: providerCard.width - 2 * providerCard.padding
+            label: "Model"
+            description: "Empty picks the first model Ollama lists."
+            overridden: ConfigStore.isOverridden("ai.ollamaModel")
+            onResetRequested: ConfigStore.reset("ai.ollamaModel")
+            TextInputRow {
+                width: parent.width
+                text: ConfigStore.value("ai.ollamaModel", "")
+                onCommitted: value => ConfigStore.set("ai.ollamaModel", value)
+            }
+        }
+
+        PanelText {
+            visible: root.provider === "custom"
+            width: providerCard.width - 2 * providerCard.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: `The custom command is a list, so it is set in the profile as ai.command: ["my-tool", "%report"]. %report becomes the bundle's path; without it, the bundle arrives on standard input.`
         }
     }
 
-    PanelText {
-        visible: root.provider === "custom"
-        width: parent.width
-        x: 8
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: `The custom command is a list, so it is set in the profile as ai.command: ["my-tool", "%report"]. %report becomes the bundle's path; without it, the bundle arrives on standard input.`
-    }
+    Card {
+        id: sending
 
-    Item { width: 1; height: 8 }
+        width: root.cellWidth
+        spacing: 12
 
-    Row {
-        spacing: 8
+        SectionLabel { text: "What gets sent" }
 
-        Rectangle {
-            width: tryText.implicitWidth + 24
-            height: 30
-            radius: 6
-            color: tryHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
+        Flow {
+            width: sending.width - 2 * sending.padding
+            spacing: 8
 
-            PanelText { id: tryText; anchors.centerIn: parent; text: "See what would be sent" }
-            HoverHandler { id: tryHover }
-            TapHandler { onTapped: Quickshell.execDetached([Branding.ctlBin, "ask", "--review"]) }
+            TextButton {
+                glyph: "preview"
+                iconName: "document-preview"
+                text: "See what would be sent"
+                onActivated: Quickshell.execDetached([Branding.ctlBin, "ask", "--review"])
+            }
+
+            TextButton {
+                glyph: "lock_reset"
+                iconName: "edit-undo"
+                text: "Ask again before sending"
+                onActivated: { forgetProc.running = false; forgetProc.running = true; }
+            }
         }
 
-        Rectangle {
-            width: forgetText.implicitWidth + 24
-            height: 30
-            radius: 6
-            color: forgetHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
-
-            PanelText { id: forgetText; anchors.centerIn: parent; text: "Ask again before sending" }
-            HoverHandler { id: forgetHover }
-            TapHandler { onTapped: { forgetProc.running = false; forgetProc.running = true; } }
+        PanelText {
+            width: sending.width - 2 * sending.padding
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: `Every report is written locally first and redacted there; 'rmpr report show' prints the same text a provider receives. A provider that sends off this machine asks once, showing the whole bundle, and remembers the answer until it is withdrawn here. Bind a key to ask about the last notification with: rmpr shortcuts set ask <key>`
         }
-    }
-
-    PanelText {
-        width: parent.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: `Every report is written locally first and redacted there; 'rmpr report show' prints the same text a provider receives. A provider that sends off this machine asks once, showing the whole bundle, and remembers the answer until it is withdrawn here. Bind a key to ask about the last notification with: rmpr shortcuts set ask <key>`
     }
 }

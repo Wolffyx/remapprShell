@@ -362,12 +362,14 @@
             "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
             "keys": {
                 "desktop.border": {
+                    "group": "Screen border",
                     "type": "bool",
                     "default": false,
                     "label": "Rounded screen border",
                     "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
                 },
                 "desktop.borderInset": {
+                    "group": "Screen border",
                     "type": "int",
                     "min": 0,
                     "max": 40,
@@ -376,6 +378,7 @@
                     "description": "How far in from each edge the frame is painted, in pixels."
                 },
                 "desktop.borderRadius": {
+                    "group": "Screen border",
                     "type": "int",
                     "min": 0,
                     "max": 48,
@@ -384,12 +387,14 @@
                     "description": "How round the painted corners are, in pixels."
                 },
                 "desktop.clock": {
+                    "group": "Desktop clock",
                     "type": "bool",
                     "default": false,
                     "label": "Clock on the desktop",
                     "description": "The time and date on the wallpaper, under every window."
                 },
                 "desktop.clockPosition": {
+                    "group": "Desktop clock",
                     "type": "enum",
                     "values": [
                         "top-left",
@@ -401,6 +406,7 @@
                     "label": "Where it sits"
                 },
                 "desktop.clockSize": {
+                    "group": "Desktop clock",
                     "type": "int",
                     "min": 40,
                     "max": 200,
@@ -409,11 +415,13 @@
                     "description": "The height of the time, in pixels; the date follows it."
                 },
                 "desktop.clockDate": {
+                    "group": "Desktop clock",
                     "type": "bool",
                     "default": true,
                     "label": "Show the date"
                 },
                 "desktop.clockInk": {
+                    "group": "Desktop clock",
                     "type": "enum",
                     "values": [
                         "auto",

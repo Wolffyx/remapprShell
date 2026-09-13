@@ -25,7 +25,7 @@ import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
-Column {
+CardGrid {
     id: root
 
     readonly property string base: "widgets.tray"
@@ -162,216 +162,230 @@ Column {
         return section;
     }
 
-    spacing: 0
+    count: 2
 
-    PanelText {
-        width: parent.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: root.items.length === 0
-            ? "Nothing is in the tray at the moment. Applications appear here as they start."
-            : "Drag a row into another list. Icons on the panel keep the order you leave them in."
-    }
+    // The three lists are dragged between, so this card takes the whole row.
+    Card {
+        id: lists
 
-    Item { width: 1; height: 10 }
+        width: root.width
+        spacing: 12
 
-    Item {
-        width: parent.width
-        height: root.rows.length * root.rowHeight
+        SectionLabel { text: "The three lists" }
 
-        Repeater {
-            model: root.rows
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: root.items.length === 0
+                ? "Nothing is in the tray at the moment. Applications appear here as they start."
+                : "Drag a row into another list. Icons on the panel keep the order you leave them in."
+        }
 
-            Item {
-                id: row
+        Item {
+            width: parent.width
+            height: root.rows.length * root.rowHeight
 
-                required property var modelData
-                required property int index
+            Repeater {
+                model: root.rows
 
-                readonly property bool dragging: root.dragIndex === row.index
-                readonly property bool isLastOnPanel: !row.modelData.header
-                    && row.modelData.section === 0 && root.countIn(0) === 1
+                Item {
+                    id: row
 
-                width: parent.width
-                height: root.rowHeight
-                y: row.index * root.rowHeight
-                   + (row.dragging ? dragHandler.activeTranslation.y : root.dragShift(row.index))
-                z: row.dragging ? 2 : 1
+                    required property var modelData
+                    required property int index
 
-                Behavior on y {
-                    enabled: !row.dragging
-                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                }
+                    readonly property bool dragging: root.dragIndex === row.index
+                    readonly property bool isLastOnPanel: !row.modelData.header
+                        && row.modelData.section === 0 && root.countIn(0) === 1
 
-                // ---- a list heading
-                PanelText {
-                    visible: row.modelData.header
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 6
-                    text: root.sections[row.modelData.section].title
-                    font.bold: true
-                    font.pixelSize: 12
-                }
+                    width: parent.width
+                    height: root.rowHeight
+                    y: row.index * root.rowHeight
+                       + (row.dragging ? dragHandler.activeTranslation.y : root.dragShift(row.index))
+                    z: row.dragging ? 2 : 1
 
-                PanelText {
-                    visible: row.modelData.header
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 7
-                    text: root.sections[row.modelData.section].note
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 10
-                }
-
-                Rectangle {
-                    visible: row.modelData.header
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: 1
-                    color: Theme.alpha(Theme.foreground, 0.12)
-                }
-
-                // ---- an item
-                Rectangle {
-                    visible: !row.modelData.header
-                    anchors.fill: parent
-                    anchors.topMargin: 2
-                    anchors.bottomMargin: 2
-                    radius: 5
-                    color: row.dragging ? Theme.alpha(Theme.accent, 0.25)
-                         : (rowHover.hovered ? Theme.hoverBackground : "transparent")
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        spacing: 10
-
-                        PanelIcon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            implicitSize: 18
-                            source: root.itemFor(row.modelData.id)?.icon ?? ""
-                            fallbackName: row.modelData.id ?? ""
-                            opacity: root.runningNow(row.modelData.id) ? 1 : 0.4
-                        }
-
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - 18 - grip.width - up.width - down.width - parent.spacing * 4
-
-                            PanelText {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                text: root.labelFor(row.modelData.id ?? "")
-                                font.pixelSize: 12
-                            }
-
-                            // The id is worth showing: it is what the config
-                            // holds, and two windows of one application can
-                            // share a title but never an id.
-                            PanelText {
-                                width: parent.width
-                                elide: Text.ElideMiddle
-                                text: root.runningNow(row.modelData.id)
-                                    ? (row.modelData.id ?? "")
-                                    : `${row.modelData.id ?? ""} -- not running`
-                                color: Theme.foregroundInactive
-                                font.pixelSize: 10
-                            }
-                        }
-
-                        // Drag to move between lists. The arrows beside it do
-                        // the same thing for anyone who would rather not drag,
-                        // and appear only under the pointer.
-                        Item {
-                            id: grip
-                            anchors.verticalCenter: parent.verticalCenter
-                            implicitWidth: 22
-                            implicitHeight: 22
-
-                            PanelIcon {
-                                anchors.centerIn: parent
-                                implicitSize: 16
-                                iconName: "transform-move"
-                                opacity: row.dragging ? 1 : 0.5
-                            }
-
-                            DragHandler {
-                                id: dragHandler
-                                target: null
-                                xAxis.enabled: false
-                                cursorShape: Qt.ClosedHandCursor
-                                enabled: !row.isLastOnPanel
-
-                                onActiveChanged: {
-                                    if (active) {
-                                        root.dragIndex = row.index;
-                                        root.dropIndex = row.index;
-                                    } else {
-                                        root.commitDrag();
-                                    }
-                                }
-
-                                onTranslationChanged: {
-                                    if (!dragHandler.active)
-                                        return;
-                                    const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
-                                    root.dropIndex = Math.max(1, Math.min(root.rows.length - 1,
-                                                                          row.index + steps));
-                                }
-                            }
-                        }
-
-                        IconButton {
-                            id: up
-                            anchors.verticalCenter: parent.verticalCenter
-                            iconName: "go-up"
-                            visible: rowHover.hovered && !row.isLastOnPanel
-                            onActivated: root.moveRow(row.index, row.index - 1)
-                        }
-
-                        IconButton {
-                            id: down
-                            anchors.verticalCenter: parent.verticalCenter
-                            iconName: "go-down"
-                            visible: rowHover.hovered && !row.isLastOnPanel
-                            onActivated: root.moveRow(row.index, row.index + 1)
-                        }
+                    Behavior on y {
+                        enabled: !row.dragging
+                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
                     }
 
-                    HoverHandler { id: rowHover }
+                    // ---- a list heading
+                    PanelText {
+                        visible: row.modelData.header
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 6
+                        text: root.sections[row.modelData.section].title
+                        font.bold: true
+                        font.pixelSize: 12
+                    }
+
+                    PanelText {
+                        visible: row.modelData.header
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 7
+                        text: root.sections[row.modelData.section].note
+                        color: Theme.mut
+                        font.pixelSize: 11
+                    }
+
+                    Rectangle {
+                        visible: row.modelData.header
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 1
+                        color: Theme.out
+                    }
+
+                    // ---- an item
+                    Rectangle {
+                        visible: !row.modelData.header
+                        anchors.fill: parent
+                        anchors.topMargin: 2
+                        anchors.bottomMargin: 2
+                        radius: Theme.radiusOf(9)
+                        color: row.dragging ? Theme.accC
+                             : (rowHover.hovered ? Theme.hover : "transparent")
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 10
+
+                            PanelIcon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                implicitSize: 18
+                                source: root.itemFor(row.modelData.id)?.icon ?? ""
+                                fallbackName: row.modelData.id ?? ""
+                                opacity: root.runningNow(row.modelData.id) ? 1 : 0.4
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - 18 - grip.width - up.width - down.width - parent.spacing * 4
+
+                                PanelText {
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    text: root.labelFor(row.modelData.id ?? "")
+                                    font.pixelSize: 12
+                                }
+
+                                // The id is worth showing: it is what the config
+                                // holds, and two windows of one application can
+                                // share a title but never an id.
+                                PanelText {
+                                    width: parent.width
+                                    elide: Text.ElideMiddle
+                                    text: root.runningNow(row.modelData.id)
+                                        ? (row.modelData.id ?? "")
+                                        : `${row.modelData.id ?? ""} -- not running`
+                                    color: Theme.mut
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            // Drag to move between lists. The arrows beside it do
+                            // the same thing for anyone who would rather not drag,
+                            // and appear only under the pointer.
+                            Item {
+                                id: grip
+                                anchors.verticalCenter: parent.verticalCenter
+                                implicitWidth: 22
+                                implicitHeight: 22
+
+                                PanelIcon {
+                                    anchors.centerIn: parent
+                                    implicitSize: 16
+                                    iconName: "transform-move"
+                                    opacity: row.dragging ? 1 : 0.5
+                                }
+
+                                DragHandler {
+                                    id: dragHandler
+                                    target: null
+                                    xAxis.enabled: false
+                                    cursorShape: Qt.ClosedHandCursor
+                                    enabled: !row.isLastOnPanel
+
+                                    onActiveChanged: {
+                                        if (active) {
+                                            root.dragIndex = row.index;
+                                            root.dropIndex = row.index;
+                                        } else {
+                                            root.commitDrag();
+                                        }
+                                    }
+
+                                    onTranslationChanged: {
+                                        if (!dragHandler.active)
+                                            return;
+                                        const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
+                                        root.dropIndex = Math.max(1, Math.min(root.rows.length - 1,
+                                                                              row.index + steps));
+                                    }
+                                }
+                            }
+
+                            IconButton {
+                                id: up
+                                anchors.verticalCenter: parent.verticalCenter
+                                iconName: "go-up"
+                                visible: rowHover.hovered && !row.isLastOnPanel
+                                onActivated: root.moveRow(row.index, row.index - 1)
+                            }
+
+                            IconButton {
+                                id: down
+                                anchors.verticalCenter: parent.verticalCenter
+                                iconName: "go-down"
+                                visible: rowHover.hovered && !row.isLastOnPanel
+                                onActivated: root.moveRow(row.index, row.index + 1)
+                            }
+                        }
+
+                        HoverHandler { id: rowHover }
+                    }
                 }
             }
         }
-    }
 
-    Item { width: 1; height: 10 }
-
-    PanelText {
-        width: parent.width
-        wrapMode: Text.WordWrap
-        color: Theme.foregroundInactive
-        font.pixelSize: 11
-        text: "One icon always stays on the panel: an empty list means 'show everything', so emptying it would bring them all back. An application that is not running keeps its place until you move it."
-    }
-
-    Item { width: 1; height: 12 }
-
-    SettingRow {
-        width: parent.width
-        label: "Icon size"
-        overridden: ConfigStore.isOverridden(`${root.base}.iconSize`)
-        onResetRequested: ConfigStore.reset(`${root.base}.iconSize`)
-        NumberSlider {
+        PanelText {
             width: parent.width
-            from: 12
-            to: 48
-            stepSize: 2
-            value: ConfigStore.value(`${root.base}.iconSize`, 18)
-            onMoved: value => ConfigStore.set(`${root.base}.iconSize`, Math.round(value))
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            lineHeight: 1.35
+            text: "One icon always stays on the panel: an empty list means 'show everything', so emptying it would bring them all back. An application that is not running keeps its place until you move it."
+        }
+    }
+
+    Card {
+        id: sizeCard
+
+        width: root.cellWidth
+
+        SectionLabel { text: "Icon size" }
+
+        SettingRow {
+            width: parent.width
+            label: "Icon size"
+            overridden: ConfigStore.isOverridden(`${root.base}.iconSize`)
+            onResetRequested: ConfigStore.reset(`${root.base}.iconSize`)
+            NumberSlider {
+                width: parent.width
+                from: 12
+                to: 48
+                stepSize: 2
+                value: ConfigStore.value(`${root.base}.iconSize`, 18)
+                onMoved: value => ConfigStore.set(`${root.base}.iconSize`, Math.round(value))
+            }
         }
     }
 }
