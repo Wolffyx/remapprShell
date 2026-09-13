@@ -46,7 +46,7 @@ export "$NO_SESSION_VAR=1"
 # reading an unset key was reading the real desktop's answer.
 export XDG_CONFIG_DIRS=/etc/xdg
 
-for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-switcher test-lockscreen test-update test-renderer test-redact test-report test-windows test-ask test-crash test-ctl; do
+for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-switcher test-lockscreen test-update test-renderer test-redact test-report test-windows test-ask test-crash test-ctl test-config; do
     log_step "$t"
     "$REPO_ROOT/tests/$t.sh" || exit 1
 done

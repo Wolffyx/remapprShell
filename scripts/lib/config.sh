@@ -30,9 +30,17 @@ config_merged() {
 }
 
 # config_get <jq path> [default]   -- one value, raw. Arrays come back as JSON.
+#
+# Absent means absent, and nothing else does. jq's `//` takes its right-hand
+# side when the left is false OR null, so `.x // "true"` answered "true" for a
+# setting whose value was `false` -- every boolean that was off read back as
+# on. A setting exists to be turned off, so the test is against null alone.
 config_get() {
     local path=$1 fallback=${2:-}
     local v
-    v=$(config_merged | jq -r --arg d "$fallback" "$path // \$d | if type == \"array\" or type == \"object\" then tojson else tostring end" 2>/dev/null)
-    printf '%s' "${v:-$fallback}"
+    v=$(config_merged | jq -r --arg d "$fallback" \
+        "($path) as \$v | if \$v == null then \$d
+         else (\$v | if type == \"array\" or type == \"object\" then tojson else tostring end) end" 2>/dev/null) || v=""
+    [ -n "$v" ] || v=$fallback
+    printf '%s' "$v"
 }
