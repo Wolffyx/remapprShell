@@ -19,6 +19,7 @@ pragma Singleton
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.domain.config.merge
 import qs.platform.system
 
 QtObject {
@@ -132,8 +133,12 @@ QtObject {
         }
 
         const isDefault = Obj.deepEqual(value, Obj.get(root.defaults, path, undefined));
-        root.profileData = isDefault ? Obj.unset(root.profileData, path)
-                                     : Obj.set(root.profileData, path, value);
+        if (isDefault) {
+            root.profileData = Obj.unset(root.profileData, path);
+            root._drop(path);
+        } else {
+            root.profileData = Obj.set(root.profileData, path, value);
+        }
         root._scheduleWrite();
         return true;
     }
@@ -144,9 +149,16 @@ QtObject {
             return false;
         }
         root.profileData = Obj.unset(root.profileData, path);
+        root._drop(path);
         root._scheduleWrite();
         return true;
     }
+
+    // Keys removed since the last write, because their value returned to the
+    // shipped default. Remembered until the write, so that merging with a file
+    // that still has them does not bring them back.
+    property var _removed: []
+    function _drop(path) { root._removed = root._removed.concat([path]); }
 
     // Runtime overrides sit above the profile and are never persisted. Used for
     // things like a temporary preview while dragging a slider.
@@ -216,13 +228,17 @@ QtObject {
             return;
 
         // Re-read before writing. If the file changed underneath us since our
-        // last write, the user hand-edited it while the settings GUI was open;
-        // reapply our delta onto their current content rather than clobbering it.
+        // last write, somebody else wrote it -- a hand edit, or one of the CLI
+        // commands that does -- so our changes go onto their content rather
+        // than over it.
         const onDisk = root._parseProfile(root._profileView.text());
-        if (onDisk.ok && !Obj.deepEqual(onDisk.data, root._lastParsed)) {
-            Log.info("config", "profile changed on disk; merging our delta onto it");
-            root.profileData = Obj.deepMerge(onDisk.data, root.profileData);
+        if (onDisk.ok) {
+            if (ConfigMerge.changedOnDisk(onDisk.data, root._lastParsed))
+                Log.info("config", "profile changed on disk; merging our delta onto it");
+            root.profileData = ConfigMerge.flushData(onDisk.data, root._lastParsed,
+                                                     root.profileData, root._removed);
         }
+        root._removed = [];
 
         const out = Object.assign({ schemaVersion: Migrations.currentVersion }, root.profileData);
         const text = JSON.stringify(out, null, 4) + "\n";
