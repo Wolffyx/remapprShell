@@ -26,7 +26,10 @@ PanelWindow {
         right: true
     }
     exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
+    // Top, not overlay: the overlay layer is above a full-screen window, and
+    // the search covering a game or Spectacle's region selector is not what
+    // anyone asked for. See EdgeWindow.
+    WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     color: "transparent"
 
@@ -62,6 +65,7 @@ PanelWindow {
     }
 
     RectangularShadow {
+        visible: Theme.shadows
         anchors.fill: card
         radius: card.radius
         blur: 64

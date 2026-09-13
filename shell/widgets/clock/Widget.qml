@@ -43,6 +43,7 @@ BarWidget {
     readonly property real k: Math.max(0.7, root.unit)
 
     // A click opens the month.
+    popoutWidth: 348
     popoutPadding: 22
     popout: Component {
         CalendarPopout {

@@ -181,7 +181,7 @@ BarWidget {
                         visible: root.style === "dots"
                         width: 6
                         height: 6
-                        radius: 3
+                        radius: Theme.radiusOf(3)
                         color: pill.ink
                     }
                 }
@@ -192,7 +192,7 @@ BarWidget {
                     visible: pill.compact
                     width: 4
                     height: 4
-                    radius: 2
+                    radius: Theme.radiusOf(2)
                     color: Theme.mut
                     opacity: 0.6
                 }

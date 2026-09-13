@@ -43,8 +43,7 @@ Item {
     // Closes this slot's popout: another one has opened, or a click landed
     // somewhere else. PanelModel decides when.
     function closePopout() {
-        if (root.widget)
-            root.widget.popoutVisible = false;
+        root.widget?.closePopout();
     }
 
     Connections {
@@ -204,14 +203,21 @@ Item {
         // The margin is derived rather than written down twice: a margin
         // smaller than blur + drop cuts the blur off square against the edge
         // of the window, and on a screen that cut reads as a second card
-        // sitting behind the card -- which is how it was reported.
-        readonly property real shadowBlur: 40
-        readonly property real shadowDrop: 12
+        // sitting behind the card.
+        //
+        // Smaller than it was. At blur 40 and drop 12 the shadow was a 52 px
+        // band of dimmed wallpaper around a card whose own background is
+        // blurred, and the difference between the two drew a second rectangle
+        // -- reported, twice, as "another popup underneath". A shadow should
+        // say the card is above the wallpaper, not be a shape of its own.
+        readonly property real shadowBlur: Theme.shadows ? 22 : 0
+        readonly property real shadowDrop: Theme.shadows ? 7 : 0
 
         slot: root
         bar: root.bar
         label: `popout '${root.entry?.id}'`
         centre: root.popoutCentre
+        align: root.widget?.popoutAlign ?? "centre"
         shadowMargin: Math.ceil(popout.shadowBlur + popout.shadowDrop)
 
         visible: popout.wanted
@@ -233,8 +239,12 @@ Item {
 
         // The contents, the padding they sit in, and room for the shadow.
         readonly property int padding: root.widget?.popoutPadding ?? 20
-        implicitWidth: (popout.popoutContent?.implicitWidth ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
-        implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
+        readonly property int askedWidth: root.widget?.popoutWidth ?? -1
+        implicitWidth: (popout.askedWidth >= 0 ? popout.askedWidth
+                                               : (popout.popoutContent?.implicitWidth ?? 0))
+                       + 2 * popout.padding + popout.padH
+        implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding
+                        + popout.padV
 
         // Only the card takes the pointer: a click in its shadow goes to
         // whatever is beneath, which is the surface that closes the popout.
@@ -248,9 +258,15 @@ Item {
         // and has no mask, and every popout that masks takes no keyboard.
         //
         // The keyboard wins, because a launcher nobody can see is worse than a
-        // 52px band of shadow that swallows a click instead of passing it
-        // through. Found on a real screen; every offscreen render of this menu
-        // was perfect, because the harness strips both properties.
+        // band of shadow that swallows a click instead of passing it through.
+        // Found on a real screen; every offscreen render of this menu was
+        // perfect, because the harness strips both properties.
+        //
+        // What that band must not do is reach back over the panel. It did, by
+        // the whole shadow margin, so the start button sat underneath the
+        // start menu's own window and a second click on it went nowhere --
+        // the menu could be opened and not closed. EdgeWindow caps the room
+        // on the panel side at the gap for exactly this.
         mask: (root.widget?.popoutGrabsFocus ?? false) ? null : cardOnly
         readonly property Region cardOnly: Region { item: card }
 
@@ -300,6 +316,7 @@ Item {
         }
 
         RectangularShadow {
+            visible: Theme.shadows
             anchors.fill: card
             radius: card.radius
             blur: popout.shadowBlur
@@ -311,10 +328,10 @@ Item {
         Rectangle {
             id: card
 
-            x: popout.shadowMargin
-            y: popout.shadowMargin
-            width: parent.width - 2 * popout.shadowMargin
-            height: parent.height - 2 * popout.shadowMargin
+            x: popout.padLeft
+            y: popout.padTop
+            width: parent.width - popout.padH
+            height: parent.height - popout.padV
             radius: Math.min((root.widget?.popoutRadius ?? -1) >= 0 ? root.widget.popoutRadius : Theme.radius,
                              width / 2, height / 2)
             color: Theme.glass

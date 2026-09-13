@@ -45,6 +45,7 @@ PanelWindow {
     readonly property string glyph: StatusIcons.osdGlyph(OsdService.icon, root.fraction)
 
     RectangularShadow {
+        visible: Theme.shadows
         anchors.fill: body
         radius: body.radius
         blur: 36

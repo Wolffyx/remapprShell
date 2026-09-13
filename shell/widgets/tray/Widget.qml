@@ -65,7 +65,6 @@ BarWidget {
     property var menuItem: null
 
     popoutPadding: root.popoutMode === "menu" ? 8 : 12
-    popoutRadius: 18
 
     // Which cell the pointer is over, or -1: an icon, or -- one past the
     // last -- the chevron. The panel reports a position along the widget;
@@ -325,7 +324,7 @@ BarWidget {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 12
+                            radius: Theme.radiusOf(12)
                             color: hiddenHover.hovered ? Theme.s2 : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.durationFast } }
                         }

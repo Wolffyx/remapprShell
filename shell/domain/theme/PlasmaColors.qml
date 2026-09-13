@@ -87,7 +87,12 @@ QtObject {
         watchChanges: true
         printErrors: false
 
-        onFileChanged: reload()
+        // Debounced. KDE writes kdeglobals to a temporary file and renames it
+        // over the original, which the watcher sees as several changes in a
+        // few milliseconds -- four, measured here. Each one reparsed the file
+        // and reassigned every colour in the shell, so one colour-scheme
+        // change repainted everything four times.
+        onFileChanged: settle.restart()
 
         onLoaded: {
             const g = root._parse(text());
@@ -111,5 +116,11 @@ QtObject {
         }
 
         onLoadFailed: Log.warn("theme", "kdeglobals unreadable; using built-in colours")
+    }
+
+    readonly property Timer _settle: Timer {
+        id: settle
+        interval: 120
+        onTriggered: root._view.reload()
     }
 }

@@ -67,8 +67,11 @@ Item {
     component SearchField: Rectangle {
         property string placeholder: "Search apps, files and actions"
         height: 48
-        radius: 16
-        color: Theme.s2
+        radius: Theme.radiusOf(16)
+        // An outline rather than a fill: a field drawn a shade lighter than
+        // the menu it sits in is one more background to read past, and the
+        // border says "type here" on its own.
+        color: "transparent"
         border.width: 1
         border.color: search.activeFocus ? Theme.acc : Theme.out
 
@@ -88,7 +91,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: badgeText.implicitWidth + 14
             height: 22
-            radius: 6
+            radius: Theme.radiusOf(6)
             color: Theme.s1
 
             PanelText {
@@ -166,7 +169,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: 16
+            radius: Theme.radiusOf(16)
             color: tileHover.hovered ? Theme.s2 : "transparent"
         }
 
@@ -176,7 +179,7 @@ Item {
             y: 14
             width: 52
             height: 52
-            radius: 16
+            radius: Theme.radiusOf(16)
             color: tile.framed ? Theme.accC : "transparent"
 
             PanelIcon {
@@ -211,7 +214,7 @@ Item {
 
         width: parent ? parent.width : 0
         height: 52
-        radius: 14
+        radius: Theme.radiusOf(14)
         color: result.selected ? Theme.accC : (resultHover.hovered ? Theme.s2 : "transparent")
 
         Item {
@@ -294,7 +297,7 @@ Item {
 
         width: parent ? parent.width : 0
         height: 40
-        radius: 14
+        radius: Theme.radiusOf(14)
         color: recentHover.hovered ? Theme.s2 : "transparent"
 
         Glyph {
@@ -418,13 +421,24 @@ Item {
 
         Item {
             // The rail.
-            Rectangle {
+            //
+            // A column of buttons, not a panel of its own. It used to be
+            // filled a shade lighter than the menu and rounded on its left,
+            // which put a second background inside the popout's -- and, where
+            // its corner radius did not land exactly on the card's, left the
+            // menu's bottom-left corner looking square. One surface, a
+            // hairline where one part ends and the next begins.
+            Item {
                 id: rail
                 width: 78
                 height: parent.height
-                topLeftRadius: Theme.radius
-                bottomLeftRadius: Theme.radius
-                color: Theme.s2
+
+                Rectangle {
+                    anchors.right: parent.right
+                    width: 1
+                    height: parent.height
+                    color: Theme.out
+                }
 
                 Column {
                     y: 14
@@ -442,7 +456,7 @@ Item {
 
                             width: 48
                             height: 48
-                            radius: 16
+                            radius: Theme.radiusOf(16)
                             color: railButton.current ? Theme.acc : railHover.hovered ? Theme.s3 : "transparent"
 
                             Glyph {
@@ -469,7 +483,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: 48
                     height: 48
-                    radius: 16
+                    radius: Theme.radiusOf(16)
                     color: menu.view === "recent" ? Theme.acc : historyHover.hovered ? Theme.s3 : "transparent"
 
                     Glyph {
@@ -571,14 +585,17 @@ Item {
             }
 
             // The side: who, what is playing, the machine, the session.
-            Rectangle {
+            Item {
                 id: side
                 anchors.right: parent.right
                 width: 276
                 height: parent.height
-                topRightRadius: Theme.radius
-                bottomRightRadius: Theme.radius
-                color: Theme.s2
+
+                Rectangle {
+                    width: 1
+                    height: parent.height
+                    color: Theme.out
+                }
 
                 Column {
                     x: 20
@@ -633,12 +650,12 @@ Item {
                         }
                     }
 
-                    // What is playing.
-                    Rectangle {
+                    // What is playing. No card of its own: inside a popout
+                    // that is already a card, a second one is just another
+                    // background.
+                    Item {
                         width: parent.width
                         height: player.implicitHeight + 28
-                        radius: 18
-                        color: Theme.s1
 
                         Column {
                             id: player
@@ -654,7 +671,7 @@ Item {
                                 Rectangle {
                                     width: 56
                                     height: 56
-                                    radius: 12
+                                    radius: Theme.radiusOf(12)
                                     color: Theme.accC
                                     clip: true
 
@@ -717,11 +734,15 @@ Item {
                     }
 
                     // The machine.
-                    Rectangle {
+                    Item {
                         width: parent.width
                         height: meters.implicitHeight + 32
-                        radius: 18
-                        color: Theme.s1
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: Theme.out
+                        }
 
                         Column {
                             id: meters
@@ -793,7 +814,7 @@ Item {
                             required property var modelData
                             width: (side.width - 40 - 16) / 3
                             height: 44
-                            radius: 14
+                            radius: Theme.radiusOf(14)
                             color: sessionHover.hovered ? Theme.s3 : Theme.s1
 
                             Glyph {
@@ -888,7 +909,7 @@ Item {
                             required property var modelData
                             width: (parent.width - 8) / 2
                             height: 44
-                            radius: 14
+                            radius: Theme.radiusOf(14)
                             color: recHover.hovered ? Theme.s3 : Theme.s2
 
                             Glyph {
@@ -985,7 +1006,7 @@ Item {
                                 required property var modelData
                                 width: group.width
                                 height: 38
-                                radius: 12
+                                radius: Theme.radiusOf(12)
                                 color: listedHover.hovered ? Theme.s2 : "transparent"
 
                                 PanelIcon {

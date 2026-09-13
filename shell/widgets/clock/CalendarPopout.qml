@@ -41,7 +41,10 @@ Column {
 
     readonly property var weeks: Calendar.weeks(cal.year, cal.month, cal.firstDay)
 
-    width: 348
+    // How wide it is belongs to the widget: `popoutWidth`. The Loader
+    // anchors this to fill the card, so a width set here would be
+    // overwritten -- which left the card as wide as the longest line of
+    // text in it, a different size in every locale.
     spacing: 0
 
     PanelText {
@@ -142,7 +145,7 @@ Column {
                         anchors.centerIn: parent
                         width: 34
                         height: 34
-                        radius: 17
+                        radius: Theme.radiusOf(17)
                         color: cell.today ? Theme.acc : "transparent"
                     }
 

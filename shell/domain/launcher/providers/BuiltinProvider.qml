@@ -135,6 +135,7 @@ Provider {
         if (root.shownOn.length === 0)
             root.shownOn = Quickshell.screens[0]?.name ?? "";
         root.visible = true;
+        Log.debug("launcher", `open: ${root.mode} on ${root.shownOn}`);
     }
 
     function openOn(screenName, mode) {
@@ -148,6 +149,8 @@ Provider {
     }
 
     function close() {
+        if (root.visible)
+            Log.debug("launcher", `close: was ${root.mode} on ${root.shownOn}`);
         root.visible = false;
         root.query = "";
         root.shownOn = "";

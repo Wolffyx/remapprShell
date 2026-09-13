@@ -139,7 +139,7 @@ BarWidget {
             y: face.height - 30
             width: parent.width - 24
             height: 38
-            radius: 18
+            radius: Theme.radiusOf(18)
             color: Theme.s2
         }
 
@@ -147,7 +147,7 @@ BarWidget {
             id: face
             width: parent.width
             height: body.implicitHeight + 28
-            radius: 20
+            radius: Theme.radiusOf(20)
             color: Theme.s1
             border.width: 1
             border.color: Theme.out
@@ -184,7 +184,7 @@ BarWidget {
                             visible: card.count > 1
                             width: countText.implicitWidth + 14
                             height: 18
-                            radius: 9
+                            radius: Theme.radiusOf(9)
                             color: Theme.accC
 
                             PanelText {

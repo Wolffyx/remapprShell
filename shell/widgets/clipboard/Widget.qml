@@ -89,7 +89,7 @@ BarWidget {
 
                         width: body.width
                         height: 26
-                        radius: 5
+                        radius: Theme.radiusOf(5)
                         color: rowHover.hovered && !row.modelData.image ? Theme.hoverBackground : "transparent"
                         opacity: row.modelData.image ? 0.5 : 1
 

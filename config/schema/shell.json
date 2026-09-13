@@ -39,6 +39,12 @@
                     "label": "Translucent surfaces",
                     "description": "The panel and its popouts let a little of what is behind them through. Off draws them solid."
                 },
+                "theme.shadows": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Drop shadows",
+                    "description": "A soft shadow under the panel, its popouts, the start menu and the on-screen display. Off by default: a shadow is a band of dimmed wallpaper around a surface whose own background is blurred, and on a dark desktop the join between the two reads as a second panel behind the first."
+                },
                 "theme.rounding": {
                     "type": "int",
                     "min": 0,

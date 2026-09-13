@@ -134,8 +134,10 @@ BarWidget {
         return b ? b.x + b.width / 2 : 0;
     }
 
-    popoutRadius: 18
     popoutPadding: root.popoutMode === "menu" ? 8 : 14
+    // The menu is a list of actions and has a width of its own; the preview
+    // is a picture and takes its size from what it is showing.
+    popoutWidth: root.popoutMode === "menu" ? 262 : -1
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a

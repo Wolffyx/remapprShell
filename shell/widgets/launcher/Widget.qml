@@ -32,10 +32,12 @@ BarWidget {
     }
 
     // The start menu, not the search: that one is drawn over the screen.
-    popoutVisible: LauncherService.active === LauncherService.builtin
-                   && LauncherService.builtin.visible
-                   && LauncherService.builtin.mode === "apps"
-                   && LauncherService.builtin.shownOn === root.screenName
+    popoutVisible: root.openHere
+
+    // From the button, not around it: the menu is many times wider than the
+    // start button, so centring it on the button and then pushing it back on
+    // screen put it somewhere that read as belonging to nothing.
+    popoutAlign: "start"
 
     // The two-pane menu draws its own edges, to the card's.
     popoutPadding: LauncherService.builtin.layout === "twopane" ? 0 : 22
@@ -47,13 +49,35 @@ BarWidget {
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
+    // Whether the menu is up *here*. Anywhere else -- the other monitor, or
+    // the search rather than the menu -- and this button's job is still to
+    // put the menu on this screen.
+    readonly property bool openHere: LauncherService.active === LauncherService.builtin
+                                     && LauncherService.builtin.visible
+                                     && LauncherService.builtin.mode === "apps"
+                                     && LauncherService.builtin.shownOn === root.screenName
+
     function handleActivate(button) {
-        // Tell the provider which screen this button is on, so the popout is
-        // built there and only there.
-        if (LauncherService.active === LauncherService.builtin && !LauncherService.builtin.visible)
-            LauncherService.builtin.openOn(root.screenName, "apps");
-        else
+        if (LauncherService.active !== LauncherService.builtin) {
             LauncherService.toggle("apps");
+            return;
+        }
+        // Tell the provider which screen this button is on, so the popout is
+        // built there and only there. Clicking this screen's button always
+        // ends with the menu on this screen, or gone -- never open on the
+        // monitor the pointer is not on.
+        if (root.openHere)
+            LauncherService.builtin.close();
+        else
+            LauncherService.builtin.openOn(root.screenName, "apps");
+    }
+
+    // The panel closes popouts by calling this. Assigning to `popoutVisible`
+    // would replace the binding below with a constant, and the start menu
+    // would never open again -- which is what a click outside it used to do.
+    function closePopout() {
+        if (LauncherService.active === LauncherService.builtin)
+            LauncherService.builtin.close();
     }
 
     // A tile in the accent, as the design draws the start button. Icon only

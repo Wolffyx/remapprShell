@@ -21,7 +21,7 @@ Rectangle {
 
     implicitWidth: 760
     height: column.implicitHeight
-    radius: 26
+    radius: Theme.radiusOf(26)
     color: Theme.glass
     border.width: 1
     border.color: Theme.out
@@ -124,7 +124,7 @@ Rectangle {
 
                     width: parent.width
                     height: card.provider.dense ? 48 : 62
-                    radius: 16
+                    radius: Theme.radiusOf(16)
                     color: row.selected ? Theme.accC : (rowHover.hovered ? Theme.s2 : "transparent")
 
                     Item {
@@ -183,7 +183,7 @@ Rectangle {
                         visible: row.selected
                         width: enterText.implicitWidth + 16
                         height: 22
-                        radius: 6
+                        radius: Theme.radiusOf(6)
                         color: Theme.s1
 
                         PanelText {
@@ -215,13 +215,20 @@ Rectangle {
             }
         }
 
+        // The hints along the foot. A line above them rather than a filled
+        // bar: the card is the surface, and a second one inside it is one
+        // more background to read past.
         Rectangle {
             visible: card.provider.hints
             width: parent.width
             height: 42
-            color: Theme.s2
-            bottomLeftRadius: card.radius
-            bottomRightRadius: card.radius
+            color: "transparent"
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.out
+            }
 
             Row {
                 x: 24

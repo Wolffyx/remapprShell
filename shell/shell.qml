@@ -413,7 +413,8 @@ ShellRoot {
         function sidebar(): void { Surfaces.toggleSidebar(""); }
         function keys(): void { Surfaces.toggleKeys(""); }
         function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
-        function switcher(): void { Surfaces.openWindowSwitcher(""); }
+        function switcher(): void { Surfaces.openWindowSwitcher("", 1); }
+        function switcherReverse(): void { Surfaces.openWindowSwitcher("", -1); }
         function close(): void { Surfaces.closeAll(); }
     }
 

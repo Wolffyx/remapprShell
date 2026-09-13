@@ -48,6 +48,18 @@ Item {
     property Component popout: null
     property bool popoutVisible: false
 
+    // How the panel asks this widget to put its popout away -- another one
+    // opened, or a click landed elsewhere. It is a function rather than the
+    // panel writing `popoutVisible` directly, because a widget whose
+    // `popoutVisible` is a *binding* loses that binding the moment anything
+    // assigns to it, and never opens again. The launcher was exactly that:
+    // one click outside the start menu and the start button did nothing for
+    // the rest of the session. A widget that keeps its open state somewhere
+    // else overrides this and puts it back there.
+    function closePopout() {
+        root.popoutVisible = false;
+    }
+
     // Whether the popout needs the keyboard. A popout that only displays
     // something should not steal focus from whatever the user was typing in,
     // so this is opt-in rather than always on.
@@ -58,6 +70,22 @@ Item {
     // that follows the pointer, like the task list's preview, closes by
     // itself when the pointer leaves, and turns this off.
     property bool popoutClosesOnOutsideClick: true
+
+    // How the popout lines up with this widget along the panel: "centre", the
+    // default, or "start" -- its near edge level with the widget's. A popout
+    // about as wide as its icon wants centring; a menu many times wider than
+    // its button does not, because centred and then pushed back on screen it
+    // ends up level with neither the button nor anything else.
+    property string popoutAlign: "centre"
+
+    // How wide the popout's card is; -1 takes it from the contents.
+    //
+    // It belongs here rather than in the contents because the panel anchors
+    // the contents to fill the card: a width set inside them is overwritten,
+    // and what was left was the width of the longest line of text -- which
+    // changes with the locale, so the calendar was a different size in every
+    // language.
+    property int popoutWidth: -1
 
     // How far in from the popout's edge its contents sit, and how round it
     // is; -1 is the theme's own rounding. A menu wants less of both than a

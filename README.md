@@ -69,6 +69,13 @@ generated from `config/schema/shell.json` and the widget manifests, and
 `make lint` fails if it has drifted from them -- a configuration reference that
 is quietly wrong is worse than none, because it is trusted.
 
+### Working on the panel's popouts
+
+[`docs/popouts.md`](docs/popouts.md) is how one is built: the four files, what
+a widget declares, where each thing on screen comes from, how a popout is
+placed and closed, and how to look at one -- including which of the two ways
+to look at one will lie to you.
+
 ### The theme layer
 
 `rmpr theme apply` installs a Look-and-Feel package (our OSD, splash and logout

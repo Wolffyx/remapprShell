@@ -99,7 +99,7 @@ BarWidget {
 
                         width: body.width
                         height: line.implicitHeight + 10
-                        radius: 6
+                        radius: Theme.radiusOf(6)
                         color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
                         Row {

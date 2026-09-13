@@ -181,17 +181,32 @@ PanelWindow {
     }
 
     // A click anywhere off the panel closes an open popout, as a menu's does
-    // everywhere else. A layer surface has no popup grab to do that for it,
-    // so this is a transparent surface over the rest of the screen, shown
-    // only while a popout is open. It is on the top layer, beneath the popout
-    // on the overlay one (EdgeWindow), and leaves the panel's own strip
-    // uncovered, so a click on another widget still reaches that widget. One
-    // per panel, so a click on the other monitor closes it as well. The click
-    // that closes the popout goes no further -- as in Plasma, where the same
-    // click is taken by the popup's grab.
+    // everywhere else. A layer surface has no popup grab to do that for it, so
+    // this is a transparent surface over the rest of the screen. It leaves the
+    // panel's own strip uncovered, so a click on another widget still reaches
+    // that widget. One per panel, so a click on the other monitor closes it as
+    // well. The click that closes the popout goes no further -- as in Plasma,
+    // where the same click is taken by the popup's grab.
+    //
+    // Mapped always, and made deaf rather than hidden when there is nothing to
+    // close.
+    //
+    // It shares the top layer with the popouts now that those have come off
+    // the overlay layer -- where they sat above full-screen windows, over
+    // Spectacle's region selector and over games. Two surfaces on one layer
+    // stack in the order they were mapped, so a surface that maps and unmaps
+    // with the popout is a race the popout can lose, and losing it means every
+    // click on a popout closes it instead of reaching it. One that is mapped
+    // from the start always loses, which is the answer.
     PanelWindow {
+        id: catcher
         screen: root.screen
-        visible: PanelModel.openPopoutSlot !== null
+        visible: true
+
+        // Takes nothing at all while no popout is open: an empty input region,
+        // so the desktop and every window below behave as if it were not here.
+        readonly property Region deaf: Region {}
+        mask: PanelModel.openPopoutSlot !== null ? null : catcher.deaf
 
         anchors {
             top: true

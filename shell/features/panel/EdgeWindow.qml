@@ -12,6 +12,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.core
+import qs.domain.panel
 
 PanelWindow {
     id: win
@@ -34,6 +35,34 @@ PanelWindow {
     property int shadowMargin: 0
     property int edgeMargin: 12
 
+    // How the window lines up with the slot along the panel: "centre" or
+    // "start". See Placement.
+    property string align: "centre"
+
+    // Along the panel the room is lopsided wherever the window has been pushed
+    // back on screen: the card keeps its place over the widget and the shadow
+    // gives up the room it could not have had anyway. See Placement.shift.
+    readonly property int padLead: win.shadowMargin + win.alongShift
+    readonly property int padTrail: win.shadowMargin - win.alongShift
+
+    // The totals, which the shift cannot change: it moves the card within the
+    // window, it does not resize it. Sizes are taken from these rather than
+    // from the four margins, because a size that depended on the shift would
+    // depend on itself -- the shift is worked out from the size.
+    //
+    // The room is the same on every side. It was once capped on the side
+    // facing the panel, to stop the window reaching back over it; that cut the
+    // shadow off square along the bottom, which is what "the bottom-left
+    // corner is straight, not round" was. The gap carries that job now --
+    // Placement.away.
+    readonly property int padH: 2 * win.shadowMargin
+    readonly property int padV: 2 * win.shadowMargin
+
+    readonly property int padTop: win.horizontal ? win.shadowMargin : win.padLead
+    readonly property int padBottom: win.horizontal ? win.shadowMargin : win.padTrail
+    readonly property int padLeft: win.horizontal ? win.padLead : win.shadowMargin
+    readonly property int padRight: win.horizontal ? win.padTrail : win.shadowMargin
+
     readonly property string edge: win.bar?.position ?? "bottom"
     readonly property bool horizontal: win.edge === "top" || win.edge === "bottom"
 
@@ -52,20 +81,20 @@ PanelWindow {
         win.slotStart = win.horizontal ? p.x : p.y;
     }
 
-    // Centred on what the slot pointed at, then kept on screen: a window for a
-    // widget near either end would otherwise run off it.
-    readonly property real along: {
-        const size = win.horizontal ? win.implicitWidth : win.implicitHeight;
-        const extent = win.horizontal ? (win.screen?.width ?? 0) : (win.screen?.height ?? 0);
-        const wanted = win.slotStart + win.centre - size / 2;
-        const lo = Math.max(0, win.edgeMargin - win.shadowMargin);
-        const hi = Math.max(lo, extent - size - lo);
-        return Math.max(lo, Math.min(wanted, hi));
-    }
+    readonly property real along: Placement.along(
+        win.align, win.slotStart, win.centre,
+        win.horizontal ? win.implicitWidth : win.implicitHeight,
+        win.horizontal ? (win.screen?.width ?? 0) : (win.screen?.height ?? 0),
+        win.shadowMargin, win.edgeMargin)
 
-    // Beyond the whole of the panel's strip -- a floating bar's margin from
-    // the screen edge included -- then the gap, less the shadow's room.
-    readonly property real away: Math.max(0, (win.bar?.extent ?? win.bar?.thickness ?? 0) + win.gap - win.shadowMargin)
+    readonly property int alongShift: Placement.shift(
+        win.align, win.slotStart, win.centre,
+        win.horizontal ? win.implicitWidth : win.implicitHeight,
+        win.horizontal ? (win.screen?.width ?? 0) : (win.screen?.height ?? 0),
+        win.shadowMargin, win.edgeMargin)
+
+    readonly property real away: Placement.away(
+        win.bar?.extent ?? win.bar?.thickness ?? 0, win.gap, win.shadowMargin)
 
     // Where it went, for whoever is working out why a window is somewhere
     // unexpected -- which is how the placement bug above was found. Called
@@ -95,11 +124,20 @@ PanelWindow {
     // The panel already reserves its strip; this must not reserve another.
     exclusionMode: ExclusionMode.Ignore
 
-    // The overlay layer, above the top one. The surface that closes a popout
-    // when the screen around it is clicked (Panel.qml) is on the top layer,
-    // and the popout has to be above it: two surfaces on one layer stack in
-    // the order they were mapped, and both are mapped at the same moment.
-    WlrLayershell.layer: WlrLayer.Overlay
+    // The top layer, with the panel and the surface that closes a popout when
+    // the screen around it is clicked.
+    //
+    // Not the overlay layer, which is above everything a compositor draws --
+    // including a full-screen window. A popout there covers Spectacle's region
+    // selector, a full-screen game and a video, which is how it was reported.
+    // The top layer is what a panel wants: above ordinary windows, and out of
+    // the way of a window that has asked for the whole screen.
+    //
+    // Sharing a layer with the closing surface means the two stack in the
+    // order they were mapped, so the popout is mapped a turn *after* it has
+    // told PanelModel it is open -- see WidgetSlot. Mapping both in one turn
+    // is what the overlay layer used to paper over.
+    WlrLayershell.layer: WlrLayer.Top
     color: "transparent"
 
     onVisibleChanged: {

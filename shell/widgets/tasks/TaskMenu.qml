@@ -27,7 +27,10 @@ Column {
 
     readonly property int count: menu.item?.windows?.length ?? 0
 
-    width: 262
+    // How wide it is belongs to the widget: `popoutWidth`. The Loader
+    // anchors this to fill the card, so a width set here would be
+    // overwritten -- which left the card as wide as the longest line of
+    // text in it, a different size in every locale.
     spacing: 0
 
     MenuTitle {

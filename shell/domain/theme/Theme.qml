@@ -27,6 +27,16 @@ QtObject {
     readonly property string modeSetting: ConfigStore.value("theme.mode", "auto")
     readonly property string accentSetting: ConfigStore.value("theme.accent", "plasma")
     readonly property bool translucent: ConfigStore.value("theme.translucent", true) !== false
+
+    // Off by default, and deliberately.
+    //
+    // A drop shadow is a band of dimmed wallpaper around a surface whose own
+    // background the compositor has blurred. On a dark desktop the join
+    // between the two reads as a second panel sitting behind the first, which
+    // is how it was reported twice. It also costs the surface a transparent
+    // border the width of the blur, which is room a popout has to keep clear
+    // of everything it must not cover.
+    readonly property bool shadows: ConfigStore.value("theme.shadows", false) === true
     readonly property int rounding: ConfigStore.value("theme.rounding", 28)
 
     // ---- which scheme ------------------------------------------------------
@@ -157,6 +167,19 @@ QtObject {
     // centre -- take the setting; smaller things scale down from it, so a
     // square look is one slider away rather than a hundred edits.
     readonly property real radius: root.rounding
+
+    // A radius from the design, rescaled to the rounding in force.
+    //
+    // The design is drawn at 28, and everything inside a popout was written
+    // with its numbers -- a tile at 20, a row at 14, a chip at 6. Left alone
+    // they do not follow `theme.rounding`, so at a small setting the card is
+    // squarer than the things inside it and each one draws a rounder corner
+    // inside the card's straighter one. That is what "a straight corner under
+    // the corner with a radius" is.
+    function radiusOf(designed) {
+        return Math.round(designed * root.rounding / 28);
+    }
+
     readonly property real radiusMedium: Math.round(root.rounding * 0.72)
     readonly property real radiusSmall: Math.round(root.rounding * 0.5)
     readonly property real radiusTiny: Math.round(root.rounding * 0.36)

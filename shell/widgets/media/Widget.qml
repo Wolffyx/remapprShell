@@ -88,7 +88,7 @@ BarWidget {
                     Rectangle {
                         width: 64
                         height: 64
-                        radius: 6
+                        radius: Theme.radiusOf(6)
                         color: Theme.alpha(Theme.foreground, 0.08)
                         clip: true
 
@@ -152,7 +152,7 @@ BarWidget {
                         id: track
                         width: parent.width
                         height: 4
-                        radius: 2
+                        radius: Theme.radiusOf(2)
                         color: Theme.alpha(Theme.foreground, 0.2)
 
                         Rectangle {

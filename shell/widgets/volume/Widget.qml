@@ -156,7 +156,7 @@ BarWidget {
 
                             width: body.width
                             height: 26
-                            radius: 5
+                            radius: Theme.radiusOf(5)
                             color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
                             Rectangle {
@@ -164,7 +164,7 @@ BarWidget {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 8
                                 height: 8
-                                radius: 4
+                                radius: Theme.radiusOf(4)
                                 color: device.current ? Theme.accent : "transparent"
                                 border.width: 1
                                 border.color: device.current ? Theme.accent : Theme.foregroundInactive

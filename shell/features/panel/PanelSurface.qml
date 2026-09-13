@@ -59,7 +59,7 @@ Item {
     // ---- the bar -----------------------------------------------------------
 
     RectangularShadow {
-        visible: root.style === "floating"
+        visible: Theme.shadows && root.style === "floating"
         anchors.fill: bodyRect
         radius: bodyRect.radius
         blur: 28
@@ -108,6 +108,7 @@ Item {
         height: !island.shown ? 0 : root.horizontal ? root.body.height : island.zone.height + 2 * root.islandPad
 
         RectangularShadow {
+            visible: Theme.shadows
             anchors.fill: parent
             radius: root.islandRadius
             blur: 24

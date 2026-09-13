@@ -119,7 +119,7 @@ Item {
 
         required property var modelData
 
-        radius: 20
+        radius: Theme.radiusOf(20)
         color: tile.modelData.on ? Theme.acc : (tileHover.hovered ? Theme.s3 : Theme.s2)
         implicitHeight: tileColumn.implicitHeight + 28
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
@@ -187,7 +187,7 @@ Item {
         readonly property bool paged: (row.modelData.page ?? "").length > 0
 
         height: 44
-        radius: 14
+        radius: Theme.radiusOf(14)
         color: row.paged && row.modelData.on ? Theme.accC : (rowHover.hovered ? Theme.s2 : "transparent")
 
         Glyph {
@@ -292,7 +292,7 @@ Item {
 
         width: parent ? parent.width : 0
         height: 52
-        radius: 14
+        radius: Theme.radiusOf(14)
         color: item.current ? Theme.accC : (itemHover.hovered ? Theme.s2 : "transparent")
 
         Glyph {
@@ -445,12 +445,18 @@ Item {
                 }
             }
 
-            // The levels.
-            Rectangle {
+            // The levels. Sliders, not a panel of sliders: the popout is
+            // already a card, and a card inside it is one more background
+            // between the wallpaper and the thing being read.
+            Item {
                 width: parent.width
                 height: levels.implicitHeight + 32
-                radius: 20
-                color: Theme.s2
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Theme.out
+                }
 
                 Column {
                     id: levels

@@ -335,6 +335,30 @@ Column {
             }
         }
 
+        Row {
+            width: parent.width
+
+            Column {
+                width: parent.width - shadows.width
+                anchors.verticalCenter: parent.verticalCenter
+                PanelText { text: "Drop shadows"; font.pixelSize: 14 }
+                PanelText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 12
+                    color: Theme.mut
+                    text: "Under the panel, its popouts, the start menu and the on-screen display. Off by default: a shadow is a band of dimmed wallpaper around a surface whose own background is blurred, and the join between the two can read as a second panel behind the first."
+                }
+            }
+
+            Toggle {
+                id: shadows
+                anchors.verticalCenter: parent.verticalCenter
+                checked: Theme.shadows
+                onToggled: value => ConfigStore.set("theme.shadows", value)
+            }
+        }
+
         PanelText {
             width: parent.width
             wrapMode: Text.WordWrap
