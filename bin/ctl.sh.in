@@ -41,20 +41,52 @@ Anything not listed here is not implemented yet.
 USAGE
 }
 
+# Is this path one of our own source trees? `<tree>/shell/shell.qml` with a
+# branding.json naming this slug two directories up. Asked of a path rather
+# than assumed from where it lives, because a checkout is wherever the person
+# working on it put it -- a git worktree beside the repository, most often.
+_is_our_checkout() {
+    local qml=$1 tree
+    case "$qml" in */shell/shell.qml) ;; *) return 1 ;; esac
+    tree=${qml%/shell/shell.qml}
+    [ -f "$tree/branding.json" ] || return 1
+    grep -q "\"slug\"[[:space:]]*:[[:space:]]*\"@SLUG@\"" "$tree/branding.json" 2>/dev/null
+}
+
 # The IPC socket is keyed by the config path the shell was started with, so a
 # command has to name the copy that is actually running. `make run` from a
 # checkout names the source tree, and every one of these calls asked for the
 # installed path -- so `@ALIAS@ settings` answered "No running instances" with
-# the settings window's own shell on screen. The installed copy wins when both
-# are somehow up: it is the one a person who did not build anything is using.
+# the settings window's own shell on screen.
+#
+# Three answers, in order. The installed copy wins when more than one is up:
+# it is the one a person who did not build anything is using. Then this
+# checkout. Then any other checkout of this project that is running, which is
+# the case the first version missed -- the shell was being run from a second
+# worktree, so it matched neither of the two paths the script knew and went on
+# failing after the fix. Another shell's Quickshell config is not a candidate:
+# the layout and the branding both have to be ours.
 shell_ipc_path() {
-    local procs
+    local procs installed line qml
+    installed="@QS_CONFIG_DIR@/shell.qml"
     procs=$(pgrep -a -x quickshell 2>/dev/null) || true
+
     case "$procs" in
-        *"@QS_CONFIG_DIR@/shell.qml"*)   printf '%s' "@QS_CONFIG_DIR@/shell.qml" ;;
-        *"@REPO_ROOT@/shell/shell.qml"*) printf '%s' "@REPO_ROOT@/shell/shell.qml" ;;
-        *)                               printf '%s' "@QS_CONFIG_DIR@/shell.qml" ;;
+        *"$installed"*)                  printf '%s' "$installed"; return ;;
+        *"@REPO_ROOT@/shell/shell.qml"*) printf '%s' "@REPO_ROOT@/shell/shell.qml"; return ;;
     esac
+
+    while IFS= read -r line; do
+        # "<pid> <argv...>": the config path follows -p, and nothing else in
+        # the command line ends in shell.qml.
+        for qml in $line; do
+            case "$qml" in
+                *shell.qml) _is_our_checkout "$qml" && { printf '%s' "$qml"; return; } ;;
+            esac
+        done
+    done <<< "$procs"
+
+    printf '%s' "$installed"
 }
 
 require_repo() {

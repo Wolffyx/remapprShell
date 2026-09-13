@@ -67,11 +67,40 @@ check "someone else's shell"    "$(bash "$CTL" settings)"  "$installed"
 export FAKE_PROC=""
 check "nothing running"         "$(bash "$CTL" settings)"  "$installed"
 
+# A checkout somewhere else entirely -- a git worktree beside the repository,
+# which is how this project's own redesign was built. The first version of the
+# fix knew two paths, the installed one and this tree, so a shell run from a
+# second worktree still answered "No running instances" after it.
+OTHER="$SANDBOX/elsewhere"
+mkdir -p "$OTHER/shell"
+printf '{ "slug": "%s" }\n' "$SLUG" > "$OTHER/branding.json"
+export FAKE_PROC="7 /usr/bin/quickshell -n -p $OTHER/shell/shell.qml"
+check "another checkout"        "$(bash "$CTL" settings)"  "$OTHER/shell/shell.qml"
+
+# Someone else's Quickshell config is not a checkout of ours, whatever its
+# layout: the branding has to name this project.
+NOTOURS="$SANDBOX/notours"
+mkdir -p "$NOTOURS/shell"
+printf '{ "slug": "someone-elses-shell" }\n' > "$NOTOURS/branding.json"
+export FAKE_PROC="7 /usr/bin/quickshell -n -p $NOTOURS/shell/shell.qml"
+check "another project's tree"  "$(bash "$CTL" settings)"  "$installed"
+
+# The same shape with no branding at all is not ours either.
+BARE="$SANDBOX/bare"
+mkdir -p "$BARE/shell"
+export FAKE_PROC="7 /usr/bin/quickshell -n -p $BARE/shell/shell.qml"
+check "no branding, not ours"   "$(bash "$CTL" settings)"  "$installed"
+
 # Both up at once: the installed copy is the one a person who built nothing
 # is looking at.
 export FAKE_PROC="7 /usr/bin/quickshell -n -p $checkout
 8 /usr/bin/quickshell -n -p $installed"
 check "both, installed wins"    "$(bash "$CTL" settings)"  "$installed"
+
+# This tree is preferred over a stranger's checkout of the same project.
+export FAKE_PROC="7 /usr/bin/quickshell -n -p $OTHER/shell/shell.qml
+8 /usr/bin/quickshell -n -p $checkout"
+check "this tree wins"          "$(bash "$CTL" settings)"  "$checkout"
 
 echo "== no command left naming the installed path outright =="
 check "none hardcoded" "$(grep -c 'ipc --path "@QS_CONFIG_DIR@' "$REPO_ROOT/bin/ctl.sh.in")" "0"
