@@ -236,9 +236,23 @@ Item {
         implicitWidth: (popout.popoutContent?.implicitWidth ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
         implicitHeight: (popout.popoutContent?.implicitHeight ?? 0) + 2 * popout.padding + 2 * popout.shadowMargin
 
-        // Only the card takes the pointer. A click in its shadow goes to
-        // whatever is beneath -- the surface that closes the popout.
-        mask: Region { item: card }
+        // Only the card takes the pointer: a click in its shadow goes to
+        // whatever is beneath, which is the surface that closes the popout.
+        //
+        // Except when this popout has asked for the keyboard. A layer surface
+        // that asks for exclusive keyboard focus AND carries an input mask is
+        // mapped by KWin 6.7.5 and then drawn as nothing at all -- the window
+        // is there, at the right size on the right screen, and the log says so,
+        // but the screen stays empty. That is what "the start menu does not
+        // open" was. Either one alone is fine: the key sheet takes the keyboard
+        // and has no mask, and every popout that masks takes no keyboard.
+        //
+        // The keyboard wins, because a launcher nobody can see is worse than a
+        // 52px band of shadow that swallows a click instead of passing it
+        // through. Found on a real screen; every offscreen render of this menu
+        // was perfect, because the harness strips both properties.
+        mask: (root.widget?.popoutGrabsFocus ?? false) ? null : cardOnly
+        readonly property Region cardOnly: Region { item: card }
 
         // Frosted behind, where the compositor offers it.
         BackgroundEffect.blurRegion: Theme.translucent ? popout._blur : null
