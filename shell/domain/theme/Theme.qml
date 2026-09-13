@@ -102,7 +102,11 @@ QtObject {
     readonly property color hover: root.alpha(root.surfaceFg, 0.08)
     readonly property color pressed: root.alpha(root.surfaceFg, 0.12)
 
-    readonly property color shadow: root.alpha("#000000", root.dark ? 0.45 : 0.22)
+    // The mockup casts every raised surface with rgba(20,15,10,.26) to .34,
+    // in both themes. At 0.45 the dark shadow stopped reading as a shadow: a
+    // popout's blur kept the card's silhouette, and on a screen it looked
+    // like a second card sitting behind the card -- reported as exactly that.
+    readonly property color shadow: root.alpha("#000000", root.dark ? 0.28 : 0.22)
 
     // ---- the names the shell used before it had a palette of its own --------
     //

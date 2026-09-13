@@ -200,11 +200,19 @@ Item {
         readonly property bool wanted: !!root.widget?.popout && !!root.widget?.popoutVisible
         readonly property Item popoutContent: content.item as Item
 
+        // The shadow's own numbers, and the room the window keeps for them.
+        // The margin is derived rather than written down twice: a margin
+        // smaller than blur + drop cuts the blur off square against the edge
+        // of the window, and on a screen that cut reads as a second card
+        // sitting behind the card -- which is how it was reported.
+        readonly property real shadowBlur: 40
+        readonly property real shadowDrop: 12
+
         slot: root
         bar: root.bar
         label: `popout '${root.entry?.id}'`
         centre: root.popoutCentre
-        shadowMargin: 28
+        shadowMargin: Math.ceil(popout.shadowBlur + popout.shadowDrop)
 
         visible: popout.wanted
 
@@ -280,8 +288,8 @@ Item {
         RectangularShadow {
             anchors.fill: card
             radius: card.radius
-            blur: 40
-            offset.y: 12
+            blur: popout.shadowBlur
+            offset.y: popout.shadowDrop
             color: Theme.shadow
             opacity: popout.shown
         }
