@@ -2,8 +2,10 @@
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
 sessions, and added to since -- most recently on **2026-09-13, when the
-Meridian redesign was merged into `main` and met a real screen for the first
-time**, which found eight bugs in an afternoon that 306 passing tests had not.
+Meridian redesign was merged into `main`, met a real screen for the first
+time**, which found eight bugs in an afternoon that 306 passing tests had not,
+**and finally reached the settings window**, the one surface it had never
+covered.
 The earlier sessions: the first built the Plasma renderer, diagnostics, the
 wizard, the theme layer, the open-window list and panel auto-hide; the second
 added AI assist, the notification history, crash reporting, and a tray you can
@@ -23,6 +25,16 @@ and learning the hard way that `dev/preview` cannot show anything the
 compositor does. It also found that **Spectacle will take a real screenshot
 from inside a session here**, which changes what a session can check on its own
 -- see "Looking at the real screen".
+
+A sixth, late on **2026-09-13**, committed what the fifth had left in the tree
+-- 48 files, as four commits -- and then drew the settings window in the
+Meridian design. The design was read from the mockup itself rather than
+inferred (`Meridian Shell.dc.html`, the settings markup around lines 227-605):
+a page there is a grid of cards under small capitals, which five pages already
+were and ten were not. It also fixed a widget row whose buttons were drawn
+outside the window, which the user reported mid-session, and a lint that had
+been failing since the popouts work landed. **None of it has been on a screen**:
+every page was rendered offscreen and looked at, which is not the same thing.
 
 ## What this is
 
@@ -83,9 +95,9 @@ Everything below was read off the running system rather than remembered.
 
 ### Where the last session left off, and what to pick up
 
-Nothing is half-written: every change is complete, tested and reloaded into the
-running shell. What follows is what is *open*, in the order a new session
-should weigh it.
+Nothing is half-written, and **nothing is uncommitted**: `main` is clean, `make
+lint` is clean, `make test` is 369 QML cases and every shell suite green. What
+follows is what is *open*, in the order a new session should weigh it.
 
 **1. The settings window is drawn, and has never been on a screen.** It was the
 one surface the redesign never reached; it is now in the Meridian design, and
@@ -2317,3 +2329,136 @@ still there.
 - `rmpr settings pages` is unreachable: the CLI passes any argument to the
   `page` IPC call, so the `pages()` function beside it can only be reached by
   asking for a page that does not exist and reading the error.
+
+## The settings session, 2026-09-13, late
+
+Two things: the previous session's work was committed, and the settings window
+was drawn in the Meridian design. **Nothing here has been on a screen.**
+
+### The 48 files, committed
+
+The fifth session left everything in the working tree. It went in as four
+commits rather than one, because they are four separate pieces of work:
+
+| commit | what |
+| --- | --- |
+| `feb9543` | global shortcuts that were filed and never grabbed -- the `SetPresent` ownership fix, the daemon's `Shortcuts` interface, `accel_release`/`accel_clear`/`accel_unregister` |
+| `8a5919f` | Alt+Shift+Tab steps the switcher backwards, as its own action |
+| `3c93b52` | popouts that land where the widget is, on every edge -- `Placement.qml`, alignment, layering, one surface, `theme.shadows` |
+| `8f924e5` | the handoff |
+
+`make test` was run before committing and was green: 353 QML cases, every
+shell suite.
+
+### The design was read, not inferred
+
+`docs/meridian-handoff.md` names the design source, and it has settings markup
+in it -- `Meridian Shell.dc.html`, around lines 227-605, read with DesignSync.
+Worth doing before drawing anything: the mockup answers the question this file
+had been holding open.
+
+**A page there is a grid of cards.** Each card is `s2`, radius 16, padded
+16-18, under a label in small capitals -- `COLOUR SCHEME`, `WALLPAPER`,
+`ACTION PREFIX` -- laid out `grid-template-columns: 1fr 1fr`, gap 16. That is
+the whole of it, and it is what five pages already were: the redesign's commit
+`8323eac` wrote launcher, lock, notifications, taskbar and windows to it and
+left the other ten alone. `Card` and `SectionLabel` already existed.
+
+So the redesign was not a new design. It was finishing one.
+
+### What was built
+
+- **`shell/ui/primitives/CardGrid.qml`** -- two columns where there is room for
+  two, one where there is not, and the whole width for a lone card. It has a
+  `count` property because `visibleChildren` counts a `Repeater` as a child:
+  an `Item` that draws nothing, which the Flow steps over but the count does
+  not. Tested in `tests/tst_CardGrid.qml`, including the two ways it can divide
+  by zero and hand every card a NaN width -- which draws as an empty page.
+- **`shell/domain/settings/groups/SettingGroups.qml`** -- which key goes in
+  which card. Pure, in a leaf module, tested in `tests/tst_SettingGroups.qml`.
+  A group keeps the position of its first key, so cards come in the schema's
+  order; ungrouped keys share one card at the top, titled by the section.
+- **`SchemaRenderer`** draws its keys in those cards. A `group` in the schema
+  key's spec is what makes one. It is additive -- `gen-docs.sh` ignores the
+  field, so `docs/config.md` did not move -- and it reaches every schema-only
+  section and every third-party widget's settings at once.
+- **`SettingRow`** gained `controlWidth` and `stacked`. It used to reserve the
+  same slot for every control, which gave a 44px switch a hundred pixels of
+  nothing and left the description a column too narrow to read. Survivable in
+  one column; in two it is what the page looks like.
+- **The ten pages that predated the design**: about, AI assist, screen edges,
+  layouts, profiles, restore points, renderer, switching windows, tray icons,
+  widgets. Appearance went with them -- it had the section labels and one card.
+  They were also still on the pre-palette names (`foregroundInactive`,
+  `hoverBackground`, `backgroundAlternate`) and 11px text.
+- **`theme.rounding` reaches the window**, through `Theme.radiusOf`.
+
+### What the linter passed and the render caught
+
+Every page was rendered with `PREVIEW_PAGE=<id> dev/preview/preview.sh
+dev/preview/settings.qml out.png 1120 860 dark`. Three bugs survived a clean
+`qmllint` and were obvious in a picture:
+
+1. **A card whose contents had escaped it.** Unwrapping the old nested card on
+   the appearance page put its closing brace in the wrong place, so two toggles
+   drew full-width below the grid, outside any card.
+2. **A row sized against an id that did not exist.** A patch that added
+   `id: grip` silently did not apply -- wrong indentation in the pattern -- and
+   the width binding referenced it anyway. qmllint said nothing; the shell
+   logged `ReferenceError: grip is not defined` a hundred times and the rows
+   overflowed the window.
+3. **Button groups wider than the half-width cards they sit in.** A `Row` of
+   two `TextButton`s and an `IconButton` does not fit in half a page. They are
+   `Flow`s now. Note that a positioner's children cannot use `anchors`, so the
+   `anchors.verticalCenter` on each had to go.
+
+### The widget row, reported mid-session
+
+The user sent a screenshot: hovering a row on the widgets page put its last
+button outside the dialog. The row reserved a written-down `320` for everything
+that is not the widget's name -- an icon, a zone dropdown, a switch, a drag
+grip and four buttons, nearly 400 -- and it was short *only while the pointer
+was on the row*, because the four buttons are `visible: rowHover.hovered` and a
+`Row` skips invisible children. So hovering widened the contents past the card.
+
+The width comes from the widths of the things on the line now, and the buttons
+hold their place with `opacity` rather than `visible`, so the line does not
+change width under the pointer. `5dbdab6`.
+
+### The lint that had been failing
+
+`make lint` was red before this session started, and the fifth session did not
+know it: `tests/tst_Popouts.qml` imports `qs.ui.primitives`, and `PanelIcon`
+in that module imports Quickshell.
+
+The rule's own comment explains itself in terms of **singletons** --
+qmltestrunner instantiates every singleton in a module it imports, so one that
+touches the runtime makes the whole module unimportable. It was grepping every
+file in the directory. An ordinary component is compiled with the module and
+instantiated only where a test writes one down; `qs.ui.primitives` has no
+singletons at all, which is why the suite passed while the lint refused it.
+
+It reads the module's `qmldir` now. Verified both ways: it goes quiet on
+`qs.ui.primitives`, and still fires on `qs.domain.config`, naming `ConfigStore`
+and `Schema`. `e72d7ef`.
+
+### Where it stands
+
+`main` clean, `make lint` clean, `make test` 369 QML cases and every shell
+suite green. `docs/settings.md` is the new map, linked from the README beside
+`docs/popouts.md`.
+
+**What needs a real screen**, in order:
+
+1. **The two drag lists** -- tray icons and widgets. The offscreen harness
+   cannot exercise a drag at all, and both pages were restructured around them.
+2. **A small window.** The grid drops to one column below about 800px of page;
+   rendered once at 800x700 and it held, but that is one size.
+3. **Light mode.** Rendered, not lived in.
+4. **The hover state of a widget row** -- the fix above is arithmetic that
+   reserves space unconditionally, so it is right by construction, but the bug
+   it replaces was also invisible until someone hovered.
+
+The two papercuts below are untouched, and so is the user's report that the
+window **feels unresponsive** -- nothing in this session was aimed at it. Ask
+which part is slow before optimising anything.
