@@ -149,11 +149,16 @@ Item {
     function lengthOf(zone) { return root.horizontal ? zone.width : zone.height; }
     function startOf(zone) { return root.horizontal ? zone.x : zone.y; }
 
-    readonly property real middleRoom: root.bodyLength - root.lengthOf(leftZone) - root.lengthOf(rightZone)
-        - 2 * (root.lead + root.zoneGap)
+    // Never negative. A zone reads -1 as "no limit", so arithmetic that ran
+    // past zero handed the most crowded panel of all the fewest constraints --
+    // which is how a taskbar with too many windows ended up drawn over the
+    // clock rather than cut short.
+    readonly property real middleRoom: Math.max(0, root.bodyLength - root.lengthOf(leftZone) - root.lengthOf(rightZone)
+        - 2 * (root.lead + root.zoneGap))
     function endRoom(other) {
         const middle = root.lengthOf(middleZone);
-        return root.bodyLength - root.lengthOf(other) - middle - 2 * root.lead - (middle > 0 ? 2 : 1) * root.zoneGap;
+        return Math.max(0, root.bodyLength - root.lengthOf(other) - middle - 2 * root.lead
+                           - (middle > 0 ? 2 : 1) * root.zoneGap);
     }
 
     // The middle is centred on the bar itself while it fits there, so a long

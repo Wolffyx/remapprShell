@@ -42,7 +42,7 @@ BarWidget {
     readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
     readonly property int iconSize: root.configuredIconSize > 0
         ? root.configuredIconSize
-        : Math.max(16, Math.min(40, Math.round(24 * root.unit)))
+        : Math.max(16, Math.min(44, Math.round(28 * root.unit)))
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
 
@@ -82,7 +82,7 @@ BarWidget {
     // As tall as the design's buttons at this thickness. With titles a
     // button is as wide as its title needs, up to `maxWidth`; without, it is
     // the icon and its padding.
-    readonly property int buttonHeight: Math.max(22, Math.round(44 * root.unit))
+    readonly property int buttonHeight: Math.max(22, Math.round(48 * root.unit))
     readonly property int padding: Math.round((root.showTitles ? 16 : 12) * Math.max(0.7, root.unit))
     readonly property int spacing: Math.max(2, Math.round(6 * root.unit))
 
@@ -90,9 +90,30 @@ BarWidget {
     // button is cut to an equal share of it -- titles elided first, then gone
     // below a readable width, down to the icon alone.
     readonly property real iconOnly: root.iconSize + 2 * root.padding
-    readonly property real share: root.room > 0 && root.items.length > 0
+    readonly property real share: root.room >= 0 && root.items.length > 0
         ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
         : 1e9
+
+    // Past a certain number of windows even the icon alone does not fit, and a
+    // Row does not shrink: the buttons kept their width and ran on past the
+    // end of the zone, over the widgets beside them. Reported as the icons
+    // sitting one on top of another.
+    //
+    // So below that point they are squeezed -- the padding first, since it is
+    // the emptiest pixels, and the icon after it, down to a floor where an
+    // icon is still an icon. Below even that the row is clipped: something has
+    // to give, and it should be the last button rather than the clock.
+    readonly property real wanted: root.room >= 0 && root.items.length > 0
+        ? (root.room - root.spacing * (root.items.length - 1)) / root.items.length
+        : 1e9
+    readonly property real squeeze: root.wanted >= root.iconOnly
+        ? 1
+        : Math.max(0.5, root.wanted / root.iconOnly)
+    readonly property int drawnIcon: Math.max(12, Math.round(root.iconSize * root.squeeze))
+    readonly property int drawnPadding: root.squeeze === 1
+        ? root.padding
+        : Math.max(2, Math.round(root.padding * root.squeeze * 0.6))
+    readonly property real drawnIconOnly: root.drawnIcon + 2 * root.drawnPadding
     readonly property real titleRoom: Math.min(root.maxWidth, root.share) - root.iconOnly - Math.round(10 * Math.max(0.7, root.unit))
     readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
 
@@ -135,7 +156,7 @@ BarWidget {
     // settling to a steady tint.
     readonly property int flashMs: 6000
 
-    implicitWidth: row.implicitWidth
+    implicitWidth: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
     implicitHeight: root.bar.thickness
 
     function handleHover(position, horizontal) {
@@ -211,6 +232,11 @@ BarWidget {
         id: row
         anchors.verticalCenter: parent.verticalCenter
         spacing: root.spacing
+        // The last line of defence: with the buttons already at their floor
+        // the row is still wider than the zone, and what is left over is cut
+        // rather than drawn over the neighbours.
+        clip: true
+        width: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
 
         Repeater {
             id: buttons
@@ -233,7 +259,7 @@ BarWidget {
                 readonly property int windowCount: button.modelData.windows.length
 
                 width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
-                                      : root.iconOnly
+                                      : root.drawnIconOnly
                 height: root.buttonHeight
                 radius: Math.round(14 * Math.max(0.7, root.unit))
 
@@ -306,7 +332,7 @@ BarWidget {
 
                     PanelIcon {
                         anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: root.iconSize
+                        implicitSize: root.drawnIcon
                         iconName: button.modelData.iconName
                         iconFile: button.modelData.iconFile
                     }

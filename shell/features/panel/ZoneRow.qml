@@ -16,8 +16,20 @@ Item {
     required property string screenName
     required property bool horizontal
 
-    implicitWidth: layout.implicitWidth
-    implicitHeight: layout.implicitHeight
+    // A zone never draws past the room it was given. Widgets that can give way
+    // shrink into it (the task list); the rest keep their size, and what will
+    // not fit is cut at the zone's edge rather than drawn over the zone beside
+    // it. Something has to give on a panel with no space left, and a clipped
+    // last icon is better than two widgets on top of each other.
+    readonly property bool bounded: root.room >= 0
+    clip: root.bounded
+
+    implicitWidth: root.horizontal && root.bounded
+                   ? Math.min(layout.implicitWidth, root.room)
+                   : layout.implicitWidth
+    implicitHeight: !root.horizontal && root.bounded
+                    ? Math.min(layout.implicitHeight, root.room)
+                    : layout.implicitHeight
 
     // How long this zone may grow along the panel before it runs into the
     // next; -1 for no limit. See PanelSurface.
@@ -74,7 +86,21 @@ Item {
         readonly property int shown: Array.prototype.filter.call(layout.children,
             c => c !== slots && c.visible).length
 
-        anchors.centerIn: parent
+        // Anchored to the end of the panel this zone belongs to, not centred.
+        // It only matters once a zone is clipped: centred, it lost widgets
+        // from both ends at once, and the clock -- the last thing anybody
+        // wants cut -- went first because it sits furthest out.
+        // One anchor across the panel, and a position along it: setting left,
+        // right and horizontalCenter together is a warning even when only one
+        // of them is ever in force.
+        anchors.verticalCenter: root.horizontal ? parent.verticalCenter : undefined
+        anchors.horizontalCenter: root.horizontal ? undefined : parent.horizontalCenter
+
+        // The far zone keeps its far end. Zero while the zone fits, since the
+        // zone is then exactly as long as this.
+        x: root.horizontal && root.zone === "right" ? root.width - layout.width : 0
+        y: !root.horizontal && root.zone === "right" ? root.height - layout.height : 0
+
         columns: root.horizontal ? Math.max(1, layout.shown) : 1
         spacing: root.bar?.spacing ?? 6
         verticalItemAlignment: Grid.AlignVCenter
