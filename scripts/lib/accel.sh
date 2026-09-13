@@ -84,6 +84,7 @@ _accel_keys() {
 # Writes an action's active keys in the form its group uses. Reads the other
 # two fields from the last _accel_fields.
 _accel_write() {   # <scope> <group> <action> <active>
+    _accel_touch "$2" "$3"
     if [[ $2 == services/* ]]; then
         kconfig_set "$1" "$ACCEL_FILE" "$2" "$3" "$4"
     else
@@ -132,12 +133,134 @@ accel_take() {
     accel_bind "$scope" "$group" "$action" "$key" "$mode"
 }
 
-# kglobalaccel reads the file when it starts, and every program holding a
-# shortcut registers again when it comes back, so a restart is what applies
-# an edit. The service is the user's own whatever HOME says: without the
-# check, every run of the test suite restarted it.
+# ---- applying an edit to the running session ------------------------------
+#
+# Restarting the service is what this used to do, and on Plasma 6.7 it does
+# nothing at all: **KWin owns `org.kde.kglobalaccel`**, so
+# plasma-kglobalaccel.service starts, finds the name taken, and exits 0
+# immediately. Every shortcut this project set was therefore applying at the
+# next login and not before -- silently, because the restart "succeeded".
+#
+# What does work is telling the running server, which takes Qt key codes
+# rather than the strings the file holds. Hence the table below.
+
+# Qt::KeyboardModifier values, ORed into the key.
+_ACCEL_MOD_Meta=268435456      # 0x10000000
+_ACCEL_MOD_Ctrl=67108864       # 0x04000000
+_ACCEL_MOD_Alt=134217728       # 0x08000000
+_ACCEL_MOD_Shift=33554432      # 0x02000000
+
+# Qt::Key values for everything that is not a letter or a digit, which are
+# their ASCII codes. Only what a person is likely to bind: an unknown name
+# makes the conversion fail, and the caller falls back to the restart.
+_accel_base_code() {
+    local k=$1
+    case "$k" in
+        [A-Za-z])  printf '%d' "'$(printf '%s' "$k" | tr '[:lower:]' '[:upper:]')" ; return 0 ;;
+        [0-9])     printf '%d' "'$k" ; return 0 ;;
+        F[1-9]|F1[0-9]|F2[0-5]) printf '%d' $(( 16777264 + ${k#F} - 1 )) ; return 0 ;;
+    esac
+    case "$k" in
+        Space)        printf '32' ;;
+        Tab)          printf '16777217' ;;
+        Backtab)      printf '16777218' ;;
+        Return|Enter) printf '16777220' ;;
+        Escape|Esc)   printf '16777216' ;;
+        Backspace)    printf '16777219' ;;
+        Delete|Del)   printf '16777223' ;;
+        Insert|Ins)   printf '16777222' ;;
+        Home)         printf '16777232' ;;
+        End)          printf '16777233' ;;
+        PgUp|PageUp)  printf '16777238' ;;
+        PgDown|PageDown) printf '16777239' ;;
+        Left)         printf '16777234' ;;
+        Up)           printf '16777235' ;;
+        Right)        printf '16777236' ;;
+        Down)         printf '16777237' ;;
+        Print|SysReq) printf '16777225' ;;
+        Menu)         printf '16777301' ;;
+        Comma)        printf '44' ;;
+        Period)       printf '46' ;;
+        Slash)        printf '47' ;;
+        Semicolon)    printf '59' ;;
+        Equal)        printf '61' ;;
+        Minus)        printf '45' ;;
+        Plus)         printf '43' ;;
+        *) return 1 ;;
+    esac
+}
+
+# accel_keycode <key>   -- "Meta+Shift+Print" -> one integer, Qt's encoding.
+# Fails on anything it does not know rather than guessing a wrong key.
+accel_keycode() {
+    local spec=$1 part total=0 base="" bases=0 mod
+    local IFS='+'
+    for part in $spec; do
+        [ -n "$part" ] || continue
+        case "$part" in
+            Meta|Super|Win) mod=$_ACCEL_MOD_Meta ;;
+            Ctrl|Control)   mod=$_ACCEL_MOD_Ctrl ;;
+            Alt)            mod=$_ACCEL_MOD_Alt ;;
+            Shift)          mod=$_ACCEL_MOD_Shift ;;
+            # Anything else is the key itself. A second one means a modifier
+            # nobody here knows -- "Hyper+Q" must fail rather than quietly
+            # binding Q on its own.
+            *)              base=$part; bases=$(( bases + 1 )); continue ;;
+        esac
+        total=$(( total | mod ))
+    done
+    [ -n "$base" ] && [ "$bases" = 1 ] || return 1
+    local code
+    code=$(_accel_base_code "$base") || return 1
+    printf '%d' $(( total | code ))
+}
+
+# Every (group, action) an edit has touched, so the reload knows what to push
+# rather than pushing the whole file.
+ACCEL_TOUCHED=()
+_accel_touch() { ACCEL_TOUCHED+=("$1"$'\t'"$2"); }
+
+# The four-part action id kglobalaccel wants: component, action, and a
+# friendly name for each. A [services][x.desktop] group is its own component.
+_accel_push_live() {   # <group> <action>
+    local group=$1 action=$2 component friendly keys key code
+    case "$group" in
+        services/*) component=${group#services/} ;;
+        *)          component=$group ;;
+    esac
+
+    _accel_fields "$(accel_value "$group" "$action")"
+    friendly=${ACCEL_FRIENDLY:-$action}
+
+    local -a codes=()
+    while IFS= read -r key; do
+        code=$(accel_keycode "$key") || return 1
+        codes+=("$code")
+    done < <(_accel_keys "$ACCEL_ACTIVE")
+
+    local -a args=("asa(ai)" 4 "$component" "$action" "$component" "$friendly" "${#codes[@]}")
+    for code in "${codes[@]}"; do args+=(1 "$code"); done
+
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        setForeignShortcutKeys "${args[@]}" >/dev/null 2>&1
+}
+
+# Applies what was written to the running session. Pushes each touched action
+# to the server; falls back to the restart when anything is not convertible or
+# the server is not there, so a key this table does not know still ends up
+# right at the next login.
 accel_reload() {
     session_available || return 0
+
+    local entry group action pushed=1
+    for entry in "${ACCEL_TOUCHED[@]:-}"; do
+        [ -n "$entry" ] || continue
+        IFS=$'\t' read -r group action <<< "$entry"
+        _accel_push_live "$group" "$action" || { pushed=0; break; }
+    done
+
+    [ "$pushed" = 1 ] && [ "${#ACCEL_TOUCHED[@]}" -gt 0 ] && return 0
+
     systemctl --user restart plasma-kglobalaccel.service 2>/dev/null \
       || kquitapp6 kglobalacceld 2>/dev/null \
       || log_warn "could not reload kglobalaccel; the change applies at next login"

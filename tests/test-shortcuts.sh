@@ -13,6 +13,8 @@ mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/accel.sh"
 
 # Stand-ins for what reaches the running desktop. Before these, every run of
 # this suite restarted the user's own kglobalaccel four times.
@@ -66,6 +68,28 @@ check "settings binding removed"  "$(binding settings)" "<unset>"
 check "launcher binding removed"  "$(binding launcher)" "<unset>"
 check "the holder's key given back" "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "Meta,none,Theirs"
 check "the second holder's too"     "$(kreadconfig6 --file kglobalshortcutsrc --group kwin --key 'Some Action')" "$(printf 'Meta+Q\tMeta+J,none,Some Action')"
+
+# The numbers a running kglobalaccel actually holds. All three were read back
+# off the server on 2026-09-13 after setting them, so these are not derived
+# from the same table twice.
+echo "== keys as Qt encodes them =="
+check "Print"                 "$(accel_keycode 'Print')"              "16777225"
+check "Meta+Shift+Print"      "$(accel_keycode 'Meta+Shift+Print')"   "318767113"
+check "Meta+Print"            "$(accel_keycode 'Meta+Print')"         "285212681"
+check "a letter is its ASCII" "$(accel_keycode 'Q')"                  "81"
+check "lower case too"        "$(accel_keycode 'q')"                  "81"
+check "Meta+Space"            "$(accel_keycode 'Meta+Space')"         "268435488"
+check "a function key"        "$(accel_keycode 'F5')"                 "16777268"
+check "the last function key" "$(accel_keycode 'F12')"                "16777275"
+check "Alt+Tab"               "$(accel_keycode 'Alt+Tab')"            "150994945"
+check "every modifier at once" "$(accel_keycode 'Meta+Alt+Ctrl+Shift+Delete')" "520093703"
+
+# Refusing is the point: a key this table gets wrong would be bound to the
+# wrong thing silently, where a refusal falls back to applying at next login.
+check "a modifier alone"      "$(accel_keycode 'Meta' || echo refused)"        "refused"
+check "a modifier nobody knows" "$(accel_keycode 'Hyper+Q' || echo refused)"   "refused"
+check "nothing at all"        "$(accel_keycode '' || echo refused)"            "refused"
+check "a key nobody knows"    "$(accel_keycode 'Meta+Banana' || echo refused)" "refused"
 
 echo "== the live session =="
 check "kglobalaccel never restarted" "$(wc -l < "$CALLS")" "0"
