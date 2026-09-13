@@ -112,6 +112,19 @@ shell_running_from() {
     return 1
 }
 
+# The config path the running shell was started with, which is what its IPC
+# socket is keyed by. A script that talks to the shell must name the copy that
+# is actually running: `make run` from this tree, or the installed one. The
+# generated CLI answers the same question and knows about other checkouts too;
+# a script in this tree only ever has these two to choose between.
+shell_ipc_path() {
+    if [ "$(shell_running_from)" = "working tree" ]; then
+        printf '%s/shell/shell.qml' "$REPO_ROOT"
+    else
+        printf '%s/shell.qml' "$QS_CONFIG_DIR"
+    fi
+}
+
 NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 

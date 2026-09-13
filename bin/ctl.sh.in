@@ -21,7 +21,7 @@ usage: @ALIAS@ <command> [options]
   crash list|show|remove            crashes quickshell caught and systemd did not
   windows enable|disable|status     the open-window list (needs a KWin script)
   edges status|set|snap|disable-all the screen's corners and edges (KWin's)
-  switcher status|layout|give       Alt+Tab's look, and who gets Alt+Tab and Meta+Tab
+  switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)
   shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page]                   open the settings window, on a page

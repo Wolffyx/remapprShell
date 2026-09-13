@@ -24,7 +24,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 
-ACTIONS=(launcher search settings ask clipboard sidebar keys)
+ACTIONS=(launcher search settings ask clipboard sidebar keys switcher)
 
 action_desktop() { printf '%s-%s.desktop' "$SLUG" "$1"; }
 action_label() {
@@ -36,6 +36,7 @@ action_label() {
         clipboard) printf 'Clipboard history' ;;
         sidebar)  printf 'Sidebar' ;;
         keys)     printf 'Keyboard shortcuts' ;;
+        switcher) printf 'Window switcher' ;;
     esac
 }
 

@@ -144,5 +144,9 @@
     },
     "session": {
         "prompt": "plasma"
+    },
+    "switching": {
+        "windows": "plasma",
+        "desktops": "plasma"
     }
 }

@@ -3,6 +3,9 @@
 #
 #   status [--json]         Alt+Tab's look, and who holds Alt+Tab and Meta+Tab
 #   layout <id>             choose Alt+Tab's look, from the installed switchers
+#   use plasma|shell        who draws Alt+Tab, and who gets the key for it
+#   show                    put this shell's own switcher on screen, for the
+#                           key bound to it when `switching.windows` is "shell"
 #   give alt-tab|meta-tab   hand a key to KWin -- Alt+Tab to its window
 #                           switcher, Meta+Tab to its Overview -- taking it from
 #                           whatever holds it
@@ -21,6 +24,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 SCOPE=switching
@@ -129,6 +133,50 @@ case "$cmd" in
         kconfig_set "$SCOPE" kwinrc TabBox LayoutName "$want"
         kwin_reconfigure
         log_step "Alt+Tab looks like $want"
+        ;;
+
+    # Who draws it. Writes the setting and moves the key to match, because a
+    # setting that says "this shell draws Alt+Tab" while Alt+Tab still goes to
+    # KWin is just a lie in a file.
+    use)
+        who=${1:?usage: $ALIAS switcher use plasma|shell}
+        case "$who" in
+            plasma|shell) ;;
+            *) die "unknown: $who (plasma or shell)" ;;
+        esac
+
+        profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
+        mkdir -p "$(dirname "$profile")"
+        if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
+            die "$profile does not parse; fix it first"
+        fi
+        tmp=$(mktemp)
+        if [ -f "$profile" ]; then
+            jq --arg w "$who" '.switching = ((.switching // {}) + {windows: $w})' "$profile" > "$tmp" || die "could not write $profile"
+        else
+            jq -n --arg w "$who" '{switching: {windows: $w}}' > "$tmp" || die "could not write $profile"
+        fi
+        mv "$tmp" "$profile"
+
+        if [ "$who" = shell ]; then
+            accel_take switching "Alt+Tab" "services/$SLUG-switcher.desktop" _launch replace
+            accel_take switching "Alt+Shift+Tab" "services/$SLUG-switcher.desktop" _launch add
+            accel_reload
+            log_step "Alt+Tab -> $DISPLAY_NAME's own switcher"
+        else
+            accel_take switching "Alt+Tab" kwin "Walk Through Windows" replace
+            accel_take switching "Alt+Shift+Tab" kwin "Walk Through Windows (Reverse)" replace
+            accel_reload
+            log_step "Alt+Tab -> KWin's Walk Through Windows"
+        fi
+        log_info "undo with: $ALIAS switcher revert"
+        ;;
+
+    # Ours, not KWin's. The shortcut is bound to a desktop file that runs this,
+    # and the key that ran it is still held: the switcher itself watches for
+    # the release.
+    show)
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcher
         ;;
 
     give)

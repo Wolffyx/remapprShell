@@ -18,6 +18,9 @@ QtObject {
     property bool keys: false
     property bool session: false
 
+    // Alt+Tab, when this shell is the one drawing it rather than KWin.
+    property bool windowSwitcher: false
+
     // What the session screen was opened for: "promptAll", "promptLogout",
     // "promptReboot" or "promptShutDown", as Plasma's prompt names them.
     property string sessionKind: "promptAll"
@@ -31,9 +34,15 @@ QtObject {
         root.sidebar = which === "sidebar";
         root.keys = which === "keys";
         root.session = which === "session";
+        root.windowSwitcher = which === "windowSwitcher";
         if (screen !== undefined)
             root.screen = screen ?? "";
     }
+
+    // Opened by a key that is still held, so it never toggles: pressing the
+    // shortcut again while it is up steps through the list instead, which the
+    // switcher itself handles.
+    function openWindowSwitcher(screen) { root._only("windowSwitcher", screen); }
 
     function toggleSidebar(screen) { root._only(root.sidebar ? "" : "sidebar", screen); }
     function toggleKeys(screen) { root._only(root.keys ? "" : "keys", screen); }

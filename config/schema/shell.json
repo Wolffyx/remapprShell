@@ -465,7 +465,29 @@
             "icon": "preferences-system-tabbox",
             "glyph": "switch_access_2",
             "page": "switching",
-            "description": "What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked."
+            "description": "What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked.",
+            "keys": {
+                "switching.windows": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "shell"
+                    ],
+                    "default": "plasma",
+                    "label": "Alt+Tab is drawn by",
+                    "description": "plasma is KWin's own switcher, in this shell's colours, and it is the only one that can show a picture of each window -- KWin renders those for its own switcher and for nothing else. shell is this shell's card row, drawn here, which shows each application's icon instead. Changing this rebinds Alt+Tab to whichever draws it."
+                },
+                "switching.desktops": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "shell"
+                    ],
+                    "default": "plasma",
+                    "label": "Meta+Tab is drawn by",
+                    "description": "plasma is KWin's Overview, which cannot be restyled: it is compiled into KWin rather than shipped as a package. shell is this shell's desktop switcher. Changing this rebinds Meta+Tab."
+                }
+            }
         },
         {
             "id": "osd",

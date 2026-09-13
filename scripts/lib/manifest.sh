@@ -29,6 +29,7 @@ template|share/applications/ask.desktop.in|$APPLICATIONS_DIR/$SLUG-ask.desktop
 template|share/applications/clipboard.desktop.in|$APPLICATIONS_DIR/$SLUG-clipboard.desktop
 template|share/applications/sidebar.desktop.in|$APPLICATIONS_DIR/$SLUG-sidebar.desktop
 template|share/applications/keys.desktop.in|$APPLICATIONS_DIR/$SLUG-keys.desktop
+template|share/applications/switcher.desktop.in|$APPLICATIONS_DIR/$SLUG-switcher.desktop
 ENTRIES
 }
 

@@ -17,6 +17,7 @@ import qs.domain.config
 import qs.features.osd
 import qs.features.notifications
 import qs.features.settings
+import qs.features.switchers
 import qs.features.wizard
 import qs.domain.notifications
 import qs.domain.diagnostics
@@ -99,6 +100,12 @@ ShellRoot {
     Variants {
         model: Surfaces.session ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
         SessionOverlay {}
+    }
+
+    // Alt+Tab, when `switching.windows` says this shell draws it.
+    Variants {
+        model: Surfaces.windowSwitcher ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
+        WindowSwitcher {}
     }
 
     // The desktop's own two: a rounded frame over the screen's corners, and a
@@ -406,6 +413,7 @@ ShellRoot {
         function sidebar(): void { Surfaces.toggleSidebar(""); }
         function keys(): void { Surfaces.toggleKeys(""); }
         function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
+        function switcher(): void { Surfaces.openWindowSwitcher(""); }
         function close(): void { Surfaces.closeAll(); }
     }
 
