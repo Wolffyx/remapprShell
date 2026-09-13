@@ -87,26 +87,24 @@ Nothing is half-written: every change is complete, tested and reloaded into the
 running shell. What follows is what is *open*, in the order a new session
 should weigh it.
 
-**1. The settings window is the natural next piece of work, and nobody has
-designed it.** It is the one surface the redesign never reached:
-`shell/features/settings/` is a `FloatingWindow` with a sidebar of pages
-generated from `config/schema/shell.json`, built before the Meridian design
-existed and never revisited. The user raised it as the next thing. Two
-questions to settle with them before drawing anything: whether it should look
-like the popouts do now (one surface, hairlines, `Theme.radiusOf`) or like a
-Plasma settings module; and whether the page list stays generated from the
-schema -- it is what keeps the reference in `docs/config.md` honest, and
-`make lint` fails when they drift.
+**1. The settings window is drawn, and has never been on a screen.** It was the
+one surface the redesign never reached; it is now in the Meridian design, and
+every page of it was rendered offscreen and looked at, which is not the same
+thing as being used. See [`docs/settings.md`](settings.md) for how a page is
+built.
 
-What is there: `SettingsWindow.qml` (302 lines, the frame and the sidebar),
-`SchemaRenderer.qml` (131, which draws a section straight from the schema --
-bools, enums, ints, strings -- and is what a page gets for free), and sixteen
-pages totalling 3,600 lines. Four are big because they do real work rather
-than list keys: appearance (537), tray (377, three drag-between lists), widgets
-(332, drag to reorder) and lock (308). The rest are thin. A redesign that only
-changes the frame and the shared controls would reach every page at once; one
-that rewrites pages should start with the four big ones and leave
-`SchemaRenderer` to carry the others.
+What was done: `CardGrid` (two columns where there is room, one where there is
+not), `SchemaRenderer` drawing its keys in cards from a `group` in the schema,
+`SettingGroups` holding the grouping rules where they can be tested,
+`SettingRow` putting a control beside its label or under it, and the ten pages
+that predated the design brought to it -- about, AI assist, screen edges,
+layouts, profiles, restore points, renderer, switching windows, tray icons,
+widgets, and appearance, which had the labels but not the cards.
+
+What to check, in front of a real screen: the drag lists on **tray icons** and
+**widgets**, which the offscreen harness cannot exercise at all; every page at
+a **small window size**, where the grid drops to one column; and **light mode**,
+which was rendered but not lived in.
 
 Known papercuts, both small and both listed under "Two papercuts left":
 `rmpr settings <page>` within a few seconds of the shell starting says "no such
@@ -114,7 +112,8 @@ page" because `Schema` has not loaded, and `rmpr settings pages` is
 unreachable. The user has also said the window feels unresponsive; nothing was
 measured for it beyond ruling out the shell burning CPU (25 s over 56 min, 0 %
 at rest) and fixing a colour-scheme reload that fired four times per KDE config
-write. Ask them which part is slow before optimising anything.
+write. Ask them which part is slow before optimising anything. Nothing in the
+redesign was aimed at it.
 
 **2. A popout visual the user still sees and no session has reproduced.**
 Reported as extra backgrounds, a band at the top of a card, and square corners
@@ -820,7 +819,8 @@ are not.
 - **Config** — layered defaults → profile → per-monitor → runtime. Sparse
   deltas. Live reload. Refuses to write over a file that does not parse.
 - **Settings window** — schema-driven; every control is generated from a schema,
-  including a third-party widget's own settings.
+  including a third-party widget's own settings. A page is a grid of named
+  cards; `group` in the schema is what puts a key in one. See `docs/settings.md`.
 - **Launcher providers** — chosen at runtime, separately for the menu and for
   search: kickoff, krunner, builtin, fuzzel, rofi, custom.
 - **Theme** — a Plasma Look-and-Feel package with our own OSD; appearance

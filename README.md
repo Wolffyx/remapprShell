@@ -76,6 +76,12 @@ a widget declares, where each thing on screen comes from, how a popout is
 placed and closed, and how to look at one -- including which of the two ways
 to look at one will lie to you.
 
+### Working on the settings window
+
+[`docs/settings.md`](docs/settings.md) is how a page is built: the parts, what
+the schema decides on its own, where a control goes and why, and how to render a
+page offscreen and look at it.
+
 ### The theme layer
 
 `rmpr theme apply` installs a Look-and-Feel package (our OSD, splash and logout
