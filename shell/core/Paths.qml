@@ -41,6 +41,25 @@ QtObject {
     // widget uses. `rmpr reload` is for those.)
     readonly property string userWidgetsDir: `${Branding.dataDir}/widgets`
 
+    // A filesystem path as a URL.
+    //
+    // Qt resolves a bare path against the base URL of the component that uses
+    // it, and for a type that lives in a module that base is inside qrc: -- so
+    // an absolute path handed to an Image arrived as "qrc:/home/..." and could
+    // not be opened. A screenshot notification showed a blank icon for exactly
+    // this reason, its path having come straight off the bus.
+    //
+    // Each segment is encoded separately, so a file in a directory with a
+    // space in its name is still a valid URL. Anything that is not an absolute
+    // path -- a theme icon name, a URL that already has a scheme -- is handed
+    // back untouched.
+    function fileUrl(path) {
+        const s = String(path ?? "");
+        if (!s.startsWith("/"))
+            return s;
+        return "file://" + s.split("/").map(encodeURIComponent).join("/");
+    }
+
     function profileDir(profile) {
         return `${root.profilesDir}/${profile}`;
     }

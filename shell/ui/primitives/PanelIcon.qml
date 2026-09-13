@@ -7,6 +7,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import qs.core
 
 IconImage {
     id: root
@@ -23,8 +24,10 @@ IconImage {
     implicitSize: 18
 
     source: {
+        // Through fileUrl: a caller with a path off the bus rather than a
+        // URL should not end up asking qrc: for somebody's home directory.
         if (root.iconFile.length > 0)
-            return root.iconFile;
+            return Paths.fileUrl(root.iconFile);
         if (root.iconName.length > 0 && Quickshell.hasThemeIcon(root.iconName))
             return Quickshell.iconPath(root.iconName);
         return Quickshell.iconPath(root.fallbackName, true);
