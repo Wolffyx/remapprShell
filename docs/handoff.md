@@ -14,6 +14,16 @@ the last part of the plan -- and found that Plasma 6 draws it from the shell
 package, not the look-and-feel package this file had said. The redesign itself
 was built across 2026-09-11 and 2026-09-12, entirely offscreen.
 
+A fifth, on the evening of **2026-09-13**, did two things. It gave the global
+shortcuts an owner, so a key this project binds is grabbed for the first time
+in the project's life -- Alt+Tab now opens this shell's own switcher, confirmed
+by the user pressing it. And it went over the popout system four times on the
+user's report, fixing the placement, the layering, the closing and the radii,
+and learning the hard way that `dev/preview` cannot show anything the
+compositor does. It also found that **Spectacle will take a real screenshot
+from inside a session here**, which changes what a session can check on its own
+-- see "Looking at the real screen".
+
 ## What this is
 
 `remappr-shell` — a configurable desktop shell for **KDE Plasma 6**, at
@@ -68,8 +78,68 @@ Everything below was read off the running system rather than remembered.
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | **nothing else**: caelestia's Quickshell bar was stopped on 2026-09-13 and not restarted. krohnkite is installed but **not loaded** (`krohnkiteEnabled=false`) |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
-| Shortcuts | Alt+Tab and Meta+Tab are caelestia's, still, though caelestia is not running; KWin's own switcher is unbound. Ours: `settings` on Meta+Shift+R, ledgered (`shortcuts revert` removes it). **Spectacle has no shortcut**: `kglobalshortcutsrc [services][org.kde.spectacle.desktop] _launch=none`, so Print does nothing. Nothing in this project writes that key and nothing else holds Print -- it was not us. The user was given the command to put it back and had not run it |
+| Shortcuts | **Ours, and grabbed for the first time** (2026-09-13): the component `remappr-shell` is active, with Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Alt+Tab and Alt+Shift+Tab (this shell's switcher). Meta+Tab is KWin's Overview. Alt+Tab was taken from KWin, Meta+Shift+R from Krohnkite; `rmpr switcher revert` and `rmpr shortcuts revert` give them back. **Alt+Tab was pressed and works** -- the first key this project has ever bound that does anything. The other five are registered and read back off kglobalaccel but have not been pressed. **Spectacle has no shortcut**: `kglobalshortcutsrc [services][org.kde.spectacle.desktop] _launch=none`, so Print does nothing. Nothing in this project writes that key and nothing else holds Print -- it was not us. The user was given the command to put it back and had not run it |
 | `rmpr doctor` | no problems, 3 warnings (2026-09-13, shell running). One is the ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left behind when the Phase 6b revert purged that group; harmless |
+
+### Where the last session left off, and what to pick up
+
+Nothing is half-written: every change is complete, tested and reloaded into the
+running shell. What follows is what is *open*, in the order a new session
+should weigh it.
+
+**1. The settings window is the natural next piece of work, and nobody has
+designed it.** It is the one surface the redesign never reached:
+`shell/features/settings/` is a `FloatingWindow` with a sidebar of pages
+generated from `config/schema/shell.json`, built before the Meridian design
+existed and never revisited. The user raised it as the next thing. Two
+questions to settle with them before drawing anything: whether it should look
+like the popouts do now (one surface, hairlines, `Theme.radiusOf`) or like a
+Plasma settings module; and whether the page list stays generated from the
+schema -- it is what keeps the reference in `docs/config.md` honest, and
+`make lint` fails when they drift.
+
+What is there: `SettingsWindow.qml` (302 lines, the frame and the sidebar),
+`SchemaRenderer.qml` (131, which draws a section straight from the schema --
+bools, enums, ints, strings -- and is what a page gets for free), and sixteen
+pages totalling 3,600 lines. Four are big because they do real work rather
+than list keys: appearance (537), tray (377, three drag-between lists), widgets
+(332, drag to reorder) and lock (308). The rest are thin. A redesign that only
+changes the frame and the shared controls would reach every page at once; one
+that rewrites pages should start with the four big ones and leave
+`SchemaRenderer` to carry the others.
+
+Known papercuts, both small and both listed under "Two papercuts left":
+`rmpr settings <page>` within a few seconds of the shell starting says "no such
+page" because `Schema` has not loaded, and `rmpr settings pages` is
+unreachable. The user has also said the window feels unresponsive; nothing was
+measured for it beyond ruling out the shell burning CPU (25 s over 56 min, 0 %
+at rest) and fixing a colour-scheme reload that fired four times per KDE config
+write. Ask them which part is slow before optimising anything.
+
+**2. A popout visual the user still sees and no session has reproduced.**
+Reported as extra backgrounds, a band at the top of a card, and square corners
+under rounded ones. Four causes were found and fixed -- three stacked
+background tones, radii that ignored `theme.rounding`, a shadow clipped square
+by the window edge, and two popouts that hardcoded `popoutRadius: 18`. The user
+says something remains. What was *measured* on the real screen afterwards, and
+came back clean: corners symmetric at the rounding in force, one background,
+the card's gap to the panel exactly as placed, and blur-on versus blur-off
+**pixel-identical** around the card, which rules the compositor blur out.
+Ask for an uncropped capture and the screen name before theorising again; a
+crop over a window boundary is easy to misread, and most of this session was
+spent doing exactly that. `docs/popouts.md` is the map.
+
+**3. KWin's own Alt+Tab box has never appeared on this machine.** Unchanged
+and unexplained; `switching.windows` is `shell` now, so it is out of the way
+rather than fixed. The two experiments to run are under "Alt+Tab has two
+implementations now", and both need a person to press a key.
+
+**4. Five bound keys have never been pressed** -- Meta, Meta+Space,
+Meta+Shift+R, Meta+V, Alt+Shift+Tab. They are registered and read back off
+kglobalaccel; only Alt+Tab has been tried.
+
+**5. The lock screen has still never been enabled** (item 22 below), and the
+desktop still does not follow day and night (item 26).
 
 ### What to check first, before building anything
 
@@ -77,6 +147,12 @@ Everything below needs a real mouse or keyboard, which no session here has
 had: `ydotool`, `wtype`, `dotool` and `xdotool` are all absent, so a keystroke
 and a click cannot be produced from inside. Each is quick, and some are a bug
 if they fail.
+
+**Seeing, though, is no longer a problem.** A session can open anything over
+IPC and take a real screenshot of it -- `rmpr ipc panel click status DP-2`,
+then `spectacle -b -f -n -d 2000 -o /tmp/shot.png` -- and read the pixels. Four
+rounds of this session were spent arguing from offscreen renders that could not
+show the bug. Do not repeat that: see "Looking at the real screen".
 
 1. **Type into the launcher.** `rmpr launcher`, then type. The keyboard-focus
    fix is only proven as far as item focus; proving a keystroke lands needs a
@@ -194,18 +270,21 @@ if they fail.
     could never do before, and after Meta+D its tooltip should say "Bring
     the windows back". Verified: the reloaded shell watches `/KWin` and reads
     `showingDesktop`. The peek itself needs a pointer.
-19. **Alt+Tab and Meta+Tab, by hand.** `rmpr settings switching`. Pick a
-    layout -- Large Icons, say -- and press Alt+Tab: nothing changes while
-    caelestia holds the key. Then "Give it to KWin" beside Alt+Tab: the
-    shortcuts service restarts, and Alt+Tab should draw KWin's switcher in
-    that layout, with caelestia's silent. The same for Meta+Tab and the
-    Overview. "Undo everything set here" hands both back to caelestia.
-    Verified: the whole round trip in the sandbox, seeded like this machine,
-    down to a byte-identical kglobalshortcutsrc after the undo; and the live
-    `switcher status` naming caelestia for both keys. Not tried live,
-    because it takes the user's Alt+Tab. **Unknown before trying:** whether
-    caelestia's shell notices losing a key when kglobalaccel restarts, or
-    asks for it back.
+19. **Press a key -- any of ours. This is the one thing to do first.**
+    Until 2026-09-13 no shortcut this project bound had ever been grabbed;
+    now the component has a running owner and kglobalaccel says every key is
+    registered (see "Global shortcuts" below for the numbers read back off
+    the server). Nobody has pressed one. Try, in this order:
+    - **Alt+Tab** -- this shell's own switcher, the card row, should come up.
+      Hold Alt and press Tab again: the selection should move along, and
+      Alt+Shift+Tab should move it back. Letting Alt go chooses.
+    - **Meta** alone: the start menu. **Meta+Space**: search.
+      **Meta+Shift+R**: settings. **Meta+V**: the clipboard.
+    - If nothing happens, `rmpr shortcuts status` says whether the component
+      is grabbed, and `journalctl --user -t remappr-shell-windowsd` says
+      whether the press arrived and the command ran.
+    - The way back is `rmpr switcher revert` (Alt+Tab to KWin) and
+      `rmpr shortcuts revert` (everything else).
 20. **The application style, by hand.** `rmpr settings appearance`, then
     Darkly: an open Dolphin or Konsole should restyle at once, and "Undo the
     style" should bring Breeze back. Verified: the key written and put back,
@@ -296,6 +375,32 @@ if they fail.
     needs a light variant of those defaults and something to re-apply them when
     `daylight` changes. It writes KDE keys on a timer, so it is the user's call
     to ask for, and they had not.
+
+### Looking at the real screen
+
+`dev/preview/preview.sh` is not what is on the screen, and a session that
+forgets this will report a fix that is not one. It deletes
+`BackgroundEffect.blurRegion` and the input mask from `WidgetSlot.qml` before
+rendering (they have nothing to attach to on a `FloatingWindow`), and it turns
+every full-screen layer surface into a plain `Item`. So it cannot show
+anything the compositor does: the blur behind a card, how a mask takes input,
+what layer a surface is on. Three rounds of "it looks right in my render" were
+spent on this before the user pointed it out.
+
+**Spectacle will take a real screenshot from here**, which `grim` will not --
+KWin does not implement `wlr-screencopy`, so grim writes nothing at all:
+
+```
+spectacle -b -f -n -o /path/out.png      # background, full screen, no notification
+```
+
+It captures every output into one image: on this machine 4000x2560, with DP-3
+(1440x2560) at x=2560 and DP-2 (2560x1440) at x=0, y=1041. Open the popout
+over IPC first (`panel click <widget> <screen>`), take the shot from a
+backgrounded subshell a second or two later, and crop with Pillow. Reading the
+pixels beats looking at them: `panel layout <screen>` gives the slot, and a
+scan across the card's edge gives the corner radius, the border and the gap to
+the panel in numbers.
 
 ### The lesson this session paid for twice
 
@@ -388,6 +493,117 @@ are not.
   Hover reaches the tooltip from wherever it actually arrives: the slot's
   MouseArea for widgets with `wantsHover`, and a HoverHandler on `BarWidget`
   (`hovered`) for the rest.
+- **A click outside the start menu used to break it for good** (2026-09-13,
+  from the user's report: "not working any more, I do not know if clicking
+  outside the launcher affects this" -- it did). The panel closed a popout by
+  assigning `popoutVisible = false` onto the widget. That is right for the
+  fourteen widgets that keep the flag as plain state and silently fatal for
+  the one that does not: assigning to a QML property **replaces its binding
+  with a constant**, and the launcher's `popoutVisible` is a binding on "is
+  the provider open, here, in menu mode". One outside click and the start
+  button did nothing for the rest of the session -- including every press of
+  Meta.
+
+  `BarWidget` now has a `closePopout()` the panel calls instead, whose default
+  is the old assignment; the launcher overrides it to close the provider, so
+  its binding survives. `tests/tst_Popouts.qml` holds the contract. The same
+  report's "does not open every time" had a second cause in the same file:
+  the button closed the menu when it was open *anywhere*, so on two monitors
+  clicking the other screen's button put it away instead of moving it over.
+
+- **The popout system, gone over on a real screen** (2026-09-13, from the
+  user's report: a start menu nowhere near its button that the button could
+  not close, "another popup underneath" every popout, and a calendar that was
+  a different size each time). Four separate faults, and none of them could be
+  seen without a screen:
+
+  - **A popout reached back over the panel.** The window keeps a transparent
+    border for its shadow and was placed `extent + gap - shadowMargin` from
+    the screen edge -- 12 px, which is *inside* a 52 px panel. For the popouts
+    that carry an input mask that was invisible; the start menu cannot carry
+    one (mask + exclusive keyboard focus = a window KWin maps and never draws,
+    see WidgetSlot), so its window sat over the start button and the second
+    click on it went nowhere. The room on the panel side is now capped at the
+    gap: there is nothing to see behind the panel anyway.
+  - **The start menu was centred on a button it is twenty times wider than**,
+    then shoved back on screen, so it lined up with neither. `popoutAlign:
+    "start"` puts its near edge level with the button's.
+  - **The shadow was drawing a second card.** Blur 40 and drop 12 is a 52 px
+    band of dimmed wallpaper around a card whose own background is blurred by
+    the compositor, and the join between the two reads as another surface.
+    22 and 7 now.
+  - **A popout's contents cannot set their own width.** The Loader anchors
+    them to fill the card, so `width: 348` in CalendarPopout was overwritten
+    and the card came out as wide as the longest line of text in it -- which
+    changes with the locale. The widget says `popoutWidth` instead. (Assigning
+    `implicitWidth` in the contents is not the fix: on a `Column` it is
+    read-only, which qmllint does not catch and the running shell reports as
+    the whole widget failing to load.)
+
+  The arithmetic is now `qs.domain.panel.Placement`, four pure functions with
+  `tests/tst_Placement.qml` on them, because every placement bug this project
+  has had has been one of these numbers and none of them needed a screen to
+  check.
+
+  Then a second round, the same evening, from the same screen:
+
+  - **Shadows are a setting now, `theme.shadows`, and it is off by default.**
+    Settings -> Appearance. A drop shadow is a band of dimmed wallpaper around
+    a surface whose own background the compositor has blurred, and on a dark
+    desktop the join reads as a second panel behind the first. Off, a popout
+    keeps no transparent border at all: the card *is* the window, there are no
+    dead bands above and below it, and an aligned popout lands exactly on its
+    widget. It gates the four places the shell draws one -- the popout, a
+    floating panel and its islands, the OSD and the search.
+  - **Popouts and the search came off the overlay layer.** The overlay layer
+    is above everything a compositor draws, full-screen windows included, so
+    the start menu sat on top of Spectacle's region selector -- and would have
+    sat on top of a game or a video. They are on the top layer with the panel
+    now, where KWin puts them under a window that has asked for the screen.
+    The session screen, the Alt+Tab switcher and the rounded screen border are
+    still on the overlay layer, deliberately.
+  - **The click-catcher is mapped from the start and made deaf instead.**
+    Sharing a layer with the popouts means the two stack in the order they
+    were mapped, and a surface that maps *with* the popout is a race the
+    popout can lose -- losing it means every click on a popout closes it. One
+    that never unmaps always loses. It takes no input at all (an empty region)
+    while there is nothing to close.
+  - **Radii inside a popout follow `theme.rounding` now.** Reported as "the
+    bottom corners have straight corners under the corners with a radius", and
+    it is the other way round: this machine has `theme.rounding` at **8**, the
+    design is drawn at 28, and all 34 radii inside the popouts were the
+    design's numbers written out. So a tile at 20 sat inside a card at 8 --
+    a rounder corner inside a straighter one, at every corner of every popout.
+    `Theme.radiusOf(designed)` rescales them. The tray's flyout and the task
+    popout were worse again: both hardcoded `popoutRadius: 18` and ignored the
+    setting outright, which is why the flyout was the clearest example. Both
+    dropped.
+  - **One surface per popout.** Reported as "multiple backgrounds on the same
+    popup", and the offscreen render (`dev/preview/preview.sh
+    dev/preview/popout.qml`, `PREVIEW_WIDGET=launcher`) showed three tones
+    stacked inside one card: the card's own glass, the start menu's rail and
+    side filled a shade lighter, and inside those, cards a shade darker again.
+    The rule now is that a popout is one surface and only what can be pressed
+    or typed into gets a background of its own -- everything else is space and
+    a hairline. The rail, the side column, the "what is playing" and "the
+    machine" cards, the quick settings' slider panel and the search overlay's
+    hint bar all lost their fills; tiles, buttons and list rows kept theirs.
+    The search field is an outline rather than a third shade.
+  - **An aligned popout at the corner of the screen keeps its alignment.** A
+    window cannot start at a negative position, so with shadows on the start
+    menu -- its button 12 px from the corner, its shadow wanting 29 -- opened
+    17 px to the right of it. `Placement.shift` moves the card inside its own
+    window instead, which costs nothing: the shadow on that side is off the
+    screen either way.
+  - **The gap opens up for a shadow rather than the shadow being cut.** The
+    first answer to "the window must not reach over the panel" was to cap the
+    room on that side at the gap. That cuts the blur off square where the room
+    runs out, and a card with a straight bottom-left corner is what that looks
+    like -- reported. `Placement.away` widens the gap to the shadow's reach
+    instead, so the window still starts at the panel's edge and none of the
+    shadow is clipped. With shadows off, which is the default, there is
+    nothing to make room for: the card *is* the window.
+
 - **Popouts behave like menus** (2026-09-11, from the user's report). Three
   things were wrong. Every popout window was sized to its contents, with the
   contents 8 px in from each edge, so every popout was 16 px too small. Most
@@ -1909,16 +2125,42 @@ it.
   on this machine** -- Alt+Tab switches windows silently. `ShowTabBox` is now
   explicitly `true`, KPackage lists the package, the metadata is right, KWin
   logs no QML error, and `dev/preview/switcher.sh` loads the file cleanly
-  against a stub of KWin's own type. Unexplained; the next thing to try is a
-  stock layout (`kwriteconfig6 --file kwinrc --group TabBox --key LayoutName
-  big_icons`) and a press, to find out whether any layout draws.
+  against a stub of KWin's own type -- checked again on 2026-09-13 with a
+  fresh stub, which found only that the stub needed a default property, the
+  file itself loading without a single error. Still unexplained.
+
+  **KWin logs nothing here by design**, which is why there is no error to
+  find: a layout that fails to load is reported with `qCDebug(KWIN_TABBOX)`,
+  off unless the category is turned on, and the category is read at KWin's
+  startup. So "no QML error in the journal" is not evidence of anything.
+
+  Two things to try, in this order, both needing a person:
+  - **Press Alt+`** (Walk Through Windows of Current Application) with two
+    windows of one application open. It is still KWin's, it uses the *same*
+    layout, and it does not need Alt+Tab back to test. If no box draws there
+    either, KWin's tabbox is not drawing at all and the layout is innocent.
+  - Then a stock layout (`rmpr switcher layout big_icons`) and the same press.
+    If big_icons draws and ours does not, the difference is our package -- and
+    the first suspect is that this KWin started at 15:46 on 2026-09-13 and the
+    package was installed at 19:45, four hours later, so a re-login is the
+    thing to rule out before anything is rewritten.
 - **shell** is `shell/features/switchers/WindowSwitcher.qml`, the design's
   card row drawn by this shell, which **works**: `rmpr switcher show` puts it
   on screen, and there is a screenshot of it in this session's scratch. It
   cannot show window pictures -- that needs the screencast protocol bound in
   C++ and fed to PipeWire, which is what caelestia's
-  `libcaelestia-servicesplugin.so` does. What stops it being usable is the
-  shortcut, above: the key never reaches it.
+  `libcaelestia-servicesplugin.so` does. **It now has the key**: as of
+  2026-09-13 `rmpr switcher use shell` is what this machine is on, Alt+Tab and
+  Alt+Shift+Tab belong to this project's kglobalaccel component, and the
+  component is active -- see "Global shortcuts" below.
+
+  A repeated press while it is up cannot arrive as a key: KWin takes a global
+  shortcut before any client sees it, so the second Alt+Tab never reaches the
+  surface even though the surface holds the keyboard exclusively. It comes
+  back as another call to `surfaces switcher` instead, and
+  `Surfaces.windowSwitcherTick` turns that into a step. Alt+Shift+Tab is a
+  second action, `switcher-reverse`, for the same reason: by the time the call
+  arrives there is nothing left to say which of the two keys was pressed.
 
 **Meta+Tab is KWin's Overview and cannot be restyled.** Overview is compiled
 into KWin -- `/usr/share/kwin/effects/` holds one scripted effect, `cube`, and
@@ -1955,11 +2197,10 @@ What is built, works, and is simply **not turned on here**:
   live -- Wi-Fi "Leo 5G", Bluetooth "1 device", Night Light "Suspended".
 - **The desktop clock and the rounded screen border**, both off by default.
 
-### Global shortcuts: what was wrong, and what is still unproven
+### Global shortcuts: what was wrong, and what was done about it
 
-**Nothing this project binds has ever reached a key press on this machine**,
-and most of one evening went into finding out why. The chain, measured end to
-end:
+**Nothing this project bound had ever reached a key press on this machine.**
+The chain, measured end to end on 2026-09-12:
 
 - The key reaches KDE. Meta+D (KWin's own "Show Desktop") works.
 - The command works. `rmpr switcher show` run from a terminal puts the
@@ -1967,13 +2208,7 @@ end:
 - The action works. `invokeShortcut` over D-Bus runs it.
 - The record is right. `getGlobalShortcutsByKey` shows our key against our
   action.
-- **The component is not active, so the key is never grabbed.**
-
-```
-kwin                             active=true    its shortcuts work
-org_kde_spectacle_desktop        active=true
-remappr_shell_switcher_desktop   active=false   ours
-```
+- **The component was not active, so the key was never grabbed.**
 
 `setShortcutKeys` takes a flags word. Passing `0` files a perfect record and
 grabs nothing. **`SetPresent` is bit 2**, and the KF6 client library passes
@@ -1986,30 +2221,93 @@ flags=1 active=False    flags=3 active=True     flags=7 active=True
 flags=4 active=False
 ```
 
-**This is not yet confirmed to fix anything.** The last step -- pressing
-Meta+F2 with an owning client registered at flags=6 -- was never run. Do that
-first: `dev/` has no harness for it, but the throwaway client used is worth
-rewriting, because the only way to test a global shortcut here is for a person
-to press the key. There is no `ydotool`, `wtype`, `dotool` or `xdotool` on
-this machine.
+#### What was built, 2026-09-13
 
-Two further things follow from it, neither done:
+**The shortcuts have an owner.** Every action is now a component action under
+`[remappr-shell]` in kglobalshortcutsrc -- the same place and shape as any
+other shell's -- registered by `GlobalShortcuts` in `bin/windowsd.py.in` with
+`doRegister` and `setShortcutKeys` at flags 6, and run from the
+`globalShortcutPressed` signal. The daemon was the right place because the
+KWin script D-Bus-activates it at login, before the shell is up, so the keys
+work whether the shell is running or not; each one runs the same `rmpr`
+command its desktop file used to run.
 
-- **A shortcut needs an owner, and ours have none.** Every action this project
-  binds is a `[services][<id>.desktop] _launch` entry -- KDE launches a program
-  when the key is pressed -- and those are only active when kglobalaccel loads
-  them from the file at startup, which means a re-login. Caelestia does not do
-  this: `Caelestia.GlobalShortcut` is a compiled C++ type in its Services
-  plugin that registers a *component action* owned by the running shell, which
-  is why its bindings live under `[caelestia-shell]`. The same thing is
-  available over plain D-Bus -- `doRegister`, `setShortcutKeys` with flags 6,
-  and the `globalShortcutPressed` signal -- and `bin/windowsd.py.in` is
-  already a Python process on the session bus that could own them.
-- **`accel_reload` is still wrong.** It pushes keys live, which was a real fix
-  for the service-restart no-op, but a key pushed without `SetPresent` is a
-  key nobody grabbed. Whatever replaces it has to pass the flag, and the
-  claim that a shortcut "applies immediately" should not be repeated until a
-  person has pressed one.
+Measured after the change, on the running session:
+
+```
+component remappr-shell      isActive = true
+launcher          16777250   (Meta)
+search           268435488   (Meta+Space)
+settings         301989970   (Meta+Shift+R)
+clipboard        268435542   (Meta+V)
+switcher         150994945   (Alt+Tab)
+switcher-reverse 184549377   (Alt+Shift+Tab)
+```
+
+Every one of those is what kglobalaccel hands back when asked, not what was
+written to a file. **What is still unproven is the last inch**: nobody has
+pressed one. That is the first thing to do, and it needs a person -- there is
+no `ydotool`, `wtype`, `dotool` or `xdotool` on this machine.
+
+`rmpr shortcuts status` now says `component remappr-shell: grabbed` or `NOT
+grabbed -- no owner is running` as its first line, and `rmpr doctor` fails on
+the second, because the failure is invisible in the file: the record is
+perfect either way.
+
+#### Two things kglobalaccel does that cost an attempt each
+
+- **It keeps every `[services]` entry it read at login in memory and writes
+  the lot back when it saves.** Emptying the group in the file does nothing:
+  the old holder keeps the key, our new claim on it is refused, and the group
+  reappears in the file minutes later. `accel_release` hands the key back in
+  the *running server* (`setForeignShortcutKeys` with no keys) and
+  `accel_unregister` drops the action, and only then is purging the group from
+  the file safe. `rmpr shortcuts migrate` does all of it, and this is why
+  `accel_reload` now pushes everyone else's changes *before* telling our own
+  daemon: the holder has to let go before the new claimant asks.
+- **Its writeback is on a timer.** An unregister returns long before
+  kglobalaccel saves, so keys written to the file in between are overwritten
+  from memory -- which is exactly how the first run of `migrate` left every
+  action at `none` while reporting success. `migrate` waits for the writeout,
+  then checks what actually landed and retries once, and says which action it
+  could not place rather than claiming five were moved.
+
+#### The test suite unbound the user's keys, twice
+
+Worth writing down because it took the second report to find. `make test`
+runs `tests/test-windows.sh`, which renders the real `bin/windowsd.py.in` and
+**runs it against the real session bus** -- there is no other one -- under a
+bus name of its own. The moment the daemon grew a `GlobalShortcuts`, that copy
+registered the shell's kglobalaccel component with the *sandbox's* empty
+bindings, and kglobalaccel does what it is told: it took every key off the
+real daemon. From outside it looked exactly like the fix not working.
+
+Two guards now, either of which is enough:
+
+- `shortcuts_wanted()` -- only the daemon holding the shell's own bus name
+  claims the shell's keys. The bus name is the one thing only one process can
+  hold, so it is what decides; a copy under any other name leaves them alone
+  and says so on stderr.
+- `test-windows.sh` sets the no-session variable as well, and checks that the
+  test daemon registered no component.
+
+Reproduced, fixed and re-checked by measurement: bind the keys, run `make
+test`, read them back off kglobalaccel. Before: all gone. After: all six
+still there.
+
+#### What is left
+
+- **The desktop files are still installed** (`~/.local/share/applications/
+  remappr-shell-*.desktop`) and still carry `X-KDE-GlobalAccel-CommandShortcut`.
+  They are no longer how a key is bound, and nothing writes `_launch` any
+  more; they are kept because binding one from System Settings is a route a
+  person may reach for, and `migrate` takes the key back from it. If they are
+  ever dropped, the manifest, `KeyMap.shellRows` and `shortcuts migrate` all
+  refer to them.
+- **A held modifier is not watched.** `globalShortcutReleased` exists on the
+  component and the switcher does not use it: it takes the release from its
+  own exclusive keyboard focus instead. That works while the surface is up
+  before the key goes, which is the case that has not been tried by hand.
 
 ### Two papercuts left, both small
 
