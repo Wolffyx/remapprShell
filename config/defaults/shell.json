@@ -4,7 +4,16 @@
         "mode": "auto",
         "accent": "plasma",
         "translucent": true,
-        "rounding": 28
+        "rounding": 28,
+        "desktop": {
+            "enabled": true,
+            "colours": true,
+            "icons": true,
+            "style": true,
+            "plasmaTheme": true,
+            "decorations": true,
+            "switcher": true
+        }
     },
     "panel": {
         "renderer": "quickshell",

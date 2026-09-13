@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs and activates the look-and-feel package, reversibly.
 #
-#   apply [--appearance]   install the package and activate it
+#   apply [--appearance|--package-only]
+#                          install the package and activate it
 #   revert                 put every key back and remove the package
 #   osd ours|plasma        which OSD draws when our package is active
 #   style [<id>|revert]    the Qt style every application is drawn in
@@ -9,15 +10,22 @@
 #                          how to install a style that is missing
 #   status [--json]        what is active, and what would be undone
 #
-# A plain apply installs the package and activates it -- which is what makes
-# our OSD, splash and logout screens take effect -- and touches nothing else.
+# An apply installs the package and activates it -- which is what makes our
+# OSD, splash and logout screens take effect -- and then themes the desktop:
+# the colour scheme, icon theme, widget style, Plasma theme, window decorations
+# and the Alt+Tab switcher, from the package's `defaults` file.
 #
-# --appearance additionally writes the colour scheme, icon theme, widget style
-# and window decoration from the package's `defaults` file. That is opt-in
-# because those are the settings a user is most likely to have deliberately
-# chosen: overwriting a dynamic colour scheme with a static one, uninvited, is
-# exactly the kind of surprise this project is meant not to spring. It is
-# ledgered like everything else, so `revert` puts it all back either way.
+# Which of those it touches is the user's, under `theme.desktop`: the whole
+# thing has a switch and so does every part, the settings window offers them as
+# checkboxes, and a part that is off keeps whatever System Settings says. They
+# default to on, so choosing this shell's theme themes the desktop to match it
+# rather than leaving the two disagreeing.
+#
+# --package-only ignores all of that and installs the package alone.
+# --appearance is the older spelling of "yes, the desktop too", kept because
+# scripts and documentation use it.
+#
+# Every key is ledgered, so `revert` puts all of it back whatever was applied.
 #
 # Keys are written individually through the ledger rather than with
 # `lookandfeeltool --apply`. lookandfeeltool overwrites the colour scheme, icon
@@ -30,6 +38,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
@@ -217,15 +226,48 @@ remove_colors() {
 # The file's group syntax is [file][Group], and a nested group appears as
 # [file][A][B] -- which kwriteconfig6 expresses as repeated --group arguments,
 # so it is passed through as "A/B".
+# Is this part of the desktop ours to theme? `theme.desktop.enabled` is the
+# whole question and each part is a second one, so turning the lot off is one
+# setting and leaving out just the colour scheme is another. Anything left out
+# keeps whatever the user chose in System Settings.
+desktop_part_wanted() {
+    local part=$1
+    [ "$(config_get ".theme.desktop.enabled" true)" = "true" ] || return 1
+    [ "$(config_get ".theme.desktop.$part" true)" = "true" ]
+}
+
+# Which parts would be written, and which are left alone -- for `status` and
+# for saying out loud what an apply did.
+desktop_parts() { printf '%s\n' colours icons style plasmaTheme decorations switcher; }
+
 apply_defaults() {
     local defaults="$LNF_DEST/contents/defaults"
     [ -f "$defaults" ] || { log_error "no defaults file at $defaults"; return 1; }
 
-    local file="" group="" line key value
+    local file="" group="" line key value part="" wanted=1
     while IFS= read -r line; do
         line=${line%%$'\r'}
         [ -n "$line" ] || continue
-        case "$line" in \#*) continue ;; esac
+
+        # `# part: <id>` governs the lines beneath it, up to the next marker.
+        case "$line" in
+            '#'*)
+                case "$line" in
+                    '# part: '*)
+                        part=${line#\# part: }
+                        if desktop_part_wanted "$part"; then
+                            wanted=1
+                        else
+                            wanted=0
+                            log_info "leaving $part alone (theme.desktop.$part is off)"
+                        fi
+                        ;;
+                esac
+                continue
+                ;;
+        esac
+
+        [ "$wanted" = 1 ] || continue
 
         if [[ "$line" =~ ^\[ ]]; then
             # [file][Group] or [file][A][B]
@@ -247,12 +289,14 @@ cmd=${1:-status}
 [ $# -gt 0 ] && shift
 
 WITH_APPEARANCE=0
+PACKAGE_ONLY=0
 WITH_JSON=0
 RUN_INSTALL=0
 positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --appearance) WITH_APPEARANCE=1 ;;
+        --package-only) PACKAGE_ONLY=1 ;;
         --json) WITH_JSON=1 ;;
         --run) RUN_INSTALL=1 ;;
         -*) die "unknown option: $1" ;;
@@ -344,11 +388,16 @@ case "$cmd" in
             chmod 644 "$LNF_DEST/contents/osd/Osd.qml"
         fi
 
-        if [ "$WITH_APPEARANCE" = 1 ]; then
+        # The desktop is themed unless it is turned off. `theme.desktop` says
+        # which parts, and `--package-only` overrides the lot for the case
+        # where somebody wants the package installed and nothing else touched.
+        if [ "$PACKAGE_ONLY" = 1 ]; then
+            log_info "package only: colour scheme, icons, widget style and the rest left alone"
+        elif [ "$WITH_APPEARANCE" = 1 ] || [ "$(config_get '.theme.desktop.enabled' true)" = "true" ]; then
             apply_defaults || die "could not write the defaults; run '$ALIAS theme revert'"
         else
-            log_info "leaving colour scheme, icons and widget style alone"
-            log_info "  (pass --appearance to apply those too)"
+            log_info "leaving the desktop alone (theme.desktop.enabled is off)"
+            log_info "  the shell is themed either way; --appearance applies the rest once"
         fi
 
         # Activating the package is what makes our OSD, splash and logout QML
@@ -407,9 +456,15 @@ case "$cmd" in
                 --argjson splash "$(has "$LNF_DEST/contents/splash/Splash.qml")" \
                 --arg style "$(style_active_id)" \
                 --argjson styles "$styles" \
+                --argjson desktop "$(for part in $(desktop_parts); do
+                                        printf '%s\t%s\n' "$part" "$(desktop_part_wanted "$part" && echo true || echo false)"
+                                    done | jq -R -s -c 'split("\n")[] | select(length > 0) | split("\t")
+                                                        | {(.[0]): (.[1] == "true")}' | jq -s -c 'add
+                                                        + {enabled: '"$(config_get '.theme.desktop.enabled' true)"'}')" \
                 --argjson styleCustomised "$(jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1 && echo true || echo false)" \
                 '{package: $package, active: ($active == $lnf),
                   parts: {schemes: $schemes, switcher: $switcher, desktoptheme: $desktoptheme, splash: $splash},
+                  desktop: $desktop,
                   style: $style, styles: $styles, styleCustomised: $styleCustomised}'
             exit 0
         fi
@@ -422,6 +477,16 @@ case "$cmd" in
         printf 'active Alt+Tab: %s\n' "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName --default '<unset>')"
         printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"
         printf 'widget style: %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle --default '<unset>')"
+        echo
+        if [ "$(config_get '.theme.desktop.enabled' true)" = "true" ]; then
+            echo 'themes the desktop: yes -- an apply writes these parts:'
+        else
+            echo 'themes the desktop: no (theme.desktop.enabled is off); an apply would write none of:'
+        fi
+        for part in $(desktop_parts); do
+            printf '  %-12s %s\n' "$part" \
+                "$(desktop_part_wanted "$part" && echo "applied" || echo "left as System Settings has it")"
+        done
         echo
         echo 'ledger (what revert would undo):'
         kconfig_ledger_summary theme

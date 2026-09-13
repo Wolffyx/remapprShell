@@ -1,552 +1,594 @@
 {
-  "comment": "Describes every setting so the GUI can render controls for it, and so docs/config.md can be generated from it. A section carrying both `page` and `keys` renders as the page -- that wins -- while the keys still reach the generated reference, which is how a setting that needs more than a control in the window is still documented as the config key it is. Deliberately the same shape as the `config` block in a widget.json, so one renderer handles built-in settings and third-party widgets alike.",
-  "sections": [
-    {
-      "id": "appearance",
-      "label": "Appearance",
-      "icon": "preferences-desktop-theme-global",
-      "glyph": "palette",
-      "page": "appearance",
-      "description": "How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.",
-      "keys": {
-        "theme.mode": {
-          "type": "enum",
-          "values": [
-            "auto",
-            "light",
-            "dark"
-          ],
-          "default": "auto",
-          "label": "Colour scheme",
-          "description": "auto turns the shell dark whenever the Plasma colour scheme is dark, and follows it the moment it changes -- so whatever switches KDE's scheme switches this shell with it. Plasma 6.7 has no day/night switch of its own for themes (its sunset switching is for wallpapers), so nothing here changes at sunset unless something else changes the scheme. light and dark hold it where they say."
+    "comment": "Describes every setting so the GUI can render controls for it, and so docs/config.md can be generated from it. A section carrying both `page` and `keys` renders as the page -- that wins -- while the keys still reach the generated reference, which is how a setting that needs more than a control in the window is still documented as the config key it is. Deliberately the same shape as the `config` block in a widget.json, so one renderer handles built-in settings and third-party widgets alike.",
+    "sections": [
+        {
+            "id": "appearance",
+            "label": "Appearance",
+            "icon": "preferences-desktop-theme-global",
+            "glyph": "palette",
+            "page": "appearance",
+            "description": "How the shell itself looks -- light or dark, its accent, its corners -- and the style every Qt application is drawn in. The shell's own colours change nothing outside it.",
+            "keys": {
+                "theme.mode": {
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "light",
+                        "dark"
+                    ],
+                    "default": "auto",
+                    "label": "Colour scheme",
+                    "description": "auto turns the shell dark whenever the Plasma colour scheme is dark, and follows it the moment it changes -- so whatever switches KDE's scheme switches this shell with it. Plasma 6.7 has no day/night switch of its own for themes (its sunset switching is for wallpapers), so nothing here changes at sunset unless something else changes the scheme. light and dark hold it where they say."
+                },
+                "theme.accent": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "blue",
+                        "teal",
+                        "magenta",
+                        "orange"
+                    ],
+                    "default": "plasma",
+                    "label": "Accent",
+                    "description": "plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too."
+                },
+                "theme.translucent": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Translucent surfaces",
+                    "description": "The panel and its popouts let a little of what is behind them through. Off draws them solid."
+                },
+                "theme.rounding": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 36,
+                    "step": 2,
+                    "default": 28,
+                    "label": "Corner rounding",
+                    "description": "The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion."
+                },
+                "theme.desktop.enabled": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Theme the whole desktop",
+                    "description": "Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back."
+                },
+                "theme.desktop.colours": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Colour scheme",
+                    "description": "The Plasma colour scheme every Qt application is drawn with. Off leaves whatever you have chosen in System Settings."
+                },
+                "theme.desktop.icons": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Icon theme",
+                    "description": "The icon theme, for applications and for the shell's own icons, which come from it rather than from a set of our own."
+                },
+                "theme.desktop.style": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Widget style",
+                    "description": "The Qt widget style applications are drawn in -- buttons, scrollbars, checkboxes."
+                },
+                "theme.desktop.plasmaTheme": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Plasma desktop theme",
+                    "description": "The theme Plasma's own surfaces use: the desktop, its widgets, and anything the shell does not draw itself."
+                },
+                "theme.desktop.decorations": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Window decorations",
+                    "description": "The titlebars and borders KWin draws around windows."
+                },
+                "theme.desktop.switcher": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Alt+Tab switcher",
+                    "description": "The window switcher's layout."
+                }
+            }
         },
-        "theme.accent": {
-          "type": "enum",
-          "values": [
-            "plasma",
-            "blue",
-            "teal",
-            "magenta",
-            "orange"
-          ],
-          "default": "plasma",
-          "label": "Accent",
-          "description": "plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too."
+        {
+            "id": "taskbar",
+            "label": "Taskbar",
+            "icon": "configure",
+            "glyph": "view_agenda",
+            "page": "taskbar",
+            "description": "The panel: where it sits, how big it is, and the widgets that are parts of it -- the clock, the workspace pills and the window buttons. Every one of these is a configuration key, so a profile can set them by hand as well.",
+            "keys": {
+                "panel.position": {
+                    "type": "enum",
+                    "values": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right"
+                    ],
+                    "default": "bottom",
+                    "label": "Position",
+                    "description": "Which edge the panel is anchored to."
+                },
+                "panel.thickness": {
+                    "type": "int",
+                    "min": 28,
+                    "max": 96,
+                    "step": 2,
+                    "default": 56,
+                    "label": "Thickness",
+                    "description": "Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it."
+                },
+                "panel.style": {
+                    "type": "enum",
+                    "values": [
+                        "full",
+                        "floating",
+                        "islands"
+                    ],
+                    "default": "full",
+                    "label": "Style",
+                    "description": "full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own."
+                },
+                "panel.spacing": {
+                    "type": "int",
+                    "min": 2,
+                    "max": 16,
+                    "default": 6,
+                    "label": "Spacing",
+                    "description": "The gap between widgets, in pixels."
+                },
+                "panel.iconSize": {
+                    "type": "int",
+                    "min": 15,
+                    "max": 26,
+                    "default": 19,
+                    "label": "Tray icon size",
+                    "description": "The size of the tray's and the status icons, in pixels."
+                },
+                "panel.revealOnHover": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Reveal on hover",
+                    "description": "With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say."
+                },
+                "panel.autoHide": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Hide until pointed at",
+                    "description": "The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen."
+                }
+            }
         },
-        "theme.translucent": {
-          "type": "bool",
-          "default": true,
-          "label": "Translucent surfaces",
-          "description": "The panel and its popouts let a little of what is behind them through. Off draws them solid."
+        {
+            "id": "windows",
+            "label": "Windows",
+            "icon": "preferences-system-windows",
+            "glyph": "select_window",
+            "page": "windows",
+            "description": "What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here."
         },
-        "theme.rounding": {
-          "type": "int",
-          "min": 0,
-          "max": 36,
-          "step": 2,
-          "default": 28,
-          "label": "Corner rounding",
-          "description": "The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion."
+        {
+            "id": "launcher",
+            "label": "Launcher",
+            "icon": "start-here-kde",
+            "glyph": "search",
+            "page": "launcher",
+            "description": "What opens when you press the start button, and what opens when you search.",
+            "keys": {
+                "launcher.provider": {
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "kickoff",
+                        "builtin",
+                        "krunner",
+                        "fuzzel",
+                        "rofi",
+                        "custom"
+                    ],
+                    "default": "auto",
+                    "label": "Application menu",
+                    "description": "Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one."
+                },
+                "launcher.searchProvider": {
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "krunner",
+                        "builtin",
+                        "kickoff",
+                        "fuzzel",
+                        "rofi",
+                        "custom"
+                    ],
+                    "default": "auto",
+                    "label": "Search",
+                    "description": "KRunner is Plasma's own search."
+                },
+                "launcher.layout": {
+                    "type": "enum",
+                    "values": [
+                        "twopane",
+                        "grid",
+                        "list"
+                    ],
+                    "default": "twopane",
+                    "label": "Start menu",
+                    "description": "How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu."
+                },
+                "launcher.actionPrefix": {
+                    "type": "enum",
+                    "values": [
+                        ">",
+                        ":",
+                        "/"
+                    ],
+                    "default": ">",
+                    "label": "Action prefix",
+                    "description": "Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications."
+                },
+                "launcher.dense": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Compact results",
+                    "description": "Shorter rows in the built-in search, so more fit."
+                },
+                "launcher.hints": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Key hints",
+                    "description": "The keys the built-in search answers to, under its results."
+                },
+                "launcher.pinned": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Pinned applications",
+                    "description": "Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed."
+                },
+                "launcher.kickoffMode": {
+                    "type": "enum",
+                    "values": [
+                        "menu",
+                        "windowed"
+                    ],
+                    "default": "menu",
+                    "label": "Kickoff style",
+                    "description": "Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus."
+                }
+            }
+        },
+        {
+            "id": "notifications",
+            "label": "Notifications",
+            "icon": "notifications",
+            "glyph": "notifications",
+            "page": "notifications",
+            "description": "Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.",
+            "keys": {
+                "notifications.server": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "shell"
+                    ],
+                    "default": "plasma",
+                    "label": "Drawn by",
+                    "description": "plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it."
+                },
+                "notifications.popupTimeout": {
+                    "type": "int",
+                    "min": 2,
+                    "max": 30,
+                    "default": 6,
+                    "label": "Popups stay for (seconds)",
+                    "description": "Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them."
+                },
+                "notifications.popupPosition": {
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "top-right",
+                        "top-center",
+                        "top-left",
+                        "bottom-right",
+                        "bottom-center",
+                        "bottom-left"
+                    ],
+                    "default": "auto",
+                    "label": "Popups appear at",
+                    "description": "auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them."
+                },
+                "notifications.centreStyle": {
+                    "type": "enum",
+                    "values": [
+                        "grouped",
+                        "stream"
+                    ],
+                    "default": "grouped",
+                    "label": "Notification centre",
+                    "description": "What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier."
+                },
+                "notifications.history": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Keep a history",
+                    "description": "Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all."
+                },
+                "notifications.historySize": {
+                    "type": "int",
+                    "min": 5,
+                    "max": 500,
+                    "step": 5,
+                    "default": 50,
+                    "label": "Remember",
+                    "description": "How many recent notifications to keep."
+                }
+            }
+        },
+        {
+            "id": "lock",
+            "label": "Lock & session",
+            "icon": "system-log-out",
+            "glyph": "lock",
+            "page": "lock",
+            "description": "This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.",
+            "keys": {
+                "session.prompt": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "shell"
+                    ],
+                    "default": "plasma",
+                    "label": "Ending the session asks with",
+                    "description": "plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save."
+                }
+            }
+        },
+        {
+            "id": "desktop",
+            "label": "Desktop",
+            "icon": "preferences-desktop-wallpaper",
+            "glyph": "wallpaper",
+            "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
+            "keys": {
+                "desktop.border": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Rounded screen border",
+                    "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
+                },
+                "desktop.borderInset": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 40,
+                    "default": 10,
+                    "label": "Border width",
+                    "description": "How far in from each edge the frame is painted, in pixels."
+                },
+                "desktop.borderRadius": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 48,
+                    "default": 26,
+                    "label": "Corner radius",
+                    "description": "How round the painted corners are, in pixels."
+                },
+                "desktop.clock": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Clock on the desktop",
+                    "description": "The time and date on the wallpaper, under every window."
+                },
+                "desktop.clockPosition": {
+                    "type": "enum",
+                    "values": [
+                        "top-left",
+                        "top-right",
+                        "bottom-left",
+                        "bottom-right"
+                    ],
+                    "default": "bottom-right",
+                    "label": "Where it sits"
+                },
+                "desktop.clockSize": {
+                    "type": "int",
+                    "min": 40,
+                    "max": 200,
+                    "default": 92,
+                    "label": "How big",
+                    "description": "The height of the time, in pixels; the date follows it."
+                },
+                "desktop.clockDate": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Show the date"
+                },
+                "desktop.clockInk": {
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "light",
+                        "dark"
+                    ],
+                    "default": "auto",
+                    "label": "Ink",
+                    "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed."
+                }
+            }
+        },
+        {
+            "id": "services",
+            "label": "Plasma services",
+            "icon": "preferences-system",
+            "glyph": "memory",
+            "description": "Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
+            "keys": {
+                "services.hostPlasma": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Keep Plasma's notifications, clipboard and device notifier running",
+                    "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
+                }
+            }
+        },
+        {
+            "id": "widgets",
+            "label": "Widgets",
+            "icon": "preferences-desktop-plasma",
+            "glyph": "widgets",
+            "page": "widgets",
+            "description": "What appears on the panel, and in which zone."
+        },
+        {
+            "id": "tray",
+            "label": "Tray icons",
+            "icon": "preferences-system-tray",
+            "glyph": "expand_circle_down",
+            "page": "tray",
+            "description": "Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another."
+        },
+        {
+            "id": "edges",
+            "label": "Screen edges",
+            "icon": "preferences-system-windows-effect-screenedge",
+            "glyph": "border_outer",
+            "page": "edges",
+            "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
+        },
+        {
+            "id": "switching",
+            "label": "Switching windows",
+            "icon": "preferences-system-tabbox",
+            "glyph": "switch_access_2",
+            "page": "switching",
+            "description": "What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked."
+        },
+        {
+            "id": "osd",
+            "label": "On-screen display",
+            "icon": "audio-volume-high",
+            "glyph": "display_settings",
+            "description": "The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.",
+            "keys": {
+                "osd.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Draw our own",
+                    "description": "Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was."
+                },
+                "osd.timeout": {
+                    "type": "int",
+                    "min": 500,
+                    "max": 5000,
+                    "step": 100,
+                    "default": 1800,
+                    "label": "Visible for",
+                    "description": "Milliseconds before it fades."
+                }
+            }
+        },
+        {
+            "id": "presets",
+            "label": "Layouts",
+            "icon": "preferences-desktop-theme",
+            "glyph": "style",
+            "page": "presets",
+            "description": "Shipped panel layouts. Applying one replaces your current configuration."
+        },
+        {
+            "id": "profiles",
+            "label": "Profiles",
+            "icon": "preferences-desktop-display",
+            "glyph": "folder_managed",
+            "page": "profiles",
+            "description": "Separate configurations you can switch between, and per-monitor overrides within each."
+        },
+        {
+            "id": "snapshots",
+            "label": "Restore points",
+            "icon": "document-save",
+            "glyph": "history",
+            "page": "snapshots",
+            "description": "Snapshots of your KDE configuration. Nothing here is ever deleted automatically."
+        },
+        {
+            "id": "renderer",
+            "label": "Drawn by",
+            "icon": "preferences-desktop-plasma",
+            "glyph": "dashboard",
+            "page": "renderer",
+            "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
+            "keys": {
+                "panel.renderer": {
+                    "type": "enum",
+                    "values": [
+                        "quickshell",
+                        "plasma",
+                        "caelestia",
+                        "none"
+                    ],
+                    "default": "quickshell",
+                    "label": "Drawn by",
+                    "description": "Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
+                }
+            }
+        },
+        {
+            "id": "ai",
+            "label": "AI assist",
+            "icon": "help-hint",
+            "glyph": "smart_toy",
+            "page": "ai",
+            "description": "When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.",
+            "keys": {
+                "ai.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "AI assist",
+                    "description": "Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about."
+                },
+                "ai.provider": {
+                    "type": "enum",
+                    "values": [
+                        "clipboard",
+                        "claude-code",
+                        "ollama",
+                        "custom"
+                    ],
+                    "default": "clipboard",
+                    "label": "Provider",
+                    "description": "`clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered."
+                },
+                "ai.command": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Custom command",
+                    "description": "For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input."
+                },
+                "ai.ollamaUrl": {
+                    "type": "string",
+                    "default": "http://127.0.0.1:11434",
+                    "label": "Ollama address",
+                    "description": "Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other."
+                },
+                "ai.ollamaModel": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Ollama model",
+                    "description": "Empty picks the first model Ollama lists."
+                }
+            }
+        },
+        {
+            "id": "about",
+            "label": "About",
+            "icon": "help-about",
+            "glyph": "info",
+            "page": "about"
         }
-      }
-    },
-    {
-      "id": "taskbar",
-      "label": "Taskbar",
-      "icon": "configure",
-      "glyph": "view_agenda",
-      "page": "taskbar",
-      "description": "The panel: where it sits, how big it is, and the widgets that are parts of it -- the clock, the workspace pills and the window buttons. Every one of these is a configuration key, so a profile can set them by hand as well.",
-      "keys": {
-        "panel.position": {
-          "type": "enum",
-          "values": [
-            "top",
-            "bottom",
-            "left",
-            "right"
-          ],
-          "default": "bottom",
-          "label": "Position",
-          "description": "Which edge the panel is anchored to."
-        },
-        "panel.thickness": {
-          "type": "int",
-          "min": 28,
-          "max": 96,
-          "step": 2,
-          "default": 56,
-          "label": "Thickness",
-          "description": "Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it."
-        },
-        "panel.style": {
-          "type": "enum",
-          "values": [
-            "full",
-            "floating",
-            "islands"
-          ],
-          "default": "full",
-          "label": "Style",
-          "description": "full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own."
-        },
-        "panel.spacing": {
-          "type": "int",
-          "min": 2,
-          "max": 16,
-          "default": 6,
-          "label": "Spacing",
-          "description": "The gap between widgets, in pixels."
-        },
-        "panel.iconSize": {
-          "type": "int",
-          "min": 15,
-          "max": 26,
-          "default": 19,
-          "label": "Tray icon size",
-          "description": "The size of the tray's and the status icons, in pixels."
-        },
-        "panel.revealOnHover": {
-          "type": "bool",
-          "default": true,
-          "label": "Reveal on hover",
-          "description": "With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say."
-        },
-        "panel.autoHide": {
-          "type": "bool",
-          "default": false,
-          "label": "Hide until pointed at",
-          "description": "The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen."
-        }
-      }
-    },
-    {
-      "id": "windows",
-      "label": "Windows",
-      "icon": "preferences-system-windows",
-      "glyph": "select_window",
-      "page": "windows",
-      "description": "What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here."
-    },
-    {
-      "id": "launcher",
-      "label": "Launcher",
-      "icon": "start-here-kde",
-      "glyph": "search",
-      "page": "launcher",
-      "description": "What opens when you press the start button, and what opens when you search.",
-      "keys": {
-        "launcher.provider": {
-          "type": "enum",
-          "values": [
-            "auto",
-            "kickoff",
-            "builtin",
-            "krunner",
-            "fuzzel",
-            "rofi",
-            "custom"
-          ],
-          "default": "auto",
-          "label": "Application menu",
-          "description": "Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one."
-        },
-        "launcher.searchProvider": {
-          "type": "enum",
-          "values": [
-            "auto",
-            "krunner",
-            "builtin",
-            "kickoff",
-            "fuzzel",
-            "rofi",
-            "custom"
-          ],
-          "default": "auto",
-          "label": "Search",
-          "description": "KRunner is Plasma's own search."
-        },
-        "launcher.layout": {
-          "type": "enum",
-          "values": [
-            "twopane",
-            "grid",
-            "list"
-          ],
-          "default": "twopane",
-          "label": "Start menu",
-          "description": "How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu."
-        },
-        "launcher.actionPrefix": {
-          "type": "enum",
-          "values": [
-            ">",
-            ":",
-            "/"
-          ],
-          "default": ">",
-          "label": "Action prefix",
-          "description": "Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications."
-        },
-        "launcher.dense": {
-          "type": "bool",
-          "default": false,
-          "label": "Compact results",
-          "description": "Shorter rows in the built-in search, so more fit."
-        },
-        "launcher.hints": {
-          "type": "bool",
-          "default": true,
-          "label": "Key hints",
-          "description": "The keys the built-in search answers to, under its results."
-        },
-        "launcher.pinned": {
-          "type": "list",
-          "default": [],
-          "label": "Pinned applications",
-          "description": "Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed."
-        },
-        "launcher.kickoffMode": {
-          "type": "enum",
-          "values": [
-            "menu",
-            "windowed"
-          ],
-          "default": "menu",
-          "label": "Kickoff style",
-          "description": "Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus."
-        }
-      }
-    },
-    {
-      "id": "notifications",
-      "label": "Notifications",
-      "icon": "notifications",
-      "glyph": "notifications",
-      "page": "notifications",
-      "description": "Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.",
-      "keys": {
-        "notifications.server": {
-          "type": "enum",
-          "values": [
-            "plasma",
-            "shell"
-          ],
-          "default": "plasma",
-          "label": "Drawn by",
-          "description": "plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it."
-        },
-        "notifications.popupTimeout": {
-          "type": "int",
-          "min": 2,
-          "max": 30,
-          "default": 6,
-          "label": "Popups stay for (seconds)",
-          "description": "Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them."
-        },
-        "notifications.popupPosition": {
-          "type": "enum",
-          "values": [
-            "auto",
-            "top-right",
-            "top-center",
-            "top-left",
-            "bottom-right",
-            "bottom-center",
-            "bottom-left"
-          ],
-          "default": "auto",
-          "label": "Popups appear at",
-          "description": "auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them."
-        },
-        "notifications.centreStyle": {
-          "type": "enum",
-          "values": [
-            "grouped",
-            "stream"
-          ],
-          "default": "grouped",
-          "label": "Notification centre",
-          "description": "What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier."
-        },
-        "notifications.history": {
-          "type": "bool",
-          "default": false,
-          "label": "Keep a history",
-          "description": "Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all."
-        },
-        "notifications.historySize": {
-          "type": "int",
-          "min": 5,
-          "max": 500,
-          "step": 5,
-          "default": 50,
-          "label": "Remember",
-          "description": "How many recent notifications to keep."
-        }
-      }
-    },
-    {
-      "id": "lock",
-      "label": "Lock & session",
-      "icon": "system-log-out",
-      "glyph": "lock",
-      "page": "lock",
-      "description": "This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.",
-      "keys": {
-        "session.prompt": {
-          "type": "enum",
-          "values": [
-            "plasma",
-            "shell"
-          ],
-          "default": "plasma",
-          "label": "Ending the session asks with",
-          "description": "plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save."
-        }
-      }
-    },
-    {
-      "id": "desktop",
-      "label": "Desktop",
-      "icon": "preferences-desktop-wallpaper",
-      "glyph": "wallpaper",
-      "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
-      "keys": {
-        "desktop.border": {
-          "type": "bool",
-          "default": false,
-          "label": "Rounded screen border",
-          "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
-        },
-        "desktop.borderInset": {
-          "type": "int",
-          "min": 0,
-          "max": 40,
-          "default": 10,
-          "label": "Border width",
-          "description": "How far in from each edge the frame is painted, in pixels."
-        },
-        "desktop.borderRadius": {
-          "type": "int",
-          "min": 0,
-          "max": 48,
-          "default": 26,
-          "label": "Corner radius",
-          "description": "How round the painted corners are, in pixels."
-        },
-        "desktop.clock": {
-          "type": "bool",
-          "default": false,
-          "label": "Clock on the desktop",
-          "description": "The time and date on the wallpaper, under every window."
-        },
-        "desktop.clockPosition": {
-          "type": "enum",
-          "values": [
-            "top-left",
-            "top-right",
-            "bottom-left",
-            "bottom-right"
-          ],
-          "default": "bottom-right",
-          "label": "Where it sits"
-        },
-        "desktop.clockSize": {
-          "type": "int",
-          "min": 40,
-          "max": 200,
-          "default": 92,
-          "label": "How big",
-          "description": "The height of the time, in pixels; the date follows it."
-        },
-        "desktop.clockDate": {
-          "type": "bool",
-          "default": true,
-          "label": "Show the date"
-        },
-        "desktop.clockInk": {
-          "type": "enum",
-          "values": [
-            "auto",
-            "light",
-            "dark"
-          ],
-          "default": "auto",
-          "label": "Ink",
-          "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed."
-        }
-      }
-    },
-    {
-      "id": "services",
-      "label": "Plasma services",
-      "icon": "preferences-system",
-      "glyph": "memory",
-      "description": "Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
-      "keys": {
-        "services.hostPlasma": {
-          "type": "bool",
-          "default": true,
-          "label": "Keep Plasma's notifications, clipboard and device notifier running",
-          "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
-        }
-      }
-    },
-    {
-      "id": "widgets",
-      "label": "Widgets",
-      "icon": "preferences-desktop-plasma",
-      "glyph": "widgets",
-      "page": "widgets",
-      "description": "What appears on the panel, and in which zone."
-    },
-    {
-      "id": "tray",
-      "label": "Tray icons",
-      "icon": "preferences-system-tray",
-      "glyph": "expand_circle_down",
-      "page": "tray",
-      "description": "Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another."
-    },
-    {
-      "id": "edges",
-      "label": "Screen edges",
-      "icon": "preferences-system-windows-effect-screenedge",
-      "glyph": "border_outer",
-      "page": "edges",
-      "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
-    },
-    {
-      "id": "switching",
-      "label": "Switching windows",
-      "icon": "preferences-system-tabbox",
-      "glyph": "switch_access_2",
-      "page": "switching",
-      "description": "What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked."
-    },
-    {
-      "id": "osd",
-      "label": "On-screen display",
-      "icon": "audio-volume-high",
-      "glyph": "display_settings",
-      "description": "The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.",
-      "keys": {
-        "osd.enabled": {
-          "type": "bool",
-          "default": false,
-          "label": "Draw our own",
-          "description": "Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was."
-        },
-        "osd.timeout": {
-          "type": "int",
-          "min": 500,
-          "max": 5000,
-          "step": 100,
-          "default": 1800,
-          "label": "Visible for",
-          "description": "Milliseconds before it fades."
-        }
-      }
-    },
-    {
-      "id": "presets",
-      "label": "Layouts",
-      "icon": "preferences-desktop-theme",
-      "glyph": "style",
-      "page": "presets",
-      "description": "Shipped panel layouts. Applying one replaces your current configuration."
-    },
-    {
-      "id": "profiles",
-      "label": "Profiles",
-      "icon": "preferences-desktop-display",
-      "glyph": "folder_managed",
-      "page": "profiles",
-      "description": "Separate configurations you can switch between, and per-monitor overrides within each."
-    },
-    {
-      "id": "snapshots",
-      "label": "Restore points",
-      "icon": "document-save",
-      "glyph": "history",
-      "page": "snapshots",
-      "description": "Snapshots of your KDE configuration. Nothing here is ever deleted automatically."
-    },
-    {
-      "id": "renderer",
-      "label": "Drawn by",
-      "icon": "preferences-desktop-plasma",
-      "glyph": "dashboard",
-      "page": "renderer",
-      "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
-      "keys": {
-        "panel.renderer": {
-          "type": "enum",
-          "values": [
-            "quickshell",
-            "plasma",
-            "caelestia",
-            "none"
-          ],
-          "default": "quickshell",
-          "label": "Drawn by",
-          "description": "Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
-        }
-      }
-    },
-    {
-      "id": "ai",
-      "label": "AI assist",
-      "icon": "help-hint",
-      "glyph": "smart_toy",
-      "page": "ai",
-      "description": "When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.",
-      "keys": {
-        "ai.enabled": {
-          "type": "bool",
-          "default": false,
-          "label": "AI assist",
-          "description": "Turns on the 'ask' actions: in the notification history, as a global shortcut, and as `rmpr ask`. It also starts the notification listener, since a notification has to have been seen to be asked about."
-        },
-        "ai.provider": {
-          "type": "enum",
-          "values": [
-            "clipboard",
-            "claude-code",
-            "ollama",
-            "custom"
-          ],
-          "default": "clipboard",
-          "label": "Provider",
-          "description": "`clipboard` copies the report for pasting anywhere and sends nothing. `claude-code` opens the `claude` command with the report. `ollama` asks a local model over HTTP. `custom` runs `ai.command`. Providers whose program is not installed are not offered."
-        },
-        "ai.command": {
-          "type": "list",
-          "default": [],
-          "label": "Custom command",
-          "description": "For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input."
-        },
-        "ai.ollamaUrl": {
-          "type": "string",
-          "default": "http://127.0.0.1:11434",
-          "label": "Ollama address",
-          "description": "Where the `ollama` provider sends its request. An address that is not this machine counts as leaving it, and is confirmed like any other."
-        },
-        "ai.ollamaModel": {
-          "type": "string",
-          "default": "",
-          "label": "Ollama model",
-          "description": "Empty picks the first model Ollama lists."
-        }
-      }
-    },
-    {
-      "id": "about",
-      "label": "About",
-      "icon": "help-about",
-      "glyph": "info",
-      "page": "about"
-    }
-  ]
+    ]
 }

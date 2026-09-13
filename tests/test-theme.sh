@@ -63,15 +63,58 @@ export "${ENV_PREFIX}_STYLE_DIRS=$SANDBOX/styles"
 mkdir -p "$COLORS_DIR"
 printf '[General]\nName=Theirs\n' > "$COLORS_DIR/TheirScheme.colors"
 
-echo "== apply (default: package only) =="
+# Choosing this shell's theme themes the desktop to match it: that is the
+# default, so that the panel and the applications under it do not disagree.
+# What it is allowed to touch is `theme.desktop`, part by part.
+profile="$CONFIG_DIR/profiles/default/shell.json"
+mkdir -p "$(dirname "$profile")"
+desktop_parts_off() {   # desktop_parts_off <jq assignment>
+    if [ -n "$1" ]; then printf '{ "theme": { "desktop": %s } }\n' "$1" > "$profile"
+    else rm -f "$profile"; fi
+}
+
+echo "== apply (default: the desktop too) =="
+desktop_parts_off ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
 
 check "look and feel active"        "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
-check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
-check "icon theme left alone"       "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "user-icons"
+check "colour scheme is ours"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "icon theme is ours"          "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
 check "back to the user scheme"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+check "and their icons"             "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "user-icons"
+
+echo "== a part left out keeps what System Settings says =="
+desktop_parts_off '{ "colours": false }'
+"$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
+
+check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+check "but the icons are ours"      "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
+check "and the decorations"         "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
+check "the package is still active" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "status says which"           "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.colours')" "false"
+check "and which are on"            "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.icons')" "true"
+"$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
+
+echo "== the whole switch off writes nothing outside our own package =="
+desktop_parts_off '{ "enabled": false }'
+"$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
+
+check "colour scheme untouched"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+check "icons untouched"             "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "user-icons"
+check "Alt+Tab still theirs"        "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "thumbnail_grid"
+check "the shell is themed anyway"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "status says so"              "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.enabled')" "false"
+"$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
+
+echo "== --package-only ignores the settings entirely =="
+desktop_parts_off ""
+"$REPO_ROOT/scripts/theme.sh" apply --package-only >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
+check "nothing but the package"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
+check "the package is active"       "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+"$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
+desktop_parts_off ""
 
 echo "== apply --appearance =="
 "$REPO_ROOT/scripts/theme.sh" apply --appearance >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
@@ -96,7 +139,6 @@ check "unrelated key untouched" "$(kreadconfig6 --file kwinrc --group Windows --
 # that one file is the whole mechanism.
 echo "== which OSD draws =="
 osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
-profile="$CONFIG_DIR/profiles/default/shell.json"
 
 check "Plasma's by default"    "$(grep -c 'drawn as nothing' "$osd_file")" "0"
 

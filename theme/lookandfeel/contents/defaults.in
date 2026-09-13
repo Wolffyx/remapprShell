@@ -1,18 +1,34 @@
+# What `@ALIAS@ theme apply` writes into KDE's own configuration, and which
+# part of the desktop each line belongs to.
+#
+# A `# part:` marker names the setting under `theme.desktop` that governs the
+# lines beneath it, so what the settings window offers and what actually gets
+# written come from one declaration rather than two that can disagree. A line
+# whose part is turned off is not written at all, and keeps whatever the user
+# chose in System Settings. Every line that is written goes through the ledger,
+# so `@ALIAS@ theme revert` puts it back either way.
+
+# part: style
 [kdeglobals][KDE]
 widgetStyle=Breeze
 
+# part: colours
 [kdeglobals][General]
 ColorScheme=@DISPLAY_NAME@ Dark
 
+# part: icons
 [kdeglobals][Icons]
 Theme=breeze-dark
 
+# part: plasmaTheme
 [plasmarc][Theme]
 name=@SLUG@
 
+# part: decorations
 [kwinrc][org.kde.kdecoration2]
 library=org.kde.breeze
 theme=Breeze
 
+# part: switcher
 [kwinrc][TabBox]
 LayoutName=@SLUG@

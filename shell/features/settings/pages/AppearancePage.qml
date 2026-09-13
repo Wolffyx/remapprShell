@@ -420,20 +420,63 @@ Column {
     }
 
     TextButton {
-        visible: root.missing.length > 0
         enabled: !root.busy
         iconName: "run-install"
-        text: root.themeState?.package ? "Install the missing parts" : "Install the theme"
+        text: root.missing.length > 0
+              ? (root.themeState?.package ? "Install the missing parts and apply" : "Install the theme")
+              : "Apply the theme"
         onActivated: root.run(["apply"])
     }
 
     PanelText {
-        visible: root.missing.length > 0
         width: root.width
         wrapMode: Text.WordWrap
         color: Theme.foregroundInactive
         font.pixelSize: 11
-        text: "A restore point is taken first. Your colours, icons and style are left as they are; the new parts appear in System Settings for you to choose."
+        text: "A restore point is taken first, and every key is recorded, so \"Undo everything\" puts the desktop back exactly as it was."
+    }
+
+    // What the theme is allowed to touch.
+    //
+    // The parts are the schema's, and the same names the CLI prints, so a
+    // checkbox here and `theme status` can never describe different things.
+    // Each one off keeps whatever System Settings says for it.
+    PanelText {
+        text: "What it themes"
+        font.pixelSize: 13
+        topPadding: 8
+    }
+
+    ToggleRow {
+        label: "Theme the whole desktop"
+        description: "Applications match the shell, rather than only the panel and its popouts."
+        checked: ConfigStore.value("theme.desktop.enabled", true) === true
+        onToggled: value => ConfigStore.set("theme.desktop.enabled", value)
+    }
+
+    Column {
+        width: root.width
+        opacity: ConfigStore.value("theme.desktop.enabled", true) === true ? 1 : 0.45
+        enabled: ConfigStore.value("theme.desktop.enabled", true) === true
+
+        Repeater {
+            model: [
+                { key: "colours",     label: "Colour scheme",        sub: "The colours every Qt application is drawn with." },
+                { key: "icons",       label: "Icon theme",           sub: "Applications, and the shell's own icons, which come from the theme." },
+                { key: "style",       label: "Widget style",         sub: "Buttons, scrollbars, checkboxes." },
+                { key: "plasmaTheme", label: "Plasma desktop theme", sub: "Plasma's own surfaces, and anything this shell does not draw." },
+                { key: "decorations", label: "Window decorations",   sub: "The titlebars and borders KWin draws." },
+                { key: "switcher",    label: "Alt+Tab switcher",     sub: "The window switcher's layout." }
+            ]
+
+            delegate: ToggleRow {
+                required property var modelData
+                label: modelData.label
+                description: modelData.sub
+                checked: ConfigStore.value(`theme.desktop.${modelData.key}`, true) === true
+                onToggled: value => ConfigStore.set(`theme.desktop.${modelData.key}`, value)
+            }
+        }
     }
 
     Row {

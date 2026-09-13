@@ -42,6 +42,13 @@ How the shell itself looks -- light or dark, its accent, its corners -- and the 
 | `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
 | `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
 | `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
+| `theme.desktop.enabled` | `true` or `false` | `true` | Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back. |
+| `theme.desktop.colours` | `true` or `false` | `true` | The Plasma colour scheme every Qt application is drawn with. Off leaves whatever you have chosen in System Settings. |
+| `theme.desktop.icons` | `true` or `false` | `true` | The icon theme, for applications and for the shell's own icons, which come from it rather than from a set of our own. |
+| `theme.desktop.style` | `true` or `false` | `true` | The Qt widget style applications are drawn in -- buttons, scrollbars, checkboxes. |
+| `theme.desktop.plasmaTheme` | `true` or `false` | `true` | The theme Plasma's own surfaces use: the desktop, its widgets, and anything the shell does not draw itself. |
+| `theme.desktop.decorations` | `true` or `false` | `true` | The titlebars and borders KWin draws around windows. |
+| `theme.desktop.switcher` | `true` or `false` | `true` | The window switcher's layout. |
 
 ### Taskbar
 

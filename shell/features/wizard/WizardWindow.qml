@@ -31,7 +31,7 @@ FloatingWindow {
 
     signal finished
 
-    readonly property int stepCount: 6
+    readonly property int stepCount: 7
     property int step: 0
 
     // Answers, held until Finish. Nothing is written while the user is still
@@ -42,6 +42,23 @@ FloatingWindow {
     property string preset: ""
     property string launcher: ConfigStore.value("launcher.provider", "auto")
     property string renderer: "quickshell"
+
+    // What this shell's theme is allowed to change outside itself. The whole
+    // desktop by default, so the panel and the applications under it agree;
+    // every part can be left out, and one left out keeps whatever System
+    // Settings says. The same names the settings window and `theme status`
+    // use.
+    property bool themeDesktop: ConfigStore.value("theme.desktop.enabled", true) === true
+    readonly property var themeParts: [
+        { key: "colours",     label: "Colour scheme",        sub: "The colours every Qt application is drawn with." },
+        { key: "icons",       label: "Icon theme",           sub: "Applications, and the shell's own icons." },
+        { key: "style",       label: "Widget style",         sub: "Buttons, scrollbars, checkboxes." },
+        { key: "plasmaTheme", label: "Plasma desktop theme", sub: "Plasma's own surfaces." },
+        { key: "decorations", label: "Window decorations",   sub: "Titlebars and borders." },
+        { key: "switcher",    label: "Alt+Tab switcher",     sub: "The window switcher's layout." }
+    ]
+    property var themeWanted: ({ colours: true, icons: true, style: true,
+                                 plasmaTheme: true, decorations: true, switcher: true })
     // "off", or a provider id. Off by default: nothing about a shell needs an
     // assistant, and a wizard that pre-ticked it would be choosing for people.
     property string ai: "off"
@@ -110,6 +127,10 @@ FloatingWindow {
         if (root.ai !== "off")
             ConfigStore.set("ai.provider", root.ai);
 
+        ConfigStore.set("theme.desktop.enabled", root.themeDesktop);
+        for (const part of root.themeParts)
+            ConfigStore.set(`theme.desktop.${part.key}`, root.themeWanted[part.key] !== false);
+
         if (root.renderer !== "quickshell") {
             root.status = `Switching to the ${root.renderer} renderer...`;
             rendererProc.command = [Branding.ctlBin, "renderer", "set", root.renderer, "--yes"];
@@ -160,7 +181,8 @@ FloatingWindow {
             text: [`Welcome`, `Where should the panel go?`, `Pick a layout`,
                    `What opens when you press the start button?`,
                    `What should draw the panel?`,
-                   `When something breaks, ask an assistant?`][root.step] ?? ""
+                   `When something breaks, ask an assistant?`,
+                   `What should the theme change?`][root.step] ?? ""
             font.pixelSize: 20
         }
 
@@ -296,6 +318,48 @@ FloatingWindow {
                     values: ["off"].concat(root.aiProviders)
                     currentIndex: Math.max(0, ["off"].concat(root.aiProviders).indexOf(root.ai))
                     onPicked: value => root.ai = value
+                }
+            }
+        }
+
+        // ---- 6: what the theme changes
+        Column {
+            visible: root.step === 6
+            width: parent.width
+            spacing: 6
+
+            PanelText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: `Choosing ${Branding.displayName}'s theme can retheme KDE itself, so applications match the shell rather than only the panel. Every key is recorded, and \`${Branding.shortName} theme revert\` puts all of it back.`
+            }
+
+            ToggleRow {
+                label: "Theme the whole desktop"
+                description: "Off confines the theme to what this shell draws."
+                checked: root.themeDesktop
+                onToggled: value => root.themeDesktop = value
+            }
+
+            Column {
+                width: parent.width
+                opacity: root.themeDesktop ? 1 : 0.45
+                enabled: root.themeDesktop
+
+                Repeater {
+                    model: root.themeParts
+
+                    delegate: ToggleRow {
+                        required property var modelData
+                        label: modelData.label
+                        description: modelData.sub
+                        checked: root.themeWanted[modelData.key] !== false
+                        onToggled: value => {
+                            const next = Object.assign({}, root.themeWanted);
+                            next[modelData.key] = value;
+                            root.themeWanted = next;
+                        }
+                    }
                 }
             }
 
