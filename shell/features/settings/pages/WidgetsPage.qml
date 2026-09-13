@@ -14,7 +14,7 @@ import qs.ui.primitives
 import qs.ui.controls
 import qs.features.settings
 
-Column {
+CardGrid {
     id: root
 
     readonly property var entries: ConfigStore.value("bar.entries", [])
@@ -85,248 +85,302 @@ Column {
         ConfigStore.set("bar.entries", next);
     }
 
-    spacing: 4
+    count: 2
 
-    Repeater {
-        model: root.entries
+    // A widget's row carries its name, its zone, a switch and five buttons, so
+    // both cards here take the whole row rather than half of it.
+    Card {
+        id: onPanel
 
-        Rectangle {
-            id: entryRow
+        width: root.width
+        spacing: 6
 
-            required property var modelData
-            required property int index
+        SectionLabel { text: "On the panel" }
 
-            readonly property var manifest: WidgetRegistry.manifest(entryRow.modelData.id)
-            readonly property bool known: entryRow.manifest !== null
-            readonly property bool quarantined: Quarantine.isQuarantined(entryRow.modelData.id)
-            property bool expanded: false
+        Repeater {
+            model: root.entries
 
-            width: root.width
-            height: body.implicitHeight + 12
-            radius: 6
-            color: Theme.backgroundAlternate
+            Rectangle {
+                id: entryRow
 
-            readonly property bool dragging: root.dragIndex === entryRow.index
+                required property var modelData
+                required property int index
 
-            // Above the others while it moves, so it is not drawn behind the
-            // rows it is passing.
-            z: entryRow.dragging ? 2 : 1
-            opacity: entryRow.dragging ? 0.85 : 1
+                readonly property var manifest: WidgetRegistry.manifest(entryRow.modelData.id)
+                readonly property bool known: entryRow.manifest !== null
+                readonly property bool quarantined: Quarantine.isQuarantined(entryRow.modelData.id)
+                property bool expanded: false
 
-            onHeightChanged: if (entryRow.height > 0) root.rowHeight = entryRow.height + 4
+                width: onPanel.width - 2 * onPanel.padding
+                height: body.implicitHeight + 12
+                radius: Theme.radiusOf(12)
+                color: Theme.s1
 
-            HoverHandler { id: rowHover }
+                readonly property bool dragging: root.dragIndex === entryRow.index
 
-            transform: Translate {
-                y: entryRow.dragging ? dragHandler.activeTranslation.y : root.dragShift(entryRow.index)
+                // Above the others while it moves, so it is not drawn behind the
+                // rows it is passing.
+                z: entryRow.dragging ? 2 : 1
+                opacity: entryRow.dragging ? 0.85 : 1
 
-                // Only the rows making way animate; the dragged one must track
-                // the pointer exactly or it feels like it is lagging behind.
-                Behavior on y {
-                    enabled: !entryRow.dragging
-                    NumberAnimation { duration: 90; easing.type: Easing.OutQuad }
+                onHeightChanged: if (entryRow.height > 0) root.rowHeight = entryRow.height + 4
+
+                HoverHandler { id: rowHover }
+
+                transform: Translate {
+                    y: entryRow.dragging ? dragHandler.activeTranslation.y : root.dragShift(entryRow.index)
+
+                    // Only the rows making way animate; the dragged one must track
+                    // the pointer exactly or it feels like it is lagging behind.
+                    Behavior on y {
+                        enabled: !entryRow.dragging
+                        NumberAnimation { duration: 90; easing.type: Easing.OutQuad }
+                    }
                 }
-            }
 
-            Column {
-                id: body
-                anchors.fill: parent
-                anchors.margins: 6
-                spacing: 6
+                Column {
+                    id: body
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    spacing: 6
 
-                Row {
-                    width: parent.width
-                    spacing: 8
+                    Row {
+                        id: line
 
-                    PanelIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 20
-                        iconName: entryRow.manifest?.icon ?? "preferences-desktop-plasma"
-                    }
+                        // Everything on this line that is not the name, so the
+                        // name gets the rest. It was a written-down 320, which
+                        // was already short by the time the row gained a
+                        // drag grip -- and short only while the pointer was on
+                        // the row, because the four buttons appear on hover:
+                        // the row overflowed its card and the last button was
+                        // drawn outside the window.
+                        readonly property real fixed: 20 + zone.width + onOff.width
+                            + grip.width + up.width + down.width
+                            + configure.width + remove.width + 8 * spacing
 
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 320
-
-                        PanelText {
-                            text: entryRow.manifest?.name ?? entryRow.modelData.id
-                            color: entryRow.known ? Theme.foreground : Theme.negative
-                        }
-
-                        PanelText {
-                            font.pixelSize: 11
-                            color: entryRow.quarantined ? Theme.negative : Theme.foregroundInactive
-                            text: entryRow.quarantined ? `Disabled after repeated failures: ${Quarantine.reasonFor(entryRow.modelData.id)}`
-                                : !entryRow.known ? "Not installed"
-                                : (entryRow.manifest?.description ?? "")
-                            width: parent.width
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    Select {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: 110
-                        values: root.zones
-                        currentIndex: Math.max(0, root.zones.indexOf(entryRow.modelData.zone ?? "left"))
-                        onPicked: value => root.updateEntry(entryRow.index, { zone: value })
-                    }
-
-                    Toggle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        checked: entryRow.modelData.enabled !== false
-                        onToggled: value => root.updateEntry(entryRow.index, { enabled: value })
-                    }
-
-                    // Drag to reorder. The arrows it replaces are still here
-                    // for anyone who cannot drag -- shown when the row is
-                    // under the pointer, so they are available without being
-                    // permanent furniture.
-                    Item {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: 22
-                        implicitHeight: 22
+                        width: parent.width
+                        spacing: 8
 
                         PanelIcon {
-                            anchors.centerIn: parent
-                            implicitSize: 16
-                            iconName: "transform-move"
-                            opacity: entryRow.dragging ? 1 : 0.5
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 20
+                            iconName: entryRow.manifest?.icon ?? "preferences-desktop-plasma"
                         }
 
-                        DragHandler {
-                            id: dragHandler
-                            target: null            // the row moves itself
-                            xAxis.enabled: false
-                            cursorShape: Qt.ClosedHandCursor
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(80, parent.width - line.fixed)
 
-                            onActiveChanged: {
-                                if (active) {
-                                    root.dragIndex = entryRow.index;
-                                    root.dropIndex = entryRow.index;
-                                } else {
-                                    root.commitDrag();
+                            PanelText {
+                                text: entryRow.manifest?.name ?? entryRow.modelData.id
+                                font.pixelSize: 14
+                                color: entryRow.known ? Theme.fg : Theme.error
+                            }
+
+                            PanelText {
+                                font.pixelSize: 12
+                                color: entryRow.quarantined ? Theme.error : Theme.mut
+                                text: entryRow.quarantined ? `Disabled after repeated failures: ${Quarantine.reasonFor(entryRow.modelData.id)}`
+                                    : !entryRow.known ? "Not installed"
+                                    : (entryRow.manifest?.description ?? "")
+                                width: parent.width
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Select {
+                            id: zone
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: 110
+                            values: root.zones
+                            currentIndex: Math.max(0, root.zones.indexOf(entryRow.modelData.zone ?? "left"))
+                            onPicked: value => root.updateEntry(entryRow.index, { zone: value })
+                        }
+
+                        Toggle {
+                            id: onOff
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            checked: entryRow.modelData.enabled !== false
+                            onToggled: value => root.updateEntry(entryRow.index, { enabled: value })
+                        }
+
+                        // Drag to reorder. The arrows it replaces are still here
+                        // for anyone who cannot drag -- shown when the row is
+                        // under the pointer, so they are available without being
+                        // permanent furniture.
+                        Item {
+                            id: grip
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: 22
+                            implicitHeight: 22
+
+                            PanelIcon {
+                                anchors.centerIn: parent
+                                implicitSize: 16
+                                iconName: "transform-move"
+                                opacity: entryRow.dragging ? 1 : 0.5
+                            }
+
+                            DragHandler {
+                                id: dragHandler
+                                target: null            // the row moves itself
+                                xAxis.enabled: false
+                                cursorShape: Qt.ClosedHandCursor
+
+                                onActiveChanged: {
+                                    if (active) {
+                                        root.dragIndex = entryRow.index;
+                                        root.dropIndex = entryRow.index;
+                                    } else {
+                                        root.commitDrag();
+                                    }
+                                }
+
+                                onTranslationChanged: {
+                                    if (!dragHandler.active)
+                                        return;
+                                    const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
+                                    const target = entryRow.index + steps;
+                                    root.dropIndex = Math.max(0, Math.min(root.entries.length - 1, target));
                                 }
                             }
+                        }
 
-                            onTranslationChanged: {
-                                if (!dragHandler.active)
-                                    return;
-                                const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
-                                const target = entryRow.index + steps;
-                                root.dropIndex = Math.max(0, Math.min(root.entries.length - 1, target));
-                            }
+                        IconButton {
+                            id: up
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            iconName: "go-up"
+                            opacity: rowHover.hovered ? 1 : 0
+                            enabled: rowHover.hovered
+                            onActivated: root.moveEntry(entryRow.index, -1)
+                        }
+
+                        IconButton {
+                            id: down
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            iconName: "go-down"
+                            opacity: rowHover.hovered ? 1 : 0
+                            enabled: rowHover.hovered
+                            onActivated: root.moveEntry(entryRow.index, 1)
+                        }
+
+                        IconButton {
+                            id: configure
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            iconName: entryRow.expanded ? "arrow-up" : "configure"
+                            opacity: Object.keys(entryRow.manifest?.config ?? {}).length > 0 ? 1 : 0
+                            enabled: Object.keys(entryRow.manifest?.config ?? {}).length > 0
+                            onActivated: entryRow.expanded = !entryRow.expanded
+                        }
+
+                        IconButton {
+                            id: remove
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            iconName: "list-remove"
+                            onActivated: root.removeEntry(entryRow.index)
                         }
                     }
 
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: "go-up"
-                        visible: rowHover.hovered
-                        onActivated: root.moveEntry(entryRow.index, -1)
+                    // The widget's own settings, from its manifest.
+                    SchemaRenderer {
+                        width: parent.width
+                        visible: entryRow.expanded
+                        title: "Settings"
+                        keys: entryRow.manifest?.config ?? ({})
+                        prefix: `widgets.${entryRow.modelData.id}.`
                     }
 
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: "go-down"
-                        visible: rowHover.hovered
-                        onActivated: root.moveEntry(entryRow.index, 1)
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        visible: entryRow.quarantined
+                        color: "transparent"
                     }
 
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: entryRow.expanded ? "arrow-up" : "configure"
-                        visible: Object.keys(entryRow.manifest?.config ?? {}).length > 0
-                        onActivated: entryRow.expanded = !entryRow.expanded
-                    }
+                    Row {
+                        visible: entryRow.quarantined
+                        spacing: 8
 
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        iconName: "list-remove"
-                        onActivated: root.removeEntry(entryRow.index)
-                    }
-                }
+                        PanelText {
+                            text: "This widget was disabled automatically."
+                            color: Theme.error
+                            font.pixelSize: 12
+                        }
 
-                // The widget's own settings, from its manifest.
-                SchemaRenderer {
-                    width: parent.width
-                    visible: entryRow.expanded
-                    keys: entryRow.manifest?.config ?? ({})
-                    prefix: `widgets.${entryRow.modelData.id}.`
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    visible: entryRow.quarantined
-                    color: "transparent"
-                }
-
-                Row {
-                    visible: entryRow.quarantined
-                    spacing: 8
-
-                    PanelText {
-                        text: "This widget was disabled automatically."
-                        color: Theme.negative
-                        font.pixelSize: 11
-                    }
-
-                    PanelText {
-                        text: "Enable it again"
-                        color: Theme.accent
-                        font.pixelSize: 11
-                        TapHandler { onTapped: Quarantine.release(entryRow.modelData.id) }
+                        PanelText {
+                            text: "Enable it again"
+                            color: Theme.acc
+                            font.pixelSize: 12
+                            TapHandler { onTapped: Quarantine.release(entryRow.modelData.id) }
+                        }
                     }
                 }
             }
         }
     }
 
-    PanelText {
-        text: "Available widgets"
-        font.pixelSize: 14
-        topPadding: 12
-    }
+    Card {
+        id: availableCard
 
-    Flow {
         width: root.width
-        spacing: 6
+        spacing: 10
 
-        Repeater {
-            model: Object.keys(WidgetRegistry.all).filter(
-                id => !root.entries.some(e => e.id === id))
+        SectionLabel { text: "Available widgets" }
 
-            Rectangle {
-                id: available
+        Flow {
+            width: availableCard.width - 2 * availableCard.padding
+            spacing: 6
 
-                required property string modelData
+            Repeater {
+                model: Object.keys(WidgetRegistry.all).filter(
+                    id => !root.entries.some(e => e.id === id))
 
-                width: label.implicitWidth + 28
-                height: 28
-                radius: 6
-                color: addHover.hovered ? Theme.hoverBackground : Theme.backgroundAlternate
+                Rectangle {
+                    id: available
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 6
+                    required property string modelData
 
-                    PanelIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 14
-                        iconName: "list-add"
+                    width: label.implicitWidth + 30
+                    height: 30
+                    radius: Theme.radiusOf(10)
+                    color: addHover.hovered ? Theme.hover : Theme.s1
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        PanelIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 14
+                            iconName: "list-add"
+                        }
+
+                        PanelText {
+                            id: label
+                            anchors.verticalCenter: parent.verticalCenter
+                            font.pixelSize: 13
+                            text: WidgetRegistry.manifest(available.modelData)?.name ?? available.modelData
+                        }
                     }
 
-                    PanelText {
-                        id: label
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: WidgetRegistry.manifest(available.modelData)?.name ?? available.modelData
-                    }
+                    HoverHandler { id: addHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.addWidget(available.modelData) }
                 }
-
-                HoverHandler { id: addHover }
-                TapHandler { onTapped: root.addWidget(available.modelData) }
             }
+        }
+
+        PanelText {
+            visible: Object.keys(WidgetRegistry.all).every(id => root.entries.some(e => e.id === id))
+            text: "Every installed widget is already on the panel."
+            font.pixelSize: 13
+            color: Theme.mut
         }
     }
 }
