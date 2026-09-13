@@ -25,7 +25,16 @@ mkdir -p "$root/org/kde/kwin"
 cat > "$root/org/kde/kwin/qmldir" <<'QMLDIR'
 module org.kde.kwin
 TabBoxSwitcher 1.0 TabBoxSwitcher.qml
+WindowThumbnail 1.0 WindowThumbnail.qml
 QMLDIR
+
+cat > "$root/org/kde/kwin/WindowThumbnail.qml" <<'THUMB'
+import QtQuick
+
+// KWin renders the real window here. Outside KWin there is nothing to render,
+// and the point of this stub is that the file still loads.
+Item { property var wId }
+THUMB
 
 cat > "$root/org/kde/kwin/TabBoxSwitcher.qml" <<'STUB'
 import QtQuick
@@ -39,11 +48,11 @@ Window {
     property rect screenGeometry: Qt.rect(0, 0, 2560, 1440)
 
     readonly property ListModel fake: ListModel {
-        ListElement { caption: "shell.json — WebStorm";       icon: "code-context";       minimized: false }
-        ListElement { caption: "Quickshell docs — Firefox";   icon: "firefox";            minimized: false }
-        ListElement { caption: "~ : fish — Konsole";          icon: "utilities-terminal"; minimized: false }
-        ListElement { caption: "Wallpapers — Dolphin";        icon: "system-file-manager"; minimized: true }
-        ListElement { caption: "Remappr Shell settings";      icon: "configure";          minimized: false }
+        ListElement { caption: "shell.json — WebStorm";       icon: "code-context";        minimized: false; windowId: 1 }
+        ListElement { caption: "Quickshell docs — Firefox";   icon: "firefox";             minimized: false; windowId: 2 }
+        ListElement { caption: "~ : fish — Konsole";          icon: "utilities-terminal";  minimized: false; windowId: 3 }
+        ListElement { caption: "Wallpapers — Dolphin";        icon: "system-file-manager"; minimized: true;  windowId: 4 }
+        ListElement { caption: "Remappr Shell settings";      icon: "configure";           minimized: false; windowId: 5 }
     }
     function activate(i) { }
 }

@@ -188,6 +188,7 @@ KWin.TabBoxSwitcher {
                     required property string caption
                     required property var icon
                     required property bool minimized
+                    required property var windowId
 
                     readonly property bool selected: entry.index === cards.currentIndex
 
@@ -230,6 +231,9 @@ KWin.TabBoxSwitcher {
                             clip: true
                             color: tabBox.tintFor(entry.caption)
 
+                            // The icon, large and faint, behind whatever the
+                            // preview turns out to be: a window KWin has no
+                            // picture of still reads as that application.
                             Kirigami.Icon {
                                 anchors.right: parent.right
                                 anchors.bottom: parent.bottom
@@ -238,6 +242,19 @@ KWin.TabBoxSwitcher {
                                 width: 96; height: 96
                                 source: entry.icon
                                 opacity: 0.38
+                            }
+
+                            // The window itself. KWin renders this for its own
+                            // switcher, which is the one place a preview costs
+                            // nothing: an ordinary client cannot get one
+                            // without speaking the screencast protocol in C++
+                            // and feeding PipeWire, which is what every other
+                            // shell that shows previews is doing.
+                            KWin.WindowThumbnail {
+                                anchors.fill: parent
+                                anchors.topMargin: 22
+                                wId: entry.windowId
+                                opacity: entry.minimized ? 0.55 : 1
                             }
 
                             // The design's little title strip along the top.
