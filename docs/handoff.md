@@ -1,15 +1,18 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on 2026-09-12, when the
-Meridian redesign was finished on its own branch: the first built the Plasma renderer, diagnostics, the wizard, the
-theme layer, the open-window list and panel auto-hide; the second added AI
-assist, the notification history, crash reporting, and a tray you can curate
-whose menus open. A third, on 2026-09-11, added volume, network, Bluetooth
-and battery widgets -- and found that every popout had been opening at the
-screen's left edge. A fourth, the same evening, built the lock screen -- the
-last part of the plan -- and found that Plasma 6 draws it from the shell
-package, not the look-and-feel package this file had said.
+sessions, and added to since -- most recently on **2026-09-13, when the
+Meridian redesign was merged into `main` and met a real screen for the first
+time**, which found eight bugs in an afternoon that 306 passing tests had not.
+The earlier sessions: the first built the Plasma renderer, diagnostics, the
+wizard, the theme layer, the open-window list and panel auto-hide; the second
+added AI assist, the notification history, crash reporting, and a tray you can
+curate whose menus open. A third, on 2026-09-11, added volume, network,
+Bluetooth and battery widgets -- and found that every popout had been opening
+at the screen's left edge. A fourth, the same evening, built the lock screen --
+the last part of the plan -- and found that Plasma 6 draws it from the shell
+package, not the look-and-feel package this file had said. The redesign itself
+was built across 2026-09-11 and 2026-09-12, entirely offscreen.
 
 ## What this is
 
@@ -27,39 +30,46 @@ and never the default.
 **Clean-room.** No code is taken from caelestia-dots-kde. It is referenced only
 for lessons — which patterns to avoid.
 
-## The redesign, on a branch
+## The redesign, merged
 
-Since 2026-09-11 a second line of work has been running in the worktree
-`~/Projects/remappr-shell-meridian`, branch **`meridian`**: the user's Claude
-Design mockup "Meridian Shell" implemented as this shell's look, with Material
-Design colours and a light and a dark scheme. **None of it reaches the screen
-until that branch is merged, which is the user's call.** Everything below
-describes `main` unless it says otherwise; what the branch changes is under
-"The Meridian redesign" further down, and `docs/meridian-handoff.md` in the
-worktree carries the detail.
+The Meridian redesign -- the user's Claude Design mockup implemented as this
+shell's look, in Material Design colours -- **is `main`** as of 2026-09-13.
+The seventeen commits were fast-forwarded onto `main`, which is how this
+project's history is kept: there are no merge commits anywhere in it.
+
+The worktree `~/Projects/remappr-shell-meridian` **has been removed**. Before
+removing it, the fifteen untracked files that existed only there were copied
+into this tree and verified byte-identical: `dev/preview/` (the offscreen
+preview harness, which is how every picture of the redesign was made) and
+`docs/meridian-handoff.md`. Both are still untracked here, as they were there.
+The branch label `meridian` still exists, pointing inside `main`'s history.
+
+What the redesign changed is under "The Meridian redesign" further down;
+`docs/meridian-handoff.md` carries the detail of how it was built, and remains
+accurate about that. It is **not** accurate about what is on a screen: it was
+written before any of it had been seen.
 
 ## The state of this machine, right now
 
-Updated 2026-09-11. Everything below was read off the running system rather
-than remembered. The machine was rebooted between sessions, and the first two
-rows are what that did.
+Updated **2026-09-13**, at the end of the session that merged the redesign.
+Everything below was read off the running system rather than remembered.
 
 | | |
 | --- | --- |
-| Shell | installed via `make link` as `remappr-shell.service`, **inactive and deliberately not enabled**: the user starts and stops it by hand for testing (`rmpr start` / `rmpr stop`). Do not enable it or suggest enabling it. After a reboot there is no panel of ours until `rmpr start` |
-| plasmashell | on **`remappr-shell.desktop`**, profile `panel.renderer: quickshell` -- the user switched at 14:12 on 2026-09-11 with `rmpr renderer set quickshell`, then restarted plasmashell. Our shell draws the panel; caelestia's bar still runs beside it |
-| Plasma services | notifications: **caelestia's Quickshell** (it took the name the moment the plasmashell restart freed it, before our hosted applet could; the user is fine with that for now). Clipboard: our hosted `plasmawindowed` (Klipper). Device notifier: hosted too |
-| Panel | bottom, 40px, entries `launcher, tasks, notifications, tray, clock, showdesktop` -- the `windows` preset plus the history bell. The new status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
+| Shell | installed via `make link` as `remappr-shell.service`, **inactive and deliberately not enabled**: the user starts and stops it by hand for testing (`rmpr start` / `rmpr stop`). Do not enable it or suggest enabling it. At the end of 2026-09-13 it was **running from the working tree** under `make run`, not from the installed copy -- `rmpr status` says which |
+| plasmashell | on **`remappr-shell.desktop`**, profile `panel.renderer: quickshell` -- set again on 2026-09-13, the profile having said `plasma` at the start of that session. Our shell draws the panel, and it is the only shell running: caelestia's was stopped at the user's request |
+| Plasma services | notifications: **our hosted `plasmawindowed`** holds `org.freedesktop.Notifications` -- caelestia had taken it on 2026-09-11, and stopping caelestia on 2026-09-13 let the hosting work as designed. The shell does not serve them itself (`notifications.server` is `plasma`). Clipboard: our hosted `plasmawindowed` (Klipper). Device notifier: hosted too |
+| Panel | bottom, **floating**, 52px, icons 18, spacing 5, rounding 8 -- the user's own settings, made through the settings window on 2026-09-13 once it started saving. Entries `launcher, tasks, notifications, tray, clock, showdesktop`. The status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
-| Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off |
+| Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | our Look-and-Feel package is active, but it is the one `theme apply` installed on 2026-09-09 at 20:15 -- `defaults` and `osd/` only. The colour schemes, the Alt+Tab switcher, the desktop theme and the splash were added to `theme apply` after that and have **never been installed here** (`theme status`: 0 schemes, switcher not installed; read 2026-09-11). Nothing deleted them. This row used to say they were installed. Re-running `rmpr theme apply` -- or "Install the missing parts" in Settings -> Appearance -- would put them in place |
-| Lock screen | **ours is built and not on**: Plasma's draws. `rmpr lockscreen try` has never been run -- it needs the person at the keyboard (item 22). faillock was empty at 19:48, after two failed logins this session's checks caused at 19:32 and 19:42 (see "A greeter stopped mid-authentication is a failed login") |
+| Theme | our Look-and-Feel package is active and **every part is now installed**: 2 colour schemes, the switcher (selected -- `active Alt+Tab: remappr-shell`), the desktop theme, the splash. The colour scheme in force is **BreezeLight**, the user's own, and the icon theme `breeze-dark`. `theme apply` themes the desktop by default now, by parts the user chooses -- see `theme.desktop` in Settings → Appearance |
+| Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 9 windows |
-| Also running | caelestia's own Quickshell bar, alongside ours. krohnkite is installed but **not loaded** (`isScriptLoaded krohnkite` false, `krohnkiteEnabled=false`, read 2026-09-11) |
+| Also running | **nothing else**: caelestia's Quickshell bar was stopped on 2026-09-13 and not restarted. krohnkite is installed but **not loaded** (`krohnkiteEnabled=false`) |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
-| Shortcuts | Alt+Tab and Meta+Tab are caelestia's; KWin's own switcher is unbound. Ours: `settings` on Meta+Shift+R, bound for real when `75c4a6f` was written and ledgered (`shortcuts revert` removes it) |
-| `rmpr doctor` | no problems, 2 warnings (2026-09-11, shell running): caelestia's shell, and one ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left in the ledger when the Phase 6b revert purged that group; harmless. The krohnkite warning is gone: it was about installed scripts, not enabled ones |
+| Shortcuts | Alt+Tab and Meta+Tab are caelestia's, still, though caelestia is not running; KWin's own switcher is unbound. Ours: `settings` on Meta+Shift+R, ledgered (`shortcuts revert` removes it). **Spectacle has no shortcut**: `kglobalshortcutsrc [services][org.kde.spectacle.desktop] _launch=none`, so Print does nothing. Nothing in this project writes that key and nothing else holds Print -- it was not us. The user was given the command to put it back and had not run it |
+| `rmpr doctor` | no problems, 3 warnings (2026-09-13, shell running). One is the ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left behind when the Phase 6b revert purged that group; harmless |
 
 ### What to check first, before building anything
 
@@ -238,51 +248,54 @@ if they fail.
     Verified without a person: the real greeter loading it (`lockscreen
     check`, now part of `make test`), every state drawn offscreen under a
     stand-in authenticator, the unlock rules (21 QML cases) and the
-    commands (61 checks). Not seen: any of it on a screen, or a real
-    password through it.
+    commands (61 checks). **Done on 2026-09-13**: tried twice on a real
+    screen, unlocked with the user's real password both times. Not done:
+    `enable`, and everything after it in this item.
 
-23. **The redesign, once it is merged -- everything in it needs eyes.** No
-    part of `meridian` has ever been on a screen: every picture of it was
-    drawn offscreen. Worth going through in order: the panel in its three
-    styles on each edge; the start menu in its three layouts and the search
-    overlay; quick settings, the calendar and the notification centre; the
-    sidebar (`rmpr sidebar`) and the key sheet (`rmpr keys`); the session
-    screen (Settings -> Lock & session -> "Show it"); a notification popup in
-    each position; the settings window's new pages; the rounded screen border
-    and the desktop clock (Settings -> Desktop, both off by default).
-24. **The lock screen, again, on the merged build.** The Meridian lock screen
-    is a different build from the one `try` recorded on 2026-09-11, so
-    `lockscreen status` will say "changed since it was tried" and `enable`
-    will refuse until `rmpr lockscreen try` has unlocked the new one. Same
-    rules as item 22, and the same way back.
-25. **The taskbar reported missing on 2026-09-12 -- answered, and it needs
-    one command.** Nothing is drawing a panel on this machine, and both halves
-    of the reason are in `rmpr renderer status`: the profile says
-    `panel.renderer: plasma`, so this shell deliberately draws none, while
-    plasmashell is on `caelestia.desktop` rather than the expected
-    `remappr-shell-plasma.desktop`, so the generated Plasma panel is not
-    loaded either. Something moved plasmashell back after the last switch --
-    the ledger still holds `ShellPackage (was: caelestia.desktop)`.
+23. **The redesign is merged and has been seen -- but only in part.** On
+    2026-09-13 it drew on the user's two screens for the first time. Confirmed
+    working by eye: the panel in all three styles (full, floating, islands) and
+    on all four edges; popouts on a side panel, which the placement fix was
+    for; the notification centre; the sidebar (`rmpr sidebar`), with its media
+    card, calendar and live CPU, memory, GPU and network readings. **Still not
+    seen by anyone**: the start menu in its three layouts, the search overlay,
+    quick settings, the calendar popout, the key sheet, the session screen, a
+    notification popup in each position, the settings window's newer pages, the
+    rounded screen border and the desktop clock (Settings -> Desktop, both off
+    by default).
 
-    The way out is `rmpr renderer set quickshell` (this shell draws it, which
-    is what `make run` and `rmpr start` are for) or `rmpr renderer set plasma`
-    again, which actually moves plasmashell onto our package; check `renderer
-    status` afterwards either way. **Left to the user**, because both write
-    KDE keys and change what is on their screen.
+24. **The lock screen has been tried on a real screen; it has never been
+    enabled.** `rmpr lockscreen try` was run twice on 2026-09-13 and unlocked
+    with the user's real password both times, so build `b80537960ca3deb1` is
+    recorded and `enable` will be accepted. faillock was empty after both. What
+    remains is item 22's second half: `rmpr lockscreen enable` with a text
+    console logged in and waiting (Ctrl+Alt+F3), then Meta+L, and the list of
+    things to look for there. The user chose not to on 2026-09-13.
 
-    Confirmed by the user on 2026-09-12: `rmpr renderer set quickshell` was
-    what made the panel appear, under `rmpr start`.
+25. **The taskbar reported missing on 2026-09-12 -- answered, twice over.**
+    The first answer was the profile: `panel.renderer: plasma` while
+    plasmashell sat on `caelestia.desktop`, so nothing drew a panel.
+    `rmpr renderer set quickshell` fixed it, confirmed by the user.
 
-    The run exposed two bugs of ours, both fixed on `meridian`. The flash in
-    the log -- "panel: up on DP-2" a line before "profile loaded" -- is
-    `f094923`: the defaults name this shell as what draws the panel, so a
-    profile naming Plasma got a panel for one frame; `ConfigStore.profileLoaded`
-    gates it now. And **every "is the shell running?" check missed a shell
-    started by `make run`**, because it matched only the installed config
-    directory while a working-tree run names the source tree instead -- so
-    `rmpr status` said "no" with a panel on screen, and `renderer set` refused
-    on the grounds that nothing would draw. `shell_running` in `brand.sh`
-    answers for both copies now, and `rmpr status` says which one it found.
+    On 2026-09-13 the profile said `plasma` again, and the cause was never
+    found. Two theories were tested and both failed: a second shell holding a
+    stale copy and writing it back was **disproved** -- two shells were run
+    side by side, the file was replaced by `mv` underneath them, and both
+    picked the change up within three seconds -- and no background writer
+    exists. `panel.renderer` has exactly two writers: `scripts/renderer.sh`
+    (`set` and `revert` both write it) and nothing else, the settings page
+    having been written deliberately to shell out to the CLI rather than set
+    the key. So a `rmpr renderer` command ran; `revert` is the one that would
+    do it as a side effect. **If it drifts again, that is the thing to watch.**
+
+26. **The desktop does not follow day and night; only the shell does.**
+    `theme.mode: auto` now turns the shell light by day and dark by night on
+    KWin's Night Light schedule, but `theme apply` writes one fixed colour
+    scheme -- `@DISPLAY_NAME@ Dark` in the look-and-feel `defaults` -- so
+    applications stay wherever they were put. Making the desktop switch too
+    needs a light variant of those defaults and something to re-apply them when
+    `daylight` changes. It writes KDE keys on a timer, so it is the user's call
+    to ask for, and they had not.
 
 ### The lesson this session paid for twice
 
@@ -1707,7 +1720,11 @@ Nothing was put on the screen: every picture was taken offscreen.
 Six sessions, all in the worktree `~/Projects/remappr-shell-meridian` on
 branch `meridian`, cut from `main` at `1a0b10c`. The main tree was not
 touched, and nothing was merged: the user asked for one commit per phase and
-keeps the merge for themselves.
+kept the merge for themselves.
+
+*(Read as history. The merge happened on 2026-09-13 and the worktree has since
+been removed; `dev/preview/` and `docs/meridian-handoff.md` were copied into
+the main tree first, and are still untracked there.)*
 
 The shape of it: the mockup was read with DesignSync rather than described,
 each phase ended green (`make lint`, `make test`, and for the lock screen
@@ -1726,8 +1743,132 @@ switching, so no packages were built for one; and `font.pixelSize` refuses a
 fraction at load, which qmllint does not catch. They are all under
 "Non-obvious things".
 
-What is left is a person's: none of it has been on a screen, the lock screen
-needs `try` again on the new build, and the merge is the user's decision. See
-items 23 to 25 under "What to check first" -- item 25 is a taskbar the user
-reported missing on `main` on 2026-09-12, which no session has yet been able
-to measure.
+*(The third still holds -- Plasma has no light/dark switch. What changed on
+2026-09-13 is that the shell stopped needing one: KWin's Night Light already
+knows when night is, and `theme.mode: auto` follows it.)*
+
+What was left then was a person's, and most of it was done on 2026-09-13: the
+branch was merged, the redesign ran on both screens, and the lock screen was
+tried twice with a real password. See "The session of 2026-09-13" at the end of
+this file for what that found, and items 23 to 26 under "What to check first"
+for what is still unseen.
+
+## The session of 2026-09-13: merged, and met a screen
+
+The redesign was fast-forwarded onto `main` and run on the user's two monitors.
+**Every bug below was found by looking at it or by the user using it**, and the
+suite was green throughout: 306 QML cases passed before the session and passed
+after every one of these was fixed. That is the whole lesson of the day.
+
+Eight fixes, in the order they were found:
+
+1. **`make run` named no tree, so nothing counted it as running** (`fe58850`).
+   `1eae99a`, the session before, had taught every check to recognise a shell
+   run from a checkout -- and tested it against an absolute command line the
+   Makefile never produced. The recipe passed `shell/shell.qml`, relative. So
+   the bug it fixed was still there. The recipe names `$(CURDIR)` now, and the
+   test reads the recipe rather than an invented string. The suite also stubs
+   `pgrep`: its sandbox gave every script a throwaway HOME while the process
+   list still answered for the real machine, so the refusal test passed or
+   failed depending on whether whoever ran it had `make run` going.
+
+2. **A popout's shadow kept the card's shape** (`32ab44d`). Reported as "the
+   popup from the taskbar have some kind of a second popup behind". At 0.45
+   alpha in dark the blur never faded far enough to stop being a silhouette, so
+   a rounded card's shadow read as a second rounded card. The mockup casts
+   these at .26 to .34; the dark shadow is 0.28 now. The window was also too
+   small for the shadow it asked for -- margin 28 against blur 40 and a 12px
+   drop -- so the blur was cut square against the window's edge. The margin is
+   derived from the blur and the drop now.
+
+3. **The notification centre opened as a small round blob** (`5f47904`).
+   Reported as "first click shows round nothing, second time it shows the
+   list", and dismissed in this session as a capture artefact before the user
+   insisted -- they were right. The window is sized from its content's implicit
+   size on the frame it is shown, and this was the one widget whose popout was
+   a bare `Column`. A Column has no implicit width until its children have been
+   laid out, and the card's radius is clamped to half the smaller side, so the
+   first opening drew a circle. Every other widget's popout is an `Item` that
+   states its own width. Measured at the moment the window is shown: 144x208
+   before, 528x208 after.
+
+4. **Every IPC command asked the installed shell, never the running one**
+   (`49ac51e`, then `995fa1b`). `rmpr settings` answered "No running instances"
+   with the settings window's own shell on screen, because the socket is keyed
+   by the config path the shell was started with and all nine IPC commands
+   named the installed path outright. The first fix knew two paths, the
+   installed copy and this tree -- and the shell being run at the time was in a
+   *third*, the worktree, so it went on failing after the fix was installed.
+   The second fix asks the question of the path: any `<tree>/shell/shell.qml`
+   with a `branding.json` two levels up naming this slug.
+
+5. **An icon given as a path was looked for inside qrc** (`9bdc370`). A bare
+   path is not a URL, and Qt resolves one against the base URL of the component
+   that uses it -- for a type from a module, inside `qrc:`. So an absolute path
+   off the bus became `qrc:/home/...` and drew nothing: every Spectacle
+   screenshot notification had a blank icon. `Paths.fileUrl` does the
+   conversion, encoding each segment, and `PanelIcon` puts everything through
+   it rather than the next caller having to remember.
+
+6. **Choosing a setting's default value did nothing at all** (`d871ac2`). The
+   user: picking "auto" for the theme left it on light, and "some other actions
+   in the settings are behaving the same". The profile is a sparse delta, so a
+   value returning to its default *removes* its key -- and `ConfigStore`
+   compared the parsed file (which carries `schemaVersion`) against its own
+   copy (which has it stripped on load) to decide whether the file had moved.
+   Never equal. Every write took the merging path, and the merge put back the
+   key the write had just removed. The log said so fifty times over one
+   afternoon. The comparison is made on one shape now, dropped keys are
+   remembered and re-dropped after a merge, and the decision is a pure function
+   beside `Hosting`, in its own module so a test can import it without pulling
+   `Quickshell.Io` in after it.
+
+7. **A setting that was off read back as on** (`cda709d`). `config_get` used
+   jq's `//`, which takes its right-hand side when the left is false as well as
+   null, so `.x // true` answered "true" for a setting deliberately turned off.
+   Latent -- every existing caller wanted a string -- and it would have made
+   every checkbox in the next commit impossible to untick.
+
+8. **The theme themes the desktop, by parts the user chooses** (`f3be17b`).
+   Asked for: picking this shell's theme should change KDE's global theme, with
+   checkboxes for what it affects, defaulting to everything. `theme apply` now
+   writes the colour scheme, icon theme, widget style, Plasma theme, window
+   decorations and Alt+Tab switcher unless told otherwise; `theme.desktop` holds
+   one switch for the lot and one per part; a part left off keeps what System
+   Settings says. The parts are declared once, as `# part:` markers in the
+   look-and-feel `defaults`, so the checkbox, the key written and what `theme
+   status` prints cannot drift. In Settings → Appearance and in the wizard.
+
+And one feature, asked for by the user after the theme work (`d7f5147`):
+**`theme.mode: auto` is light by day and dark by night**, on KWin's Night Light
+schedule -- `daylight` on `org.kde.KWin.NightLight`, the same sunset that warms
+the screen. Plasma has no automatic light/dark switching of its own, which this
+file had said and which remains true; Night Light is simply the one thing that
+already knows when night is. With it off, auto means what it meant before.
+Writing it turned up the same trap `f094923` did: `known` was read from
+`DbusProperty.available`, which is set one statement before the value, and a
+binding re-evaluated between the two statements said "night" on every start.
+
+### What was measured rather than assumed
+
+- **Two shells do not clobber each other's config.** Run side by side, with the
+  file replaced by `mv` underneath them, both picked the change up within three
+  seconds. The theory that a stale second shell had been rewriting
+  `panel.renderer` is dead; see item 25.
+- **Spectacle is not broken and it was not us.** Its global shortcut is
+  `_launch=none` in `kglobalshortcutsrc`, nothing in this project writes that
+  key, our ledger holds one entry (`Meta+Shift+R` for settings), and nothing
+  else holds Print. The CLI drove Spectacle perfectly all afternoon.
+- **The user's "two taskbars" were two checkouts**, not two shells: `make run`
+  in `~/Projects/remappr-shell` before the merge built the pre-redesign shell
+  (18 widgets, 52 qmldirs) beside the redesign running from the worktree (22
+  and 69).
+
+### Two papercuts left, both small
+
+- `rmpr settings <page>` run within a few seconds of the shell starting says
+  "no such page: <name> ()" -- with the list of known pages empty, because
+  `Schema` has not loaded yet. The name is fine; the message is a lie.
+- `rmpr settings pages` is unreachable: the CLI passes any argument to the
+  `page` IPC call, so the `pages()` function beside it can only be reached by
+  asking for a page that does not exist and reading the error.
