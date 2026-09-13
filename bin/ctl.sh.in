@@ -28,6 +28,7 @@ usage: @ALIAS@ <command> [options]
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   sidebar                           open or close the sidebar (bind: shortcuts set sidebar)
   keys                              open or close the key sheet (bind: shortcuts set keys)
+  session [kind]                    the session screen: log out, restart, sleep, shut down
   wizard                            re-run the first-run wizard
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
@@ -134,6 +135,20 @@ case "$cmd" in
     # second press closes it.
     sidebar|keys)
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces "$cmd"
+        ;;
+
+    # The session screen: log out, restart, sleep, shut down. The kind picks
+    # which button starts under the keys, as Plasma's own prompt names them,
+    # and it is always passed: the IPC declares the argument, so leaving it out
+    # is refused ("1 required but 0 were provided") rather than defaulted.
+    session)
+        case "${1:-promptAll}" in
+            promptAll|promptLogout|promptReboot|promptShutDown) ;;
+            *) echo "unknown session kind: $1" >&2
+               echo "       one of: promptAll promptLogout promptReboot promptShutDown" >&2
+               exit 1 ;;
+        esac
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces session "${1:-promptAll}"
         ;;
 
     settings)

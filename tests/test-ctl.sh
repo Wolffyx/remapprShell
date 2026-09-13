@@ -56,6 +56,7 @@ check "a run from a checkout"   "$(bash "$CTL" settings)"  "$checkout"
 check "and for the sidebar"     "$(bash "$CTL" sidebar)"   "$checkout"
 check "and the key sheet"       "$(bash "$CTL" keys)"      "$checkout"
 check "and reload"              "$(bash "$CTL" reload)"    "$checkout"
+check "and the session screen"  "$(bash "$CTL" session)"   "$checkout"
 check "and a page by name"      "$(bash "$CTL" settings appearance)" "$checkout"
 
 # Somebody else's shell is not ours, whatever it is drawing.
@@ -101,6 +102,15 @@ check "both, installed wins"    "$(bash "$CTL" settings)"  "$installed"
 export FAKE_PROC="7 /usr/bin/quickshell -n -p $OTHER/shell/shell.qml
 8 /usr/bin/quickshell -n -p $checkout"
 check "this tree wins"          "$(bash "$CTL" settings)"  "$checkout"
+
+# The session screen's kind reaches the shell, and a kind nobody defined is
+# refused here rather than at the other end: the IPC takes any string.
+echo "== the session screen's kind =="
+export FAKE_PROC="7 /usr/bin/quickshell -n -p $installed"
+check "a kind is passed through"  "$(bash "$CTL" session promptShutDown)" "$installed"
+out=$(bash "$CTL" session nonsense 2>&1); rc=$?
+check "an unknown kind refused"   "$rc" "1"
+check "and says which are valid"  "$(printf '%s' "$out" | grep -c 'promptShutDown')" "1"
 
 echo "== no command left naming the installed path outright =="
 check "none hardcoded" "$(grep -c 'ipc --path "@QS_CONFIG_DIR@' "$REPO_ROOT/bin/ctl.sh.in")" "0"

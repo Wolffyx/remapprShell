@@ -12,6 +12,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import qs.core
 import qs.domain.session
 import qs.domain.surfaces
 import qs.domain.theme
@@ -34,6 +35,12 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     color: "transparent"
+
+    // The panel says when it comes up; these did not, and "the session screen
+    // does not appear" could not be told from "it appears and something closes
+    // it" without this line.
+    Component.onCompleted: Log.debug("surfaces", `session screen: up on ${win.screen?.name}`)
+    Component.onDestruction: Log.debug("surfaces", `session screen: gone from ${win.screen?.name}`)
 
     BackgroundEffect.blurRegion: win._everything
     readonly property Region _everything: Region { item: scrim }
