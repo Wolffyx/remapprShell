@@ -115,5 +115,17 @@ check "and says which are valid"  "$(printf '%s' "$out" | grep -c 'promptShutDow
 echo "== no command left naming the installed path outright =="
 check "none hardcoded" "$(grep -c 'ipc --path "@QS_CONFIG_DIR@' "$REPO_ROOT/bin/ctl.sh.in")" "0"
 
+# `ipc` is the passthrough every document uses, so that no example has to name
+# a path: which copy is running decides it, and an example naming the other one
+# answers "No running instances" rather than doing anything.
+echo "== ipc passthrough =="
+check "refuses a call with no function" "$("$CTL" ipc panel >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+check "and with nothing at all"         "$("$CTL" ipc >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+check "it is listed"                    "$("$CTL" --help 2>&1 | grep -c '^  ipc ')" "1"
+# The stub prints the --path it was handed, so this is the path the passthrough
+# would really have used -- the worktree's, because FAKE_PROC says so.
+check "it hands over the running path"  "$(FAKE_PROC="quickshell -p $REPO_ROOT/shell/shell.qml" "$CTL" ipc panel layout DP-1)" "$REPO_ROOT/shell/shell.qml"
+check "and the installed one otherwise" "$("$CTL" ipc panel layout DP-1)" "$QS_CONFIG_DIR/shell.qml"
+
 if [ "$fail" -gt 0 ]; then echo "FAILED: $pass passed, $fail failed" >&2; exit 1; fi
 echo "OK: $pass passed"

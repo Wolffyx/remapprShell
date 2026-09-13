@@ -33,6 +33,7 @@ usage: @ALIAS@ <command> [options]
   status                            is the shell installed and running?
   doctor                            check everything and report fixes
   update [--check|--rollback]       update the shell
+  ipc <target> <call> [args]        call the running shell directly
   log [-f]                          show the shell's journal
   start | stop | restart            control the user service
   reload                            reload the running shell's QML (after editing a widget)
@@ -197,6 +198,17 @@ case "$cmd" in
         systemctl --user is-active "@SYSTEMD_UNIT@" 2>/dev/null || true
         printf 'config:     %s\n' "@CONFIG_DIR@"
         printf 'state:      %s\n' "@STATE_DIR@"
+        ;;
+
+    # Straight through to the running shell, with the path worked out here.
+    #
+    # Which copy is running decides that path -- the installed one under
+    # ~/.config/quickshell, or this worktree under `make run` -- and every
+    # example that wrote one of them out was wrong for whoever was running the
+    # other. `@ALIAS@ ipc panel layout DP-2` is right either way.
+    ipc)
+        [ $# -ge 2 ] || { echo "usage: @ALIAS@ ipc <target> <call> [args...]" >&2; exit 1; }
+        exec quickshell ipc --path "$(shell_ipc_path)" call "$@"
         ;;
 
     log)     exec journalctl --user -u "@SYSTEMD_UNIT@" "$@" ;;

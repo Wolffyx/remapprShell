@@ -12,6 +12,11 @@
 # took the first field as the key and rewrote the line as "Meta+Shift+R, ,
 # Settings": it worked, by accident.
 #
+# This project's own keys are a component's actions, under [<slug>], because
+# only a component with a running owner is ever *active* -- a [services] entry
+# added after login is filed and never grabbed. The owner is the session
+# daemon; see bin/windowsd.py.in.
+#
 # Requires brand.sh, log.sh, kconfig.sh.
 
 ACCEL_FILE=kglobalshortcutsrc
@@ -81,6 +86,12 @@ _accel_keys() {
     printf '%s\n' "$1" | tr '\t' '\n' | sed 's/^ *//; s/ *$//' | grep -vx none | grep . || true
 }
 
+# A friendly name for an action being written for the first time, set by the
+# caller. It is what System Settings shows in its shortcut list, so "Application
+# menu" is worth having there in place of "launcher"; an action that already has
+# one keeps it, because that is what a reset in System Settings goes back to.
+ACCEL_FRIENDLY_HINT=""
+
 # Writes an action's active keys in the form its group uses. Reads the other
 # two fields from the last _accel_fields.
 _accel_write() {   # <scope> <group> <action> <active>
@@ -88,7 +99,8 @@ _accel_write() {   # <scope> <group> <action> <active>
     if [[ $2 == services/* ]]; then
         kconfig_set "$1" "$ACCEL_FILE" "$2" "$3" "$4"
     else
-        kconfig_set "$1" "$ACCEL_FILE" "$2" "$3" "$4,$ACCEL_DEFAULT,${ACCEL_FRIENDLY:-$3}"
+        kconfig_set "$1" "$ACCEL_FILE" "$2" "$3" \
+            "$4,$ACCEL_DEFAULT,${ACCEL_FRIENDLY:-${ACCEL_FRIENDLY_HINT:-$3}}"
     fi
 }
 
@@ -113,6 +125,41 @@ accel_remove_key() {   # <scope> <group> <action> <key>
     _accel_fields "$(accel_value "$2" "$3")"
     keys=$(_accel_keys "$ACCEL_ACTIVE" | grep -vxF "$4" | paste -sd '\t')
     _accel_write "$1" "$2" "$3" "${keys:-none}"
+}
+
+# Gives a key up in the running server as well as in the file.
+#
+# kglobalaccel keeps every [services] entry it read at login in memory and
+# writes the lot back whenever it saves, so emptying the file alone does
+# nothing twice over: the old holder keeps the key -- which makes the new claim
+# on it fail -- and the group reappears in the file minutes later.
+accel_release() {   # <scope> <group> <action>
+    _accel_fields "$(accel_value "$2" "$3")"
+    _accel_write "$1" "$2" "$3" none
+    session_available && _accel_push_live "$2" "$3"
+}
+
+# Drops an action from kglobalaccel entirely, so it stops being listed in
+# System Settings and stops being written back to the file.
+accel_unregister() {   # <component> <action>
+    session_available || return 0
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+        unRegister as 4 "$1" "$2" "$1" "$2" >/dev/null 2>&1 || true
+}
+
+# Leaves an action bound to nothing, keeping its default and friendly name so
+# System Settings still lists it and can reset it.
+accel_clear() {   # <scope> <group> <action>
+    _accel_fields "$(accel_value "$2" "$3")"
+    _accel_write "$1" "$2" "$3" none
+}
+
+# Whether kglobalaccel has a running owner for a component -- which is the
+# difference between a shortcut that is filed and one that is grabbed. Prints
+# "true", "false", or nothing when the server cannot be reached.
+accel_component_active() {   # <component>
+    busctl --user call org.kde.kglobalaccel "/component/${1//[-.]/_}" \
+        org.kde.kglobalaccel.Component isActive 2>/dev/null | awk '{ print $2 }'
 }
 
 # accel_take <scope> <key> <group> <action> <add|replace>
@@ -263,19 +310,39 @@ _accel_push_live() {   # <group> <action>
         setForeignShortcutKeys "${args[@]}" >/dev/null 2>&1
 }
 
-# Applies what was written to the running session. Pushes each touched action
-# to the server; falls back to the restart when anything is not convertible or
-# the server is not there, so a key this table does not know still ends up
-# right at the next login.
+# Our own actions are owned by the session daemon, which is the only thing that
+# can make a shortcut *active* -- see bin/windowsd.py.in. It re-reads the file
+# and pushes every key with SetPresent; this only has to tell it to.
+#
+# The call also starts it if it is not running, because it is D-Bus activated.
+accel_daemon_reload() {
+    busctl --user call "$DBUS_NAME" /Shortcuts "$DBUS_NAME.Shortcuts" Reload >/dev/null 2>&1
+}
+
+# Applies what was written to the running session. Our component goes to the
+# daemon that owns it; anything else -- KWin's actions, another shell's -- is
+# pushed to kglobalaccel directly, and falls back to the restart when a key is
+# not convertible or the server is not there, so it still ends up right at the
+# next login.
 accel_reload() {
     session_available || return 0
 
+    # Everyone else first, then us. A key kglobalaccel still has recorded
+    # against a running component is refused to a second claimant, so the
+    # holder has to let go before our component asks for it -- the file having
+    # been rewritten in the meantime is not enough.
     local entry group action pushed=1
     for entry in "${ACCEL_TOUCHED[@]:-}"; do
         [ -n "$entry" ] || continue
         IFS=$'\t' read -r group action <<< "$entry"
+        [ "$group" = "$SLUG" ] && continue
         _accel_push_live "$group" "$action" || { pushed=0; break; }
     done
+
+    # Unconditional, and cheap: the daemon re-reads the file, so this is also
+    # what applies a `revert`, which puts keys back without touching the list
+    # of actions above.
+    accel_daemon_reload || log_warn "the session daemon did not answer; our keys apply at next login"
 
     [ "$pushed" = 1 ] && [ "${#ACCEL_TOUCHED[@]}" -gt 0 ] && return 0
 

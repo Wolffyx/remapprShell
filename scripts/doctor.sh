@@ -11,6 +11,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/accel.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 
@@ -256,6 +257,33 @@ else
     ok "no competing Quickshell instance"
 fi
 
+# A shortcut kglobalaccel has a record of but no running owner for is never
+# grabbed, and that is invisible from the file: the record is perfect. It is
+# the one failure this project spent a whole evening finding, so it is checked
+# by name.
+bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key launcher --default '' 2>/dev/null)
+for k in search settings ask clipboard sidebar keys switcher; do
+    [ -n "$bound" ] && break
+    bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$k" --default '' 2>/dev/null)
+done
+legacy=""
+for k in launcher search settings ask clipboard sidebar keys switcher; do
+    v=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$k.desktop" --key _launch --default '' 2>/dev/null | cut -d, -f1)
+    [ -n "$v" ] && [ "$v" != none ] && legacy="$legacy $k"
+done
+if [ -n "$legacy" ]; then
+    warn "shortcuts still bound the old way:$legacy"
+    fix "those are never grabbed after login; move them: $ALIAS shortcuts migrate"
+fi
+if [ -n "$bound" ] && [ "${bound%%,*}" != none ]; then
+    case "$(accel_component_active "$SLUG")" in
+        true)  ok "our global shortcuts have a running owner, so the keys are grabbed" ;;
+        false) bad "our global shortcuts are filed but not grabbed: no owner is running"
+               fix "the session daemon owns them; start it: $ALIAS windows list" ;;
+        *)     warn "kglobalaccel did not say whether our shortcuts are grabbed" ;;
+    esac
+fi
+
 if command -v kreadconfig6 >/dev/null 2>&1; then
     tilers=$(kwin_tiling_scripts | tr '\n' ' ')
     if [ -n "$tilers" ]; then
@@ -456,7 +484,7 @@ if [ "$ai_enabled" = true ]; then
         printf '  %s--%s    agreed to send: %s\n' "$_c_dim" "$_c_off" "$(jq -r 'keys | join(", ")' "$consent" 2>/dev/null)"
         fix "withdraw: $ALIAS ask --forget"
     fi
-    if [ "$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-ask.desktop" --key _launch --default '' | cut -d, -f1)" = "" ]; then
+    if [ "$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key ask --default '' | cut -d, -f1)" = "" ]; then
         printf '  %s--%s    no key bound to ask about the last notification\n' "$_c_dim" "$_c_off"
         fix "bind one: $ALIAS shortcuts set ask <key>"
     fi

@@ -76,6 +76,13 @@ python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo " 
 
 # A name of its own: the installed daemon may be running on this bus, and two
 # daemons answering one name is the thing the daemon itself refuses to do.
+#
+# That name is also what stops this copy touching the user's global shortcuts.
+# It runs against the *real* session bus -- there is no other -- so a daemon
+# that claimed the shell's kglobalaccel component here would unbind the keys on
+# the machine running the tests, which is exactly what happened once. Belt and
+# braces: the no-session variable as well, which the daemon honours too.
+export "$NO_SESSION_VAR=1"
 TEST_NAME="com.remappr.ShellTest$$"
 DAEMON="$SANDBOX/windowsd"
 render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
@@ -99,6 +106,14 @@ call() { busctl --user --json=short call "$TEST_NAME" /Windows "$TEST_NAME.Windo
 list()  { call List | jq -r '.data[0]'; }
 
 check "starts empty"          "$(list)" "[]"
+
+# The guard that keeps this test off the user's keyboard. Checked here rather
+# than only in the unit block below, because this is the copy that would do the
+# damage: if it ever registers a component, the live session loses its keys.
+check "it claims no shortcuts" \
+    "$(busctl --user --json=short call org.kde.kglobalaccel /kglobalaccel \
+        org.kde.KGlobalAccel allComponents 2>/dev/null \
+        | grep -c "ShellTest" || true)" "0"
 
 WINDOW='[{"uuid":"a","title":"Work","appId":"org.kde.dolphin","minimized":false,"active":true}]'
 call Update s "$WINDOW" >/dev/null
@@ -185,6 +200,83 @@ fails += not case("skips a size too large to draw", [512, 1] + [0] * 512 + [8, 1
 sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+
+# The shortcuts the daemon owns. Two things can be checked without a session:
+# that a key string becomes the integer kglobalaccel wants -- the same numbers
+# scripts/lib/accel.sh is checked against, from the same measurements off a
+# running server -- and that the component's group is read out of the file the
+# way kglobalaccel writes it.
+echo "== the shortcuts the daemon owns =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t"}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+keycode, shortcuts = mod["keycode"], mod["GlobalShortcuts"]
+
+fails = 0
+def case(name, got, want):
+    global fails
+    ok = got == want
+    fails += not ok
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+
+for name, spec, want in [
+    ("Print", "Print", 16777225),
+    ("Meta+Shift+Print", "Meta+Shift+Print", 318767113),
+    ("a letter is its ASCII", "Q", 81),
+    ("lower case too", "q", 81),
+    ("Meta+Space", "Meta+Space", 268435488),
+    ("a function key", "F5", 16777268),
+    ("Alt+Tab", "Alt+Tab", 150994945),
+    ("every modifier at once", "Meta+Alt+Ctrl+Shift+Delete", 520093703),
+    ("Meta alone is a key", "Meta", 16777250),
+    ("a modifier nobody knows", "Hyper+Q", None),
+    ("a key nobody knows", "Meta+Banana", None),
+    ("nothing at all", "", None),
+]:
+    case(name, keycode(spec), want)
+
+# The file as kglobalaccel keeps it: a component's group, three fields, a tab
+# between two keys written as a literal backslash-t.
+config = os.path.join(sandbox, "kglobalshortcutsrc")
+os.environ["XDG_CONFIG_HOME"] = sandbox
+open(config, "w").write(
+    "[somebodyelse]\n"
+    "launcher=Meta+X,none,Not ours\n"
+    "\n"
+    "[t]\n"
+    "launcher=Meta,none,Application menu\n"
+    "search=none,none,Search\n"
+    "switcher=Alt+Tab\\tMeta+F1,none,Window switcher\n"
+    "nosuchaction=Meta+Z,none,Unknown\n"
+)
+found = shortcuts.bindings()
+case("reads our group only", found.get("launcher"), ["Meta"])
+case("an unbound action is empty", found.get("search"), [])
+case("two keys on one action", found.get("switcher"), ["Alt+Tab", "Meta+F1"])
+case("an action we do not know is ignored", "nosuchaction" in found, False)
+
+# Ownership: only the daemon holding the shell's own bus name claims the
+# shell's keys. A second copy that did would take them off the first, on the
+# live session, which is what the test suite itself once did.
+wanted = mod["shortcuts_wanted"]
+os.environ.pop(mod["NO_SESSION_VAR"], None)
+mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
+case("the daemon that owns the name claims them", wanted(), True)
+mod["BUS_NAME"] = mod["SHORTCUT_OWNER"] + "Test1234"
+case("a copy under another name claims nothing", wanted(), False)
+mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
+os.environ[mod["NO_SESSION_VAR"]] = "1"
+case("and neither does one with no session", wanted(), False)
+
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi

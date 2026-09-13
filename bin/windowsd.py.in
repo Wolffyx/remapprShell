@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""@DISPLAY_NAME@ window list daemon.
+"""@DISPLAY_NAME@ session daemon: the window list, and the global shortcuts.
 
 GENERATED FILE -- DO NOT EDIT. Regenerate: make link (or scripts/install.sh)
 
@@ -13,14 +13,30 @@ be received from. Quickshell cannot own a DBus name, so there was nothing for
 the script to call.
 
 This is that something: a name the KWin script can call, holding the current
-window list and announcing changes. It is deliberately the smallest thing that
-closes the gap -- it holds a list, hands it out, and emits a signal. It does not
-talk to KWin, does not talk to the shell, and makes no decisions about what a
-window is.
+window list and announcing changes. It holds a list, hands it out, and emits a
+signal. It does not talk to KWin, does not talk to the shell, and makes no
+decisions about what a window is.
 
 Activation goes the other way and does not come through here at all: the shell
 calls KWin's own `/WindowsRunner` directly, which is a supported interface. That
 is what keeps this one-directional, and one-directional is what keeps it small.
+
+Why the shortcuts are here too.
+
+A global shortcut needs an owning process. Until this, every key this project
+bound was a `[services][<id>.desktop] _launch` entry -- KDE launches a program
+when the key is pressed -- and kglobalaccel reads those only when it starts.
+On Plasma 6.7 kglobalaccel runs *inside kwin_wayland*, so it cannot be
+restarted without restarting the session: every shortcut bound after login was
+therefore filed perfectly and grabbed nothing, and `isActive` on the component
+said so. The component has to be registered by something that is running, with
+`SetPresent` in the flags word, which is what a compiled `GlobalShortcut` type
+does in other shells and what `GlobalShortcuts` below does over plain D-Bus.
+
+This process is the one to do it: it is already on the session bus, and the
+KWin script activates it at login, before the shell is up. So the keys work
+whether the shell is running or not -- each one runs the same `@CTL_BIN@`
+command its desktop file used to run, and that starts the shell if it has to.
 """
 
 import json
@@ -61,6 +77,283 @@ INTROSPECTION = f"""
   </interface>
 </node>
 """
+
+# Reload: what `@ALIAS@ shortcuts set` calls once it has written the file, so a
+# new binding is grabbed now rather than at the next login.
+SHORTCUT_INTROSPECTION = """
+<node>
+  <interface name="@DBUS_NAME@.Shortcuts">
+    <method name="Reload"/>
+  </interface>
+</node>
+"""
+
+
+# ---- global shortcuts ------------------------------------------------------
+
+# Only the daemon holding the shell's own bus name claims the shell's keys.
+#
+# kglobalaccel hands a component's shortcuts to whoever registered them last
+# and takes them from the one before, so two copies of this file running at
+# once do not compete -- the second silently unbinds the first. A copy under
+# another bus name is exactly what the test suite runs, against the real
+# session bus, and it wiped the user's live shortcuts the first time this
+# class existed. The bus name is the one thing only one process can hold, so
+# it is what decides.
+SHORTCUT_OWNER = "@DBUS_NAME@"
+NO_SESSION_VAR = "@ENV_PREFIX@_NO_SESSION"
+
+
+def shortcuts_wanted():
+    """Whether this copy of the daemon should claim the shell's global keys."""
+    if os.environ.get(NO_SESSION_VAR):
+        return False
+    return BUS_NAME == SHORTCUT_OWNER
+
+
+SHORTCUT_COMPONENT = "@SLUG@"
+SHORTCUT_COMPONENT_PATH = "/component/" + "@SLUG@".replace("-", "_").replace(".", "_")
+SHORTCUT_INTERFACE = "@DBUS_NAME@.Shortcuts"
+SHORTCUT_OBJECT_PATH = "/Shortcuts"
+CTL = "@BIN_DIR@/@CTL_BIN@"
+
+# Every key this project can bind: action id -> (friendly name, what it runs).
+# The friendly name is what System Settings shows in its shortcut list, so it
+# is a sentence a person recognises rather than the id. The command is the one
+# the action's desktop file used to carry, unchanged.
+SHORTCUT_ACTIONS = {
+    "launcher":  ("Application menu", [CTL, "launcher"]),
+    "search":    ("Search", [CTL, "search"]),
+    "settings":  ("Settings", [CTL, "settings"]),
+    "ask":       ("Ask about the last notification", [CTL, "ask", "--last-notification"]),
+    "clipboard": ("Clipboard history", [CTL, "clipboard"]),
+    "sidebar":   ("Sidebar", [CTL, "sidebar"]),
+    "keys":      ("Keyboard shortcuts", [CTL, "keys"]),
+    "switcher":  ("Window switcher", [CTL, "switcher", "show"]),
+    "switcher-reverse": ("Window switcher (backwards)", [CTL, "switcher", "show", "--reverse"]),
+}
+
+# kglobalaccel's setShortcutKeys flags word. SetPresent is the bit that makes
+# the component active -- without it the record is filed and no key is grabbed,
+# which is the bug this whole class exists to fix. NoAutoloading means "use the
+# keys I am passing" rather than "read them from the file yourself", which is
+# what lets one push apply immediately.
+SET_PRESENT = 0x2
+NO_AUTOLOADING = 0x4
+
+# Qt::KeyboardModifier values, ORed into the key. The same table as
+# scripts/lib/accel.sh, because the file stores "Meta+Space" and kglobalaccel
+# wants an integer.
+_MODIFIERS = {
+    "meta": 0x10000000, "super": 0x10000000, "win": 0x10000000,
+    "ctrl": 0x04000000, "control": 0x04000000,
+    "alt": 0x08000000,
+    "shift": 0x02000000,
+}
+
+# A modifier pressed alone is a key in its own right -- a bare Super opening a
+# launcher is the obvious binding, and kglobalaccel accepts it.
+_BARE_MODIFIERS = {
+    "meta": 0x01000022, "super": 0x01000022, "win": 0x01000022,
+    "ctrl": 0x01000021, "control": 0x01000021,
+    "shift": 0x01000020,
+    "alt": 0x01000023,
+}
+
+_NAMED_KEYS = {
+    "space": 32, "tab": 0x01000001, "backtab": 0x01000002,
+    "return": 0x01000004, "enter": 0x01000004,
+    "escape": 0x01000000, "esc": 0x01000000,
+    "backspace": 0x01000003, "delete": 0x01000007, "del": 0x01000007,
+    "insert": 0x01000006, "ins": 0x01000006,
+    "home": 0x01000010, "end": 0x01000011,
+    "pgup": 0x01000016, "pageup": 0x01000016,
+    "pgdown": 0x01000017, "pagedown": 0x01000017,
+    "left": 0x01000012, "up": 0x01000013, "right": 0x01000014, "down": 0x01000015,
+    "print": 0x01000009, "sysreq": 0x01000009, "menu": 0x01000055,
+    "comma": 44, "period": 46, "slash": 47, "semicolon": 59,
+    "equal": 61, "minus": 45, "plus": 43,
+}
+
+
+def keycode(spec):
+    """"Meta+Shift+Print" -> one integer in Qt's encoding, or None.
+
+    Anything this table does not know returns None rather than a guess: a
+    wrong integer is a key bound to something the user never asked for.
+    """
+    parts = [p.strip() for p in spec.split("+") if p.strip()]
+    if len(parts) == 1 and parts[0].lower() in _BARE_MODIFIERS:
+        return _BARE_MODIFIERS[parts[0].lower()]
+
+    total = 0
+    bases = [p for p in parts if p.lower() not in _MODIFIERS]
+    for part in parts:
+        mod = _MODIFIERS.get(part.lower())
+        if mod is not None:
+            total |= mod
+
+    # Two things that are not modifiers means a modifier this table does not
+    # know -- "Hyper+Q" must fail rather than quietly binding Q on its own.
+    if len(bases) != 1:
+        return None
+    base = bases[0]
+
+    low = base.lower()
+    if low in _NAMED_KEYS:
+        return total | _NAMED_KEYS[low]
+    if len(base) == 1 and base.isalnum():
+        return total | ord(base.upper())
+    match = re.fullmatch(r"[Ff]([1-9]|1[0-9]|2[0-5])", base)
+    if match:
+        return total | (0x01000030 + int(match.group(1)) - 1)
+    return None
+
+
+class GlobalShortcuts:
+    """This project's keys, registered by a process that is running.
+
+    The bindings live in kglobalshortcutsrc under this project's own component
+    group, in the three-field form kglobalaccel keeps for a component's actions
+    ("keys,default,friendly") -- the same place and shape as any other shell's.
+    They are read from there and pushed to kglobalaccel with SetPresent, which
+    is what grabs the key; pressing it comes back as `globalShortcutPressed` on
+    this component, and the command runs.
+
+    Reload exists because `@ALIAS@ shortcuts set` writes the file. Without it a
+    new binding would wait for the next login -- which is exactly the bug that
+    made this class necessary.
+    """
+
+    def __init__(self):
+        self._bus = None
+        self._subscription = None
+
+    def start(self, connection):
+        self._bus = connection
+        # Subscribed before anything is registered: a key pressed between the
+        # registration and the subscription would otherwise be lost.
+        self._subscription = connection.signal_subscribe(
+            "org.kde.kglobalaccel", "org.kde.kglobalaccel.Component",
+            "globalShortcutPressed", SHORTCUT_COMPONENT_PATH, None,
+            Gio.DBusSignalFlags.NONE, self._on_pressed, None,
+        )
+        self.reload()
+
+    # ---- reading what is bound ---------------------------------------------
+
+    @staticmethod
+    def _config_path():
+        return os.path.join(
+            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+            "kglobalshortcutsrc",
+        )
+
+    @classmethod
+    def bindings(cls):
+        """action id -> list of key strings, from this project's group.
+
+        Parsed rather than read through kreadconfig6: this runs at login, once
+        per action, and a subprocess each time is a poor way to spend a login.
+        """
+        found = {}
+        try:
+            with open(cls._config_path(), encoding="utf-8") as handle:
+                lines = handle.read().splitlines()
+        except OSError:
+            return found
+
+        in_group = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("["):
+                in_group = stripped == f"[{SHORTCUT_COMPONENT}]"
+                continue
+            if not in_group or "=" not in stripped or stripped.startswith("#"):
+                continue
+            action, value = stripped.split("=", 1)
+            action = action.strip()
+            if action not in SHORTCUT_ACTIONS:
+                continue
+            # "keys,default,friendly" -- only the first field is the binding,
+            # and a key list inside it is tab-separated.
+            active = value.split(",", 1)[0]
+            keys = [k.strip() for k in active.replace("\\t", "\t").split("\t")]
+            found[action] = [k for k in keys if k and k.lower() != "none"]
+        return found
+
+    # ---- registering it ----------------------------------------------------
+
+    def _action_id(self, action):
+        return [SHORTCUT_COMPONENT, action, "@DISPLAY_NAME@", SHORTCUT_ACTIONS[action][0]]
+
+    def _call(self, method, params):
+        return self._bus.call_sync(
+            "org.kde.kglobalaccel", "/kglobalaccel", "org.kde.KGlobalAccel",
+            method, params, None, Gio.DBusCallFlags.NONE, 5000, None,
+        )
+
+    def reload(self):
+        """Push every action's keys to kglobalaccel, as they stand in the file.
+
+        Every action is registered, including the unbound ones: that is what
+        puts them in System Settings' shortcut list, where a person expects to
+        find them, instead of only in this project's own CLI.
+        """
+        if self._bus is None:
+            return
+        bound = self.bindings()
+        for action in SHORTCUT_ACTIONS:
+            # One entry per alternative binding. The argument is a(ai) -- an
+            # array of key *sequences* -- so each key is a one-element list
+            # inside a one-member struct, not a bare integer.
+            keys = []
+            for spec in bound.get(action, []):
+                code = keycode(spec)
+                if code is None:
+                    print(f"cannot bind {action}: no key code for {spec!r}", file=sys.stderr)
+                    continue
+                keys.append(([code],))
+            try:
+                # doRegister first: a component kglobalaccel has never seen
+                # takes setShortcutKeys and keeps nothing.
+                self._call("doRegister", GLib.Variant("(as)", (self._action_id(action),)))
+                self._call("setShortcutKeys", GLib.Variant(
+                    "(asa(ai)u)",
+                    (self._action_id(action), keys, SET_PRESENT | NO_AUTOLOADING),
+                ))
+            # Broad on purpose: one action that cannot be registered must not
+            # take the other seven with it, nor leave the caller of Reload
+            # waiting for an answer that is never coming.
+            except Exception as exc:
+                print(f"could not register {action}: {exc}", file=sys.stderr)
+
+    # ---- running it --------------------------------------------------------
+
+    def _on_pressed(self, _conn, _sender, _path, _iface, _signal, params, _data):
+        component, action = params[0], params[1]
+        if component != SHORTCUT_COMPONENT or action not in SHORTCUT_ACTIONS:
+            return
+        command = SHORTCUT_ACTIONS[action][1]
+        try:
+            # Detached, and never waited for: the shortcut server is inside
+            # kwin_wayland, and a key that blocks until a shell window is up
+            # would block the compositor with it.
+            subprocess.Popen(command, start_new_session=True,
+                             stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except OSError as exc:
+            print(f"could not run {action}: {exc}", file=sys.stderr)
+
+    def handle_call(self, _connection, _sender, _path, _interface, method, _params, invocation):
+        if method == "Reload":
+            self.reload()
+            invocation.return_value(None)
+        else:
+            invocation.return_error_literal(
+                Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
+            )
 
 
 class WindowIcons:
@@ -239,7 +532,9 @@ class WindowList:
 
 def main():
     windows = WindowList()
+    shortcuts = GlobalShortcuts()
     node = Gio.DBusNodeInfo.new_for_xml(INTROSPECTION)
+    shortcut_node = Gio.DBusNodeInfo.new_for_xml(SHORTCUT_INTROSPECTION)
     loop = GLib.MainLoop()
 
     def on_bus_acquired(connection, name):
@@ -247,6 +542,17 @@ def main():
         connection.register_object(
             OBJECT_PATH, node.interfaces[0], windows.handle_call, None, None
         )
+        connection.register_object(
+            SHORTCUT_OBJECT_PATH, shortcut_node.interfaces[0],
+            shortcuts.handle_call, None, None
+        )
+        # Left unstarted where this is not the owning copy: Reload then does
+        # nothing, which is the whole point -- see SHORTCUT_OWNER above.
+        if shortcuts_wanted():
+            shortcuts.start(connection)
+        else:
+            print("not the shell's own bus name; leaving the global shortcuts alone",
+                  file=sys.stderr)
 
     def on_name_lost(connection, name):
         # Another copy is already running, or the bus went away. Either way this

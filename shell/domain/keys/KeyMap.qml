@@ -76,10 +76,19 @@ QtObject {
         ] }
     ]
 
-    // The shell's own keys: `rmpr shortcuts set` binds each as the launch
-    // action of a desktop file named after the slug and the target.
+    // The shell's own keys. They are this project's kglobalaccel component --
+    // one group named after the slug, an action per binding -- because only a
+    // component with a running owner ever gets the key; see
+    // scripts/shortcuts.sh. The desktop-file form is still read so a shortcut
+    // set before the move still appears on the sheet.
     function shellRows(map, slug) {
         const rows = [];
+        const own = map?.[slug] ?? {};
+        for (const action of Object.keys(own)) {
+            const keys = root.keysOf(map, slug, action);
+            if (keys.length > 0)
+                rows.push({ keys: keys, label: own[action].label || action });
+        }
         for (const group of Object.keys(map ?? {})) {
             const m = new RegExp(`^services\\]\\[${slug}-([a-z]+)\\.desktop$`).exec(group);
             if (!m)

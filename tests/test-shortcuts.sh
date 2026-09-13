@@ -20,7 +20,7 @@ source "$REPO_ROOT/scripts/lib/accel.sh"
 # this suite restarted the user's own kglobalaccel four times.
 FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
 CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in systemctl kquitapp6; do
+for t in systemctl kquitapp6 busctl; do
     printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
     chmod +x "$FAKEBIN/$t"
 done
@@ -31,7 +31,10 @@ pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 sc() { "$REPO_ROOT/scripts/shortcuts.sh" "$@" 2>/dev/null; }
-binding() { kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$1.desktop" --key _launch --default '<unset>'; }
+# The whole value, so the friendly name and the default are checked too: both
+# are what System Settings shows and resets to.
+binding() { kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$1" --default '<unset>'; }
+legacy()  { kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$1.desktop" --key _launch --default '<unset>'; }
 
 mkdir -p "$APPLICATIONS_DIR"
 for a in launcher search settings; do : > "$APPLICATIONS_DIR/$SLUG-$a.desktop"; done
@@ -42,15 +45,15 @@ kwriteconfig6 --file kglobalshortcutsrc --group someothershell --key take-over "
 
 echo "== set =="
 sc set settings "Meta+Shift+R" >/dev/null
-# A desktop file's launch shortcut is the key alone, as Plasma writes every
-# other one; the three-field form belongs to components' actions.
-check "binding written as the key alone" "$(binding settings)" "Meta+Shift+R"
+# A component's action is "keys,default,friendly". The friendly name is what
+# System Settings lists, so it is the sentence rather than the id.
+check "binding written as a component action" "$(binding settings)" "Meta+Shift+R,none,Settings"
 check "rejects unknown action" "$(sc set nosuchaction Meta+X >/dev/null && echo ran || echo refused)" "refused"
 
 echo "== a key someone holds is taken from them, and named =="
 out=$("$REPO_ROOT/scripts/shortcuts.sh" set launcher "Meta" 2>&1)
 check "names the holder"                "$(printf '%s' "$out" | grep -c 'taken from someothershell: Theirs')" "1"
-check "binds when asked"                "$(binding launcher)" "Meta"
+check "binds when asked"                "$(binding launcher)" "Meta,none,Application menu"
 check "the holder no longer has it"     "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "none,none,Theirs"
 
 echo "== a key held second in a list is found =="
@@ -60,12 +63,28 @@ check "only that key is taken"          "$(kreadconfig6 --file kglobalshortcutsr
 
 echo "== clear =="
 sc clear launcher >/dev/null
-check "cleared to none" "$(binding launcher)" "none"
+check "cleared to none, keeping its name" "$(binding launcher)" "none,none,Application menu"
+
+# The form this project used before: a desktop file's launch shortcut, which
+# kglobalaccel reads only when it starts and therefore never grabs when it is
+# added afterwards.
+echo "== migrate =="
+kwriteconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-sidebar.desktop" --key _launch "Meta+S"
+kwriteconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-keys.desktop" --key _launch "Meta+K"
+sc set keys "Meta+Shift+K" >/dev/null
+sc migrate >/dev/null
+check "an old binding is moved"      "$(binding sidebar)" "Meta+S,none,Sidebar"
+check "the old group is gone"        "$(legacy sidebar)"  "<unset>"
+check "one already moved is kept"    "$(binding keys)"    "Meta+Shift+K,none,Keyboard shortcuts"
+check "and its old group goes too"   "$(legacy keys)"     "<unset>"
+sc clear sidebar >/dev/null
+sc clear keys >/dev/null
 
 echo "== revert =="
 sc revert >/dev/null
 check "settings binding removed"  "$(binding settings)" "<unset>"
 check "launcher binding removed"  "$(binding launcher)" "<unset>"
+check "the switcher was never touched" "$(binding switcher)" "<unset>"
 check "the holder's key given back" "$(kreadconfig6 --file kglobalshortcutsrc --group someothershell --key take-over)" "Meta,none,Theirs"
 check "the second holder's too"     "$(kreadconfig6 --file kglobalshortcutsrc --group kwin --key 'Some Action')" "$(printf 'Meta+Q\tMeta+J,none,Some Action')"
 
@@ -95,9 +114,12 @@ check "nothing at all"        "$(accel_keycode '' || echo refused)"            "
 check "a key nobody knows"    "$(accel_keycode 'Meta+Banana' || echo refused)" "refused"
 
 echo "== the live session =="
-check "kglobalaccel never restarted" "$(wc -l < "$CALLS")" "0"
+check "nothing reached the session"  "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&1
-check "with one, it is"              "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
+# The daemon that owns the component is told first: it re-reads the file, which
+# is what makes a revert apply now rather than at the next login.
+check "the session daemon is told"   "$(grep -c 'busctl .*Shortcuts Reload' "$CALLS")" "1"
+check "and kglobalaccel restarted"   "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
 
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
