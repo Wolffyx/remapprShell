@@ -29,8 +29,11 @@ uninstall: ## Remove everything the manifest owns
 	@scripts/install.sh --uninstall
 
 run: brand ## Run the shell in the foreground against the working tree
+# The absolute path is what makes the process say where it came from: every
+# "is the shell running?" check reads the command line, and a relative
+# `shell/shell.qml` names no tree at all.
 	@QML2_IMPORT_PATH="$(CURDIR)/shell:$$QML2_IMPORT_PATH" \
-	 quickshell -n -p shell/shell.qml
+	 quickshell -n -p "$(CURDIR)/shell/shell.qml"
 
 restart: ## Restart the installed systemd user unit
 	@systemctl --user restart $(UNIT)

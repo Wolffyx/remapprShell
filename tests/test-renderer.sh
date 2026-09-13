@@ -31,6 +31,22 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 export "$NO_SESSION_VAR=1"
 
+# The process list is the last piece of the live session that reached in here.
+# The sandbox gives every script its own HOME, but `pgrep` still answered for
+# the real machine, so "is the shell running?" depended on whether whoever ran
+# the suite had `make run` going -- which is precisely when these tests are
+# run. The suite says what is running, in this process and in the scripts it
+# calls, and `FAKE_PROC` is the one place it says it.
+export FAKE_PROC=""
+mkdir -p "$SANDBOX/bin"
+cat > "$SANDBOX/bin/pgrep" <<'STUB'
+#!/usr/bin/env bash
+[ -n "${FAKE_PROC:-}" ] && printf '%s\n' "$FAKE_PROC"
+exit 0
+STUB
+chmod +x "$SANDBOX/bin/pgrep"
+export PATH="$SANDBOX/bin:$PATH"
+
 pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
@@ -165,7 +181,6 @@ echo "== what counts as the shell running =="
 # `renderer set quickshell` refused because it believed nothing would draw.
 # The replacement reads a plain variable: a local of the calling function is
 # not reliably in scope by the time process substitution forks to run it.
-FAKE_PROC=""
 _shell_processes() { [ -n "$FAKE_PROC" ] && printf '%s\n' "$FAKE_PROC"; return 0; }
 running_with() { FAKE_PROC=$1; shell_running_from || echo none; }
 
@@ -174,12 +189,31 @@ check "a run from a checkout" "$(running_with "42 /usr/bin/quickshell -n -p $REP
 check "somebody else's shell" "$(running_with '42 /usr/bin/quickshell -n -p /home/other/.config/quickshell/caelestia/shell.qml')" "none"
 check "nothing running"       "$(running_with '')" "none"
 
+# The matcher above is only as true as the command line `make run` really
+# execs. The first fix invented an absolute path for the test while the recipe
+# still passed a relative one, so a shell started by `make run` went on
+# counting as not running. Read the recipe.
+run_cmd=$(grep -A2 '^\tquickshell\|quickshell -n -p' "$REPO_ROOT/Makefile" | grep -m1 'quickshell -n -p')
+check "make run names the tree" "$(printf '%s' "$run_cmd" | grep -c 'CURDIR)/shell/shell.qml')" "1"
+check "and not a relative path" "$(printf '%s' "$run_cmd" | grep -cE '\-p +"?shell/shell\.qml')" "0"
+
 echo "== refusing to leave the desktop with no panel =="
+FAKE_PROC=""
 out=$(rmpr_renderer set quickshell --yes 2>&1)
 check "refused"               "$?" "1"
 check "said why"              "$(printf '%s' "$out" | grep -c 'no panel at all')" "1"
 check "offered a way forward" "$(printf '%s' "$out" | grep -c 'renderer set plasma')" "1"
 check "nothing was switched"  "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "$PLASMA_SHELL_PACKAGE_ID"
+
+# The other half of the same gate, through the script rather than the function:
+# with a working-tree shell on the list it must not refuse. The fix for this
+# was tested one function deep, and the command line `make run` really execs
+# never reached it.
+echo "== a working-tree shell satisfies the gate =="
+FAKE_PROC="42 /usr/bin/quickshell -n -p $REPO_ROOT/shell/shell.qml"
+out=$(rmpr_renderer set quickshell --yes 2>&1)
+check "not refused"           "$(printf '%s' "$out" | grep -c 'no panel at all')" "0"
+FAKE_PROC=""
 
 echo "== back to quickshell =="
 rmpr_renderer set quickshell --yes --force >/dev/null 2>&1 || { echo "set quickshell failed" >&2; exit 1; }
