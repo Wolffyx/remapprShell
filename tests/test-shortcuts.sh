@@ -86,7 +86,10 @@ check "every modifier at once" "$(accel_keycode 'Meta+Alt+Ctrl+Shift+Delete')" "
 
 # Refusing is the point: a key this table gets wrong would be bound to the
 # wrong thing silently, where a refusal falls back to applying at next login.
-check "a modifier alone"      "$(accel_keycode 'Meta' || echo refused)"        "refused"
+# A bare Super key opening a launcher is a real binding, and kglobalaccel
+# takes it: caelestia had Meta bound that way on this machine.
+check "Meta alone is a key"   "$(accel_keycode 'Meta')"               "16777250"
+check "and Ctrl alone"        "$(accel_keycode 'Ctrl')"               "16777249"
 check "a modifier nobody knows" "$(accel_keycode 'Hyper+Q' || echo refused)"   "refused"
 check "nothing at all"        "$(accel_keycode '' || echo refused)"            "refused"
 check "a key nobody knows"    "$(accel_keycode 'Meta+Banana' || echo refused)" "refused"
