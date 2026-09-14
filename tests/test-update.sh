@@ -23,6 +23,15 @@ REPO_ROOT="$SOURCE_REPO" source "$SOURCE_REPO/scripts/lib/brand.sh"
 # below restarted the user's real, running shell on every run of the suite.
 export "$NO_SESSION_VAR=1"
 
+# `update.sh` runs preflight first, and preflight fails outright without a
+# Plasma session and the binaries the shell is installed against. A container
+# has neither, so the honest answer there is that this suite did not run --
+# not that the updater is broken. Same shape as the guards in test-windows.sh.
+for tool in plasmashell quickshell; do
+    command -v "$tool" >/dev/null 2>&1 \
+        || { printf '  SKIP  %s not available; the update pipeline needs a desktop\n' "$tool"; exit 0; }
+done
+
 pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
           else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
@@ -43,9 +52,13 @@ check "starts at the old version" "$(cat "$INSTALLED/VERSION")" "$(cat "$SOURCE_
 
 echo "== update --from =="
 "$INSTALLED/scripts/update.sh" --from "$NEWER" >"$SANDBOX/out" 2>&1
-check "the real shell is left running" "$(grep -c 'no session: not restarting' "$SANDBOX/out")" "1"
+# Taken before anything else runs: `$?` after the `check` below is the check's
+# own status, so the diagnostic was never printed on the one occasion it was
+# wanted -- an update that failed in CI reported six failed assertions and not
+# one line of why.
 rc=$?
 [ "$rc" -eq 0 ] || { echo "update failed:"; sed 's/^/    /' "$SANDBOX/out"; }
+check "the real shell is left running" "$(grep -c 'no session: not restarting' "$SANDBOX/out")" "1"
 
 check "version advanced"            "$(cat "$INSTALLED/VERSION")" "0.9.9"
 check "new source content arrived"  "$(grep -c 'added by the newer version' "$INSTALLED/shell/core/Obj.qml")" "1"
