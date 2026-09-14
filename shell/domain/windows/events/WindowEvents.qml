@@ -56,8 +56,22 @@ QtObject {
             // Dropped here until 2026-09-14, which made every window look like
             // it was on every desktop: the overview listed all eleven under
             // each of two desktops.
-            desktops: Array.isArray(entry.desktops) ? entry.desktops.map(d => String(d)) : []
+            desktops: Array.isArray(entry.desktops) ? entry.desktops.map(d => String(d)) : [],
+            // The window's shape on screen, for a preview to letterbox its
+            // stream with. 0 from a script older than the field, which is why
+            // anything using it needs a sensible aspect of its own.
+            width: typeof entry.width === "number" ? entry.width : 0,
+            height: typeof entry.height === "number" ? entry.height : 0
         };
+    }
+
+    // A window's shape, for letterboxing a picture of it. 16:9 when the window
+    // did not say, which is the shape of the screen it is on more often than
+    // not and a better guess than a square.
+    function aspectOf(window) {
+        const w = window?.width ?? 0;
+        const h = window?.height ?? 0;
+        return w > 0 && h > 0 ? w / h : 16 / 9;
     }
 
     // The daemon's JSON array. Returns null -- not an empty list -- when it

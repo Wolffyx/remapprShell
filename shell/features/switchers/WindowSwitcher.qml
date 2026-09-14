@@ -292,8 +292,11 @@ PanelWindow {
                                 WindowThumbnail {
                                     anchors.fill: parent
                                     windowId: tile.modelData?.uuid ?? ""
+                                    sourceAspect: WindowEvents.aspectOf(tile.modelData)
                                     iconScale: 0.45
-                                    live: !tile.modelData?.minimized
+                                    // The selected card alone: see the same
+                                    // note in Overview.qml.
+                                    live: tile.selected && !tile.modelData?.minimized
                                     iconName: WindowsService.iconFor(tile.modelData)
                                     iconFile: WindowsService.iconFileFor(tile.modelData)
                                 }

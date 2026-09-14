@@ -500,6 +500,7 @@ BarWidget {
                     iconName: preview.item?.iconName ?? ""
                     iconFile: preview.item?.iconFile ?? ""
                     iconScale: 0.3
+                    sourceAspect: WindowEvents.aspectOf(preview.windows[0])
                     live: preview.windows.length === 1
                 }
 

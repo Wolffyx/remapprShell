@@ -57,7 +57,15 @@ function describe(window) {
         stacking: typeof window.stackingOrder === "number" ? window.stackingOrder : -1,
         // Which virtual desktop, so the panel can show only the current one if
         // asked to. `desktops` is a list; a window on all of them has none.
-        desktops: (window.desktops || []).map(d => String(d.id))
+        desktops: (window.desktops || []).map(d => String(d.id)),
+        // How big it is on screen, for anything drawing a picture of it: a
+        // window's stream fills whatever it is given, so a 4:3 window
+        // letterboxed as 16:9 is a worse picture than none. Only the shape is
+        // wanted, which is why this is not watched for changes -- a window
+        // resized while a preview is open is a slightly wrong shape until the
+        // next update, and that is cheaper than a message per drag.
+        width: Math.round((window.frameGeometry && window.frameGeometry.width) || 0),
+        height: Math.round((window.frameGeometry && window.frameGeometry.height) || 0)
     };
 }
 

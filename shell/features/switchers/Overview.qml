@@ -585,12 +585,17 @@ PanelWindow {
                                     iconName: WindowsService.iconFor(card.modelData)
                                     iconFile: WindowsService.iconFileFor(card.modelData)
                                     iconScale: 0.5
-                                    sourceAspect: 16 / 9
-                                    // Every card on the desktop being looked
-                                    // at, and none on the others: a strip of
-                                    // four desktops is forty streams KWin
-                                    // would be capturing for nothing.
-                                    live: !card.modelData?.minimized
+                                    sourceAspect: WindowEvents.aspectOf(card.modelData)
+                                    // Only the card under the selection.
+                                    //
+                                    // Eleven windows meant eleven streams,
+                                    // and the list is rebuilt whenever a
+                                    // window opens or closes -- so streams
+                                    // were created and destroyed in bursts and
+                                    // PipeWire answered "target not found" for
+                                    // all of them. One stream at a time is
+                                    // also all a person is looking at.
+                                    live: card.selected && !card.modelData?.minimized
                                 }
 
                                 Rectangle {

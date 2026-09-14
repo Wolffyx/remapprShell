@@ -15,7 +15,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.core
-import qs.domain.theme
 
 Item {
     id: root
@@ -45,6 +44,21 @@ Item {
     // the source.
     property bool _complained: false
 
+    // The icon sits *under* the picture rather than being swapped out for it.
+    //
+    // A stream can arrive and then draw nothing -- a fullscreen game whose
+    // buffer kpipewire cannot turn into an EGL image logs
+    // "invalid image EGL_BAD_PARAMETER" and shows a transparent item -- and a
+    // card that is empty is worse than a card that is an icon. Underneath, the
+    // icon is covered when there is a picture and shows through when there is
+    // not, without anything having to detect which.
+    PanelIcon {
+        anchors.centerIn: parent
+        implicitSize: Math.max(16, Math.round(Math.min(root.width, root.height) * root.iconScale))
+        iconName: root.iconName
+        iconFile: root.iconFile
+    }
+
     Loader {
         id: stream
 
@@ -66,14 +80,5 @@ Item {
             stream.item.active = Qt.binding(() => root.live);
             stream.item.sourceAspect = Qt.binding(() => root.sourceAspect);
         }
-    }
-
-    PanelIcon {
-        anchors.centerIn: parent
-        implicitSize: Math.max(16, Math.round(Math.min(root.width, root.height) * root.iconScale))
-        iconName: root.iconName
-        iconFile: root.iconFile
-        opacity: root.showingPicture ? 0 : 1
-        Behavior on opacity { NumberAnimation { duration: Theme.animationMs } }
     }
 }

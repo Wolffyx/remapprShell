@@ -80,6 +80,22 @@ TestCase {
         compare(list[0].desktops[0], "6e59888c");
     }
 
+    // A window's shape, which a preview letterboxes its stream with. A window
+    // that did not say is 16:9 rather than a square: the guess is drawn, so it
+    // has to be the likelier one.
+    function test_the_windows_shape_survives_and_has_a_sane_default() {
+        const sized = WindowEvents.parseList(JSON.stringify([
+            windowJson({ width: 1600, height: 1200 })
+        ]));
+        compare(sized[0].width, 1600);
+        compare(WindowEvents.aspectOf(sized[0]), 4 / 3);
+
+        const silent = WindowEvents.parseList(JSON.stringify([windowJson()]));
+        compare(silent[0].width, 0);
+        compare(WindowEvents.aspectOf(silent[0]), 16 / 9);
+        compare(WindowEvents.aspectOf(null), 16 / 9);
+    }
+
     // An empty list is KWin's "on all desktops", and so is a script too old to
     // send the field. Both have to arrive as an empty array rather than
     // undefined: a filter reading undefined shows the window nowhere.
