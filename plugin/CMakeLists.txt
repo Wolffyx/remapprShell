@@ -57,12 +57,29 @@ qt6_add_qml_module(shellscreencast
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/KWinScreencast"
 )
 
+# A second module, deliberately separate. The one above is about KWin's
+# screencast protocol and is named for it; asking the keyboard what is held has
+# nothing to do with that, and a module that answered both would be a module
+# about "the C++ we happened to need".
+qt_add_library(shellinput SHARED)
+qt6_add_qml_module(shellinput
+    URI ShellInput
+    VERSION 1.0
+    SOURCES src/modifiers.cpp src/modifiers.h
+    OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/ShellInput"
+)
+target_link_libraries(shellinput PRIVATE Qt6::Core Qt6::Gui Qt6::Qml)
+# The generated type registration includes <modifiers.h> by name, so src/ must
+# be on the include path -- without it the header is not found, the type is
+# unknown, and the failure is reported in the generated file rather than ours.
+target_include_directories(shellinput PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 # The installed module must stand on its own: Qt splits a QML module into the
 # plugin and a backing library, and without this the plugin's RUNPATH points at
 # whatever directory it was *built* in. A build directory that is later removed
 # -- a temporary one, a cleaned checkout -- leaves a module that silently stops
 # loading, and the shell then draws icons with nothing to say why.
-foreach(t shellscreencast shellscreencastplugin)
+foreach(t shellscreencast shellscreencastplugin shellinput shellinputplugin)
     if(TARGET ${t})
         set_target_properties(${t} PROPERTIES
             INSTALL_RPATH "$ORIGIN"
@@ -87,4 +104,13 @@ install(TARGETS shellscreencast shellscreencastplugin
 )
 install(DIRECTORY "${CMAKE_BINARY_DIR}/qml/KWinScreencast/"
     DESTINATION "${QML_INSTALL_DIR}/KWinScreencast"
+)
+
+install(TARGETS shellinput shellinputplugin
+    LIBRARY DESTINATION "${QML_INSTALL_DIR}/ShellInput"
+    ARCHIVE DESTINATION "${QML_INSTALL_DIR}/ShellInput"
+    RUNTIME DESTINATION "${QML_INSTALL_DIR}/ShellInput"
+)
+install(DIRECTORY "${CMAKE_BINARY_DIR}/qml/ShellInput/"
+    DESTINATION "${QML_INSTALL_DIR}/ShellInput"
 )
