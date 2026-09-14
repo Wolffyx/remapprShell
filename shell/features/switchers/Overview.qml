@@ -212,9 +212,34 @@ PanelWindow {
         Log.debug("surfaces", `overview: up on ${win.screen?.name}, ${win.desks.length} desktop(s)`);
 
         // The key was let go before this surface existed. See the same lines
-        // in WindowSwitcher.qml: read here and nowhere else.
+        // in WindowSwitcher.qml.
         if (win.hold && Surfaces.heldCommitFresh)
             win.commit();
+    }
+
+    // And the release that lands just *after* it opened, which the read above
+    // cannot see. Meta+Tab races exactly as Alt+Tab does -- the press and the
+    // release are two detached processes -- so a quick one left the overview
+    // on screen with the key already up and nothing able to close it.
+    //
+    // Only meaningful while the overview closes on the key at all: with
+    // `switching.overviewHold` off it stays until something is chosen, and a
+    // release means nothing. See WindowSwitcher.qml for why the keyboard has
+    // to be asked rather than the timing trusted.
+    readonly property Connections _lateCommit: Connections {
+        target: Surfaces
+
+        function onHeldCommitAsked(): void {
+            if (!win.hold || !Surfaces.heldCommitFresh || modifiers.status !== Loader.Ready)
+                return;
+            if (modifiers.item && !modifiers.item.held())
+                win.commit();
+        }
+    }
+
+    readonly property Loader _modifiers: Loader {
+        id: modifiers
+        source: Qt.resolvedUrl("../../platform/input/HeldModifiers.qml")
     }
 
     Item {
