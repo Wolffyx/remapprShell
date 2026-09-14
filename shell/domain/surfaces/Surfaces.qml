@@ -57,6 +57,18 @@ QtObject {
     readonly property bool windowSwitcherCommitFresh: root.windowSwitcherCommitWanted
         && (Date.now() - root.windowSwitcherCommitAt) < root.windowSwitcherCommitWindow
 
+    // When the switcher last closed.
+    //
+    // Every tap of Tab spawns an open of its own through the CLI, so the last
+    // one can still be in flight when the modifier comes up and the choice is
+    // made. Arriving after that, it opened a switcher with no key held and
+    // nothing to close it -- which is what "the overlay stays open after
+    // switching" was. An open that lands just behind a close belongs to the
+    // burst that ended in it, so it is dropped.
+    property real windowSwitcherCommittedAt: 0
+
+    readonly property int windowSwitcherReopenGuard: 600
+
     // What the session screen was opened for: "promptAll", "promptLogout",
     // "promptReboot" or "promptShutDown", as Plasma's prompt names them.
     property string sessionKind: "promptAll"
@@ -67,8 +79,14 @@ QtObject {
     readonly property string screenName: root.screen.length > 0 ? root.screen : (Quickshell.screens[0]?.name ?? "")
 
     function _only(which, screen) {
-        if (which !== "windowSwitcher")
+        if (which !== "windowSwitcher") {
             root.windowSwitcherCommitWanted = false;
+            // However it went away -- a choice, Escape, a click outside -- an
+            // open still travelling the CLI from the last tap of Tab must not
+            // bring it back behind whatever just closed it.
+            if (root.windowSwitcher)
+                root.windowSwitcherCommittedAt = Date.now();
+        }
         root.sidebar = which === "sidebar";
         root.keys = which === "keys";
         root.session = which === "session";
@@ -80,6 +98,9 @@ QtObject {
     // Opened by a key that is still held, so it never toggles: pressing the
     // shortcut again while it is up steps through the list instead.
     function openWindowSwitcher(screen, delta) {
+        if (!root.windowSwitcher
+            && (Date.now() - root.windowSwitcherCommittedAt) < root.windowSwitcherReopenGuard)
+            return;
         root.windowSwitcherDelta = delta === undefined ? 1 : delta;
         if (root.windowSwitcher) {
             root.windowSwitcherTick += 1;
@@ -96,6 +117,7 @@ QtObject {
         root.windowSwitcherCommitAt = Date.now();
         root.windowSwitcherCommitWanted = true;
     }
+
 
     function toggleSidebar(screen) { root._only(root.sidebar ? "" : "sidebar", screen); }
     function toggleKeys(screen) { root._only(root.keys ? "" : "keys", screen); }
