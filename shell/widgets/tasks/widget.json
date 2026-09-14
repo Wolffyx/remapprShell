@@ -39,6 +39,12 @@
             "label": "Only this screen's windows",
             "description": "Each monitor's panel lists the windows on that monitor, as Windows does with \"show taskbar apps on the taskbar where the window is open\"."
         },
+        "thisDesktopOnly": {
+            "type": "bool",
+            "default": true,
+            "label": "Only this desktop's windows",
+            "description": "The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed."
+        },
         "showTitles": {
             "type": "bool",
             "default": true,
@@ -60,6 +66,14 @@
             "max": 48,
             "label": "Icon size",
             "description": "0 follows the panel's thickness, so resizing the panel resizes the icons with it."
+        },
+        "iconScale": {
+            "type": "int",
+            "default": 72,
+            "min": 40,
+            "max": 100,
+            "label": "Icon size, as a share of the button",
+            "description": "How much of a button's height the icon fills, in percent. 100 leaves no room around it; the default leaves a little. Ignored when \"Icon size\" is set to an exact number of pixels."
         }
     }
 }

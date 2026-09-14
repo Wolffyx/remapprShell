@@ -167,10 +167,41 @@ PanelWindow {
         // A press on the panel between widgets, or on one that takes no
         // clicks, closes an open popout too. Beneath the surface, so a widget
         // that does take the press gets it first.
+        //
+        // A right click there opens the panel's own menu, which is what every
+        // other desktop does and what this one did nothing at all about.
         MouseArea {
+            id: empty
+
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
             onPressed: PanelModel.pressed(null)
+            onClicked: event => {
+                if (event.button !== Qt.RightButton) {
+                    root.menuOpen = false;
+                    return;
+                }
+                root.menuAt = root.horizontal ? event.x : event.y;
+                root.menuOpen = true;
+            }
+        }
+
+        // The panel's own menu. One per panel, built when it is first asked
+        // for: a menu nobody opens should cost nothing.
+        LazyLoader {
+            id: panelMenuLoader
+            loading: false
+            activeAsync: root.menuOpen
+
+            PanelMenu {
+                id: panelMenu
+
+                slot: slider
+                bar: root
+                at: root.menuAt
+                visible: root.menuOpen
+                onChosen: root.menuOpen = false
+            }
         }
 
         PanelSurface {
@@ -179,6 +210,15 @@ PanelWindow {
             bar: root
         }
     }
+
+    // Whether the panel's own menu is up. Held here rather than in the menu so
+    // a click anywhere else can close it, the way a popout is closed.
+    property bool menuOpen: false
+
+    // Where along the panel the click that opened it was. Held here, not on
+    // the menu: an id inside a LazyLoader's component cannot be reached from
+    // outside it.
+    property real menuAt: 0
 
     // A click anywhere off the panel closes an open popout, as a menu's does
     // everywhere else. A layer surface has no popup grab to do that for it, so
@@ -206,7 +246,7 @@ PanelWindow {
         // Takes nothing at all while no popout is open: an empty input region,
         // so the desktop and every window below behave as if it were not here.
         readonly property Region deaf: Region {}
-        mask: PanelModel.openPopoutSlot !== null ? null : catcher.deaf
+        mask: PanelModel.openPopoutSlot !== null || root.menuOpen ? null : catcher.deaf
 
         anchors {
             top: true
@@ -227,7 +267,10 @@ PanelWindow {
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
-            onPressed: PanelModel.closeOpenPopout()
+            onPressed: {
+                PanelModel.closeOpenPopout();
+                root.menuOpen = false;
+            }
         }
     }
 

@@ -24,6 +24,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.config
+import qs.domain.desktops
 import qs.domain.theme
 import qs.domain.windows
 import qs.domain.windows.events
@@ -40,9 +41,16 @@ BarWidget {
     // buttons and their icons with it rather than leaving a row of small icons
     // in a tall strip.
     readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
+
+    // How much of the button the icon fills, as a percentage. It used to be a
+    // size worked out from the panel's thickness alone -- 28 units against a
+    // 48-unit button -- which left an icon of 23px in a 39px button on a 52px
+    // panel: under half the panel's height was the icon, and the rest read as
+    // padding nobody asked for.
+    readonly property int iconScale: root.widgetConfig?.iconScale ?? 72
     readonly property int iconSize: root.configuredIconSize > 0
         ? root.configuredIconSize
-        : Math.max(16, Math.min(44, Math.round(28 * root.unit)))
+        : Math.max(16, Math.min(56, Math.round(root.buttonHeight * root.iconScale / 100)))
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
 
@@ -54,15 +62,28 @@ BarWidget {
     // with no monitor named (a script older than that field) is shown
     // everywhere rather than nowhere.
     readonly property bool thisScreenOnly: root.widgetConfig?.thisScreenOnly ?? false
-    readonly property var windowsHere: root.thisScreenOnly
+
+    // And only the windows on the desktop in front, which is what KDE's own
+    // task manager and Windows both do by default. A window on every desktop
+    // -- an empty list, in KWin's terms -- is on this one too.
+    readonly property bool thisDesktopOnly: root.widgetConfig?.thisDesktopOnly ?? true
+
+    function onThisDesktop(window) {
+        if (!root.thisDesktopOnly)
+            return true;
+        const on = window?.desktops ?? [];
+        return on.length === 0 || on.indexOf(Desktops.currentId) >= 0;
+    }
+
+    readonly property var windowsHere: (root.thisScreenOnly
         ? WindowsService.windows.filter(w => !w.output || w.output === root.screenName)
-        : WindowsService.windows
+        : WindowsService.windows).filter(w => root.onThisDesktop(w))
 
     // One item per application when grouping, one per window otherwise. Both
     // are the same shape -- a list of {windows, appName, icon...} -- so the row
     // below does not care which it is drawing.
     readonly property var running: root.groupByApp
-        ? (root.thisScreenOnly ? WindowsService.groupsOf(root.windowsHere) : WindowsService.groups)
+        ? WindowsService.groupsOf(root.windowsHere)
         : root.windowsHere.map(w => ({
             key: w.uuid,
             appKey: String(WindowsService.entryFor(w)?.id ?? ""),

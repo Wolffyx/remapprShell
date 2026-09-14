@@ -441,9 +441,11 @@ without `tray` it stands on the panel alone.
 | `groupByApp` | `true` or `false` | `true` | One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows. |
 | `pinned` | a list | `[]` | Desktop entry ids ("org.kde.dolphin"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose "Pin to taskbar" rather than typing them. |
 | `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
+| `thisDesktopOnly` | `true` or `false` | `true` | The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed. |
 | `showTitles` | `true` or `false` | `true` | The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `230` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |
+| `iconScale` | a number, 40 to 100 | `72` | How much of a button's height the icon fills, in percent. 100 leaves no room around it; the default leaves a little. Ignored when "Icon size" is set to an exact number of pixels. |
 
 ### `widgets.taskview`
 
