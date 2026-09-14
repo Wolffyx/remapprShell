@@ -158,7 +158,7 @@ PanelWindow {
             id: card
 
             property real shown: 0
-            NumberAnimation on shown { from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic; running: true }
+            NumberAnimation on shown { from: 0; to: 1; duration: Theme.animationMs; easing.type: Easing.OutCubic; running: true }
 
             anchors.centerIn: parent
             width: Math.min(parent.width - 80, body.implicitWidth + 52)

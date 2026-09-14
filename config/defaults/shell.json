@@ -6,6 +6,7 @@
         "translucent": true,
         "shadows": false,
         "rounding": 28,
+        "animationMs": 180,
         "desktop": {
             "enabled": true,
             "followMode": false,
@@ -150,6 +151,11 @@
     },
     "switching": {
         "windows": "plasma",
-        "desktops": "shell"
+        "desktops": "shell",
+        "overviewHold": true,
+        "overviewTitles": true,
+        "overviewMinimised": true,
+        "overviewStrip": true,
+        "overviewCardWidth": 560
     }
 }

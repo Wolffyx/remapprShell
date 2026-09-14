@@ -35,7 +35,7 @@ CardGrid {
     readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "shell")
     readonly property var keys: root.switcherState?.keys ?? []
 
-    count: 3
+    count: 4
 
     Component.onCompleted: root.refresh()
 
@@ -178,6 +178,62 @@ CardGrid {
             font.pixelSize: 12
             lineHeight: 1.35
             text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
+        }
+    }
+
+    // The overview's own behaviour. Only ours has any: KWin's Overview is
+    // compiled into KWin and takes no settings from anybody.
+    Card {
+        id: overviewCard
+
+        width: root.cellWidth
+        spacing: 4
+        opacity: root.drawnByDesktops === "shell" ? 1 : 0.45
+        enabled: root.drawnByDesktops === "shell"
+
+        SectionLabel { text: "The desktop overview" }
+
+        ToggleRow {
+            width: overviewCard.width - 2 * overviewCard.padding
+            label: "Closes when the key is released"
+            description: "Held, like Alt+Tab. Off, one press opens it and it stays until you choose, press Escape or click away."
+            checked: ConfigStore.value("switching.overviewHold", true) === true
+            onToggled: value => ConfigStore.set("switching.overviewHold", value)
+        }
+
+        ToggleRow {
+            width: overviewCard.width - 2 * overviewCard.padding
+            label: "Window titles"
+            description: "The title strip along the top of each card."
+            checked: ConfigStore.value("switching.overviewTitles", true) === true
+            onToggled: value => ConfigStore.set("switching.overviewTitles", value)
+        }
+
+        ToggleRow {
+            width: overviewCard.width - 2 * overviewCard.padding
+            label: "List minimised windows"
+            description: "Off lists only what is on screen."
+            checked: ConfigStore.value("switching.overviewMinimised", true) === true
+            onToggled: value => ConfigStore.set("switching.overviewMinimised", value)
+        }
+
+        ToggleRow {
+            width: overviewCard.width - 2 * overviewCard.padding
+            label: "The desktop strip"
+            description: "Every desktop along the bottom, with what is on each and a tile for one more."
+            checked: ConfigStore.value("switching.overviewStrip", true) === true
+            onToggled: value => ConfigStore.set("switching.overviewStrip", value)
+        }
+
+        SliderRow {
+            width: overviewCard.width - 2 * overviewCard.padding
+            label: "Widest a window card gets"
+            from: 260
+            to: 720
+            stepSize: 20
+            value: ConfigStore.value("switching.overviewCardWidth", 560)
+            unit: "px"
+            onMoved: value => ConfigStore.set("switching.overviewCardWidth", Math.round(value))
         }
     }
 

@@ -54,6 +54,15 @@
                     "label": "Corner rounding",
                     "description": "The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion."
                 },
+                "theme.animationMs": {
+                    "type": "int",
+                    "default": 180,
+                    "min": 0,
+                    "max": 400,
+                    "step": 20,
+                    "label": "How long things take to appear",
+                    "description": "In milliseconds: a popout rising out of the panel, the switcher, the desktop overview. 0 makes them appear at once, which is the fastest the shell can feel and the least it can explain -- a surface that simply exists gives no hint about where it came from."
+                },
                 "theme.desktop.enabled": {
                     "type": "bool",
                     "default": true,
@@ -61,18 +70,18 @@
                     "description": "Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back."
                 },
                 "theme.desktop.followMode": {
-                "type": "bool",
-                "default": false,
-                "label": "Applications follow day and night",
-                "description": "With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start."
-            },
+                    "type": "bool",
+                    "default": false,
+                    "label": "Applications follow day and night",
+                    "description": "With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start."
+                },
                 "theme.desktop.gtk": {
                     "type": "bool",
                     "default": true,
                     "label": "GTK applications follow too",
                     "description": "Chrome, Electron applications and GTK applications do not read KDE's colour scheme: they ask a portal, and the GTK portal answers from its own dark/light preference. With this on, that preference is written with the rest -- which is what makes them turn light by day and dark by night instead of staying wherever they were. `rmpr theme revert` puts the preference back."
                 },
-            "theme.desktop.colours": {
+                "theme.desktop.colours": {
                     "type": "bool",
                     "default": true,
                     "label": "Colour scheme",
@@ -512,6 +521,38 @@
                     "default": "shell",
                     "label": "Meta+Tab is drawn by",
                     "description": "shell is this shell's own desktop overview -- every desktop, what is open on each, and one more at the end -- drawn here in the panel's colours. plasma is KWin's Overview, which shows a real picture of every window but cannot be restyled: it is compiled into KWin rather than shipped as a package. Changing this rebinds Meta+Tab, taking it from whatever holds it; `rmpr switcher revert` gives it back."
+                },
+                "switching.overviewHold": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "The overview closes when the key is released",
+                    "description": "On, Meta+Tab is held: the desktops are shown while the key is down and letting go switches to whatever is selected, the way Alt+Tab works. Off, one press opens it and it stays until you choose something, press Escape or click away -- which is closer to how Windows behaves."
+                },
+                "switching.overviewTitles": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Window titles in the overview",
+                    "description": "The title strip along the top of each window card. Off leaves the application's name and its state underneath, and a card that is only the application."
+                },
+                "switching.overviewMinimised": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "List minimised windows",
+                    "description": "Minimised windows appear in the overview, dimmed. Off lists only what is actually on screen."
+                },
+                "switching.overviewStrip": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Show the desktop strip",
+                    "description": "The row along the bottom with every desktop, what is on each, and a tile for one more. Off gives the whole surface to the selected desktop's windows, and the desktops move on the arrows alone."
+                },
+                "switching.overviewCardWidth": {
+                    "type": "int",
+                    "default": 560,
+                    "min": 260,
+                    "max": 720,
+                    "label": "Widest a window card gets",
+                    "description": "In pixels. Cards share the room between them, three to a row at most, and never grow past this."
                 }
             }
         },

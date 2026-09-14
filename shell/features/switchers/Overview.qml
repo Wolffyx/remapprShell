@@ -24,6 +24,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.core
 import qs.domain.theme
+import qs.domain.config
 import qs.domain.desktops
 import qs.domain.windows
 import qs.domain.surfaces
@@ -46,6 +47,17 @@ PanelWindow {
     // KWin's desktops, in KWin's order. Taken live rather than once: creating
     // one from the strip below has to appear without reopening.
     readonly property var desks: Desktops.desktops ?? []
+
+    // ---- what the user has asked it to be ---------------------------------
+
+    // Held, or left up. Held is Alt+Tab's behaviour and the default; left up
+    // is closer to what Windows does, and is what somebody who wants to look
+    // rather than flick wants.
+    readonly property bool hold: ConfigStore.value("switching.overviewHold", true) === true
+    readonly property bool showTitles: ConfigStore.value("switching.overviewTitles", true) === true
+    readonly property bool showMinimised: ConfigStore.value("switching.overviewMinimised", true) === true
+    readonly property bool showStrip: ConfigStore.value("switching.overviewStrip", true) === true
+    readonly property int maxCardWidth: ConfigStore.value("switching.overviewCardWidth", 560)
 
     // Which desktop the selection is on, and which window on it -- -1 for the
     // desktop itself, which is what releasing the key then switches to.
@@ -70,6 +82,8 @@ PanelWindow {
             return [];
         const all = WindowsService.windows ?? [];
         return all.filter(w => {
+            if (!win.showMinimised && w?.minimized)
+                return false;
             const on = w?.desktops ?? [];
             // An empty list is KWin's "on all desktops".
             return on.length === 0 || on.indexOf(deskId) >= 0;
@@ -82,7 +96,17 @@ PanelWindow {
     // into the Repeater's `model`: an array of object literals there is read
     // as an attempt to set the model to a count, and fails with "int
     // expected" against the object's second key.
-    readonly property var hints: [
+    readonly property var hints: win.hold ? win._holdHints : win._stayHints
+
+    readonly property var _stayHints: [
+        { kbd: "Tab", meaning: "window" },
+        { kbd: "↑ ↓", meaning: "desktop" },
+        { kbd: "Enter", meaning: "switch" },
+        { kbd: "Del", meaning: "remove" },
+        { kbd: "Esc", meaning: "close" }
+    ]
+
+    readonly property var _holdHints: [
         { kbd: "Meta+Tab", meaning: "window" },
         { kbd: "↑ ↓", meaning: "desktop" },
         { kbd: "1…9", meaning: "jump" },
@@ -152,7 +176,7 @@ PanelWindow {
 
         // The key was let go before this surface existed. See the same lines
         // in WindowSwitcher.qml: read here and nowhere else.
-        if (Surfaces.heldCommitFresh)
+        if (win.hold && Surfaces.heldCommitFresh)
             win.commit();
     }
 
@@ -214,6 +238,8 @@ PanelWindow {
         // Letting go of the modifier is what chooses. The key arrives here
         // because this surface holds the keyboard exclusively.
         Keys.onReleased: event => {
+            if (!win.hold)
+                return;   // left up on purpose: only a choice closes it
             if (event.key === Qt.Key_Meta || event.key === Qt.Key_Super_L
                 || event.key === Qt.Key_Super_R || event.key === Qt.Key_Alt) {
                 win.commit();
@@ -243,7 +269,7 @@ PanelWindow {
             anchors.bottomMargin: 28
 
             property real shown: 0
-            NumberAnimation on shown { from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic; running: true }
+            NumberAnimation on shown { from: 0; to: 1; duration: Theme.animationMs; easing.type: Easing.OutCubic; running: true }
             opacity: sheet.shown
 
             // ---- header --------------------------------------------------
@@ -361,7 +387,7 @@ PanelWindow {
                                 color: Theme.acc
                             }
                             PanelText {
-                                text: "Meta held"
+                                text: win.hold ? "Meta held" : "Open until you choose"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
                                 color: Theme.fg
@@ -376,7 +402,7 @@ PanelWindow {
                 id: middle
 
                 anchors.top: header.bottom
-                anchors.bottom: strip.top
+                anchors.bottom: win.showStrip ? strip.top : parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.topMargin: 26
@@ -398,10 +424,11 @@ PanelWindow {
                                      : "No desktops",
                             win.countLabel(win.deskWindows.length),
                             win.winIndex >= 0
-                                ? "Release Meta to switch here and raise this window"
+                                ? (win.hold ? "Release Meta to switch here and raise this window"
+                                            : "Enter, or click, to switch here and raise this window")
                                 : win.deskWindows.length > 0
-                                    ? "Release Meta to switch here"
-                                    : "Release Meta for a clean desktop"
+                                    ? (win.hold ? "Release Meta to switch here" : "Enter, or click, to switch here")
+                                    : (win.hold ? "Release Meta for a clean desktop" : "Enter for a clean desktop")
                         ]
 
                         Rectangle {
@@ -457,7 +484,7 @@ PanelWindow {
 
                     readonly property int columns: Math.max(1, Math.min(win.deskWindows.length,
                                                                         Math.floor(cards.width / 430)))
-                    readonly property real cardWidth: Math.min(560,
+                    readonly property real cardWidth: Math.min(win.maxCardWidth,
                         (cards.width - cards.spacing * (cards.columns - 1)) / cards.columns)
 
                     Repeater {
@@ -524,6 +551,7 @@ PanelWindow {
                                 }
 
                                 Rectangle {
+                                    visible: win.showTitles
                                     anchors.top: parent.top
                                     anchors.left: parent.left
                                     anchors.right: parent.right
@@ -642,6 +670,7 @@ PanelWindow {
             Rectangle {
                 id: strip
 
+                visible: win.showStrip
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right

@@ -44,7 +44,7 @@ PanelWindow {
         property: "shown"
         from: 0
         to: 1
-        duration: 180
+        duration: Theme.animationMs
         easing.type: Easing.OutCubic
     }
 

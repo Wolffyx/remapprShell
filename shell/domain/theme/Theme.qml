@@ -39,6 +39,12 @@ QtObject {
     readonly property bool shadows: ConfigStore.value("theme.shadows", false) === true
     readonly property int rounding: ConfigStore.value("theme.rounding", 28)
 
+    // How long a surface takes to appear: a popout rising out of the panel,
+    // the switcher, the overview. One number rather than one per surface, so
+    // the shell moves at a single speed and a person who wants it immediate
+    // says so once.
+    readonly property int animationMs: Math.max(0, ConfigStore.value("theme.animationMs", 180))
+
     // ---- which scheme ------------------------------------------------------
 
     // "auto" follows Night Light's day and night when Night Light is on, and

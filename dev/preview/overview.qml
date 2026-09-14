@@ -2,6 +2,8 @@
 // own: this machine has one desktop, and a strip of one says nothing about
 // how the strip looks.
 import QtQuick
+import Quickshell
+import qs.domain.config
 import qs.domain.theme
 import qs.domain.desktops
 import qs.domain.windows
@@ -31,6 +33,12 @@ Rectangle {
     Component.onCompleted: stage.fake()
 
     function fake() {
+        // PREVIEW_RUNTIME, as the popout target takes it: the settings this
+        // surface reads are worth seeing off as well as on.
+        const runtime = JSON.parse(Quickshell.env("PREVIEW_RUNTIME") || "{}");
+        for (const k of Object.keys(runtime))
+            ConfigStore.setRuntime(k, runtime[k]);
+
         const w = (appId, title, desktop, stacking, minimized) => ({
             uuid: `${appId}-${stacking}`, title: title, appId: appId, desktopFile: appId,
             minimized: minimized === true, active: stacking === 9, output: "DP-2",

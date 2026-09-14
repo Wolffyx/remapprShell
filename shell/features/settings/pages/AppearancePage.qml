@@ -324,6 +324,28 @@ CardGrid {
             onMoved: value => ConfigStore.set("theme.rounding", Math.round(value))
         }
 
+        // One speed for every surface that appears: a popout rising out of the
+        // panel, the switcher, the overview.
+        Row {
+            width: parent.width
+            PanelText { text: "How long things take to appear"; font.pixelSize: 14; width: parent.width - animValue.width }
+            PanelText {
+                id: animValue
+                text: Theme.animationMs === 0 ? "at once" : `${Theme.animationMs} ms`
+                color: Theme.mut
+            }
+        }
+
+        NumberSlider {
+            width: parent.width
+            showReadout: false
+            from: 0
+            to: 400
+            stepSize: 20
+            value: Theme.animationMs
+            onMoved: value => ConfigStore.set("theme.animationMs", Math.round(value))
+        }
+
         ToggleRow {
             width: parent.width
             label: "Translucent surfaces"
