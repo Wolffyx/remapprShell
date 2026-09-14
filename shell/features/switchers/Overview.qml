@@ -83,9 +83,10 @@ PanelWindow {
     // as an attempt to set the model to a count, and fails with "int
     // expected" against the object's second key.
     readonly property var hints: [
-        { kbd: "Meta+Tab", meaning: "desktop" },
-        { kbd: "← →", meaning: "window" },
+        { kbd: "Meta+Tab", meaning: "window" },
+        { kbd: "↑ ↓", meaning: "desktop" },
         { kbd: "1…9", meaning: "jump" },
+        { kbd: "Del", meaning: "remove" },
         { kbd: "Esc", meaning: "cancel" }
     ]
 
@@ -109,6 +110,21 @@ PanelWindow {
             return;
         win.winIndex = win.winIndex < 0 ? (delta > 0 ? 0 : n - 1)
                                         : ((win.winIndex + delta) % n + n) % n;
+    }
+
+    // Removing the selected desktop. KWin moves whatever was on it to the one
+    // before; the last desktop cannot go, because a session with no desktops
+    // has nowhere to put a window.
+    function removeDesk(index) {
+        if (win.desks.length <= 1)
+            return;
+        const desk = win.desks[index];
+        if (!desk || !desk.id)
+            return;
+        Desktops.remove(desk.id);
+        if (win.deskIndex >= win.desks.length - 1)
+            win.deskIndex = Math.max(0, win.desks.length - 2);
+        win.winIndex = -1;
     }
 
     function commit() {
@@ -147,22 +163,29 @@ PanelWindow {
 
         Keys.onPressed: event => {
             switch (event.key) {
+            // Tab steps windows, not desktops: the key is held the same way
+            // Alt+Tab is, and a person pressing Tab means "the next thing I
+            // might switch to". The desktops move on the arrows, where the
+            // strip along the bottom is.
             case Qt.Key_Tab:
-            case Qt.Key_Down:
-                win.stepDesk(1); event.accepted = true; break;
-            case Qt.Key_Backtab:
-            case Qt.Key_Up:
-                win.stepDesk(-1); event.accepted = true; break;
             case Qt.Key_Right:
                 win.stepWindow(1); event.accepted = true; break;
+            case Qt.Key_Backtab:
             case Qt.Key_Left:
                 win.stepWindow(-1); event.accepted = true; break;
+            case Qt.Key_Down:
+                win.stepDesk(1); event.accepted = true; break;
+            case Qt.Key_Up:
+                win.stepDesk(-1); event.accepted = true; break;
             case Qt.Key_Return:
             case Qt.Key_Enter:
             case Qt.Key_Space:
                 win.commit(); event.accepted = true; break;
             case Qt.Key_Escape:
                 Surfaces.closeAll(); event.accepted = true; break;
+            case Qt.Key_Delete:
+            case Qt.Key_Backspace:
+                win.removeDesk(win.deskIndex); event.accepted = true; break;
             default:
                 // 1..9 jumps, as the design's Super+1…5 does.
                 if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
@@ -184,7 +207,7 @@ PanelWindow {
             target: Surfaces
 
             function onOverviewTickChanged(): void {
-                win.stepDesk(Surfaces.overviewDelta);
+                win.stepWindow(Surfaces.overviewDelta);
             }
         }
 
@@ -454,8 +477,16 @@ PanelWindow {
                             color: card.selected ? Theme.accC : Theme.s1
                             border.width: card.selected ? 2 : 1
                             border.color: card.selected ? Theme.acc : Theme.out
-                            y: card.selected ? -3 : 0
-                            Behavior on y { NumberAnimation { duration: 120 } }
+                            // The lift is a transform, not a `y`. A Flow
+                            // positions both x and y of its children, so a
+                            // card that sets its own y fights the positioner
+                            // and the row lands on top of itself -- which is
+                            // what "the apps list are moving one over each
+                            // other" was. The switcher can set y because a
+                            // Row positions x alone.
+                            property real lift: card.selected ? 3 : 0
+                            Behavior on lift { NumberAnimation { duration: 120 } }
+                            transform: Translate { y: -card.lift }
 
                             // A colour per application, as the switcher's
                             // cards use, so the same program looks the same in
@@ -784,6 +815,37 @@ PanelWindow {
                                 }
                             }
 
+                            // Taking one away, where the pointer already is.
+                            // Kept out of the way until the card is hovered,
+                            // and absent on the last desktop, which KWin will
+                            // not remove.
+                            Rectangle {
+                                id: removeButton
+
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 6
+                                width: 24; height: 24
+                                radius: 12
+                                color: removeHover.hovered ? Theme.error : Theme.s1
+                                opacity: (deskHover.hovered || removeHover.hovered) && win.desks.length > 1 ? 1 : 0
+                                Behavior on opacity { NumberAnimation { duration: 90 } }
+
+                                Glyph {
+                                    anchors.centerIn: parent
+                                    name: "close"
+                                    fallback: "window-close"
+                                    size: 15
+                                    color: removeHover.hovered ? Theme.errorFg : Theme.mut
+                                }
+
+                                HoverHandler { id: removeHover }
+                                TapHandler {
+                                    enabled: removeButton.opacity > 0
+                                    onTapped: win.removeDesk(deskCard.index)
+                                }
+                            }
+
                             TapHandler {
                                 onTapped: {
                                     win.deskIndex = deskCard.index;
@@ -792,6 +854,7 @@ PanelWindow {
                                 }
                             }
                             HoverHandler {
+                                id: deskHover
                                 onHoveredChanged: if (hovered) {
                                     win.deskIndex = deskCard.index;
                                     win.winIndex = -1;

@@ -56,6 +56,17 @@ QtObject {
 
     readonly property Process _create: Process { id: createCall }
 
+    // Takes one away. KWin moves whatever was on it to the desktop before, and
+    // refuses to remove the last one -- a window has to be somewhere.
+    function remove(id) {
+        if (!id || root.count <= 1)
+            return;
+        removeCall.command = Dbus.callArgs(root.service, root.path, root.iface, "removeDesktop", "s", [id]);
+        removeCall.running = true;
+    }
+
+    readonly property Process _remove: Process { id: removeCall }
+
     // Whether KWin is showing the desktop. Read back from KWin rather than
     // remembered from our own clicks, so Meta+D, a hot corner and a window
     // being activated all count -- a strip that kept its own flag got out of
