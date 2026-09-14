@@ -193,6 +193,22 @@ any disagreement, in `make lint` and in CI.
 6. Snapshot names are a timestamp plus a label and the second line no longer
    repeats the timestamp, but the list is still cramped on a narrow window.
 
+**This shell starts at login now** (2026-09-15). `remappr-shell.service` is
+enabled -- the standing "keep the unit disabled, they start it by hand" rule is
+gone -- and plasmashell's shell package is `remappr-shell.desktop` rather than
+caelestia's. Plasma's lock screen still draws; ours is built and deliberately
+not enabled.
+
+**caelestia is kept on purpose** and still autostarts, so both draw at login
+and both want the same global shortcuts. That is the user's choice: they keep
+it to take ideas from. `systemctl --user disable app-caelestiashell@autostart`
+is the one command that changes it, and nothing should run it uninvited.
+
+Note the unit file at `~/.config/systemd/user/remappr-shell.service` is written
+by `make link` and is in `owned_paths`, so a restore deletes it -- systemd then
+keeps running an in-memory copy while `is-enabled` reports `not-found`. Check
+both after any restore.
+
 **What is live on the user's machine**: profile `recovered-appearance` (their
 settings, recovered from the 13:02 snapshot, with `launcher.provider` put back
 to `builtin` -- `auto` chose kickoff, which reports itself available whenever
