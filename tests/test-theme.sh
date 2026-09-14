@@ -137,6 +137,48 @@ check "unrelated key untouched" "$(kreadconfig6 --file kwinrc --group Windows --
 # Our package supplies the QML plasmashell draws for the OSD, so with it active
 # there is no way to have both ours and Plasma's without seeing two. Swapping
 # that one file is the whole mechanism.
+# `theme.mode` decides which of light and dark the applications are put in,
+# and with `auto` it is Night Light that decides -- absent in this sandbox, so
+# dark, which is what the defaults file said before there was a light variant.
+echo "== light and dark, for the applications =="
+mode() {   # mode <jq value for theme.mode, or empty to remove>
+    if [ -n "$1" ]; then printf '{ "theme": { "mode": %s } }\n' "$1" > "$profile"
+    else rm -f "$profile"; fi
+}
+
+check "auto with no schedule is dark" "$("$REPO_ROOT/scripts/theme.sh" variant | sed -n 's/^resolved: *//p')" "dark"
+mode '"light"'
+check "the setting is the answer"     "$("$REPO_ROOT/scripts/theme.sh" variant | sed -n 's/^resolved: *//p')" "light"
+
+"$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "the light scheme is written"   "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Light"
+check "and light icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze"
+check "Plasma's widgets too"          "$(cmp -s "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors" "$COLORS_DIR/$SLUG-light.colors" && echo same)" "same"
+# The style, the Plasma theme, the decorations and Alt+Tab are the same either
+# way, and a variant switch must not churn them.
+check "the style is not rewritten"    "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "Breeze"
+check "nor Alt+Tab"                   "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "$SLUG"
+
+check "asking again does nothing"     "$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1 | grep -c 'already in light')" "1"
+
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+check "and back to dark"              "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "with dark icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
+
+check "a variant nobody has"          "$("$REPO_ROOT/scripts/theme.sh" variant sideways >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+check "status carries it"             "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.resolved')" "light"
+check "and whether it follows"        "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.follows')" "false"
+
+# An apply in light leaves the desktop in light, not in whatever the file
+# happens to list first.
+mode '"light"'
+"$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
+check "an apply follows the mode"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Light"
+check "--variant overrides it"        "$("$REPO_ROOT/scripts/theme.sh" apply --variant dark >/dev/null 2>&1; kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+mode ""
+"$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
+check "back to dark by default"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+
 echo "== which OSD draws =="
 osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
 

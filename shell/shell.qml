@@ -29,6 +29,7 @@ import qs.features.launcher
 import qs.features.desktop
 import qs.features.overlays
 import qs.domain.surfaces
+import qs.domain.theme
 
 ShellRoot {
     id: root
@@ -37,6 +38,10 @@ ShellRoot {
     // nothing here has to watch for display changes.
     // Per-output overrides, one watcher per connected screen.
     MonitorConfigLoader {}
+
+    // The applications' light and dark, kept with the shell's -- opt-in, under
+    // `theme.desktop.followMode`, and it does nothing at all while that is off.
+    DesktopVariant {}
 
     // Drawn only when this renderer is the one selected. The Plasma renderer
     // draws the same panel through plasmashell, and both drawing at once is

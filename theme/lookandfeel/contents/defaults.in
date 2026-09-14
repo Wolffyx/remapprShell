@@ -7,18 +7,33 @@
 # whose part is turned off is not written at all, and keeps whatever the user
 # chose in System Settings. Every line that is written goes through the ledger,
 # so `@ALIAS@ theme revert` puts it back either way.
+#
+# A `# variant:` marker names which of light and dark the lines beneath it
+# belong to; `any` ends one. Only the variant being applied is written, so the
+# applications follow day and night the way the shell does -- see `@ALIAS@
+# theme variant`. Lines outside any variant marker are written for both.
 
 # part: style
 [kdeglobals][KDE]
 widgetStyle=Breeze
 
 # part: colours
+# variant: dark
 [kdeglobals][General]
 ColorScheme=@DISPLAY_NAME@ Dark
+# variant: light
+[kdeglobals][General]
+ColorScheme=@DISPLAY_NAME@ Light
+# variant: any
 
 # part: icons
+# variant: dark
 [kdeglobals][Icons]
 Theme=breeze-dark
+# variant: light
+[kdeglobals][Icons]
+Theme=breeze
+# variant: any
 
 # part: plasmaTheme
 [plasmarc][Theme]

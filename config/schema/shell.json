@@ -60,7 +60,13 @@
                     "label": "Theme the whole desktop",
                     "description": "Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back."
                 },
-                "theme.desktop.colours": {
+                "theme.desktop.followMode": {
+                "type": "bool",
+                "default": false,
+                "label": "Applications follow day and night",
+                "description": "With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start."
+            },
+            "theme.desktop.colours": {
                     "type": "bool",
                     "default": true,
                     "label": "Colour scheme",

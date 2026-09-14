@@ -92,6 +92,15 @@ they appear in System Settings for you to try. `--appearance` is what selects
 them, and `rmpr theme revert` puts every key back and removes every file we
 installed -- leaving anything you put in those directories yourself alone.
 
+`theme.mode: auto` turns the shell light by day and dark by night, on KWin's
+Night Light schedule. The applications follow only if you ask them to: turn on
+**Applications follow day and night** (`theme.desktop.followMode`) and the
+shell rewrites KDE's colour scheme and icon theme when night falls, or run
+`rmpr theme variant light|dark|auto` to do it once by hand. `rmpr theme
+variant` with no argument says what is resolved and from what. Every key it
+writes is ledgered like the rest, so `rmpr theme revert` still puts the desktop
+back.
+
 The colour schemes are generated from `theme/colors/palette.json`, and the
 desktop theme ships the same file, so Plasma's widgets, its dialogues and our
 panel cannot disagree about what the accent colour is. The desktop theme

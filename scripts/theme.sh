@@ -4,6 +4,8 @@
 #   apply [--appearance|--package-only]
 #                          install the package and activate it
 #   revert                 put every key back and remove the package
+#   variant [light|dark|auto]
+#                          which of light and dark the desktop is in
 #   osd ours|plasma        which OSD draws when our package is active
 #   style [<id>|revert]    the Qt style every application is drawn in
 #   install-style <id> [--run]
@@ -116,6 +118,14 @@ notify_style_changed() {
     busctl --user emit /KGlobalSettings org.kde.KGlobalSettings notifyChange ii 2 0 >/dev/null 2>&1 || true
 }
 
+# What System Settings' colours page sends. Qt applications reread kdeglobals
+# on it, which is what makes a colour scheme written here reach a window that
+# is already open rather than only the next one started.
+notify_palette_changed() {
+    session_available || return 0
+    busctl --user emit /KGlobalSettings org.kde.KGlobalSettings notifyChange ii 0 0 >/dev/null 2>&1 || true
+}
+
 # How to install a package here, printed for a person to run. Only pacman is
 # known; elsewhere the package names are not known either.
 install_command() {
@@ -123,7 +133,7 @@ install_command() {
     printf 'sudo pacman -S --needed %s' "$1"
 }
 
-install_package() {
+install_package() {   # install_package [variant]
     mkdir -p "$LNF_DEST/contents"
 
     # Failures here must stop the apply. A half-installed package that is then
@@ -146,7 +156,46 @@ install_package() {
 
     install_colors || return 1
     install_switcher || return 1
-    install_desktoptheme
+    install_desktoptheme "${1:-dark}"
+}
+
+# Is the sun up, by KWin's reckoning? "true", "false", or empty for "nobody
+# knows" -- which is Night Light missing, unsupported or switched off.
+#
+# The same three properties the shell reads, asked the same way: Plasma has no
+# light/dark schedule of its own, and Night Light's is the one the user has
+# already configured, so following it means the desktop and the shell cannot
+# disagree about when night is.
+night_light_daylight() {
+    session_available || return 0
+    local out
+    out=$(busctl --user --json=short get-property org.kde.KWin /org/kde/KWin/NightLight \
+              org.kde.KWin.NightLight available enabled daylight 2>/dev/null) || return 0
+    local values
+    values=$(printf '%s\n' "$out" | jq -r '.data' 2>/dev/null | paste -sd' ' -)
+    case "$values" in
+        "true true true")  printf 'true' ;;
+        "true true false") printf 'false' ;;
+        *) ;;   # unavailable, off, or an answer in a shape we do not know
+    esac
+}
+
+# Light or dark, for the desktop. The shell answers this for itself in
+# Scheme.resolveMode; this is the same question for the applications.
+#
+# `theme.mode` is the user's, and light and dark are answers in themselves.
+# `auto` follows Night Light. With nothing to follow it stays dark, which is
+# what the defaults file said before there was a light variant of it at all.
+resolve_variant() {
+    local mode
+    mode=$(config_get '.theme.mode' 'auto')
+    case "$mode" in
+        light|dark) printf '%s' "$mode"; return 0 ;;
+    esac
+    case "$(night_light_daylight)" in
+        true)  printf 'light' ;;
+        *)     printf 'dark' ;;
+    esac
 }
 
 # Plasma's own widgets -- applet popups, the tray, tooltips -- read their
@@ -155,17 +204,19 @@ install_package() {
 # back to Breeze's, so this is a recolour rather than a second set of assets to
 # maintain, and it cannot leave a widget with no graphics at all.
 install_desktoptheme() {
-    local dark="$REPO_ROOT/theme/colors/$SLUG-dark.colors"
-    [ -f "$dark" ] || { log_error "no generated colour scheme to build the desktop theme from"; return 1; }
+    local variant=${1:-dark}
+    local colors="$REPO_ROOT/theme/colors/$SLUG-$variant.colors"
+    [ -f "$colors" ] || { log_error "no generated $variant colour scheme to build the desktop theme from"; return 1; }
 
     mkdir -p "$DESKTOPTHEME_DEST"
     render_template "$DESKTOPTHEME_SRC/metadata.json.in" "$DESKTOPTHEME_DEST/metadata.json" \
         || { log_error "could not render the desktop theme metadata"; return 1; }
     chmod 644 "$DESKTOPTHEME_DEST/metadata.json"
 
-    # The same file, so the panel, Plasma's widgets and every dialogue cannot
-    # disagree about what the accent colour is.
-    cp -a "$dark" "$DESKTOPTHEME_DEST/colors" || return 1
+    # The same file as the colour scheme, so the panel, Plasma's widgets and
+    # every dialogue cannot disagree about what the accent colour is -- and the
+    # same variant, or a light desktop would keep dark applet popups.
+    cp -a "$colors" "$DESKTOPTHEME_DEST/colors" || return 1
     chmod 644 "$DESKTOPTHEME_DEST/colors"
     log_step "installed $DESKTOPTHEME_DEST"
 }
@@ -240,11 +291,19 @@ desktop_part_wanted() {
 # for saying out loud what an apply did.
 desktop_parts() { printf '%s\n' colours icons style plasmaTheme decorations switcher; }
 
+# apply_defaults [variant] [variant-only]
+#
+# `variant` is light or dark: the lines under the other one's `# variant:`
+# marker are not written at all. `variant-only` writes nothing else, which is
+# what `variant` uses to follow day and night without rewriting the whole
+# desktop -- the style, the Plasma theme, the decorations and Alt+Tab do not
+# change between light and dark, and rewriting them would churn the ledger.
 apply_defaults() {
+    local want=${1:-dark} variant_only=${2:-0}
     local defaults="$LNF_DEST/contents/defaults"
     [ -f "$defaults" ] || { log_error "no defaults file at $defaults"; return 1; }
 
-    local file="" group="" line key value part="" wanted=1
+    local file="" group="" line key value part="" wanted=1 variant="any"
     while IFS= read -r line; do
         line=${line%%$'\r'}
         [ -n "$line" ] || continue
@@ -253,8 +312,12 @@ apply_defaults() {
         case "$line" in
             '#'*)
                 case "$line" in
+                    '# variant: '*)
+                        variant=${line#\# variant: }
+                        ;;
                     '# part: '*)
                         part=${line#\# part: }
+                        variant="any"
                         if desktop_part_wanted "$part"; then
                             wanted=1
                         else
@@ -268,6 +331,15 @@ apply_defaults() {
         esac
 
         [ "$wanted" = 1 ] || continue
+
+        # The variant being applied, and -- for a variant-only pass -- nothing
+        # that belongs to neither. The group headers are skipped with the keys
+        # beneath them, because each variant's block carries its own.
+        if [ "$variant" = "any" ]; then
+            [ "$variant_only" = 0 ] || continue
+        else
+            [ "$variant" = "$want" ] || continue
+        fi
 
         if [[ "$line" =~ ^\[ ]]; then
             # [file][Group] or [file][A][B]
@@ -292,6 +364,7 @@ WITH_APPEARANCE=0
 PACKAGE_ONLY=0
 WITH_JSON=0
 RUN_INSTALL=0
+VARIANT_ARG=""
 positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -299,6 +372,7 @@ while [ $# -gt 0 ]; do
         --package-only) PACKAGE_ONLY=1 ;;
         --json) WITH_JSON=1 ;;
         --run) RUN_INSTALL=1 ;;
+        --variant) VARIANT_ARG=${2:-}; shift ;;
         -*) die "unknown option: $1" ;;
         *) positional+=("$1") ;;
     esac
@@ -374,13 +448,21 @@ case "$cmd" in
         # A restore point before the first write outside our own directories.
         snapshot_create "before-theme" >/dev/null || die "could not take a restore point; refusing to apply"
 
+        # Light or dark, for the applications. `--variant` overrides; without
+        # it the desktop is put in whatever the shell is in.
+        case "$VARIANT_ARG" in
+            ""|auto) variant=$(resolve_variant) ;;
+            light|dark) variant=$VARIANT_ARG ;;
+            *) die "unknown variant: $VARIANT_ARG (one of: light dark auto)" ;;
+        esac
+
         # Installing copies Plasma's Osd.qml over the silenced one, so a
         # second apply -- to add parts written since the first -- would
         # quietly bring back Plasma's OSD beside ours. The choice is kept.
         osd_was_ours=0
         grep -q 'drawn as nothing' "$LNF_DEST/contents/osd/Osd.qml" 2>/dev/null && osd_was_ours=1
 
-        install_package || die "package installation failed; nothing was activated"
+        install_package "$variant" || die "package installation failed; nothing was activated"
 
         if [ "$osd_was_ours" = 1 ]; then
             cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$LNF_DEST/contents/osd/Osd.qml" \
@@ -394,7 +476,8 @@ case "$cmd" in
         if [ "$PACKAGE_ONLY" = 1 ]; then
             log_info "package only: colour scheme, icons, widget style and the rest left alone"
         elif [ "$WITH_APPEARANCE" = 1 ] || [ "$(config_get '.theme.desktop.enabled' true)" = "true" ]; then
-            apply_defaults || die "could not write the defaults; run '$ALIAS theme revert'"
+            apply_defaults "$variant" || die "could not write the defaults; run '$ALIAS theme revert'"
+            log_info "the desktop is in $variant (theme.mode: $(config_get '.theme.mode' 'auto'))"
         else
             log_info "leaving the desktop alone (theme.desktop.enabled is off)"
             log_info "  the shell is themed either way; --appearance applies the rest once"
@@ -462,9 +545,12 @@ case "$cmd" in
                                                         | {(.[0]): (.[1] == "true")}' | jq -s -c 'add
                                                         + {enabled: '"$(config_get '.theme.desktop.enabled' true)"'}')" \
                 --argjson styleCustomised "$(jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1 && echo true || echo false)" \
+                --arg variant "$(resolve_variant)" \
+                --argjson followMode "$(config_get '.theme.desktop.followMode' false)" \
                 '{package: $package, active: ($active == $lnf),
                   parts: {schemes: $schemes, switcher: $switcher, desktoptheme: $desktoptheme, splash: $splash},
                   desktop: $desktop,
+                  variant: {resolved: $variant, follows: $followMode},
                   style: $style, styles: $styles, styleCustomised: $styleCustomised}'
             exit 0
         fi
@@ -487,9 +573,61 @@ case "$cmd" in
             printf '  %-12s %s\n' "$part" \
                 "$(desktop_part_wanted "$part" && echo "applied" || echo "left as System Settings has it")"
         done
+        printf 'light or dark: %s (theme.mode: %s)%s\n' \
+            "$(resolve_variant)" "$(config_get '.theme.mode' 'auto')" \
+            "$([ "$(config_get '.theme.desktop.followMode' false)" = "true" ] && printf ', and the desktop follows it' || printf '; the desktop follows it only when theme.desktop.followMode is on')"
         echo
         echo 'ledger (what revert would undo):'
         kconfig_ledger_summary theme
+        ;;
+
+    variant)
+        # Which of light and dark the applications are in.
+        #
+        # The shell recolours itself from `theme.mode` and needs nobody's
+        # permission; the applications read KDE's own configuration, so this
+        # writes the colour scheme and icon theme -- ledgered, like every other
+        # key this project writes -- and nothing else. The style, the Plasma
+        # theme, the decorations and Alt+Tab are the same either way.
+        [ -f "$LNF_DEST/contents/defaults" ] \
+            || die "the look-and-feel package is not installed ($ALIAS theme apply)"
+
+        case "${1:-}" in
+            "")
+                nl=$(night_light_daylight)
+                printf 'theme.mode:   %s\n' "$(config_get '.theme.mode' 'auto')"
+                printf 'night light:  %s\n' "$([ -n "$nl" ] && printf '%s' "$([ "$nl" = true ] && echo daylight || echo night)" || printf 'off or unavailable')"
+                printf 'resolved:     %s\n' "$(resolve_variant)"
+                printf 'follows it:   %s\n' "$(config_get '.theme.desktop.followMode' false)"
+                printf 'colour scheme: %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
+                printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"
+                exit 0
+                ;;
+            auto)       variant=$(resolve_variant) ;;
+            light|dark) variant=$1 ;;
+            *) die "unknown variant: $1 (one of: light dark auto)" ;;
+        esac
+
+        # Called whenever night falls, and on every start, so doing nothing
+        # when there is nothing to do matters: a write here wakes every Qt
+        # application on the machine.
+        if [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" = "$DISPLAY_NAME ${variant^}" ] \
+           && cmp -s "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" "$DESKTOPTHEME_DEST/colors" 2>/dev/null; then
+            log_info "the desktop is already in $variant"
+            exit 0
+        fi
+
+        apply_defaults "$variant" 1 || die "could not write the $variant variant"
+
+        # Plasma's own widgets read the desktop theme, not the colour scheme,
+        # so the variant has to reach both or a light desktop keeps dark applet
+        # popups. This one takes a plasmashell restart to show, which is not
+        # something to do to somebody at sunset -- it is right from the next
+        # start either way.
+        install_desktoptheme "$variant" || die "could not recolour the desktop theme"
+
+        notify_palette_changed
+        log_step "the desktop is in $variant"
         ;;
 
     osd)
@@ -544,5 +682,5 @@ case "$cmd" in
         log_info "run that in a terminal -- it needs root -- then: $ALIAS theme style $want"
         ;;
 
-    *) die "unknown command: $cmd (expected apply, revert, osd, style, install-style or status)" ;;
+    *) die "unknown command: $cmd (expected apply, revert, variant, osd, style, install-style or status)" ;;
 esac

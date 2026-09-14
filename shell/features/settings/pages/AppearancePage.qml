@@ -460,18 +460,12 @@ CardGrid {
         width: root.width
         spacing: 2
 
-        SectionLabel { text: "What it themes" }
-
         // What the theme is allowed to touch.
         //
         // The parts are the schema's, and the same names the CLI prints, so a
         // checkbox here and `theme status` can never describe different things.
         // Each one off keeps whatever System Settings says for it.
-        PanelText {
-            text: "What it themes"
-            font.pixelSize: 13
-            topPadding: 8
-        }
+        SectionLabel { text: "What it themes" }
 
         ToggleRow {
             label: "Theme the whole desktop"
@@ -484,6 +478,16 @@ CardGrid {
             width: parent.width
             opacity: ConfigStore.value("theme.desktop.enabled", true) === true ? 1 : 0.45
             enabled: ConfigStore.value("theme.desktop.enabled", true) === true
+
+            // Off by default, and not one of the parts: the parts say what an
+            // apply writes once, this says the colours are rewritten again
+            // every time night falls.
+            ToggleRow {
+                label: "Applications follow day and night"
+                description: "With Colour scheme on auto, KDE's colour scheme and icons turn dark with the shell. Plasma's own widgets follow from the next start."
+                checked: ConfigStore.value("theme.desktop.followMode", false) === true
+                onToggled: value => ConfigStore.set("theme.desktop.followMode", value)
+            }
 
             Repeater {
                 model: [
