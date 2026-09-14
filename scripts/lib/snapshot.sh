@@ -228,9 +228,28 @@ snapshot_restore() {
 
     # Paths we own that did not exist when the snapshot was taken are ours and
     # are removed. Nothing outside owned_paths is ever deleted.
+    #
+    # Except the configuration directory, which is what the user wrote.
+    #
+    # "Not in the manifest" does not mean "added since". The oldest snapshots
+    # were taken before the configuration directory was captured at all, so
+    # restoring one read its absence as ours-to-delete and removed every
+    # profile the user had -- on a command they ran to *recover* settings. An
+    # old snapshot cannot say what the configuration looked like, and a restore
+    # that deletes more than it restores is not a restore.
+    #
+    # The state directory is not exempt and should not be: it is ours and
+    # derived, and the ledger in it must not survive to claim ownership of
+    # files that have just been put back. What used to be lost with it was the
+    # profile backups, and those are written into the configuration directory
+    # as profiles now, which is the half of this that makes the rule safe.
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         [ -e "$path" ] || continue
+        if [ "$path" = "$CONFIG_DIR" ] && ! grep -qxF -- "$path" <<< "$manifest"; then
+            log_warn "this snapshot predates $path being captured; leaving your configuration as it is"
+            continue
+        fi
         if ! grep -qxF -- "$path" <<< "$manifest"; then
             snapshot_safe_rm "$path" && removed=$((removed + 1))
         fi
