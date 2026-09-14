@@ -18,7 +18,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Sy --noconfirm --needed git jq make qt6-declarative xorg-server-xvfb tar kconfig
+        run: pacman -Sy --noconfirm --needed git jq make diffutils qt6-declarative xorg-server-xvfb tar kconfig
 
       - uses: actions/checkout@v4
 
