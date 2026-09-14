@@ -81,6 +81,12 @@ PanelWindow {
     Component.onCompleted: {
         win.take();
         Log.debug("surfaces", `window switcher: up on ${win.screen?.name}, ${win.entries.length} window(s)`);
+
+        // The key was let go before this surface existed -- a quick Alt+Tab.
+        // The choice was still made, so make it, rather than leaving the
+        // switcher up with the key already released and nothing to close it.
+        if (Surfaces.windowSwitcherCommitFresh)
+            win.commit();
     }
 
     Item {
@@ -116,6 +122,15 @@ PanelWindow {
 
             function onWindowSwitcherTickChanged(): void {
                 win.step(Surfaces.windowSwitcherDelta);
+            }
+
+            // The key came up. Reported by the session daemon, which hears it
+            // from kglobalaccel whether or not this surface has the keyboard
+            // -- the release below is the same choice arriving the other way,
+            // and whichever gets here first closes the switcher.
+            function onWindowSwitcherCommitWantedChanged(): void {
+                if (Surfaces.windowSwitcherCommitFresh)
+                    win.commit();
             }
         }
 

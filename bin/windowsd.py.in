@@ -133,6 +133,19 @@ SHORTCUT_ACTIONS = {
     "switcher-reverse": ("Window switcher (backwards)", [CTL, "switcher", "show", "--reverse"]),
 }
 
+# What letting go of a key runs, for the shortcuts that are *held* rather than
+# tapped. Only the switcher is: Alt+Tab chooses when Alt comes up.
+#
+# The switcher used to take that release itself, as a key event on its own
+# surface -- which works only while the surface is up and holding the keyboard.
+# A quick Alt+Tab releases the key before it is, because the press travels
+# kglobalaccel -> here -> the CLI -> the shell's IPC first, so the release
+# reached nobody and the switcher stayed on screen with nothing to close it.
+SHORTCUT_RELEASES = {
+    "switcher": [CTL, "switcher", "commit"],
+    "switcher-reverse": [CTL, "switcher", "commit"],
+}
+
 # kglobalaccel's setShortcutKeys flags word. SetPresent is the bit that makes
 # the component active -- without it the record is filed and no key is grabbed,
 # which is the bug this whole class exists to fix. NoAutoloading means "use the
@@ -228,6 +241,7 @@ class GlobalShortcuts:
     def __init__(self):
         self._bus = None
         self._subscription = None
+        self._release_subscription = None
 
     def start(self, connection):
         self._bus = connection
@@ -237,6 +251,11 @@ class GlobalShortcuts:
             "org.kde.kglobalaccel", "org.kde.kglobalaccel.Component",
             "globalShortcutPressed", SHORTCUT_COMPONENT_PATH, None,
             Gio.DBusSignalFlags.NONE, self._on_pressed, None,
+        )
+        self._release_subscription = connection.signal_subscribe(
+            "org.kde.kglobalaccel", "org.kde.kglobalaccel.Component",
+            "globalShortcutReleased", SHORTCUT_COMPONENT_PATH, None,
+            Gio.DBusSignalFlags.NONE, self._on_released, None,
         )
         self.reload()
 
@@ -334,7 +353,15 @@ class GlobalShortcuts:
         component, action = params[0], params[1]
         if component != SHORTCUT_COMPONENT or action not in SHORTCUT_ACTIONS:
             return
-        command = SHORTCUT_ACTIONS[action][1]
+        self._run(action, SHORTCUT_ACTIONS[action][1])
+
+    def _on_released(self, _conn, _sender, _path, _iface, _signal, params, _data):
+        component, action = params[0], params[1]
+        if component != SHORTCUT_COMPONENT or action not in SHORTCUT_RELEASES:
+            return
+        self._run(action, SHORTCUT_RELEASES[action])
+
+    def _run(self, action, command):
         try:
             # Detached, and never waited for: the shortcut server is inside
             # kwin_wayland, and a key that blocks until a shell window is up

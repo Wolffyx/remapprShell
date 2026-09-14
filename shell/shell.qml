@@ -420,6 +420,10 @@ ShellRoot {
         function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
         function switcher(): void { Surfaces.openWindowSwitcher("", 1); }
         function switcherReverse(): void { Surfaces.openWindowSwitcher("", -1); }
+
+        // The switcher's key coming up, from the session daemon. See
+        // Surfaces.commitWindowSwitcher.
+        function switcherCommit(): void { Surfaces.commitWindowSwitcher(); }
         function close(): void { Surfaces.closeAll(); }
     }
 

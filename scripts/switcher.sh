@@ -6,6 +6,8 @@
 #   use plasma|shell        who draws Alt+Tab, and who gets the key for it
 #   show [--reverse]        put this shell's own switcher on screen, for the
 #                           key bound to it when `switching.windows` is "shell"
+#   commit                  the switcher's key has been let go: choose the
+#                           window under the selection and close it
 #   give alt-tab|meta-tab   hand a key to KWin -- Alt+Tab to its window
 #                           switcher, Meta+Tab to its Overview -- taking it from
 #                           whatever holds it
@@ -189,6 +191,14 @@ case "$cmd" in
             exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcherReverse
         fi
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcher
+        ;;
+
+    # What the session daemon runs when the switcher's key comes up. The
+    # release cannot be left to the surface's own key handling: a quick
+    # Alt+Tab releases before the surface is mapped, and the switcher was
+    # then stuck on screen with the key already up. See bin/windowsd.py.in.
+    commit)
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcherCommit
         ;;
 
     give)

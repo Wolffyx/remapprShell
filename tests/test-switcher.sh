@@ -91,6 +91,31 @@ check "shortcuts byte-identical" "$(sha256sum < "$XDG_CONFIG_HOME/kglobalshortcu
 check "layout key removed"       "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName --default '<unset>')" "<unset>"
 check "not customised"           "$(js .customised)" "false"
 
+# The switcher's key coming up reaches the shell as its own IPC call. The
+# release cannot be left to the surface's key handling: a quick Alt+Tab lets go
+# before the surface is mapped, and the switcher was then stuck on screen.
+echo "== show and commit reach the shell =="
+cat > "$FAKEBIN/quickshell" <<'STUB'
+#!/usr/bin/env bash
+while [ $# -gt 0 ]; do
+    [ "$1" = "call" ] && { shift; printf '%s\n' "$*"; exit 0; }
+    shift
+done
+exit 0
+STUB
+chmod +x "$FAKEBIN/quickshell"
+check "show opens it"            "$("$REPO_ROOT/scripts/switcher.sh" show 2>/dev/null)" "surfaces switcher"
+check "and backwards, its own"   "$("$REPO_ROOT/scripts/switcher.sh" show --reverse 2>/dev/null)" "surfaces switcherReverse"
+check "the key coming up commits" "$("$REPO_ROOT/scripts/switcher.sh" commit 2>/dev/null)" "surfaces switcherCommit"
+rm -f "$FAKEBIN/quickshell"
+
+# Both switcher keys are held rather than tapped, so the daemon has to run
+# something when each is released -- or the fix above reaches only Alt+Tab.
+echo "== the daemon runs a release =="
+check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/switcher.sh" revert >/dev/null 2>&1
