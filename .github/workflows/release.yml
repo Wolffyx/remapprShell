@@ -52,8 +52,13 @@ jobs:
           fi
           echo "releasing $file"
 
-      - name: Generate branding
-        run: ./scripts/gen-branding.sh
+      # Every generator, not just branding -- the same `brand` target every
+      # local `make lint` and `make test` depends on. Generating less here than
+      # a developer generates locally is a class of failure on its own: the
+      # colour schemes are gitignored, so without gen-colors the theme suite
+      # had nothing to install and one assertion failed in CI alone.
+      - name: Generate
+        run: make brand
 
       # The same gate as CI. A tag can be pushed at any commit, including one
       # that never went through a pull request, so this does not assume CI has

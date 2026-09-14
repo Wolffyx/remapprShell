@@ -31,8 +31,13 @@ jobs:
       - name: Trust the checkout
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Generate branding
-        run: ./scripts/gen-branding.sh
+      # Every generator, not just branding -- the same `brand` target every
+      # local `make lint` and `make test` depends on. Generating less here than
+      # a developer generates locally is a class of failure on its own: the
+      # colour schemes are gitignored, so without gen-colors the theme suite
+      # had nothing to install and one assertion failed in CI alone.
+      - name: Generate
+        run: make brand
 
       # Fails if the project name is hardcoded outside branding.json.
       - name: Slug lint
