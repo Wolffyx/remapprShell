@@ -88,7 +88,7 @@ CardGrid {
                     readonly property string path: root.prefix + row.modelData
                     readonly property var current: root.readValue(row.path, row.spec.default)
 
-                    width: parent.width
+                    width: group.contentWidth
                     controlWidth: {
                         switch (row.spec.type) {
                             case "bool": return 48;

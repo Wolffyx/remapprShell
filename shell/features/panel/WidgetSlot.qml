@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import qs.core
 import qs.ui.primitives
 import qs.domain.theme
 import qs.features.panel.model
@@ -293,8 +294,10 @@ Item {
         // open and forwards what it receives here. A popout that only displays
         // something does not ask, and the panel stays out of the way.
         onWantedChanged: {
-            if (popout.wanted)
+            if (popout.wanted) {
+                popout.wantedAt = Date.now();
                 enter.restart();
+            }
             if (!root.bar)
                 return;
             if (popout.wanted && (root.widget?.popoutGrabsFocus ?? false))
@@ -302,6 +305,9 @@ Item {
             else if (root.bar.openPopout === popout.popoutContent)
                 root.bar.openPopout = null;
         }
+
+        // When it was asked for, against which the build below is measured.
+        property real wantedAt: 0
 
         // It rises out of the panel as it appears.
         property real shown: 1
@@ -358,6 +364,13 @@ Item {
                 // cost nothing, and one that is closed should not keep state.
                 active: popout.wanted
                 sourceComponent: root.widget?.popout ?? null
+
+                // How long that build took. "The popouts feel slow" needs a
+                // number before anything is optimised, and the build is the
+                // part of the delay this project owns -- the rest is the
+                // compositor mapping a surface, which nothing here can time.
+                onLoaded: Log.debug("panel",
+                    `popout '${root.entry?.id}' built in ${Date.now() - popout.wantedAt} ms`)
             }
         }
     }
