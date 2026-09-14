@@ -2,6 +2,11 @@
 shell/core/Branding.qml
 theme/lockscreen/Options.qml
 
+# The pattern-check hooks' own logs: a record of local tool decisions, not of
+# the project. Committed once by accident on 2026-09-14.
+.claude/pattern-decision-log.jsonl
+.claude/pattern-block-stats.jsonl
+
 # Build / scratch
 # The preview harness copies the whole shell per run and removes it on exit;
 # a run killed before its trap leaves one behind.
