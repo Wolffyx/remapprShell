@@ -431,8 +431,8 @@ ShellRoot {
         function overviewReverse(): void { Surfaces.openOverview("", -1); }
 
         // The switcher's key coming up, from the session daemon. See
-        // Surfaces.commitWindowSwitcher.
-        function switcherCommit(): void { Surfaces.commitWindowSwitcher(); }
+        // Surfaces.commitHeld.
+        function switcherCommit(): void { Surfaces.commitHeld(); }
         function close(): void { Surfaces.closeAll(); }
     }
 

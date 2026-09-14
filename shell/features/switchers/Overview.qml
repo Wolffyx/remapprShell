@@ -27,6 +27,7 @@ import qs.domain.theme
 import qs.domain.config
 import qs.domain.desktops
 import qs.domain.windows
+import qs.domain.windows.events
 import qs.domain.surfaces
 import qs.ui.primitives
 

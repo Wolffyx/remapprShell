@@ -24,6 +24,7 @@ import Quickshell.Wayland
 import qs.core
 import qs.domain.theme
 import qs.domain.windows
+import qs.domain.windows.events
 import qs.domain.surfaces
 import qs.ui.primitives
 
