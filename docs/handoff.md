@@ -2653,3 +2653,103 @@ drag lists in Settings. And `systemctl --user stop
 app-caelestiashell@autostart.service` remains untouched: caelestia still holds
 `org.freedesktop.Notifications`, so this shell's notification server cannot
 register, and `doctor` reports it.
+
+### The second half of the day: the taskbar, the colours, and eight more bugs
+
+The keys work, so the user used the shell -- and reported a list. Everything
+below came out of that, in one afternoon.
+
+| commit | what |
+| --- | --- |
+| `74a6bd0` | ignore the pattern hooks' local decision logs |
+| `0650152` | the overview's cards drew on top of each other |
+| `0f1e367` | every window looked like it was on every desktop, and right-click drew nothing |
+| `d0b9b68` | light and dark reached the scheme's name and nothing else |
+| `7609944` | the taskbar's icons fill their buttons, and the panel has a menu of its own |
+
+**A Flow positions y as well as x.** The overview's cards lifted themselves
+with a `y` binding, which fights the positioner, and the row drew on top of
+itself. The window switcher does the same thing and is fine because a Row
+positions x alone. The lift is a transform now. Worth remembering: **a
+positioner's children may not set x or y**, which is the same class of rule as
+"a positioner's children cannot use anchors" from the settings session.
+
+**`desktops` never reached the shell.** `WindowEvents._window` normalises each
+window to a fixed set of fields and that one was not among them, so every
+window arrived with it undefined -- which the overview reads as KWin's "on all
+desktops". It listed all eleven windows under each of two desktops. Carried
+through now, with an empty list still meaning all of them, and tested both
+ways.
+
+**The taskbar's right-click menu had no width.** The popout's Loader was never
+given one, so every row laid out 0 wide inside a card of the right size: the
+menu was built, the actions were there, and the click looked dead. The menu's
+width is the widget's to state, because the rows are as wide as the menu and
+the menu as wide as the card -- asking the menu how wide it wants to be is a
+loop. `PREVIEW_MENU=1 PREVIEW_WIDGET=tasks dev/preview/preview.sh
+dev/preview/popout.qml ...` opens a widget's menu offscreen, which is how both
+the empty box and the fix were seen without a pointer.
+
+### "Dark mode is active globally", and why our light scheme changed nothing
+
+The most important finding of the day, because it means **this project's
+theme layer had never actually applied a colour scheme**.
+
+Selecting one in KDE is two things: naming it in `kdeglobals [General]
+ColorScheme`, and copying the scheme's `[Colors:*]` and `[WM]` groups into
+kdeglobals, where every Qt and KDE application reads its colours. We did the
+first. So kdeglobals said "Remappr Shell Light" while the colour groups in the
+same file still held dark values from whatever applied a dark scheme last --
+and the desktop portal, which tells Chrome and every Electron application what
+to do, reads those same values and answered "prefer dark".
+
+`scripts/lib/kdeglobals-colors.py` does the copy, on lines rather than through
+a parser, and only on the groups a colour scheme governs -- `theme revert` has
+to leave every KDE file **byte-identical**, and a parser that rewrites the file
+reorders keys even when the values are the ones already there. It cost two
+bytes to learn that KConfig writes a blank line before each group, so the blank
+above a group we later remove is left at the end of the file.
+
+The other half: **GTK and everything that asks a portal do not read KDE's
+configuration at all.** xdg-desktop-portal-gtk answers from
+`org.gnome.desktop.interface color-scheme` in dconf, which said prefer-dark.
+`theme variant` writes that too, under a new `theme.desktop.gtk` part, with the
+`gtk-application-prefer-dark-theme` key in the GTK 3 and 4 ini files beside it.
+The dconf value is remembered in a note of our own, since dconf is nobody's ini
+file.
+
+Measured before and after on the real desktop: the portal answered **1 (prefer
+dark)** and now answers **2 (prefer light)**, with Night Light saying daylight.
+`theme.desktop.followMode` is **on in the user's profile now**, so this follows
+the schedule from here.
+
+### Window thumbnails are possible after all, and this is the evidence
+
+This file has said since 2026-09-10 that previews need a protocol KWin does not
+give ordinary clients, citing 66 advertised globals with no screencast
+interface among them. **That conclusion is wrong**, and caelestia is the proof
+sitting on this machine:
+
+- `~/.local/lib/qt6/qml/Caelestia/lib/libcaelestia-services.so` contains
+  `caelestia::services::WindowScreencastGlobal`, a
+  `QWaylandClientExtensionTemplate` -- which is a client binding
+  `zkde_screencast_unstable_v1`, KWin's own screencast protocol.
+- Its QML side is `components/images/WindowPreview.qml`: a `WindowStream` from
+  that plugin feeding `org.kde.pipewire`'s `PipeWireSourceItem`, with the
+  application icon standing in until a frame arrives.
+- KWin's `supportInformation` lists screencast here.
+
+So a live window preview is a **compiled Qt/Wayland plugin** away, not a
+protocol away. That is still a real decision -- it introduces a C++ build to a
+project that has none -- but it is a decision, not an impossibility. The user
+asked for hover previews explicitly; this is what answering that costs.
+
+### What the user asked for that is not built yet
+
+1. **More settings for both switchers.** The design file's Alt+Tab comes in
+   three layouts -- row, grid and icons -- and ours implements the row only.
+   Nothing yet exposes the overview's behaviour either.
+2. **Hover previews**, per the finding above.
+3. **Whether the overview should stay up when the key is released**, the way
+   the user remembers Windows behaving. They said to leave it if unsure; a
+   setting is the honest answer.
