@@ -57,6 +57,21 @@ qt6_add_qml_module(shellscreencast
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/KWinScreencast"
 )
 
+# The installed module must stand on its own: Qt splits a QML module into the
+# plugin and a backing library, and without this the plugin's RUNPATH points at
+# whatever directory it was *built* in. A build directory that is later removed
+# -- a temporary one, a cleaned checkout -- leaves a module that silently stops
+# loading, and the shell then draws icons with nothing to say why.
+foreach(t shellscreencast shellscreencastplugin)
+    if(TARGET ${t})
+        set_target_properties(${t} PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_WITH_INSTALL_RPATH OFF
+            INSTALL_RPATH_USE_LINK_PATH OFF
+        )
+    endif()
+endforeach()
+
 target_link_libraries(shellscreencast PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::WaylandClient)
 # Both the generated protocol header (binary dir) and our own, which the
 # generated type registration includes as <screencast.h>.
@@ -65,7 +80,7 @@ target_include_directories(shellscreencast PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-install(TARGETS shellscreencast
+install(TARGETS shellscreencast shellscreencastplugin
     LIBRARY DESTINATION "${QML_INSTALL_DIR}/KWinScreencast"
     ARCHIVE DESTINATION "${QML_INSTALL_DIR}/KWinScreencast"
     RUNTIME DESTINATION "${QML_INSTALL_DIR}/KWinScreencast"

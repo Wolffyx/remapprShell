@@ -99,7 +99,13 @@ void WindowStream::close()
     // compositor to stop capturing -- destroying the proxy behind its back
     // instead leaves KWin capturing a window nobody is looking at, and takes
     // the process down on the way out.
-    if (isInitialized())
+    //
+    // Guarded on the global as well as on our own object, because this runs
+    // from the destructor: a stream outliving the connection would write a
+    // request into a display that is already gone. The crash that taught the
+    // first half of this was a wl_proxy_add_listener on a null proxy, reached
+    // from here, taking the whole shell with it on a reload.
+    if (isInitialized() && ScreencastGlobal::instance()->isActive())
         zkde_screencast_stream_unstable_v1::close();
     setNodeId(-1);
 }
