@@ -1202,8 +1202,14 @@ Everything in it was drawn offscreen and nothing has been clicked; see items
 - **KWin ignores `loadScript` for a script it already has**, so re-running
   `windows enable` after editing the script silently kept the old one running.
   It unloads first now.
-- **No window thumbnails, and here is exactly why.** Investigated properly
-  after "how does caelestia do it?", which turned out to be the right question.
+- ~~**No window thumbnails, and here is exactly why.**~~ **Wrong, and fixed on
+  2026-09-14**: the protocol is restricted, not absent. KWin grants a
+  restricted Wayland interface to a client whose **desktop file** names it in
+  `X-KDE-Wayland-Interfaces` -- 66 globals without the declaration, 68 with
+  it. The shell asks (`share/applications/wayland-interfaces.desktop.in`),
+  `plugin/` binds it, and the previews are live. See "Window previews" below.
+  What follows is the reasoning that was right about the measurement and wrong
+  about the conclusion, kept because the measurement is still true:
 
   Caelestia renders previews with `org.kde.pipewire`'s `PipeWireSourceItem`
   (kpipewire, installed here) fed by its own compiled QML plugin
@@ -1267,9 +1273,9 @@ Everything in it was drawn offscreen and nothing has been clicked; see items
    krohnkite is installed, which can fight edge tiling. Both are reported by
    `doctor`. Two bars on screen is a side-by-side development arrangement, not
    a bug — but it is why the screen looks busy.
-5. **No window thumbnails in the task preview**, and this one is settled rather
-   than open: see the entry under "Not built yet". It needs privileges KWin
-   does not give us.
+5. ~~**No window thumbnails in the task preview**~~ -- built on 2026-09-14.
+   The privileges KWin "does not give us" are given to any client that asks
+   for them in its desktop file.
 6. ~~**Some widgets still lay out horizontally on a vertical panel.**~~
    Resolved the same day; see "Side panels" under "Working today".
 
@@ -2753,3 +2759,88 @@ asked for hover previews explicitly; this is what answering that costs.
 3. **Whether the overview should stay up when the key is released**, the way
    the user remembers Windows behaving. They said to leave it if unsure; a
    setting is the honest answer.
+
+## Window previews, and the lesson in how they were missed
+
+Built on **2026-09-14**. This is the entry to read before concluding that
+anything is impossible on this desktop.
+
+### What was wrong
+
+Since 2026-09-10 this file has said a picture of a window cannot be had here,
+citing two true measurements: KWin advertises 66 Wayland globals to us and no
+screencast interface is among them, and `ScreenShot2.CaptureWindow` refuses us
+with "the process is not authorized to take a screenshot". The conclusion drawn
+from them -- that the protocol is not available to ordinary clients -- was
+wrong. It is **restricted**, which looks identical from outside: the global is
+simply not there.
+
+KWin's own words, in `libkwin.so`: *"not in X-KDE-Wayland-Interfaces of"*. A
+client may bind a restricted interface if its **desktop file** names it. The
+portal that does screencast on this machine
+(`org.freedesktop.impl.portal.desktop.kde.desktop`) names three, and
+`org.kde.plasmawindowed.desktop` names four.
+
+Proven with a throwaway client before anything was built:
+
+| what was run | globals | screencast |
+| --- | --- | --- |
+| a plain binary | 66 | no |
+| the same binary, with a desktop file declaring it | 68 | **yes** |
+| a differently-named copy, no declaration | 66 | no |
+| that copy again, named in another file's `Exec` | 67 | **yes** |
+
+So the match is on the **executable's absolute path**, from any desktop file's
+`Exec`, and the arguments are ignored. Two consequences worth knowing:
+
+- One desktop file covers a shell whose config path differs per install.
+- It grants the interfaces to **any Quickshell shell this user runs**, ours and
+  caelestia's alike. There is no narrower way to ask; KWin compares binaries.
+
+### How it works now
+
+`share/applications/wayland-interfaces.desktop.in` asks for
+`org_kde_plasma_window_management` and `zkde_screencast_unstable_v1`, and is
+installed by `make link` like every other desktop file.
+
+`plugin/` is this project's **only compiled part** and exists for the one thing
+QML cannot do: bind a Wayland protocol. It turns a window's uuid into a
+PipeWire node id; `org.kde.pipewire`'s `PipeWireSourceItem` draws the node,
+which is free. `make plugin` builds and installs it into the user's own Qt
+import path; `make plugin-clean` removes it. **Nothing else needs a C++
+toolchain**: `ui/primitives/WindowThumbnail.qml` reaches the stream through a
+Loader by *file name* rather than an import, so a machine without the module,
+without kpipewire, or with a KWin that says no draws the application's icon
+exactly as before. `rmpr doctor` has a section saying which of the three is
+missing.
+
+Drawn in three places: the taskbar's hover preview, the desktop overview, and
+this shell's own switcher. KWin's switcher has had real previews all along --
+its layouts run inside kwin_wayland, where `KWin.WindowThumbnail` exists.
+
+### What the building taught, all of it silent failure
+
+- A QML module must be a **shared** library. A static one installs an archive
+  nothing can dlopen, which looks exactly like not installing it.
+- Sources must go through `qt6_add_qml_module`. Added to the target afterwards
+  they compile, and the generated type registration does not see the type.
+- `project(LANGUAGES CXX)` leaves **wayland-scanner's C output uncompiled**, and
+  the module then fails to load with an undefined symbol.
+- A stream is released with the protocol's **own destructor request**. A raw
+  `wl_proxy_destroy` leaves KWin capturing a window nobody is looking at and
+  takes the process down on the way out.
+- **One stream at a time.** Eleven cards asking at once, with the list rebuilt
+  on every window change, got "target not found" for all of them. Only the card
+  under the selection streams.
+- A stream can arrive and **draw nothing**: a fullscreen game's buffer is one
+  kpipewire cannot turn into an EGL image. The icon sits under the picture
+  rather than being swapped out for it.
+
+### What is still not from this
+
+`ToplevelManager` still reports nothing, and that finding stands: it speaks
+`zwlr_foreign_toplevel_manager_v1`, which KWin does not implement at all. The
+window list still comes from the KWin script and the daemon. The grant now in
+place does include `org_kde_plasma_window_management` -- the protocol KWin
+*does* implement -- so a client that spoke it directly could read windows
+natively. Quickshell is not that client, and the plugin does not bind it yet.
