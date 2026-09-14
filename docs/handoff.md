@@ -1,11 +1,11 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-13, when the
-Meridian redesign was merged into `main`, met a real screen for the first
-time**, which found eight bugs in an afternoon that 306 passing tests had not,
-**and finally reached the settings window**, the one surface it had never
-covered.
+sessions, and added to since -- most recently on **2026-09-14, the first
+session run with the user at the keyboard pressing the keys as they were
+bound**, which is why it fixed six things nobody could have found offscreen,
+gave Alt+Tab back to KWin on the user's judgement, and built the desktop
+overview the settings schema had been offering since the redesign.
 The earlier sessions: the first built the Plasma renderer, diagnostics, the
 wizard, the theme layer, the open-window list and panel auto-hide; the second
 added AI assist, the notification history, crash reporting, and a tray you can
@@ -35,6 +35,16 @@ were and ten were not. It also fixed a widget row whose buttons were drawn
 outside the window, which the user reported mid-session, and a lint that had
 been failing since the popouts work landed. **None of it has been on a screen**:
 every page was rendered offscreen and looked at, which is not the same thing.
+
+A seventh, on **2026-09-14**, worked with the user in front of the screen.
+It closed the two CLI papercuts and built the day-and-night desktop (item
+26), then spent the rest of the session on the keys: binding them, watching
+them fail, and fixing what failed. Alt+Tab is **KWin's own switcher in our
+package** now, on the user's decision, after three fixes to ours and an
+honest measurement of why it will not match KWin's -- and because that
+decision finally put KWin's switcher on screen, it found why the box had
+never appeared at all. Meta+Tab is **this shell's desktop overview**, built
+from the design file's own Super+Tab view. See "The session of 2026-09-14".
 
 ## What this is
 
@@ -99,58 +109,58 @@ Nothing is half-written, and **nothing is uncommitted**: `main` is clean, `make
 lint` is clean, `make test` is 369 QML cases and every shell suite green. What
 follows is what is *open*, in the order a new session should weigh it.
 
-**1. The settings window is drawn, and has never been on a screen.** It was the
-one surface the redesign never reached; it is now in the Meridian design, and
-every page of it was rendered offscreen and looked at, which is not the same
-thing as being used. See [`docs/settings.md`](settings.md) for how a page is
-built.
+**1. Alt+Tab is KWin's, and its box has just been given a width.** The user
+tried this shell's own switcher on a real keyboard and it lost: every tap of
+Tab crosses kglobalaccel, the session daemon, the CLI and the shell's IPC --
+**88 ms measured, two processes per key press** -- so stepping lagged, and an
+overlay that takes exclusive keyboard focus mid-chord leaves the application
+behind it never seeing the modifier come up. KWin's switcher has neither
+problem and shows real window previews, so on the user's decision it holds the
+key, drawn by our own package.
 
-What was done: `CardGrid` (two columns where there is room, one where there is
-not), `SchemaRenderer` drawing its keys in cards from a `group` in the schema,
-`SettingGroups` holding the grouping rules where they can be tested,
-`SettingRow` putting a control beside its label or under it, and the ten pages
-that predated the design brought to it -- about, AI assist, screen edges,
-layouts, profiles, restore points, renderer, switching windows, tray icons,
-widgets, and appearance, which had the labels but not the cards.
+That decision is what found the reason KWin's box **had never appeared on this
+machine**: the layout sized itself from `cards.implicitContentWidth`, which no
+ListView has, so the width was NaN. Fixed, installed and KWin reconfigured --
+**whether the box now appears has not been confirmed by a person**. That is
+the first thing to ask.
 
-What to check, in front of a real screen: the drag lists on **tray icons** and
-**widgets**, which the offscreen harness cannot exercise at all; every page at
-a **small window size**, where the grid drops to one column; and **light mode**,
-which was rendered but not lived in.
+**2. The desktop overview is new and has been seen once.** Meta+Tab is this
+shell's, drawn from the design file's own Super+Tab view, and a real screenshot
+shows it working with eleven windows and every icon resolved. What no session
+can check: **stepping with the key held, and what releasing it does**. Also
+worth knowing -- this machine has **one virtual desktop**, so the strip has one
+card and stepping has nowhere to go; make two or three before judging the
+design.
 
-Known papercuts, both small and both listed under "Two papercuts left":
-`rmpr settings <page>` within a few seconds of the shell starting says "no such
-page" because `Schema` has not loaded, and `rmpr settings pages` is
-unreachable. The user has also said the window feels unresponsive; nothing was
-measured for it beyond ruling out the shell burning CPU (25 s over 56 min, 0 %
-at rest) and fixing a colour-scheme reload that fired four times per KDE config
-write. Ask them which part is slow before optimising anything. Nothing in the
-redesign was aimed at it.
+**3. The key path is still slow, and that is now the known limit.** Every
+bound key runs `rmpr` through bash and a fresh `quickshell ipc` process. The
+fix that was named and not built: have the daemon emit a D-Bus signal and the
+shell follow it with the `busctl monitor` pattern it already uses for the
+window list and the OSD -- two fewer processes per press. The user chose
+KWin's switcher over waiting for it, but it still costs the launcher, the
+search and the overview every time.
 
-**2. A popout visual the user still sees and no session has reproduced.**
-Reported as extra backgrounds, a band at the top of a card, and square corners
-under rounded ones. Four causes were found and fixed -- three stacked
-background tones, radii that ignored `theme.rounding`, a shadow clipped square
-by the window edge, and two popouts that hardcoded `popoutRadius: 18`. The user
-says something remains. What was *measured* on the real screen afterwards, and
-came back clean: corners symmetric at the rounding in force, one background,
-the card's gap to the panel exactly as placed, and blur-on versus blur-off
-**pixel-identical** around the card, which rules the compositor blur out.
-Ask for an uncropped capture and the screen name before theorising again; a
-crop over a window boundary is easy to misread, and most of this session was
-spent doing exactly that. `docs/popouts.md` is the map.
+**4. The settings window has been on a screen now, and one bug came off it.**
+`SchemaRenderer` was throwing a TypeError per row on every schema-built page
+(a Repeater delegate's `parent` is null before it is reparented); `Card`
+carries a `contentWidth` for that now. What is still unexercised: the **drag
+lists** on tray icons and widgets, and a **small window**. Light mode has been
+lived in -- Night Light says daylight, so most of this session's screenshots
+are light, and it reads correctly.
 
-**3. KWin's own Alt+Tab box has never appeared on this machine.** Unchanged
-and unexplained; `switching.windows` is `shell` now, so it is out of the way
-rather than fixed. The two experiments to run are under "Alt+Tab has two
-implementations now", and both need a person to press a key.
+**5. A popout visual the user still sees and no session has reproduced.**
+Unchanged from the last session; `docs/popouts.md` is the map, and the
+measurements there came back clean. Ask for an uncropped capture and the
+screen name before theorising again.
 
-**4. Five bound keys have never been pressed** -- Meta, Meta+Space,
-Meta+Shift+R, Meta+V, Alt+Shift+Tab. They are registered and read back off
-kglobalaccel; only Alt+Tab has been tried.
+**6. Four bound keys have never been pressed** -- Meta+Shift+R, Meta+V,
+Alt+Shift+Tab (now KWin's), overview-reverse. Meta, Meta+Space, Alt+Tab and
+Meta+Tab have all been pressed by the user.
 
-**5. The lock screen has still never been enabled** (item 22 below), and the
-desktop still does not follow day and night (item 26).
+**7. The lock screen has still never been enabled** (item 22 below). The
+desktop **does** follow day and night now, opt-in under
+`theme.desktop.followMode` -- which has been built and tested but never
+switched on by the user.
 
 ### What to check first, before building anything
 
@@ -378,7 +388,12 @@ show the bug. Do not repeat that: see "Looking at the real screen".
     the key. So a `rmpr renderer` command ran; `revert` is the one that would
     do it as a side effect. **If it drifts again, that is the thing to watch.**
 
-26. **The desktop does not follow day and night; only the shell does.**
+26. ~~**The desktop does not follow day and night; only the shell does.**~~
+    Built on 2026-09-14, opt-in under `theme.desktop.followMode` and off by
+    default; `rmpr theme variant light|dark|auto` does it once by hand. The
+    defaults file carries both variants behind `# variant:` markers and only
+    the one being applied is written. What follows is the premise it was
+    written against, which held:
     `theme.mode: auto` now turns the shell light by day and dark by night on
     KWin's Night Light schedule, but `theme apply` writes one fixed colour
     scheme -- `@DISPLAY_NAME@ Dark` in the look-and-feel `defaults` -- so
@@ -2323,12 +2338,15 @@ still there.
 
 ### Two papercuts left, both small
 
-- `rmpr settings <page>` run within a few seconds of the shell starting says
-  "no such page: <name> ()" -- with the list of known pages empty, because
-  `Schema` has not loaded yet. The name is fine; the message is a lie.
-- `rmpr settings pages` is unreachable: the CLI passes any argument to the
-  `page` IPC call, so the `pages()` function beside it can only be reached by
-  asking for a page that does not exist and reading the error.
+Both closed on 2026-09-14 (`22fe7b5`), and both were as described:
+
+- ~~`rmpr settings <page>` run within a few seconds of the shell starting says
+  "no such page: <name> ()"~~ -- the window remembers the name now and lands
+  on the page when the schema arrives. Verified on a real screen: run seconds
+  after a reload, it said "opening once the schema loads" and came up on the
+  page asked for.
+- ~~`rmpr settings pages` is unreachable~~ -- the CLI routes it, which
+  reserves `pages` as a section id; the suite asserts both.
 
 ## The settings session, 2026-09-13, late
 
@@ -2462,3 +2480,176 @@ suite green. `docs/settings.md` is the new map, linked from the README beside
 The two papercuts below are untouched, and so is the user's report that the
 window **feels unresponsive** -- nothing in this session was aimed at it. Ask
 which part is slow before optimising anything.
+
+## The session of 2026-09-14: the keys, pressed
+
+The first session with the user at the keyboard while the keys were being
+bound. That is the whole character of it: six of the eight commits are things
+no offscreen render or passing test could have found, and three of them are
+bugs this session itself introduced and the user caught within a minute of
+pressing a key.
+
+### What was committed
+
+| commit | what |
+| --- | --- |
+| `22fe7b5` | settings said a page did not exist when the schema had not loaded |
+| `734c92b` | the desktop follows day and night, when asked to |
+| `00f659e` | a row in a settings card read the width off a parent that was null |
+| `6843624` | a quick Alt+Tab left the switcher on screen with the key already up |
+| `90e0a46` | the switcher closed on the first Tab instead of when Alt came up |
+| `682cdc6` | the switcher came back after the choice that closed it |
+| `e25ab13` | KWin's switcher had no width, so it drew nothing |
+| `77856d6` | the desktops, drawn by this shell, on Meta+Tab |
+
+### The desktop follows day and night (item 26)
+
+`theme.mode: auto` already turned the shell light by day and dark by night on
+Night Light's schedule; the applications stayed wherever `theme apply` last
+put them. The defaults file carries both variants now -- a `# variant:` marker
+beside the `# part:` ones -- and only the variant being applied is written.
+Nothing else differs between light and dark: the widget style, the Plasma
+theme, the decorations and Alt+Tab are written once either way.
+
+`rmpr theme variant light|dark|auto` writes just those keys, through the same
+ledger as everything else. `auto` asks Night Light the same three properties
+the shell reads -- available, enabled, daylight -- and falls back to dark when
+there is no schedule. On this machine it resolves correctly: `theme.mode: auto
+· night light: daylight · resolved: light`, and the desktop was already in the
+light scheme, so the guard against pointless writes fired.
+
+Following the schedule is **opt-in, off by default**:
+`theme.desktop.followMode`, offered on the appearance page. `DesktopVariant`
+in the shell decides *when* (debounced, and it asks once rather than on every
+colour-scheme write); the script decides *what*, so there is one
+implementation of the writing and it is the ledgered one.
+
+### The shortcuts, and what pressing them found
+
+The shell was running with **every action unbound** -- caelestia held Meta,
+Meta+Space, Meta+Tab, Alt+Tab and Alt+Shift+Tab, and the earlier session's
+bindings were gone. Binding ours took them back (ledgered; `rmpr shortcuts
+revert` gives them back). plasmashell was also still on `caelestia.desktop`
+while the configured renderer was quickshell -- `rmpr renderer set quickshell`
+put it on ours.
+
+Then the user pressed the keys, and the switcher came apart in three ways:
+
+1. **A quick tap left it on screen.** The release that commits was a key event
+   on the switcher's own surface, which only reaches it while that surface is
+   up and holding the keyboard -- and a tap releases before it is mapped.
+   kglobalaccel has a `globalShortcutReleased` signal beside the pressed one;
+   the daemon subscribes and runs `switcher commit`.
+2. **Then it closed on the first Tab.** What kglobalaccel reports is the
+   release of the *shortcut* -- Tab coming up, not Alt -- so acting on it
+   while the switcher was up made stepping impossible. That release is read
+   **once, when the surface is created**, and never again. This is the one
+   case it exists for.
+3. **Then it came back after the choice that closed it.** Every tap spawns an
+   open of its own, so the last one can land after the modifier came up and
+   the window was chosen. An open within 600 ms of a close is dropped.
+
+All three are in Surfaces as "held key" state shared by the switcher and the
+overview, not as switcher-specific fields.
+
+### Why Alt+Tab is KWin's now
+
+The user's report after the three fixes: "the alt+tab freezes a second or 2
+until the tab next window select works... and for some reason the alt key is
+kept held. the kde task switcher is more refined that this one." Both halves
+are structural, and both were measured rather than argued:
+
+- **88 ms per key press** through kglobalaccel -> daemon -> `rmpr` (bash) ->
+  `quickshell ipc`, of which 34 ms is the ipc process alone. Five taps spawn
+  ten processes and cost 411 ms of spawning, overlapping and competing for
+  CPU. The surface build is 10 ms and the enter animation 180 ms.
+- **The stuck modifier is what exclusive keyboard focus costs.** Our overlay
+  takes the keyboard mid-chord; when it goes, the application behind it never
+  received the release. KWin's switcher runs inside the compositor, sees raw
+  key events, and is the only thing that can show a picture of a window.
+
+So Alt+Tab is `kwin: Walk Through Windows`, drawn by our own switcher package
+(`switching.windows: plasma`, TabBox layout `remappr-shell`). The shell's own
+card row is still there and still works; it is one command away.
+
+### KWin's switcher box had never appeared, and this is why
+
+Known problem, carried as unexplained since 2026-09-10. The layout sized its
+content with `cards.implicitContentWidth + 2 * pad`, and **no ListView has an
+`implicitContentWidth`** -- QtQuick's own type data has no such property on
+any type. The sum was NaN, so `PlasmaCore.Dialog`'s main item had no width and
+KWin drew nothing at all. `contentWidth` is the property that means what was
+wanted.
+
+qmllint had been printing it from the start -- "Member implicitContentWidth
+not found on type ListView. Did you mean implicitWidth?" -- in the middle of
+its unavoidable warnings about KWin's own unresolvable types, which is exactly
+how an eye learns to skip a block of output. **Whether the box now appears has
+not been confirmed by a person.**
+
+### The desktop overview, on Meta+Tab
+
+`switching.desktops` has offered "plasma" or "shell" since the redesign and the
+shell half did not exist. It does now, built from the design file's own
+Super+Tab view -- `Meridian Switchers.dc.html` in the same Claude Design
+project, read with DesignSync, which nothing in this project had looked at
+before. **That file also specifies the Alt+Tab switcher in three layouts (row,
+grid, icons), which our card row implements only as the row.**
+
+The overview: a glass header with the desktop count and what the keys do, the
+windows of the selected desktop drawn large and centred (scrolling when they
+do not fit), and a strip along the bottom with every desktop, up to three
+application icons as a glance at what is on it, and a dashed "New desktop"
+tile that calls KWin's `createDesktop`. Held like Alt+Tab -- another press
+steps, arrows step windows, 1..9 jumps, release switches and raises.
+
+`rmpr switcher desktops plasma|shell` moves the key and writes the setting, and
+the settings window now offers both keys under **"Who draws it"** -- that
+choice had been reachable only by editing the profile by hand. **Ours is the
+default** for Meta+Tab.
+
+### What the render caught that the linter could not
+
+Three in the overview alone, and none of them is visible to qmllint:
+
+1. **`font.pixelSize` is an int.** The design's 12.5px is a load error, and a
+   load error in a surface takes the whole surface with it -- "Invalid
+   property assignment: int expected", reported against the model line above
+   it.
+2. **A tile sized against `parent` in a Repeater delegate.** The same bug as
+   the settings rows, found the same day: `parent` is null until the delegate
+   is reparented.
+3. **A selection pointing past the end of the desktop list**, which drew a
+   header saying "No desktops" over a strip that was showing them.
+
+And one in the harness: `dev/preview/preview.sh` rewrites a full-screen
+surface into an `Item`, and its range delete from `anchors {` to `    }`
+**took most of the file with it** for the switchers, which write all four
+anchors on one line. Every error it then reported pointed at a line number
+that no longer meant anything, which cost three rounds of chasing a parse
+error that was not there.
+
+### Measured, not assumed
+
+- **Popout builds are 1-10 ms** (start menu 10, quick settings 5, volume 1),
+  measured from the moment the popout was asked for. The debug log carries it
+  now. So "the popouts feel slow" is not construction; what is left is the
+  180 ms enter animation, the compositor and the blur.
+- **The config layer is not slow either**: `Obj.deepMerge` of the real
+  defaults is 0.25 ms, `Obj.get` 3.2 us. A whole page of rows re-reading
+  configuration costs about 2 ms.
+- **The per-page CLI calls are the settings window's only real cost**: `edges
+  status --json` 331 ms, `theme status --json` 141 ms, the rest 54-81 ms.
+- **The user says the settings window is not the slow part** -- "the popups
+  and launcher feel slow" -- so the note in this file about the window feeling
+  unresponsive was aimed at the wrong surface all along.
+- The launcher's search is a linear scan of **364 desktop entries** capped at
+  `maxResults`, which is not it either.
+
+### Still to press
+
+Alt+Tab (KWin's, freshly given a width), Meta+Tab held and released, and the
+drag lists in Settings. And `systemctl --user stop
+app-caelestiashell@autostart.service` remains untouched: caelestia still holds
+`org.freedesktop.Notifications`, so this shell's notification server cannot
+register, and `doctor` reports it.

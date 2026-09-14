@@ -44,7 +44,7 @@ Rectangle {
         ];
         Desktops.currentId = "d1";
         WindowsService.windows = [
-            w("org.kde.konsole", "remappr-shell : fish — Konsole", "d1", 9),
+            w("org.kde.konsole", "~ : fish — Konsole", "d1", 9),
             w("code", "shell.qml — Code", "d1", 8),
             w("org.kde.dolphin", "Projects — Dolphin", "d2", 7),
             w("firefox", "Quickshell documentation — Firefox", "d2", 6),
