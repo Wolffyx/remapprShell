@@ -99,13 +99,26 @@ Everything below was read off the running system rather than remembered.
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 9 windows |
 | Also running | **nothing else**: caelestia's Quickshell bar was stopped on 2026-09-13 and not restarted. krohnkite is installed but **not loaded** (`krohnkiteEnabled=false`) |
+| Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
+| CI | **green, for the first time.** It had never passed: five causes, each hiding the next (see 2026-09-14 below). It now runs all six lints rather than three |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
 | Shortcuts | **Ours, and grabbed for the first time** (2026-09-13): the component `remappr-shell` is active, with Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Alt+Tab and Alt+Shift+Tab (this shell's switcher). Meta+Tab is KWin's Overview. Alt+Tab was taken from KWin, Meta+Shift+R from Krohnkite; `rmpr switcher revert` and `rmpr shortcuts revert` give them back. **Alt+Tab was pressed and works** -- the first key this project has ever bound that does anything. The other five are registered and read back off kglobalaccel but have not been pressed. **Spectacle has no shortcut**: `kglobalshortcutsrc [services][org.kde.spectacle.desktop] _launch=none`, so Print does nothing. Nothing in this project writes that key and nothing else holds Print -- it was not us. The user was given the command to put it back and had not run it |
 | `rmpr doctor` | no problems, 3 warnings (2026-09-13, shell running). One is the ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left behind when the Phase 6b revert purged that group; harmless |
 
 ### Where the last session left off, and what to pick up
 
-`main` is clean and nothing is half-written: `make lint` clean, `make test` 376
+**Read this first, 2026-09-14 (evening).** Work goes on `dev` now, not `main`
+-- the two are release channels, and docs/releasing.md is the whole of it. That
+session fixed the panel's right-click menu (every row ran nothing: a Process
+owned by a window a LazyLoader destroys in the same turn never spawns, and says
+nothing when it does not), made that menu configurable in Settings → Taskbar,
+fixed the switcher's key release calling a function that does not exist, and
+got CI green for the first time in the project's life. Three things it could
+not check itself, because no session here can produce a click: the panel menu's
+rows acting, the two menus no longer opening side by side, and Meta+Tab
+committing on release.
+
+Otherwise nothing is half-written: `make lint` clean, `make test` 376
 QML cases and every shell suite green. The shell is **running** and the user
 has been using it all afternoon, which is why most of what follows is theirs to
 press rather than ours to build.
