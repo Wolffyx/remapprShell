@@ -28,15 +28,18 @@ QtObject {
     property int windowSwitcherTick: 0
     property int windowSwitcherDelta: 1
 
-    // The switcher's key let go, which is what chooses.
+    // The switcher's key let go, as the session daemon heard it.
     //
-    // That release used to be a key event on the switcher's own surface, which
-    // only works while the surface is up and holding the keyboard. A quick
-    // Alt+Tab lets go before it is -- the press travels kglobalaccel, the
-    // session daemon, the CLI and the IPC first -- so nothing committed and
-    // the switcher stayed on screen. It comes through the daemon now, and it
-    // is a property rather than a call because it can arrive before there is
-    // anything to receive it: the surface reads it when it opens.
+    // This exists for one case only: a quick Alt+Tab, where the key is
+    // released before the surface is mapped. The press travels kglobalaccel,
+    // the daemon, the CLI and the IPC first, so the surface's own key handling
+    // -- which is what commits every other time -- has nothing to receive the
+    // release, and the switcher stayed on screen with the key already up.
+    //
+    // The surface reads this when it opens and never again, because what
+    // kglobalaccel reports is the release of the *shortcut*: Tab coming up,
+    // not Alt. Acting on it while the switcher is up closed it on the first
+    // Tab, so holding Alt and stepping through the list was impossible.
     //
     // Not cleared when the switcher opens, on purpose. The press and the
     // release are two detached processes racing each other through the CLI, so
