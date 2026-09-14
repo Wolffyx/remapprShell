@@ -42,7 +42,7 @@ How the shell itself looks -- light or dark, its accent, its corners -- and the 
 | `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
 | `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
 | `theme.shadows` | `true` or `false` | `false` | A soft shadow under the panel, its popouts, the start menu and the on-screen display. Off by default: a shadow is a band of dimmed wallpaper around a surface whose own background is blurred, and on a dark desktop the join between the two reads as a second panel behind the first. |
-| `theme.rounding` | a number, 0 to 36 | `28` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
+| `theme.rounding` | a number, 0 to 36 | `8` | The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion. |
 | `theme.animationMs` | a number, 0 to 400 | `180` | In milliseconds: a popout rising out of the panel, the switcher, the desktop overview. 0 makes them appear at once, which is the fastest the shell can feel and the least it can explain -- a surface that simply exists gives no hint about where it came from. |
 | `theme.desktop.enabled` | `true` or `false` | `true` | Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back. |
 | `theme.desktop.followMode` | `true` or `false` | `false` | With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start. |
@@ -61,10 +61,10 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `panel.position` | `top`, `bottom`, `left`, `right` | `bottom` | Which edge the panel is anchored to. |
-| `panel.thickness` | a number, 28 to 96 | `56` | Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it. |
+| `panel.thickness` | a number, 28 to 96 | `52` | Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it. |
 | `panel.style` | `full`, `floating`, `islands` | `full` | full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own. |
-| `panel.spacing` | a number, 2 to 16 | `6` | The gap between widgets, in pixels. |
-| `panel.iconSize` | a number, 15 to 26 | `19` | The size of the tray's and the status icons, in pixels. |
+| `panel.spacing` | a number, 2 to 16 | `5` | The gap between widgets, in pixels. |
+| `panel.iconSize` | a number, 15 to 26 | `18` | The size of the tray's and the status icons, in pixels. |
 | `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |
 | `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
 | `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
@@ -83,8 +83,8 @@ What opens when you press the start button, and what opens when you search.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `fuzzel`, `rofi`, `custom` | `auto` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
-| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `fuzzel`, `rofi`, `custom` | `auto` | KRunner is Plasma's own search. |
+| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `fuzzel`, `rofi`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
+| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `fuzzel`, `rofi`, `custom` | `builtin` | KRunner is Plasma's own search. |
 | `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
 | `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
 | `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
@@ -98,11 +98,11 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `notifications.server` | `plasma`, `shell` | `plasma` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
+| `notifications.server` | `plasma`, `shell` | `shell` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
 | `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
 | `notifications.popupPosition` | `auto`, `top-right`, `top-center`, `top-left`, `bottom-right`, `bottom-center`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them. |
 | `notifications.centreStyle` | `grouped`, `stream` | `grouped` | What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier. |
-| `notifications.history` | `true` or `false` | `false` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
+| `notifications.history` | `true` or `false` | `true` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
 
 ### Lock & session
@@ -120,9 +120,9 @@ What this shell draws on the desktop itself: a rounded frame over the screen's c
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `desktop.border` | `true` or `false` | `false` | Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that. |
-| `desktop.borderInset` | a number, 0 to 40 | `10` | How far in from each edge the frame is painted, in pixels. |
-| `desktop.borderRadius` | a number, 0 to 48 | `26` | How round the painted corners are, in pixels. |
-| `desktop.clock` | `true` or `false` | `false` | The time and date on the wallpaper, under every window. |
+| `desktop.borderInset` | a number, 0 to 40 | `0` | How far in from each edge the frame is painted, in pixels. |
+| `desktop.borderRadius` | a number, 0 to 48 | `13` | How round the painted corners are, in pixels. |
+| `desktop.clock` | `true` or `false` | `true` | The time and date on the wallpaper, under every window. |
 | `desktop.clockPosition` | `top-left`, `top-right`, `bottom-left`, `bottom-right` | `bottom-right` | Where it sits |
 | `desktop.clockSize` | a number, 40 to 200 | `92` | The height of the time, in pixels; the date follows it. |
 | `desktop.clockDate` | `true` or `false` | `true` | Show the date |
@@ -171,7 +171,7 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `switching.windows` | `plasma`, `shell` | `plasma` | plasma is KWin's own switcher, in this shell's colours. It is the default, it is the only one that can show a picture of each window -- KWin renders those for its own switcher and for nothing else -- and being inside the compositor it sees the keyboard directly. shell is this shell's card row, drawn here, which shows each application's icon instead. Choose it knowing the cost: the shell is not the compositor, so the key going down and the key coming up each cross kglobalaccel, the session daemon, the CLI and the IPC to reach it, and the two race. A quick enough Alt+Tab can leave the switcher on screen after the key is let go. Changing this rebinds Alt+Tab to whichever draws it. |
-| `switching.desktops` | `plasma`, `shell` | `shell` | shell is this shell's own desktop overview -- every desktop, what is open on each, and one more at the end -- drawn here in the panel's colours. plasma is KWin's Overview, which shows a real picture of every window but cannot be restyled: it is compiled into KWin rather than shipped as a package. Changing this rebinds Meta+Tab, taking it from whatever holds it; `rmpr switcher revert` gives it back. |
+| `switching.desktops` | `plasma`, `shell` | `plasma` | shell is this shell's own desktop overview -- every desktop, what is open on each, and one more at the end -- drawn here in the panel's colours. plasma is KWin's Overview, which shows a real picture of every window but cannot be restyled: it is compiled into KWin rather than shipped as a package. Changing this rebinds Meta+Tab, taking it from whatever holds it; `rmpr switcher revert` gives it back. |
 | `switching.overviewHold` | `true` or `false` | `true` | On, Meta+Tab is held: the desktops are shown while the key is down and letting go switches to whatever is selected, the way Alt+Tab works. Off, one press opens it and it stays until you choose something, press Escape or click away -- which is closer to how Windows behaves. |
 | `switching.overviewTitles` | `true` or `false` | `true` | The title strip along the top of each window card. Off leaves the application's name and its state underneath, and a card that is only the application. |
 | `switching.overviewMinimised` | `true` or `false` | `true` | Minimised windows appear in the overview, dimmed. Off lists only what is actually on screen. |
@@ -255,37 +255,27 @@ silently landing on the left.
         "enabled": true
       },
       {
-        "id": "taskview",
-        "zone": "left",
-        "enabled": true
-      },
-      {
-        "id": "divider",
-        "zone": "left",
-        "enabled": true
-      },
-      {
-        "id": "workspaces",
-        "zone": "left",
-        "enabled": true
-      },
-      {
         "id": "tasks",
-        "zone": "middle",
+        "zone": "left",
         "enabled": true
       },
       {
-        "id": "media",
+        "id": "tray",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "volume",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "brightness",
         "zone": "right",
         "enabled": true
       },
       {
         "id": "clipboard",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "tray",
         "zone": "right",
         "enabled": true
       },
@@ -300,17 +290,7 @@ silently landing on the left.
         "enabled": true
       },
       {
-        "id": "divider",
-        "zone": "right",
-        "enabled": true
-      },
-      {
         "id": "status",
-        "zone": "right",
-        "enabled": true
-      },
-      {
-        "id": "clock",
         "zone": "right",
         "enabled": true
       },
@@ -320,7 +300,12 @@ silently landing on the left.
         "enabled": true
       },
       {
-        "id": "power",
+        "id": "clock",
+        "zone": "right",
+        "enabled": true
+      },
+      {
+        "id": "showdesktop",
         "zone": "right",
         "enabled": true
       }

@@ -34,25 +34,19 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [root.ctl, "snapshot", "list"]
+        // JSON, not the printed table: that is padded to columns, and a name
+        // wider than its column leaves one space instead of two -- which this
+        // page, splitting on runs of spaces, read as part of the name. Long
+        // names arrived with the date stuck to them and the date line short.
+        command: [root.ctl, "snapshot", "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const rows = [];
-                for (const line of text.split("\n")) {
-                    const t = line.trim();
-                    if (t.length === 0 || t.startsWith("no snapshots"))
-                        continue;
-                    // "<name>  <created>  <n> path(s)  <size>"
-                    const parts = t.split(/\s{2,}/);
-                    rows.push({
-                        name: parts[0],
-                        created: parts[1] ?? "",
-                        paths: parts[2] ?? "",
-                        size: parts[3] ?? "",
-                        locked: t.indexOf("[locked]") >= 0
-                    });
+                try {
+                    root.snapshots = JSON.parse(text);
+                } catch (e) {
+                    root.snapshots = [];
+                    Log.warn("settings", `snapshot list: ${e}`);
                 }
-                root.snapshots = rows;
             }
         }
     }
@@ -116,7 +110,10 @@ CardGrid {
     Card {
         id: saved
 
-        width: root.cellWidth
+        // The whole row, not half of it. These names are a timestamp and a
+        // label and there is no shortening them usefully -- at half width they
+        // elided to the point where two restore points looked the same.
+        width: root.width
         spacing: 6
 
         SectionLabel { text: "Saved" }
@@ -158,7 +155,7 @@ CardGrid {
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: `${snap.modelData.created}   ${snap.modelData.paths}   ${snap.modelData.size}`
+                            text: `${snap.modelData.paths} path(s)   ${snap.modelData.size}`
                             font.pixelSize: 12
                             color: Theme.mut
                         }

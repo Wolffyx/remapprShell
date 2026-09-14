@@ -2,7 +2,7 @@
 # Restore points.
 #
 #   create [label]     take one now
-#   list               show what exists, with sizes
+#   list [--json]      show what exists, with sizes
 #   remove <name>      delete one
 #   prune [--keep N]   delete all but the newest N
 #   lock <name>        never prune this one
@@ -32,7 +32,9 @@ case "$cmd" in
 
     lock)   snapshot_lock "${1:?usage: $ALIAS snapshot lock <name>}" on ;;
     unlock) snapshot_lock "${1:?usage: $ALIAS snapshot unlock <name>}" off ;;
-    list)   snapshot_list ;;
+    list)
+        if [ "${1:-}" = "--json" ]; then snapshot_list_json; else snapshot_list; fi
+        ;;
 
     remove)
         name=${1:?usage: $ALIAS snapshot remove <name>}

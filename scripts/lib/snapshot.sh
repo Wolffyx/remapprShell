@@ -278,6 +278,28 @@ snapshot_restore() {
 
 # --- removal: user-invoked only -------------------------------------------
 
+# The same listing as JSON, for anything that has to read it rather than show
+# it. The text form is padded to columns, and a name wider than its column
+# leaves a single space -- which the settings window, splitting on runs of
+# spaces, read as part of the name. A reader should never have to guess at
+# spacing that exists for a person's benefit.
+snapshot_list_json() {
+    local root d
+    root=$(snapshot_root)
+    [ -d "$root" ] || { printf '[]\n'; return 0; }
+    {
+        for d in "$root"/*/; do
+            [ -d "$d" ] || continue
+            jq -n --arg name "$(basename "$d")" \
+                  --arg created "$(sed -n 's/^created=//p' "$d/meta" 2>/dev/null)" \
+                  --arg size "$(du -sh "$d" 2>/dev/null | cut -f1)" \
+                  --argjson paths "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo 0)" \
+                  --argjson locked "$(snapshot_is_locked "$d" && echo true || echo false)" \
+                  '{name: $name, created: $created, paths: $paths, size: $size, locked: $locked}'
+        done
+    } | jq -sc 'sort_by(.name)'
+}
+
 snapshot_list() {
     local root d
     root=$(snapshot_root)
