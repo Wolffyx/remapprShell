@@ -17,7 +17,16 @@ cd "$REPO_ROOT"
 #   docs/, README.md       prose for humans
 #   LICENSE                upstream text
 #   .git/                  not ours
-allow_re='^(branding\.json|shell/core/Branding\.qml|README\.md|docs/|LICENSE|\.git/|theme/colors/[^/]*\.colors)'
+#
+# The generated files are here because the `grep -r` fallback below does not
+# honour .gitignore, and a generated file holds the slug by design -- it was
+# rendered from branding.json. Under `git grep` they are skipped for being
+# ignored and this list does nothing; outside a work tree it is the only thing
+# standing between a tarball and a false positive. theme/lockscreen/Options.qml
+# was the one left out, and it failed every CI run: the container's checkout is
+# not a work tree git will touch, so CI took the fallback while `make lint` on
+# a developer's machine took git grep and stayed clean.
+allow_re='^(branding\.json|shell/core/Branding\.qml|README\.md|docs/|LICENSE|\.git/|theme/colors/[^/]*\.colors|theme/lockscreen/Options\.qml)'
 
 # git grep is faster and honours .gitignore, but it fails outside a work tree
 # (a release tarball, a CI checkout without .git). Falling back matters: with

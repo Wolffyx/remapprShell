@@ -22,6 +22,15 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # git refuses a repository it does not think belongs to the user running
+      # it, which inside the container is every checkout. Without this,
+      # lint-slug falls back from `git grep` to `grep -r`, which does not
+      # honour .gitignore -- so it reads the generated files and finds the slug
+      # in a path built from $HOME. That is what had been failing CI on every
+      # push while `make lint` was clean on the machine it was written on.
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Generate branding
         run: ./scripts/gen-branding.sh
 
