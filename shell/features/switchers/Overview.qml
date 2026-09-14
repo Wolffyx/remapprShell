@@ -128,12 +128,38 @@ PanelWindow {
         win.winIndex = -1;
     }
 
+    // Tab runs through the windows of the desktop under the selection and
+    // then on to the next desktop, so the key alone reaches everything that
+    // is open rather than stopping at the end of one desktop's cards.
     function stepWindow(delta) {
         const n = win.deskWindows.length;
-        if (n === 0)
+        if (n === 0) {
+            win.stepDesk(delta >= 0 ? 1 : -1);
+            win.selectEdge(delta);
             return;
-        win.winIndex = win.winIndex < 0 ? (delta > 0 ? 0 : n - 1)
-                                        : ((win.winIndex + delta) % n + n) % n;
+        }
+        if (win.winIndex < 0) {
+            win.winIndex = delta > 0 ? 0 : n - 1;
+            return;
+        }
+        const next = win.winIndex + delta;
+        if (next >= 0 && next < n) {
+            win.winIndex = next;
+            return;
+        }
+        if (win.desks.length <= 1) {
+            win.winIndex = ((next % n) + n) % n;
+            return;
+        }
+        win.stepDesk(delta > 0 ? 1 : -1);
+        win.selectEdge(delta);
+    }
+
+    // The first or last window of the desktop just stepped onto, so carrying
+    // on from one desktop to the next lands where the eye is already going.
+    function selectEdge(delta) {
+        const n = win.deskWindows.length;
+        win.winIndex = n === 0 ? -1 : (delta > 0 ? 0 : n - 1);
     }
 
     // Removing the selected desktop. KWin moves whatever was on it to the one
@@ -164,14 +190,24 @@ PanelWindow {
     }
 
     Component.onCompleted: {
-        // The desktop in front is where the selection starts, so a press and
-        // release with nothing else touched changes nothing.
+        // The desktop in front is where it opens, and the selection starts on
+        // a *window* there rather than on the desktop itself: Tab steps
+        // windows, so opening with a desktop selected put the highlight on
+        // the strip at the bottom while the key moved the cards at the top.
+        //
+        // Which window: the one behind the front one, as Alt+Tab does, so a
+        // press and release switches to what you were in before. Backwards
+        // starts at the other end.
         const at = win.desks.findIndex(d => d && d.id === Desktops.currentId);
         win.deskIndex = at >= 0 ? at : 0;
-        if (Surfaces.overviewDelta < 0)
-            win.stepDesk(-1);
-        else if (win.desks.length > 1)
-            win.stepDesk(1);
+
+        const here = win.deskWindows;
+        if (here.length === 0)
+            win.winIndex = -1;
+        else if (Surfaces.overviewDelta < 0)
+            win.winIndex = here.length - 1;
+        else
+            win.winIndex = here.length > 1 ? 1 : 0;
         Log.debug("surfaces", `overview: up on ${win.screen?.name}, ${win.desks.length} desktop(s)`);
 
         // The key was let go before this surface existed. See the same lines
