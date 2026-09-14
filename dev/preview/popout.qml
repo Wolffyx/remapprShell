@@ -64,6 +64,28 @@ Rectangle {
             if (stage.page.length > 0)
                 w.item.page = stage.page;
             w.item.popoutVisible = true;
+            // A widget whose popout has two contents -- the taskbar's preview
+            // and its right-click menu -- needs saying which. PREVIEW_MENU
+            // picks the menu, on the first button there is.
+            if (Quickshell.env("PREVIEW_MENU")) {
+                menuTimer.start();
+            }
+        }
+    }
+
+    // The button list is filled from the window daemon, which answers a moment
+    // after this loads.
+    Timer {
+        id: menuTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            const items = w.item?.items ?? [];
+            if (items.length === 0) {
+                console.warn("preview: no taskbar buttons to open a menu on");
+                return;
+            }
+            w.item.openMenu(items[0]);
         }
     }
 

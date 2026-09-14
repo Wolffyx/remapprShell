@@ -69,6 +69,32 @@ TestCase {
         compare(list[0].active, false);
     }
 
+    // Which desktops a window is on. Dropped by the parser until 2026-09-14,
+    // which made every window look like it was on all of them -- the overview
+    // listed all eleven windows under each of two desktops.
+    function test_the_desktops_a_window_is_on_survive_the_parse() {
+        const list = WindowEvents.parseList(JSON.stringify([
+            windowJson({ desktops: ["6e59888c", "b8d559b3"] })
+        ]));
+        compare(list[0].desktops.length, 2);
+        compare(list[0].desktops[0], "6e59888c");
+    }
+
+    // An empty list is KWin's "on all desktops", and so is a script too old to
+    // send the field. Both have to arrive as an empty array rather than
+    // undefined: a filter reading undefined shows the window nowhere.
+    function test_a_window_on_every_desktop_has_an_empty_list() {
+        const none = WindowEvents.parseList(JSON.stringify([windowJson({ desktops: [] })]));
+        compare(none[0].desktops.length, 0);
+
+        const missing = WindowEvents.parseList(JSON.stringify([windowJson()]));
+        verify(Array.isArray(missing[0].desktops));
+        compare(missing[0].desktops.length, 0);
+
+        const nonsense = WindowEvents.parseList(JSON.stringify([windowJson({ desktops: "d1" })]));
+        compare(nonsense[0].desktops.length, 0);
+    }
+
     function test_parses_the_signal_wrapper() {
         const list = WindowEvents.parseSignal(signalLine(JSON.stringify([windowJson()])));
         compare(list.length, 1);

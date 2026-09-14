@@ -137,7 +137,8 @@ BarWidget {
     popoutPadding: root.popoutMode === "menu" ? 8 : 14
     // The menu is a list of actions and has a width of its own; the preview
     // is a picture and takes its size from what it is showing.
-    popoutWidth: root.popoutMode === "menu" ? 262 : -1
+    readonly property int menuWidth: 262
+    popoutWidth: root.popoutMode === "menu" ? root.menuWidth : -1
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
@@ -389,11 +390,23 @@ BarWidget {
             // QObjects, so they are read through a typed alias.
             readonly property Item shownContent: (menuLoader.item ?? previewLoader.item) as Item
 
-            implicitWidth: shownContent?.implicitWidth ?? 1
+            // In menu mode the width is the widget's to state, not the
+            // menu's to work out: the rows are as wide as the menu and the
+            // menu as wide as the card, so asking the menu how wide it wants
+            // to be is a loop. The card's own width is what breaks it.
+            implicitWidth: root.popoutMode === "menu" ? root.menuWidth
+                                                      : (shownContent?.implicitWidth ?? 1)
             implicitHeight: shownContent?.implicitHeight ?? 1
 
             Loader {
                 id: menuLoader
+
+                // The menu's rows are as wide as the menu, and the menu is as
+                // wide as it is given: `popoutWidth` above fixes the card at
+                // 262 and this Loader is what passes that on. Without a width
+                // here every row laid out 0 wide inside a card the right size,
+                // which is a right click that does nothing at all.
+                width: parent.width
                 active: root.popoutMode === "menu" && root.menuItem !== null
                 sourceComponent: TaskMenu {
                     item: root.menuItem
@@ -422,6 +435,9 @@ BarWidget {
                 active: root.popoutMode !== "menu"
                 sourceComponent: root.preview
             }
+
+            // The card is as tall as whichever is loaded. The menu's height is
+            // the sum of its rows, which it only knows once it has a width.
         }
     }
 

@@ -47,7 +47,16 @@ QtObject {
             stacking: typeof entry.stacking === "number" ? entry.stacking : -1,
             // A PNG the daemon lifted out of the window itself, for windows
             // that match no installed application. Empty for the rest.
-            iconPath: String(entry.iconPath ?? "")
+            iconPath: String(entry.iconPath ?? ""),
+            // The virtual desktops it is on, as KWin's uuids. An empty list is
+            // KWin's "on all of them", and so is a script too old to send the
+            // field -- which is why anything filtering on this must treat
+            // empty as "show it", never as "show it nowhere".
+            //
+            // Dropped here until 2026-09-14, which made every window look like
+            // it was on every desktop: the overview listed all eleven under
+            // each of two desktops.
+            desktops: Array.isArray(entry.desktops) ? entry.desktops.map(d => String(d)) : []
         };
     }
 
