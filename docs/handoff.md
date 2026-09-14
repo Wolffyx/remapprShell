@@ -105,62 +105,59 @@ Everything below was read off the running system rather than remembered.
 
 ### Where the last session left off, and what to pick up
 
-Nothing is half-written, and **nothing is uncommitted**: `main` is clean, `make
-lint` is clean, `make test` is 369 QML cases and every shell suite green. What
-follows is what is *open*, in the order a new session should weigh it.
+`main` is clean and nothing is half-written: `make lint` clean, `make test` 376
+QML cases and every shell suite green. The shell is **running** and the user
+has been using it all afternoon, which is why most of what follows is theirs to
+press rather than ours to build.
 
-**1. Alt+Tab is KWin's, and its box has just been given a width.** The user
-tried this shell's own switcher on a real keyboard and it lost: every tap of
-Tab crosses kglobalaccel, the session daemon, the CLI and the shell's IPC --
-**88 ms measured, two processes per key press** -- so stepping lagged, and an
-overlay that takes exclusive keyboard focus mid-chord leaves the application
-behind it never seeing the modifier come up. KWin's switcher has neither
-problem and shows real window previews, so on the user's decision it holds the
-key, drawn by our own package.
+**1. The window previews are new, and the last mile is cosmetic.** They work
+(see "Window previews" below): KWin grants the screencast protocol to a client
+whose desktop file asks, `plugin/` binds it, and the taskbar's hover preview,
+the overview and this shell's switcher all draw real windows. What is left is
+one known roughness: the shell binds protocol **version 1** and reads the
+deprecated `created(node)` event, so occasionally kpipewire answers `target
+not found` for a node id that has been reused. Version 6's `serial` event
+exists for exactly that. The card falls back to the application's icon when it
+happens, so this is a blemish rather than a fault -- the user was asked and has
+not yet said.
 
-That decision is what found the reason KWin's box **had never appeared on this
-machine**: the layout sized itself from `cards.implicitContentWidth`, which no
-ListView has, so the width was NaN. Fixed, installed and KWin reconfigured --
-**whether the box now appears has not been confirmed by a person**. That is
-the first thing to ask.
+**2. Alt+Tab is KWin's, in our package, and now in three layouts.** "Remappr
+Shell", "(grid)" and "(icons)" are installed side by side; `rmpr switcher
+layout <id>` or the settings page picks one. **Nobody has looked at the grid
+or the icons layout on a screen** -- they load (`dev/preview/switcher.sh`
+checks all three) and that is all that is known.
 
-**2. The desktop overview is new and has been seen once.** Meta+Tab is this
-shell's, drawn from the design file's own Super+Tab view, and a real screenshot
-shows it working with eleven windows and every icon resolved. What no session
-can check: **stepping with the key held, and what releasing it does**. Also
-worth knowing -- this machine has **one virtual desktop**, so the strip has one
-card and stepping has nowhere to go; make two or three before judging the
-design.
+**3. Meta+Tab is this shell's overview, and it has been used twice.** Tab steps
+windows, the arrows step desktops, Del removes one, and five settings govern
+it. What has never been exercised: **stay-open mode**
+(`switching.overviewHold: false`), removing a desktop from the card, and the
+`1..9` jumps.
 
-**3. The key path is still slow, and that is now the known limit.** Every
-bound key runs `rmpr` through bash and a fresh `quickshell ipc` process. The
-fix that was named and not built: have the daemon emit a D-Bus signal and the
-shell follow it with the `busctl monitor` pattern it already uses for the
-window list and the OSD -- two fewer processes per press. The user chose
-KWin's switcher over waiting for it, but it still costs the launcher, the
-search and the overview every time.
+**4. The taskbar's right click works for the first time.** Its menu had been
+built with no width, so every row laid out 0 wide and the click looked dead.
+The panel's own menu is new. Both want a pointer: **nobody has clicked either
+on a screen**.
 
-**4. The settings window has been on a screen now, and one bug came off it.**
-`SchemaRenderer` was throwing a TypeError per row on every schema-built page
-(a Repeater delegate's `parent` is null before it is reparented); `Card`
-carries a `contentWidth` for that now. What is still unexercised: the **drag
-lists** on tray icons and widgets, and a **small window**. Light mode has been
-lived in -- Night Light says daylight, so most of this session's screenshots
-are light, and it reads correctly.
+**5. Light and dark now reach the whole desktop**, and this is the one to keep
+an eye on. `theme variant` writes the colour scheme's `[Colors:*]` groups into
+kdeglobals (naming a scheme is not applying it -- see the session notes), and
+GTK's dconf preference beside it. `theme.desktop.followMode` is **on in the
+user's profile**, so this follows Night Light twice a day now. It is the most
+invasive thing this project does to a machine; `theme revert` is tested to
+leave every KDE file byte-identical.
 
-**5. A popout visual the user still sees and no session has reproduced.**
-Unchanged from the last session; `docs/popouts.md` is the map, and the
-measurements there came back clean. Ask for an uncropped capture and the
-screen name before theorising again.
+**6. A popout visual the user still sees and no session has reproduced.**
+Unchanged. `docs/popouts.md` is the map, and the measurements there came back
+clean. Ask for an uncropped capture and the screen name before theorising.
 
-**6. Four bound keys have never been pressed** -- Meta+Shift+R, Meta+V,
-Alt+Shift+Tab (now KWin's), overview-reverse. Meta, Meta+Space, Alt+Tab and
-Meta+Tab have all been pressed by the user.
+**7. The key path is still two processes per press.** kglobalaccel -> the
+session daemon -> `rmpr` (bash) -> `quickshell ipc`, 88 ms measured. The named
+and unbuilt fix: have the daemon emit a D-Bus signal the shell follows with the
+`busctl monitor` pattern it already uses for the window list. It costs the
+launcher, the search and the overview on every press, and it is why this
+shell's own Alt+Tab lost to KWin's.
 
-**7. The lock screen has still never been enabled** (item 22 below). The
-desktop **does** follow day and night now, opt-in under
-`theme.desktop.followMode` -- which has been built and tested but never
-switched on by the user.
+**8. The lock screen has still never been enabled** (item 22 below).
 
 ### What to check first, before building anything
 
@@ -2844,3 +2841,55 @@ window list still comes from the KWin script and the daemon. The grant now in
 place does include `org_kde_plasma_window_management` -- the protocol KWin
 *does* implement -- so a client that spoke it directly could read windows
 natively. Quickshell is not that client, and the plugin does not bind it yet.
+
+### The rest of that afternoon: settings, layouts, and two windows nobody opened
+
+| commit | what |
+| --- | --- |
+| `29ddd97` | the overview has settings, and one speed for everything that appears |
+| `50f692b` | Alt+Tab in three layouts, as the design draws it |
+| `e8281d3` | Meta+Tab opened with a desktop selected while Tab moved the windows |
+| `b17ea74` | live window previews, drawn by this shell |
+| `bb5f983` | thirteen streams at once, and a picture that could draw nothing |
+| `8738097` | say which window got a stream, in the debug log |
+| `b818479` | the installed preview module pointed at the directory it was built in |
+| `6db8134` | the clipboard and the device notifier opened a window on every start |
+
+**The overview's five settings** are `switching.overviewHold` (held like
+Alt+Tab, or open until something is chosen -- the Windows behaviour the user
+half-remembered), `overviewTitles`, `overviewMinimised`, `overviewStrip` and
+`overviewCardWidth`. With the strip off the windows get the whole surface and
+the desktops move on the arrows alone. `theme.animationMs` is one number for
+how long any surface takes to appear -- popouts, switcher, overview, search --
+and it was 180 ms written into four files.
+
+**Three switcher packages from one source.** A layout running inside
+kwin_wayland cannot read this shell's configuration, so a *setting* would have
+had nothing to read it with. KWin picks a switcher by package, so the layout is
+a template (`main.qml.in`, `@SWITCHER_LAYOUT@`) rendered three times. Inside
+it, one delegate is shared by a horizontal list (row, icons) and a GridView
+(grid), and the selection moves through `select()`/`step()` rather than through
+whichever view happens to be drawn -- KWin sets the index and both have to
+follow.
+
+**Two windows nobody opened.** The shell hosts two of Plasma's tray-only
+applets because their services live in the applets rather than in plasmashell,
+and `plasmawindowed --statusnotifier` opens a window before settling into the
+tray. They are closed as they appear now. *How* to tell them apart is the
+interesting part, and `Hosting.windowsToClose` carries it: **not by pid** --
+plasmawindowed is a unique application, so the second invocation hands its
+applet to the first process and exits, leaving the pid we ran pointing at
+something already gone -- and **not by title**, which is the applet's name in
+the user's language. What is left is the host application's own windows while
+windows are *expected*: twenty seconds after hosting, no more than were
+started.
+
+**What a crash report was worth.** The user sent
+`~/.cache/quickshell/crashes/6wrs6dwclt`. The crash itself was a probe of this
+session's own, from before the stream teardown was fixed -- but every frame in
+it named the preview library **in the directory it had been built in**, which
+was a session-temporary one. Qt splits a QML module into a plugin and a backing
+library, and the plugin's RUNPATH is the build directory unless told otherwise:
+a build directory that later goes away leaves a module that silently stops
+loading and a shell drawing icons with nothing to say why. `$ORIGIN` now. A
+crash report is worth reading even when the crash is not the bug.
