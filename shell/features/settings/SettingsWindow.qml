@@ -24,7 +24,26 @@ FloatingWindow {
     property var sections: []
     property int currentIndex: 0
 
+    // A page asked for before the schema was read. `rmpr settings <page>` can
+    // arrive in the first seconds of a session, when `sections` is still
+    // empty and no index can be resolved; the name waits here until it can.
+    property string requestedPage: ""
+
     readonly property var currentSection: root.sections[root.currentIndex] ?? null
+
+    onSectionsChanged: root._resolveRequestedPage()
+    onRequestedPageChanged: root._resolveRequestedPage()
+
+    function _resolveRequestedPage(): void {
+        if (!root.requestedPage || (root.sections?.length ?? 0) === 0)
+            return;
+        const index = root.sections.findIndex(s => s && s.id === root.requestedPage);
+        if (index >= 0)
+            root.currentIndex = index;
+        else
+            Log.warn("settings", `no such page: ${root.requestedPage}`);
+        root.requestedPage = "";
+    }
 
     title: `${Branding.displayName} settings`
     implicitWidth: 1120

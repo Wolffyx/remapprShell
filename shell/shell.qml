@@ -437,6 +437,17 @@ ShellRoot {
         // there is one set of names for the window, the CLI and the docs.
         function page(name: string): string {
             const sections = Schema.sections ?? [];
+
+            // Asked for in the first seconds after the shell starts, the
+            // schema file has not been read yet and no page exists to find.
+            // The window remembers the name and lands on it when the file
+            // arrives; saying "no such page" here was a lie about the name.
+            if (sections.length === 0) {
+                settings.activeAsync = true;
+                settings.item.requestedPage = name;
+                return `${name} (opening once the schema loads)`;
+            }
+
             const index = sections.findIndex(s => s && s.id === name);
             if (index < 0)
                 return `no such page: ${name} (${sections.map(s => s.id).join(", ")})`;
@@ -445,8 +456,13 @@ ShellRoot {
             return name;
         }
 
+        // The page names, for `rmpr settings pages`. Empty is not an answer,
+        // so it says why it has none rather than printing nothing.
         function pages(): string {
-            return (Schema.sections ?? []).map(s => s.id).join("\n");
+            const sections = Schema.sections ?? [];
+            if (sections.length === 0)
+                return "the settings schema has not loaded yet";
+            return sections.map(s => s.id).join("\n");
         }
     }
 

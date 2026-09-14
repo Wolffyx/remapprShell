@@ -24,7 +24,7 @@ usage: @ALIAS@ <command> [options]
   switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)
   shortcuts status|set|clear        global shortcuts for this shell's own actions
-  settings [page]                   open the settings window, on a page
+  settings [page|pages]             open the settings window on a page; list the pages
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   sidebar                           open or close the sidebar (bind: shortcuts set sidebar)
   keys                              open or close the key sheet (bind: shortcuts set keys)
@@ -153,11 +153,14 @@ case "$cmd" in
         ;;
 
     settings)
-        # `settings <page>` opens straight to one, by its schema section id.
-        if [ $# -gt 0 ]; then
-            exec quickshell ipc --path "$(shell_ipc_path)" call settings page "$1"
-        fi
-        exec quickshell ipc --path "$(shell_ipc_path)" call settings toggle
+        # `settings <page>` opens straight to one, by its schema section id,
+        # and `settings pages` lists the ids -- which is the only way to learn
+        # them from the CLI, so no schema section may be called `pages`.
+        case "${1:-}" in
+            "")     exec quickshell ipc --path "$(shell_ipc_path)" call settings toggle ;;
+            pages)  exec quickshell ipc --path "$(shell_ipc_path)" call settings pages ;;
+            *)      exec quickshell ipc --path "$(shell_ipc_path)" call settings page "$1" ;;
+        esac
         ;;
 
     wizard)

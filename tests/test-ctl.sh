@@ -33,7 +33,16 @@ exit 0
 STUB
 cat > "$SANDBOX/bin/quickshell" <<'STUB'
 #!/usr/bin/env bash
-# quickshell ipc --path <path> call ...
+# quickshell ipc --path <path> call <target> <function> [args...]
+# Prints the --path it was handed, or -- with RECORD_CALL set -- the call
+# itself, for the checks that care which function an argument reaches.
+if [ -n "${RECORD_CALL:-}" ]; then
+    while [ $# -gt 0 ]; do
+        [ "$1" = "call" ] && { shift; printf '%s\n' "$*"; exit 0; }
+        shift
+    done
+    exit 0
+fi
 while [ $# -gt 0 ]; do
     [ "$1" = "--path" ] && { printf '%s\n' "$2"; exit 0; }
     shift
@@ -126,6 +135,19 @@ check "it is listed"                    "$("$CTL" --help 2>&1 | grep -c '^  ipc 
 # would really have used -- the worktree's, because FAKE_PROC says so.
 check "it hands over the running path"  "$(FAKE_PROC="quickshell -p $REPO_ROOT/shell/shell.qml" "$CTL" ipc panel layout DP-1)" "$REPO_ROOT/shell/shell.qml"
 check "and the installed one otherwise" "$("$CTL" ipc panel layout DP-1)" "$QS_CONFIG_DIR/shell.qml"
+
+# `settings pages` used to be unreachable: every argument went to the `page`
+# call, so the `pages` function beside it could only be reached by asking for a
+# page that does not exist and reading the error.
+echo "== what a settings argument reaches =="
+export RECORD_CALL=1
+check "no argument toggles"   "$(bash "$CTL" settings)"            "settings toggle"
+check "a name is a page"      "$(bash "$CTL" settings appearance)" "settings page appearance"
+check "pages lists them"      "$(bash "$CTL" settings pages)"      "settings pages"
+unset RECORD_CALL
+
+# And nothing in the schema may be called `pages`, or the list would shadow it.
+check "no section named pages" "$(grep -c '"id": "pages"' "$REPO_ROOT/config/schema/shell.json")" "0"
 
 if [ "$fail" -gt 0 ]; then echo "FAILED: $pass passed, $fail failed" >&2; exit 1; fi
 echo "OK: $pass passed"
