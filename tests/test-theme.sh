@@ -44,6 +44,21 @@ before_sums=$(kde_sums)
 # must be reached by nothing here.
 FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
 CALLS="$SANDBOX/calls"; : > "$CALLS"
+# GTK's preference lives in dconf, which no sandbox HOME contains, so
+# gsettings is a stand-in that keeps its value in a file.
+cat > "$FAKEBIN/gsettings" <<'STUB'
+#!/usr/bin/env bash
+store="$GSETTINGS_STORE"
+case "$1" in
+    get) [ -f "$store" ] && printf "'%s'\n" "$(cat "$store")" || printf "'prefer-dark'\n" ;;
+    set) printf '%s' "$4" > "$store" ;;
+esac
+exit 0
+STUB
+chmod +x "$FAKEBIN/gsettings"
+export GSETTINGS_STORE="$SANDBOX/gtk-color-scheme"
+printf 'prefer-dark' > "$GSETTINGS_STORE"
+
 for t in busctl pacman sudo; do
     printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
     chmod +x "$FAKEBIN/$t"
@@ -179,6 +194,28 @@ mode ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
 check "back to dark by default"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
 
+# Chrome, Electron and GTK applications ask a portal rather than KDE, and the
+# GTK portal answers from dconf. A light colour scheme with that left alone is
+# what "dark mode is active globally" was.
+echo "== GTK follows the variant too =="
+mode '"light"'
+"$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "GTK asked for light"       "$(cat "$GSETTINGS_STORE")" "prefer-light"
+check "and the GTK 3 ini says so" "$(kreadconfig6 --file gtk-3.0/settings.ini --group Settings --key gtk-application-prefer-dark-theme)" "false"
+check "and GTK 4's"               "$(kreadconfig6 --file gtk-4.0/settings.ini --group Settings --key gtk-application-prefer-dark-theme)" "false"
+
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+check "and dark, when dark"       "$(cat "$GSETTINGS_STORE")" "prefer-dark"
+check "the ini too"               "$(kreadconfig6 --file gtk-3.0/settings.ini --group Settings --key gtk-application-prefer-dark-theme)" "true"
+
+# The part has a switch of its own, like every other part.
+desktop_parts_off '{ "gtk": false }'
+printf 'prefer-dark' > "$GSETTINGS_STORE"
+"$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "off leaves GTK alone"      "$(cat "$GSETTINGS_STORE")" "prefer-dark"
+desktop_parts_off ""
+mode ""
+
 echo "== which OSD draws =="
 osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
 
@@ -235,6 +272,7 @@ check "user icon theme back"       "$(kreadconfig6 --file kdeglobals --group Ico
 check "user widget style back"     "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "UserStyle"
 check "user plasma theme back"     "$(kreadconfig6 --file plasmarc --group Theme --key name)" "user-theme"
 check "their scheme untouched"     "$([ -f "$COLORS_DIR/TheirScheme.colors" ] && echo yes || echo no)" "yes"
+check "GTK's preference back"      "$(cat "$GSETTINGS_STORE")" "prefer-dark"
 check "L&F key removed (was unset)" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')" "<unset>"
 
 # The gate: byte-identical, not merely equivalent.

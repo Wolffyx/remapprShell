@@ -289,7 +289,146 @@ desktop_part_wanted() {
 
 # Which parts would be written, and which are left alone -- for `status` and
 # for saying out loud what an apply did.
-desktop_parts() { printf '%s\n' colours icons style plasmaTheme decorations switcher; }
+desktop_parts() { printf '%s\n' colours icons style plasmaTheme decorations switcher gtk; }
+
+# ---- the colours themselves, not just the scheme's name -------------------
+#
+# Naming a scheme in `kdeglobals [General] ColorScheme` is half of what
+# selecting one means. The other half is copying the scheme's `[Colors:*]` and
+# `[WM]` groups into kdeglobals, which is where every Qt and KDE application
+# reads its colours -- and where the desktop portal reads the answer it gives
+# Chrome and every Electron application. Without it the name said light while
+# every window stayed the colour the last scheme left behind.
+#
+# See scripts/lib/kdeglobals-colors.py for why this one is saved whole rather
+# than ledgered key by key.
+COLORS_HELPER="$REPO_ROOT/scripts/lib/kdeglobals-colors.py"
+
+colors_backup() { printf '%s/kdeglobals-colors.json' "$STATE_DIR"; }
+
+colors_apply_scheme() {   # <light|dark>
+    local variant=$1
+    local scheme="$COLORS_DIR/$SLUG-$variant.colors"
+    local kdeglobals="$XDG_CONFIG_HOME/kdeglobals"
+    local backup
+    backup=$(colors_backup)
+
+    [ -f "$scheme" ] || { log_warn "no $variant colour scheme installed; colours not copied"; return 0; }
+
+    mkdir -p "$(dirname "$backup")" "$(dirname "$kdeglobals")"
+    touch "$kdeglobals"
+    [ -f "$backup" ] || python3 "$COLORS_HELPER" save "$kdeglobals" "$backup" \
+        || { log_error "could not save the colours that were there"; return 1; }
+
+    python3 "$COLORS_HELPER" apply "$scheme" "$kdeglobals" \
+        || { log_error "could not copy the $variant colours into kdeglobals"; return 1; }
+    log_step "copied the $variant colours into kdeglobals"
+}
+
+colors_revert_scheme() {
+    local backup kdeglobals
+    backup=$(colors_backup)
+    kdeglobals="$XDG_CONFIG_HOME/kdeglobals"
+    [ -f "$backup" ] || return 0
+    if [ -f "$kdeglobals" ]; then
+        python3 "$COLORS_HELPER" restore "$backup" "$kdeglobals" \
+            || log_warn "could not put the previous colours back"
+        log_step "put the previous colours back in kdeglobals"
+    fi
+    rm -f "$backup"
+}
+
+# ---- GTK, which is not KDE's configuration at all -------------------------
+#
+# Every application that follows "the system" asks a portal, and on this
+# desktop two portals answer: ours, and xdg-desktop-portal-gtk. The GTK one
+# reads `org.gnome.desktop.interface color-scheme` out of dconf, so a light
+# KDE colour scheme leaves Chrome, every Electron application and every GTK
+# application dark -- which is what "dark mode is active globally" was, with
+# our own light scheme selected and reading correctly everywhere else.
+#
+# So the variant writes that preference too, and the `gtk-application-prefer-
+# dark-theme` key in the GTK ini files beside it, which older GTK reads. The
+# ini files are INI, so kwriteconfig6 and the ledger handle them like any other
+# key; dconf is not, so the value it had is kept in a file of our own.
+GTK_INIS=("gtk-3.0/settings.ini" "gtk-4.0/settings.ini")
+GSETTINGS_SCHEMA="org.gnome.desktop.interface"
+
+gtk_ledger() { printf '%s/gtk-color-scheme.json' "$STATE_DIR"; }
+
+# The dconf preference, remembered the first time we change it so revert can
+# put it back. dconf is nobody's INI file, so this is a note of our own rather
+# than a ledger entry.
+gtk_remember_scheme() {
+    local led before file created=()
+    led=$(gtk_ledger)
+    [ -f "$led" ] && return 0
+
+    # Which ini files we are about to create. The ledger puts keys back but
+    # cannot remove a file that did not exist, and `theme revert` has to leave
+    # the configuration byte-identical -- two empty ini files is not that.
+    for file in "${GTK_INIS[@]}"; do
+        [ -f "$XDG_CONFIG_HOME/$file" ] || created+=("$file")
+    done
+
+    before=""
+    command -v gsettings >/dev/null 2>&1 \
+        && before=$(gsettings get "$GSETTINGS_SCHEMA" color-scheme 2>/dev/null | tr -d "'")
+
+    mkdir -p "$(dirname "$led")"
+    jq -n --arg v "$before" \
+          --argjson created "$(printf '%s\n' "${created[@]+"${created[@]}"}" | jq -R -s -c 'split("\n") | map(select(length > 0))')" \
+          '{colorScheme: $v, created: $created}' > "$led"
+    log_debug "gtk: color-scheme was ${before:-<unset>}"
+}
+
+gtk_apply_variant() {   # <light|dark>
+    local variant=$1
+    local want file
+    [ "$variant" = "light" ] && want="prefer-light" || want="prefer-dark"
+
+    gtk_remember_scheme
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set "$GSETTINGS_SCHEMA" color-scheme "$want" 2>/dev/null \
+            || log_warn "could not set GTK's colour scheme preference"
+    fi
+
+    # The ini key GTK reads without a portal. `true`/`false`, not the
+    # portal's spelling.
+    for file in "${GTK_INIS[@]}"; do
+        kconfig_set theme "$file" Settings gtk-application-prefer-dark-theme \
+            "$([ "$variant" = "light" ] && printf 'false' || printf 'true')"
+    done
+    log_step "GTK applications asked to prefer $variant"
+}
+
+gtk_revert() {
+    local led before file path
+    led=$(gtk_ledger)
+    [ -f "$led" ] || return 0
+
+    before=$(jq -r '.colorScheme // ""' "$led" 2>/dev/null)
+    if [ -n "$before" ] && command -v gsettings >/dev/null 2>&1; then
+        gsettings set "$GSETTINGS_SCHEMA" color-scheme "$before" 2>/dev/null || true
+        log_step "GTK's colour scheme preference back to $before"
+    fi
+
+    # An ini file we created, with nothing left in it once the ledger has put
+    # its keys back, goes away again. One that was the user's stays whatever it
+    # now holds.
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        path="$XDG_CONFIG_HOME/$file"
+        [ -f "$path" ] || continue
+        if ! grep -qE '^[^][:space:]#]+=' "$path"; then
+            rm -f "$path"
+            rmdir "$(dirname "$path")" 2>/dev/null || true
+            log_step "removed $path (ours, and now empty)"
+        fi
+    done < <(jq -r '.created[]? // empty' "$led" 2>/dev/null)
+
+    rm -f "$led"
+}
 
 # apply_defaults [variant] [variant-only]
 #
@@ -477,6 +616,8 @@ case "$cmd" in
             log_info "package only: colour scheme, icons, widget style and the rest left alone"
         elif [ "$WITH_APPEARANCE" = 1 ] || [ "$(config_get '.theme.desktop.enabled' true)" = "true" ]; then
             apply_defaults "$variant" || die "could not write the defaults; run '$ALIAS theme revert'"
+            desktop_part_wanted colours && colors_apply_scheme "$variant"
+            desktop_part_wanted gtk && gtk_apply_variant "$variant"
             log_info "the desktop is in $variant (theme.mode: $(config_get '.theme.mode' 'auto'))"
         else
             log_info "leaving the desktop alone (theme.desktop.enabled is off)"
@@ -505,6 +646,8 @@ case "$cmd" in
             notify_style_changed
         fi
         kconfig_revert theme
+        colors_revert_scheme
+        gtk_revert
         remove_colors
         for d in "$SWITCHER_DEST" "$DESKTOPTHEME_DEST"; do
             [ -d "$d" ] || continue
@@ -611,13 +754,38 @@ case "$cmd" in
         # Called whenever night falls, and on every start, so doing nothing
         # when there is nothing to do matters: a write here wakes every Qt
         # application on the machine.
+        colours_agree=1
+        if desktop_part_wanted colours; then
+            want_bg=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
+                          "$COLORS_DIR/$SLUG-$variant.colors" 2>/dev/null | head -1)
+            have_bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '')
+            [ -n "$want_bg" ] && [ "$(printf '%s' "$have_bg" | tr -d ' ')" = "$(printf '%s' "$want_bg" | tr -d ' ')" ] \
+                || colours_agree=0
+        fi
+
+        gtk_agrees=1
+        if desktop_part_wanted gtk && command -v gsettings >/dev/null 2>&1; then
+            want_gtk=$([ "$variant" = "light" ] && printf 'prefer-light' || printf 'prefer-dark')
+            [ "$(gsettings get "$GSETTINGS_SCHEMA" color-scheme 2>/dev/null | tr -d "'")" = "$want_gtk" ] || gtk_agrees=0
+        fi
         if [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" = "$DISPLAY_NAME ${variant^}" ] \
-           && cmp -s "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" "$DESKTOPTHEME_DEST/colors" 2>/dev/null; then
+           && cmp -s "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" "$DESKTOPTHEME_DEST/colors" 2>/dev/null \
+           && [ "$gtk_agrees" = 1 ] && [ "$colours_agree" = 1 ]; then
             log_info "the desktop is already in $variant"
             exit 0
         fi
 
         apply_defaults "$variant" 1 || die "could not write the $variant variant"
+
+        # The scheme's own colours, not only its name.
+        desktop_part_wanted colours && colors_apply_scheme "$variant"
+
+        # And the applications that ask a portal rather than KDE.
+        if desktop_part_wanted gtk; then
+            gtk_apply_variant "$variant"
+        else
+            log_info "leaving GTK alone (theme.desktop.gtk is off)"
+        fi
 
         # Plasma's own widgets read the desktop theme, not the colour scheme,
         # so the variant has to reach both or a light desktop keeps dark applet

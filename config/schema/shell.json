@@ -66,6 +66,12 @@
                 "label": "Applications follow day and night",
                 "description": "With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start."
             },
+                "theme.desktop.gtk": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "GTK applications follow too",
+                    "description": "Chrome, Electron applications and GTK applications do not read KDE's colour scheme: they ask a portal, and the GTK portal answers from its own dark/light preference. With this on, that preference is written with the rest -- which is what makes them turn light by day and dark by night instead of staying wherever they were. `rmpr theme revert` puts the preference back."
+                },
             "theme.desktop.colours": {
                     "type": "bool",
                     "default": true,
