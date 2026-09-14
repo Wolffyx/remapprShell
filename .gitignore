@@ -12,6 +12,8 @@ theme/lockscreen/Options.qml
 # a run killed before its trap leaves one behind.
 dev/preview/root.*
 /build/
+# `make plugin` builds here; the installed module lives in the user's Qt
+# import path and is removed by `make plugin-clean`.
 /dist/
 *.qmlc
 *.jsc

@@ -289,13 +289,11 @@ PanelWindow {
                                 color: tile.tint
                                 opacity: tile.modelData?.minimized ? 0.55 : 1
 
-                                PanelIcon {
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    anchors.rightMargin: -10
-                                    anchors.bottomMargin: -18
-                                    implicitSize: 96
-                                    opacity: 0.4
+                                WindowThumbnail {
+                                    anchors.fill: parent
+                                    windowId: tile.modelData?.uuid ?? ""
+                                    iconScale: 0.45
+                                    live: !tile.modelData?.minimized
                                     iconName: WindowsService.iconFor(tile.modelData)
                                     iconFile: WindowsService.iconFileFor(tile.modelData)
                                 }

@@ -1,0 +1,52 @@
+// A window's live picture, where the compositor will give one.
+//
+// Two things outside this project make it possible, and both are optional:
+// `KWinScreencast`, this project's one compiled part (see plugin/), which
+// turns a window's uuid into a PipeWire node id; and `org.kde.pipewire`, from
+// kpipewire, which draws a node.
+//
+// Loaded by name rather than imported directly by anything that draws -- see
+// ui/primitives/WindowThumbnail.qml -- so a shell without the plugin, or
+// without kpipewire, draws the application's icon instead of failing to start.
+// That is why this file is small: everything that can be missing is in it.
+
+import QtQuick
+import org.kde.pipewire as PipeWire
+import KWinScreencast
+
+Item {
+    id: root
+
+    // KWin's uuid for the window, as the window list reports it.
+    property string windowId: ""
+
+    // Whether this wants pixels at all. A stream costs the compositor a
+    // capture, so a thumbnail nobody is looking at turns its own off.
+    property bool active: true
+
+    // What the window's own shape is, so the feed can be letterboxed: a
+    // PipeWireSourceItem fills whatever it is given, and a 16:9 window
+    // stretched into a square card is a worse picture than no picture.
+    property real sourceAspect: 16 / 9
+
+    readonly property bool showing: stream.available
+    readonly property string error: stream.error
+
+    WindowStream {
+        id: stream
+        windowId: root.windowId
+        active: root.active
+    }
+
+    PipeWire.PipeWireSourceItem {
+        readonly property real fitted: root.sourceAspect > (root.width / Math.max(1, root.height))
+            ? root.width / root.sourceAspect
+            : root.height
+
+        anchors.centerIn: parent
+        width: fitted * root.sourceAspect
+        height: fitted
+        nodeId: stream.nodeId
+        visible: stream.available
+    }
+}

@@ -1,0 +1,29 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+#
+# This file exists for one line: X-KDE-Wayland-Interfaces.
+#
+# KWin keeps some Wayland protocols away from ordinary clients -- window
+# management and screencasting among them -- and grants them to a client whose
+# desktop file asks for them by name. Without this the shell is refused, and
+# the refusal is silent: the global simply is not advertised, which reads as
+# "KWin does not implement it". This project spent four days believing exactly
+# that (see "Window thumbnails" in docs/handoff.md).
+#
+# The match is on the *executable*, by absolute path, and the shell's
+# executable is quickshell's,
+# so this grants the two interfaces to any Quickshell shell this user runs.
+# There is no narrower way to ask: KWin compares the binary and ignores the
+# arguments, which is how one desktop file covers a shell whose config path is
+# per-install.
+#
+# NoDisplay, because nobody should find this in a menu: it launches the shell,
+# but launching the shell is `@ALIAS@ start`.
+[Desktop Entry]
+Type=Application
+Name=@DISPLAY_NAME@ (Wayland interfaces)
+Comment=Asks KWin for the window-management and screencast protocols
+Exec=/usr/bin/quickshell -n -p @QS_CONFIG_DIR@/shell.qml
+Icon=@SLUG@
+Terminal=false
+NoDisplay=true
+X-KDE-Wayland-Interfaces=org_kde_plasma_window_management,zkde_screencast_unstable_v1

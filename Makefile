@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests docs brand test clean
+.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests docs brand test clean plugin plugin-clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -63,6 +63,16 @@ lint-tests: ## Fail if a QML test imports a module needing a running shell
 
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh
+
+plugin: ## Build and install the window-preview plugin (needs Qt6 dev + cmake)
+	@cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release
+	@cmake --build build/plugin
+	@cmake --install build/plugin
+	@printf '\033[32m==>\033[0m window previews installed; restart the shell to pick them up\n'
+
+plugin-clean: ## Remove the plugin's build directory and installed module
+	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast"
+	@printf '\033[32m==>\033[0m window previews removed\n'
 
 clean: ## Remove generated files
 	@rm -f shell/core/Branding.qml theme/colors/*.colors

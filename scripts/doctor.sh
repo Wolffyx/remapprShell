@@ -104,6 +104,36 @@ fi
 
 # --------------------------------------------------------------- configuration
 
+section "window previews"
+
+# A live picture of a window needs three things to line up, and each of them
+# fails quietly on its own: the compiled module, kpipewire to draw a node, and
+# KWin's permission -- which it grants only to a client whose desktop file
+# names the protocol.
+preview_module="$HOME/.local/lib/qt6/qml/KWinScreencast/libshellscreencastplugin.so"
+if [ -f "$preview_module" ]; then
+    ok "the preview module is installed"
+else
+    warn "no preview module: windows are drawn as their application's icon"
+    fix "build it with: make plugin  (needs cmake and Qt 6 development files)"
+fi
+
+if [ -d /usr/lib/qt6/qml/org/kde/pipewire ]; then
+    ok "kpipewire present (it draws the stream)"
+else
+    warn "kpipewire is missing, so a stream could not be drawn even if KWin gave one"
+    fix "install it with: sudo pacman -S --needed kpipewire"
+fi
+
+wayland_desktop="$APPLICATIONS_DIR/$SLUG-wayland-interfaces.desktop"
+if grep -q "zkde_screencast_unstable_v1" "$wayland_desktop" 2>/dev/null; then
+    ok "KWin is asked for the screencast protocol ($(basename "$wayland_desktop"))"
+else
+    bad "nothing asks KWin for the screencast protocol"
+    fix "KWin only advertises it to a client whose desktop file names it in X-KDE-Wayland-Interfaces"
+    fix "reinstall with: make link"
+fi
+
 section "configuration"
 
 profile_file="$CONFIG_DIR/profiles/default/shell.json"

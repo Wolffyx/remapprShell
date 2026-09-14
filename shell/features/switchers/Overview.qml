@@ -575,15 +575,22 @@ PanelWindow {
                                 color: card.tint
                                 opacity: card.modelData?.minimized ? 0.55 : 1
 
-                                PanelIcon {
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    anchors.rightMargin: -16
-                                    anchors.bottomMargin: -32
-                                    implicitSize: 172
-                                    opacity: 0.38
+                                // The window itself where KWin gives a
+                                // picture, and the application's icon over
+                                // the card's own tint where it does not.
+                                WindowThumbnail {
+                                    anchors.fill: parent
+                                    anchors.topMargin: win.showTitles ? 34 : 0
+                                    windowId: card.modelData?.uuid ?? ""
                                     iconName: WindowsService.iconFor(card.modelData)
                                     iconFile: WindowsService.iconFileFor(card.modelData)
+                                    iconScale: 0.5
+                                    sourceAspect: 16 / 9
+                                    // Every card on the desktop being looked
+                                    // at, and none on the others: a strip of
+                                    // four desktops is forty streams KWin
+                                    // would be capturing for nothing.
+                                    live: !card.modelData?.minimized
                                 }
 
                                 Rectangle {

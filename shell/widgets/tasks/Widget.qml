@@ -464,14 +464,15 @@ BarWidget {
 
     // The preview.
     //
-    // It is not a thumbnail, and cannot be one here. Window images come from
-    // the plasma-window-management protocol, which Quickshell does not bind;
-    // KWin's other route, ScreenShot2.CaptureWindow, refuses us outright with
-    // "the process is not authorized to take a screenshot" -- it is restricted
-    // to callers KWin allows, and we are not one. So the preview shows what is
-    // actually knowable, at a size worth hovering for: the application's own
-    // icon, its real name rather than its window class, the full title, and
-    // the state the window is in.
+    // It shows a live picture of the window where the compositor gives one --
+    // KWin's screencast protocol, through this project's one compiled part
+    // (plugin/) -- and the application's icon where it does not. The text is
+    // the same either way: the application's real name rather than its window
+    // class, the full title, and the state the window is in.
+    //
+    // The previous note here said a picture was impossible. It was wrong in an
+    // instructive way: the protocol is restricted rather than absent, and KWin
+    // gives it to a client whose desktop file asks for it by name.
     readonly property Component preview: Component {
         Item {
             id: preview
@@ -486,6 +487,21 @@ BarWidget {
                 id: body
                 anchors.centerIn: parent
                 spacing: 8
+
+                // The window itself, when there is one window to show and a
+                // compositor willing to show it. A group of several is a list
+                // of titles rather than a gallery: which of five Chrome
+                // windows a picture belongs to is not obvious at this size.
+                WindowThumbnail {
+                    visible: preview.windows.length === 1
+                    width: 300
+                    height: 169
+                    windowId: preview.windows[0]?.uuid ?? ""
+                    iconName: preview.item?.iconName ?? ""
+                    iconFile: preview.item?.iconFile ?? ""
+                    iconScale: 0.3
+                    live: preview.windows.length === 1
+                }
 
                 // The application, once, however many windows it has.
                 Row {

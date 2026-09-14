@@ -30,6 +30,7 @@ template|share/applications/clipboard.desktop.in|$APPLICATIONS_DIR/$SLUG-clipboa
 template|share/applications/sidebar.desktop.in|$APPLICATIONS_DIR/$SLUG-sidebar.desktop
 template|share/applications/keys.desktop.in|$APPLICATIONS_DIR/$SLUG-keys.desktop
 template|share/applications/switcher.desktop.in|$APPLICATIONS_DIR/$SLUG-switcher.desktop
+template|share/applications/wayland-interfaces.desktop.in|$APPLICATIONS_DIR/$SLUG-wayland-interfaces.desktop
 ENTRIES
 }
 
