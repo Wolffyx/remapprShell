@@ -344,6 +344,7 @@ when two copies of a widget should differ.
 | Camera and microphone in use | `privacy` | left, middle, right | `org.kde.plasma.cameraindicator` (in the tray) |
 | Search | `search` | left, middle, right | `org.kde.milou` |
 | Show desktop | `showdesktop` | left, middle, right | `org.kde.plasma.showdesktop` |
+| Sidebar | `sidebar` | left, middle, right | **not supported** |
 | Quick settings | `status` | left, middle, right | **not supported** |
 | Open windows | `tasks` | left, middle, right | `org.kde.plasma.icontasks` |
 | Task view | `taskview` | left, middle, right | **not supported** |
