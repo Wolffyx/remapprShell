@@ -136,7 +136,9 @@ fi
 
 section "configuration"
 
-profile_file="$CONFIG_DIR/profiles/default/shell.json"
+# The profile in use, not profiles/default -- checking a file the shell is
+# not reading is a health check that cannot fail when it should.
+profile_file="$(profile_file)"
 if [ -f "$profile_file" ]; then
     if jq -e . "$profile_file" >/dev/null 2>&1; then
         ok "profile parses ($(jq -r '.schemaVersion // "no version"' "$profile_file"))"

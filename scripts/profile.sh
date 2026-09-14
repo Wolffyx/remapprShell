@@ -18,9 +18,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 state_file="$CONFIG_DIR/state.json"
 profiles_dir="$CONFIG_DIR/profiles"
 
-active_profile() {
-    [ -f "$state_file" ] && jq -r '.profile // "default"' "$state_file" 2>/dev/null || echo default
-}
+# active_profile() comes from lib/brand.sh, so every command agrees.
 
 cmd=${1:-list}
 [ $# -gt 0 ] && shift

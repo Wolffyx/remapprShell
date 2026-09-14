@@ -27,7 +27,7 @@ find_preset() {
     return 1
 }
 
-profile_file() { printf '%s/profiles/default/shell.json' "$CONFIG_DIR"; }
+# profile_file() comes from lib/brand.sh: it follows the active profile.
 
 cmd=${1:-list}
 [ $# -gt 0 ] && shift
@@ -65,6 +65,7 @@ case "$cmd" in
         # own configuration, so trying a preset must not be a one-way door --
         # and a preset replaces rather than merges, because merging two layouts
         # produces a third that is neither.
+        backup=""
         if [ -f "$target" ]; then
             backup="$STATE_DIR/profile-backups/$(date +%Y%m%d-%H%M%S)-before-$name.json"
             mkdir -p "$(dirname "$backup")"
@@ -75,9 +76,12 @@ case "$cmd" in
         schema=$(jq -r '.schemaVersion // 1' "$f" 2>/dev/null)
         jq --argjson v "${schema:-1}" '.config + {schemaVersion: $v}' "$f" > "$target"
 
-        log_step "applied preset '$name'"
+        log_step "applied preset '$name' to profile '$(active_profile)'"
         log_info "the shell picks it up immediately; no restart needed"
-        log_info "undo with: cp $backup $target"
+        # There is nothing to undo to on the very first apply, and naming an
+        # unset variable under `set -u` ended the command with an error after
+        # the preset had already been written.
+        [ -n "$backup" ] && log_info "undo with: cp $backup $target"
         ;;
 
     *) die "unknown command: $cmd (expected list, show or apply)" ;;
