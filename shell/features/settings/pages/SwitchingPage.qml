@@ -126,6 +126,25 @@ CardGrid {
             }
         }
 
+        // Said here rather than found out. This shell's switcher is not drawn
+        // by the compositor: every press of the key travels kglobalaccel, the
+        // session daemon, the CLI and the IPC before anything appears, and the
+        // key coming up makes the same trip separately. The two race, and a
+        // fast enough Alt+Tab can still leave the switcher on screen.
+        //
+        // It is a real choice and it stays -- it is the only one this project
+        // can restyle. But someone choosing it should know what they are
+        // taking on, and KWin's is the one that ships.
+        PanelText {
+            width: drawnBy.width - 2 * drawnBy.padding
+            visible: root.drawnByWindows === "shell"
+            wrapMode: Text.WordWrap
+            text: "Held keys are less reliable here than in KWin's. This shell is not the compositor: the key press and the key release each cross four processes to reach it, and they race. Pressed quickly, the switcher can stay on screen after the key is let go. KWin's switcher has none of that, shows a real picture of each window, and is what this shell uses unless you change it."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.error
+        }
+
         SettingRow {
             width: drawnBy.width - 2 * drawnBy.padding
             enabled: !root.busy

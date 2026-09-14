@@ -151,6 +151,14 @@ case "$cmd" in
             *) die "unknown: $who (plasma or shell)" ;;
         esac
 
+        # The same warning the settings window gives. Choosing this from the
+        # terminal should not be the quiet way to take on a worse switcher.
+        if [ "$who" = shell ]; then
+            log_warn "this shell's switcher is not drawn by the compositor: the key down and"
+            log_warn "the key up each cross four processes to reach it, and they race -- a quick"
+            log_warn "Alt+Tab can leave it on screen. KWin's is the default: $ALIAS switcher use plasma"
+        fi
+
         profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
         mkdir -p "$(dirname "$profile")"
         if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
