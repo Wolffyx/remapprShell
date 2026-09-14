@@ -149,6 +149,6 @@
     },
     "switching": {
         "windows": "plasma",
-        "desktops": "plasma"
+        "desktops": "shell"
     }
 }

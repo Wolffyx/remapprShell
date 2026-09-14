@@ -92,7 +92,7 @@ PanelWindow {
         // and could never be stepped through with the key held. Once this
         // surface exists it has the keyboard, and Alt coming up reaches it as
         // the key release below, which is the one that means "choose".
-        if (Surfaces.windowSwitcherCommitFresh)
+        if (Surfaces.heldCommitFresh)
             win.commit();
     }
 

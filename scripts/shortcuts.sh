@@ -3,7 +3,8 @@
 #
 #   status              what is bound, and what would conflict
 #   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard,
-#                                     sidebar, keys, switcher, switcher-reverse)
+#                                     sidebar, keys, switcher, switcher-reverse,
+#                                     overview, overview-reverse)
 #   clear <action>      unbind one
 #   migrate             move keys off the old desktop-file entries
 #   revert              undo everything this project bound
@@ -31,7 +32,8 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 
-ACTIONS=(launcher search settings ask clipboard sidebar keys switcher switcher-reverse)
+ACTIONS=(launcher search settings ask clipboard sidebar keys switcher switcher-reverse
+         overview overview-reverse)
 
 # The component every action belongs to, and the group it is kept in.
 COMPONENT=$SLUG
@@ -48,6 +50,8 @@ action_label() {
         keys)     printf 'Keyboard shortcuts' ;;
         switcher) printf 'Window switcher' ;;
         switcher-reverse) printf 'Window switcher (backwards)' ;;
+        overview) printf 'Desktops' ;;
+        overview-reverse) printf 'Desktops (backwards)' ;;
     esac
 }
 

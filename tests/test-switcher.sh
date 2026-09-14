@@ -94,6 +94,24 @@ check "not customised"           "$(js .customised)" "false"
 # The switcher's key coming up reaches the shell as its own IPC call. The
 # release cannot be left to the surface's key handling: a quick Alt+Tab lets go
 # before the surface is mapped, and the switcher was then stuck on screen.
+# Meta+Tab: the same question as Alt+Tab, for the other key. The setting says
+# who draws it and the key follows, because an overview nobody can open is not
+# a choice a person made.
+echo "== who draws Meta+Tab =="
+sw desktops shell
+check "the setting says ours"     "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "shell"
+check "and it holds Meta+Tab"     "$(sc "$SLUG" overview)" "Meta+Tab,none,Desktops"
+check "taken from caelestia"      "$(sc caelestia-shell caelestia-shortcut-overview)" "none,none,Toggle overview"
+
+sw desktops plasma
+check "back to KWin's Overview"   "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "plasma"
+# The fixture below gives KWin's Overview its own default and name, and taking
+# a key keeps both -- which is what makes giving it back possible.
+check "KWin holds the key"        "$(sc kwin Overview)" "Meta+Tab,Meta+W,Toggle Overview"
+check "and ours lost it"          "$(sc "$SLUG" overview)" "none,none,Desktops"
+check "a third answer refused"    "$(sw desktops sideways && echo ran || echo refused)" "refused"
+sw desktops shell
+
 echo "== show and commit reach the shell =="
 cat > "$FAKEBIN/quickshell" <<'STUB'
 #!/usr/bin/env bash
@@ -107,6 +125,8 @@ chmod +x "$FAKEBIN/quickshell"
 check "show opens it"            "$("$REPO_ROOT/scripts/switcher.sh" show 2>/dev/null)" "surfaces switcher"
 check "and backwards, its own"   "$("$REPO_ROOT/scripts/switcher.sh" show --reverse 2>/dev/null)" "surfaces switcherReverse"
 check "the key coming up commits" "$("$REPO_ROOT/scripts/switcher.sh" commit 2>/dev/null)" "surfaces switcherCommit"
+check "the overview opens"        "$("$REPO_ROOT/scripts/switcher.sh" overview 2>/dev/null)" "surfaces overview"
+check "and backwards"             "$("$REPO_ROOT/scripts/switcher.sh" overview --reverse 2>/dev/null)" "surfaces overviewReverse"
 rm -f "$FAKEBIN/quickshell"
 
 # Both switcher keys are held rather than tapped, so the daemon has to run
@@ -115,6 +135,8 @@ echo "== the daemon runs a release =="
 check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "the overview has a key"    "$(grep -c '"overview":  ("Desktops"' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"

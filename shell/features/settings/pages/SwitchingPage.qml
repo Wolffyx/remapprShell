@@ -13,6 +13,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.domain.config
 import qs.platform.kde
 import qs.domain.theme
 import qs.ui.primitives
@@ -27,9 +28,14 @@ CardGrid {
     property bool busy: false
 
     readonly property var layouts: root.switcherState?.layouts ?? []
+
+    // Read from configuration rather than from `switcher status`: these are
+    // this shell's own settings, and the shell already has them.
+    readonly property string drawnByWindows: ConfigStore.value("switching.windows", "plasma")
+    readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "shell")
     readonly property var keys: root.switcherState?.keys ?? []
 
-    count: 2
+    count: 3
 
     Component.onCompleted: root.refresh()
 
@@ -87,6 +93,54 @@ CardGrid {
                 const errors = text.split("\n").filter(l => /error/i.test(l));
                 if (errors.length > 0)
                     root.status = errors.pop().replace(/^.*error:?\s*/i, "");
+            }
+        }
+    }
+
+    // Who draws each of the two, which is a different question from who holds
+    // the key: the setting says which is drawn, and the command moves the key
+    // to match, because an overview nobody can open is not a choice.
+    Card {
+        id: drawnBy
+
+        width: root.cellWidth
+        spacing: 4
+
+        SectionLabel { text: "Who draws it" }
+
+        SettingRow {
+            width: drawnBy.width - 2 * drawnBy.padding
+            enabled: !root.busy
+            label: "Alt+Tab"
+            description: root.drawnByWindows === "shell"
+                ? `${Branding.displayName}'s own card row, drawn here. It shows each application's icon: a picture of a window is KWin's to give and it gives one only to its own switcher.`
+                : "KWin's own switcher, in this shell's colours if its layout is chosen above. The only one that can show a picture of each window."
+            controlWidth: 210
+
+            Segmented {
+                width: parent.width
+                values: ["plasma", "shell"]
+                labels: ["KWin", "This shell"]
+                current: root.drawnByWindows
+                onPicked: value => root.run(["use", value])
+            }
+        }
+
+        SettingRow {
+            width: drawnBy.width - 2 * drawnBy.padding
+            enabled: !root.busy
+            label: "Meta+Tab"
+            description: root.drawnByDesktops === "shell"
+                ? `${Branding.displayName}'s own overview: every desktop, what is open on each, and one more at the end.`
+                : "KWin's Overview, which shows a real picture of every window and cannot be restyled -- it is compiled into KWin rather than shipped as a package."
+            controlWidth: 210
+
+            Segmented {
+                width: parent.width
+                values: ["plasma", "shell"]
+                labels: ["KWin", "This shell"]
+                current: root.drawnByDesktops
+                onPicked: value => root.run(["desktops", value])
             }
         }
     }

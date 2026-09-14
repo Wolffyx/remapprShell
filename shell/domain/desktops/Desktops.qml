@@ -46,6 +46,16 @@ QtObject {
 
     readonly property Process _setCurrent: Process { id: setCurrent }
 
+    // One more desktop, at the end. KWin names it itself when the name is
+    // empty, the same as adding one in System Settings does.
+    function create() {
+        createCall.command = Dbus.callArgs(root.service, root.path, root.iface, "createDesktop", "us",
+                                           [String(root.count), ""]);
+        createCall.running = true;
+    }
+
+    readonly property Process _create: Process { id: createCall }
+
     // Whether KWin is showing the desktop. Read back from KWin rather than
     // remembered from our own clicks, so Meta+D, a hot corner and a window
     // being activated all count -- a strip that kept its own flag got out of

@@ -6,8 +6,12 @@
 #   use plasma|shell        who draws Alt+Tab, and who gets the key for it
 #   show [--reverse]        put this shell's own switcher on screen, for the
 #                           key bound to it when `switching.windows` is "shell"
-#   commit                  the switcher's key has been let go: choose the
-#                           window under the selection and close it
+#   commit                  a held key has been let go: choose whatever is
+#                           under the selection and close
+#   overview [--reverse]    put this shell's own desktop overview on screen,
+#                           for the key bound to it when `switching.desktops`
+#                           is "shell"
+#   desktops plasma|shell   who draws Meta+Tab, and who gets the key for it
 #   give alt-tab|meta-tab   hand a key to KWin -- Alt+Tab to its window
 #                           switcher, Meta+Tab to its Overview -- taking it from
 #                           whatever holds it
@@ -191,6 +195,52 @@ case "$cmd" in
             exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcherReverse
         fi
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces switcher
+        ;;
+
+    # Who draws Meta+Tab. The same shape as `use` above, for the other key:
+    # the setting says who draws it and the key follows, because a desktop
+    # overview nobody can open is not a choice a person made.
+    desktops)
+        who=${1:?usage: $ALIAS switcher desktops plasma|shell}
+        case "$who" in
+            plasma|shell) ;;
+            *) die "unknown: $who (plasma or shell)" ;;
+        esac
+
+        profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
+        mkdir -p "$(dirname "$profile")"
+        if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
+            die "$profile does not parse; fix it first"
+        fi
+        tmp=$(mktemp)
+        if [ -f "$profile" ]; then
+            jq --arg w "$who" '.switching = ((.switching // {}) + {desktops: $w})' "$profile" > "$tmp" \
+                || die "could not write $profile"
+        else
+            jq -n --arg w "$who" '{switching: {desktops: $w}}' > "$tmp" || die "could not write $profile"
+        fi
+        mv "$tmp" "$profile"
+
+        if [ "$who" = shell ]; then
+            ACCEL_FRIENDLY_HINT="Desktops"
+            accel_take switching "Meta+Tab" "$SLUG" overview replace
+            accel_reload
+            log_step "Meta+Tab -> $DISPLAY_NAME's own desktop overview"
+        else
+            accel_take switching "Meta+Tab" kwin "Overview" replace
+            accel_reload
+            log_step "Meta+Tab -> KWin's Overview"
+        fi
+        log_info "undo with: $ALIAS switcher revert"
+        ;;
+
+    # Meta+Tab, when this shell draws it. Held like Alt+Tab: another press
+    # steps to the next desktop, and `commit` below is the key coming up.
+    overview)
+        if [ "${1:-}" = "--reverse" ]; then
+            exec quickshell ipc --path "$(shell_ipc_path)" call surfaces overviewReverse
+        fi
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces overview
         ;;
 
     # What the session daemon runs when the switcher's key comes up. The

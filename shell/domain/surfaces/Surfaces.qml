@@ -21,6 +21,13 @@ QtObject {
     // Alt+Tab, when this shell is the one drawing it rather than KWin.
     property bool windowSwitcher: false
 
+    // Meta+Tab: the desktops, and what is open on each. Held like the
+    // switcher -- another press steps to the next desktop, letting the key go
+    // chooses -- so everything below about holding a key covers both.
+    property bool overview: false
+    property int overviewTick: 0
+    property int overviewDelta: 1
+
     // A press of the switcher's key while it is already up. KWin takes the
     // key press before any client sees it, so a second Alt+Tab never reaches
     // the surface as a key at all -- it arrives here, as another call. The
@@ -28,7 +35,7 @@ QtObject {
     property int windowSwitcherTick: 0
     property int windowSwitcherDelta: 1
 
-    // The switcher's key let go, as the session daemon heard it.
+    // A held surface's key let go, as the session daemon heard it.
     //
     // This exists for one case only: a quick Alt+Tab, where the key is
     // released before the surface is mapped. The press travels kglobalaccel,
@@ -47,15 +54,15 @@ QtObject {
     // choice that was made must not be dropped because the two crossed. It is
     // cleared when the switcher goes away, and honoured only while it is
     // fresh, so a stray one cannot close the next switcher on sight.
-    property bool windowSwitcherCommitWanted: false
-    property real windowSwitcherCommitAt: 0
+    property bool heldCommitWanted: false
+    property real heldCommitAt: 0
 
     // How long a commit is worth acting on: long enough to cross a process
     // boundary twice, short enough that nobody's next Alt+Tab meets it.
-    readonly property int windowSwitcherCommitWindow: 1500
+    readonly property int heldCommitWindow: 1500
 
-    readonly property bool windowSwitcherCommitFresh: root.windowSwitcherCommitWanted
-        && (Date.now() - root.windowSwitcherCommitAt) < root.windowSwitcherCommitWindow
+    readonly property bool heldCommitFresh: root.heldCommitWanted
+        && (Date.now() - root.heldCommitAt) < root.heldCommitWindow
 
     // When the switcher last closed.
     //
@@ -65,9 +72,9 @@ QtObject {
     // nothing to close it -- which is what "the overlay stays open after
     // switching" was. An open that lands just behind a close belongs to the
     // burst that ended in it, so it is dropped.
-    property real windowSwitcherCommittedAt: 0
+    property real heldClosedAt: 0
 
-    readonly property int windowSwitcherReopenGuard: 600
+    readonly property int heldReopenGuard: 600
 
     // What the session screen was opened for: "promptAll", "promptLogout",
     // "promptReboot" or "promptShutDown", as Plasma's prompt names them.
@@ -79,18 +86,20 @@ QtObject {
     readonly property string screenName: root.screen.length > 0 ? root.screen : (Quickshell.screens[0]?.name ?? "")
 
     function _only(which, screen) {
-        if (which !== "windowSwitcher") {
-            root.windowSwitcherCommitWanted = false;
+        const held = which === "windowSwitcher" || which === "overview";
+        if (!held) {
+            root.heldCommitWanted = false;
             // However it went away -- a choice, Escape, a click outside -- an
             // open still travelling the CLI from the last tap of Tab must not
             // bring it back behind whatever just closed it.
-            if (root.windowSwitcher)
-                root.windowSwitcherCommittedAt = Date.now();
+            if (root.windowSwitcher || root.overview)
+                root.heldClosedAt = Date.now();
         }
         root.sidebar = which === "sidebar";
         root.keys = which === "keys";
         root.session = which === "session";
         root.windowSwitcher = which === "windowSwitcher";
+        root.overview = which === "overview";
         if (screen !== undefined)
             root.screen = screen ?? "";
     }
@@ -99,7 +108,7 @@ QtObject {
     // shortcut again while it is up steps through the list instead.
     function openWindowSwitcher(screen, delta) {
         if (!root.windowSwitcher
-            && (Date.now() - root.windowSwitcherCommittedAt) < root.windowSwitcherReopenGuard)
+            && (Date.now() - root.heldClosedAt) < root.heldReopenGuard)
             return;
         root.windowSwitcherDelta = delta === undefined ? 1 : delta;
         if (root.windowSwitcher) {
@@ -113,11 +122,26 @@ QtObject {
     // Asked for by the key coming up. Held as a wish rather than acted on
     // here: this layer does not know which window is selected, and the
     // surface that does may not exist yet.
-    function commitWindowSwitcher() {
-        root.windowSwitcherCommitAt = Date.now();
-        root.windowSwitcherCommitWanted = true;
+    function commitHeld() {
+        root.heldCommitAt = Date.now();
+        root.heldCommitWanted = true;
     }
 
+
+    // The desktops. Opened by a key that is still held, exactly as the window
+    // switcher is: another press steps on rather than closing it.
+    function openOverview(screen, delta) {
+        if (!root.overview && (Date.now() - root.heldClosedAt) < root.heldReopenGuard)
+            return;
+        if (root.overview) {
+            root.overviewDelta = delta === undefined ? 1 : delta;
+            root.overviewTick += 1;
+            return;
+        }
+        root.overviewDelta = delta === undefined ? 1 : delta;
+        root.overviewTick = 0;
+        root._only("overview", screen);
+    }
 
     function toggleSidebar(screen) { root._only(root.sidebar ? "" : "sidebar", screen); }
     function toggleKeys(screen) { root._only(root.keys ? "" : "keys", screen); }

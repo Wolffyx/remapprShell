@@ -160,7 +160,7 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `switching.windows` | `plasma`, `shell` | `plasma` | plasma is KWin's own switcher, in this shell's colours, and it is the only one that can show a picture of each window -- KWin renders those for its own switcher and for nothing else. shell is this shell's card row, drawn here, which shows each application's icon instead. Changing this rebinds Alt+Tab to whichever draws it. |
-| `switching.desktops` | `plasma`, `shell` | `plasma` | plasma is KWin's Overview, which cannot be restyled: it is compiled into KWin rather than shipped as a package. shell is this shell's desktop switcher. Changing this rebinds Meta+Tab. |
+| `switching.desktops` | `plasma`, `shell` | `shell` | shell is this shell's own desktop overview -- every desktop, what is open on each, and one more at the end -- drawn here in the panel's colours. plasma is KWin's Overview, which shows a real picture of every window but cannot be restyled: it is compiled into KWin rather than shipped as a package. Changing this rebinds Meta+Tab, taking it from whatever holds it; `rmpr switcher revert` gives it back. |
 
 ### On-screen display
 

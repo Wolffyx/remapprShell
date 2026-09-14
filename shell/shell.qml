@@ -113,6 +113,13 @@ ShellRoot {
         WindowSwitcher {}
     }
 
+    // Meta+Tab, when `switching.desktops` says this shell draws it rather than
+    // KWin's Overview.
+    Variants {
+        model: Surfaces.overview ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
+        Overview {}
+    }
+
     // The desktop's own two: a rounded frame over the screen's corners, and a
     // clock on the wallpaper. Both off by default, both drawn only where they
     // are asked for, and neither takes a click or reserves a pixel.
@@ -420,6 +427,8 @@ ShellRoot {
         function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
         function switcher(): void { Surfaces.openWindowSwitcher("", 1); }
         function switcherReverse(): void { Surfaces.openWindowSwitcher("", -1); }
+        function overview(): void { Surfaces.openOverview("", 1); }
+        function overviewReverse(): void { Surfaces.openOverview("", -1); }
 
         // The switcher's key coming up, from the session daemon. See
         // Surfaces.commitWindowSwitcher.

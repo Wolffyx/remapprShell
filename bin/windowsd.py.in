@@ -131,6 +131,8 @@ SHORTCUT_ACTIONS = {
     "keys":      ("Keyboard shortcuts", [CTL, "keys"]),
     "switcher":  ("Window switcher", [CTL, "switcher", "show"]),
     "switcher-reverse": ("Window switcher (backwards)", [CTL, "switcher", "show", "--reverse"]),
+    "overview":  ("Desktops", [CTL, "switcher", "overview"]),
+    "overview-reverse": ("Desktops (backwards)", [CTL, "switcher", "overview", "--reverse"]),
 }
 
 # What letting go of a key runs, for the shortcuts that are *held* rather than
@@ -144,6 +146,8 @@ SHORTCUT_ACTIONS = {
 SHORTCUT_RELEASES = {
     "switcher": [CTL, "switcher", "commit"],
     "switcher-reverse": [CTL, "switcher", "commit"],
+    "overview": [CTL, "switcher", "commit"],
+    "overview-reverse": [CTL, "switcher", "commit"],
 }
 
 # kglobalaccel's setShortcutKeys flags word. SetPresent is the bit that makes

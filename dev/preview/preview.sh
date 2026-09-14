@@ -20,8 +20,12 @@ cp "$HERE/harness.qml" "$root/preview.qml"
 sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/WidgetSlot.qml"
 # Full-screen layer surfaces become plain Items (PanelWindow has no offscreen
 # backend); the drawing inside them is untouched.
-for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root"/features/desktop/*.qml; do
-    sed -i -E 's/^PanelWindow \{/Item {/; /^    anchors \{/,/^    \}/d;
+for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root"/features/desktop/*.qml "$root"/features/switchers/*.qml; do
+    # The anchors block goes, written either way: the switchers put all four
+    # on one line, and a range delete from there ran to the next `    }` in the
+    # file -- taking most of the file with it and reporting the syntax error
+    # that made at a line number that no longer meant anything.
+    sed -i -E 's/^PanelWindow \{/Item {/; /^    anchors \{[^}]*\}$/d; /^    anchors \{$/,/^    \}$/d;
         /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: Region|screen: |color: "transparent")/d;
         s/^    required property var modelData/    property var modelData/' "$f"
 done
