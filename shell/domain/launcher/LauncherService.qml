@@ -57,12 +57,24 @@ QtObject {
 
     readonly property var availableProviders: root.providers.filter(p => p.available)
 
-    // Preference when nothing is configured. Kickoff first for the menu,
-    // KRunner first for search: those are KDE's own, and this shell exists to
-    // work with them rather than replace them. The built-in is the fallback
-    // for a machine where neither is present.
-    readonly property var autoOrderApps: ["kickoff", "builtin", "krunner"]
-    readonly property var autoOrderSearch: ["krunner", "builtin", "kickoff"]
+    // Preference when nothing is configured. The built-in first, both times.
+    //
+    // KDE's own used to come first, on the reasoning that this shell exists to
+    // work with them rather than replace them. That reasoning was right and
+    // the order was still wrong, because "available" does not mean the same
+    // thing for all of them. Kickoff is an applet inside whichever shell
+    // package plasmashell is running: it reports itself available whenever
+    // Plasma is there, and opens nothing at all when plasmashell is running
+    // somebody else's package. A profile that lost `launcher.provider` fell
+    // back to auto, auto chose kickoff, and the start menu and the search both
+    // did nothing with no error anywhere.
+    //
+    // The built-in is drawn by this shell and has no such dependency, so it is
+    // the only one whose availability is worth as much as it claims. Auto
+    // means "the one that will work"; naming kickoff or krunner explicitly
+    // still picks them.
+    readonly property var autoOrderApps: ["builtin", "kickoff", "krunner"]
+    readonly property var autoOrderSearch: ["builtin", "krunner", "kickoff"]
 
     function _resolve(configured, order, what) {
         if (configured !== "auto") {

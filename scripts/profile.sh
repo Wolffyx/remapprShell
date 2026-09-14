@@ -44,7 +44,16 @@ case "$cmd" in
         name=${1:?usage: $ALIAS profile use <name>}
         [ -d "$profiles_dir/$name" ] || die "no profile called '$name' (create it with: $ALIAS profile new $name)"
         mkdir -p "$CONFIG_DIR"
-        jq -n --arg p "$name" '{profile: $p}' > "$state_file"
+        # Written whole, then moved into place. The shell watches this file,
+        # and a redirect truncates before it writes: a read landing in that
+        # window gets a parse error, and the shell answers it by staying on
+        # whichever profile it already has -- which at startup is 'default'.
+        # Switching profiles then looks like the configuration resetting
+        # itself, with a JSON error the only trace.
+        tmp_state=$(mktemp "$(dirname "$state_file")/.state.XXXXXX") || die "could not write $state_file"
+        jq -n --arg p "$name" '{profile: $p}' > "$tmp_state" \
+            || { rm -f "$tmp_state"; die "could not write $state_file"; }
+        mv -f "$tmp_state" "$state_file" || { rm -f "$tmp_state"; die "could not write $state_file"; }
         log_step "active profile: $name"
         log_info "the shell switches immediately; no restart needed"
         ;;
