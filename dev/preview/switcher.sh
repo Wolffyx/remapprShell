@@ -85,12 +85,24 @@ Window {
 }
 HARNESS
 
-cp "$WT/theme/windowswitcher/contents/ui/main.qml" "$root/main.qml"
+# The layout is a template now -- one source, three packages -- so each one is
+# rendered and loaded in turn. A layout that fails to load is Alt+Tab doing
+# nothing, and nothing else here can tell you that.
+source "$WT/scripts/lib/log.sh"
+source "$WT/scripts/lib/brand.sh"
+source "$WT/scripts/lib/render.sh"
 
 
-# /usr/bin/qml is Qt5's and answers "Did not load any objects" whatever it is
-# given, exactly as /usr/bin/qmllint is Qt5's. Use Qt6's.
-env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
-    timeout 30 /usr/lib/qt6/bin/qml -I "$root" "$root/preview.qml" 2>&1 \
-  | grep -viE 'KWindowShadow|installEventFilter|platform plugin|propertyCache|support raise' \
-  | grep -vE '^\s*$' | head -30
+for layout in row grid icons; do
+    echo "== $layout =="
+    SWITCHER_LAYOUT=$layout SWITCHER_SUFFIX="" SWITCHER_LABEL="" \
+        render_template "$WT/theme/windowswitcher/contents/ui/main.qml.in" "$root/main.qml" \
+        || { echo "switcher: could not render $layout"; exit 1; }
+
+    # /usr/bin/qml is Qt5's and answers "Did not load any objects" whatever it
+    # is given, exactly as /usr/bin/qmllint is Qt5's. Use Qt6's.
+    env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
+        timeout 30 /usr/lib/qt6/bin/qml -I "$root" "$root/preview.qml" 2>&1 \
+      | grep -viE 'KWindowShadow|installEventFilter|platform plugin|propertyCache|support raise' \
+      | grep -vE '^\s*$' | head -20
+done

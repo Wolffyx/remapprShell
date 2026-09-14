@@ -32,11 +32,30 @@ import org.kde.kwin as KWin
 KWin.TabBoxSwitcher {
     id: tabBox
 
-    currentIndex: cards.currentIndex
+    currentIndex: tabBox.grid ? gridCards.currentIndex : cards.currentIndex
+
+    // Which of the design's three layouts this package is.
+    //
+    // Three packages are installed from this one file -- row, grid and icons
+    // -- because KWin picks a switcher by package and a layout running inside
+    // kwin_wayland cannot read this shell's configuration. Choosing one is
+    // therefore choosing a switcher, which is what `rmpr switcher layout` and
+    // the settings page already do.
+    readonly property string layout: "@SWITCHER_LAYOUT@"
+    readonly property bool grid: tabBox.layout === "grid"
+    readonly property bool icons: tabBox.layout === "icons"
 
     // The design's row: a card 196 wide with a 118-tall panel above its name.
-    readonly property int cardWidth: 196
-    readonly property int panelHeight: 118
+    // The grid's cards are wider and their panels taller, since the point of
+    // wrapping is to give each one more room; the icons layout drops the panel
+    // and is the application's icon and name alone.
+    readonly property int cardWidth: tabBox.grid ? 250 : tabBox.icons ? 104 : 196
+    readonly property int panelHeight: tabBox.grid ? 150 : 118
+    readonly property bool showPanel: !tabBox.icons
+
+    // Four cards to a row before it wraps, which is where the design puts it.
+    readonly property int gridColumns: 4
+    readonly property int cardHeight: tabBox.showPanel ? tabBox.panelHeight + 78 : 128
     readonly property int gap: 14
     readonly property int pad: 26
     readonly property int radius: 18
@@ -50,6 +69,20 @@ KWin.TabBoxSwitcher {
     // A colour per application, so two windows of one program look alike and
     // two programs do not. Hashed from the caption because that is the only
     // stable string a layout is given.
+    // Moving and choosing, in one place: the delegate and the arrow keys both
+    // go through these rather than reaching into whichever view is drawn.
+    function select(index) {
+        cards.currentIndex = index;
+        gridCards.currentIndex = index;
+    }
+
+    function step(delta) {
+        const n = cards.count;
+        if (n === 0)
+            return;
+        tabBox.select(((tabBox.currentIndex + delta) % n + n) % n);
+    }
+
     function tintFor(text) {
         let h = 0;
         const s = String(text ?? "");
@@ -82,9 +115,14 @@ KWin.TabBoxSwitcher {
             // package was selected on. qmllint said so from the start
             // ("Did you mean implicitWidth?") and it was read as noise about
             // KWin's own unresolvable types.
-            implicitWidth: Math.min(content.maxWidth,
-                                    cards.contentWidth + 2 * tabBox.pad)
-            implicitHeight: header.height + cards.height + footer.height + 3 * tabBox.pad / 2
+            readonly property int gridInRow: Math.min(tabBox.gridColumns, Math.max(1, cards.count))
+            readonly property real cardsWidth: tabBox.grid
+                ? content.gridInRow * (tabBox.cardWidth + tabBox.gap)
+                : cards.contentWidth
+            readonly property real cardsHeight: tabBox.grid ? gridCards.height : cards.height
+
+            implicitWidth: Math.min(content.maxWidth, content.cardsWidth + 2 * tabBox.pad)
+            implicitHeight: header.height + content.cardsHeight + footer.height + 3 * tabBox.pad / 2
 
             // ---- header: what this is, and that Alt is still held ----------
             Item {
@@ -165,8 +203,14 @@ KWin.TabBoxSwitcher {
             }
 
             // ---- the cards -------------------------------------------------
+            //
+            // Two views, one delegate: a horizontal list for the row and the
+            // icons, a grid for the layout that wraps. Only one of them is
+            // ever in use, and `currentIndex` above follows whichever it is.
             ListView {
                 id: cards
+
+                visible: !tabBox.grid
 
                 anchors.top: header.bottom
                 anchors.left: parent.left
@@ -175,7 +219,7 @@ KWin.TabBoxSwitcher {
                 anchors.leftMargin: tabBox.pad / 2
                 anchors.rightMargin: tabBox.pad / 2
 
-                height: tabBox.panelHeight + 78
+                height: tabBox.cardHeight
                 orientation: ListView.Horizontal
                 spacing: tabBox.gap
                 clip: true
@@ -187,8 +231,38 @@ KWin.TabBoxSwitcher {
                 highlightMoveDuration: Kirigami.Units.shortDuration
 
                 model: tabBox.model
+                delegate: cardDelegate
+            }
 
-                delegate: Item {
+            GridView {
+                id: gridCards
+
+                visible: tabBox.grid
+                anchors.top: header.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.topMargin: tabBox.pad / 2
+                anchors.leftMargin: tabBox.pad / 2
+                anchors.rightMargin: tabBox.pad / 2
+
+                // As many rows as it takes, up to four; past that it scrolls
+                // rather than growing past the screen.
+                height: Math.min(4, Math.ceil(gridCards.count / tabBox.gridColumns))
+                        * (tabBox.cardHeight + tabBox.gap)
+                cellWidth: tabBox.cardWidth + tabBox.gap
+                cellHeight: tabBox.cardHeight + tabBox.gap
+                clip: true
+                focus: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                model: tabBox.model
+                delegate: cardDelegate
+            }
+
+            Component {
+                id: cardDelegate
+
+                Item {
                     id: entry
 
                     required property int index
@@ -197,10 +271,10 @@ KWin.TabBoxSwitcher {
                     required property bool minimized
                     required property var windowId
 
-                    readonly property bool selected: entry.index === cards.currentIndex
+                    readonly property bool selected: entry.index === tabBox.currentIndex
 
                     width: tabBox.cardWidth
-                    height: cards.height
+                    height: tabBox.cardHeight
 
                     Rectangle {
                         id: card
@@ -344,17 +418,22 @@ KWin.TabBoxSwitcher {
 
                     TapHandler {
                         onTapped: {
-                            cards.currentIndex = entry.index;
+                            tabBox.select(entry.index);
                             tabBox.model.activate(entry.index);
                         }
                     }
                 }
 
-                Connections {
-                    target: tabBox
-                    function onCurrentIndexChanged(): void {
-                        cards.currentIndex = tabBox.currentIndex;
-                    }
+            }
+
+            // KWin moves the selection by setting `currentIndex` on the
+            // switcher; the view in use has to follow it. Both are set, since
+            // the other one is not drawn and does not care.
+            Connections {
+                target: tabBox
+                function onCurrentIndexChanged(): void {
+                    cards.currentIndex = tabBox.currentIndex;
+                    gridCards.currentIndex = tabBox.currentIndex;
                 }
             }
 
@@ -362,7 +441,7 @@ KWin.TabBoxSwitcher {
             Item {
                 id: footer
 
-                anchors.top: cards.bottom
+                anchors.top: tabBox.grid ? gridCards.bottom : cards.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: tabBox.pad / 2
@@ -381,7 +460,8 @@ KWin.TabBoxSwitcher {
                     anchors.left: parent.left
                     anchors.bottom: parent.bottom
                     width: parent.width * 0.5
-                    text: cards.currentItem?.caption ?? "No open windows"
+                    text: (tabBox.grid ? gridCards.currentItem?.caption : cards.currentItem?.caption)
+                          ?? "No open windows"
                     textFormat: Text.PlainText
                     elide: Text.ElideMiddle
                     font.weight: Font.Medium
@@ -448,10 +528,10 @@ KWin.TabBoxSwitcher {
             // first time and not the second.
             Keys.onPressed: event => {
                 if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
-                    cards.decrementCurrentIndex();
+                    tabBox.step(-1);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
-                    cards.incrementCurrentIndex();
+                    tabBox.step(1);
                     event.accepted = true;
                 }
             }

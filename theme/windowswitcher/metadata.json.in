@@ -1,9 +1,9 @@
 {
     "KPackageStructure": "KWin/WindowSwitcher",
     "KPlugin": {
-        "Id": "@SLUG@",
-        "Name": "@DISPLAY_NAME@",
-        "Description": "Alt+Tab in the same colours as the panel.",
+        "Id": "@SLUG@@SWITCHER_SUFFIX@",
+        "Name": "@DISPLAY_NAME@@SWITCHER_LABEL@",
+        "Description": "Alt+Tab in the same colours as the panel, as @SWITCHER_LAYOUT@.",
         "License": "GPL-3.0-or-later",
         "Version": "@VERSION@",
         "Website": "@REPO_FETCH@"

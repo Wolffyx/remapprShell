@@ -225,13 +225,32 @@ install_desktoptheme() {
 # `--appearance`, like the colour schemes: a switcher package that is present
 # but not named in kwinrc changes nothing, and appears in System Settings for
 # someone who wants to try it without this command deciding for them.
+# The design draws Alt+Tab three ways -- a row of cards, a wrapping grid, and
+# icons alone -- and a layout running inside kwin_wayland cannot read this
+# shell's configuration to pick one. So one source installs three packages and
+# choosing a layout is choosing a package, which is what KWin's own TabBox
+# setting already means: `$ALIAS switcher layout <id>` and the settings page
+# both list what is installed.
+SWITCHER_LAYOUTS=("row||" "grid|-grid| (grid)" "icons|-icons| (icons)")
+
+switcher_dest() { printf '%s/%s%s' "$KWIN_SWITCHER_DIR" "$SLUG" "$1"; }
+
 install_switcher() {
-    mkdir -p "$SWITCHER_DEST/contents"
-    render_template "$SWITCHER_SRC/metadata.json.in" "$SWITCHER_DEST/metadata.json" \
-        || { log_error "could not render the window switcher metadata"; return 1; }
-    chmod 644 "$SWITCHER_DEST/metadata.json"
-    cp -a "$SWITCHER_SRC/contents/ui" "$SWITCHER_DEST/contents/" || return 1
-    log_step "installed $SWITCHER_DEST"
+    local spec layout suffix label dest
+    for spec in "${SWITCHER_LAYOUTS[@]}"; do
+        IFS='|' read -r layout suffix label <<< "$spec"
+        dest=$(switcher_dest "$suffix")
+
+        export SWITCHER_LAYOUT="$layout" SWITCHER_SUFFIX="$suffix" SWITCHER_LABEL="$label"
+        mkdir -p "$dest/contents/ui"
+        render_template "$SWITCHER_SRC/metadata.json.in" "$dest/metadata.json" \
+            || { log_error "could not render the $layout switcher metadata"; return 1; }
+        render_template "$SWITCHER_SRC/contents/ui/main.qml.in" "$dest/contents/ui/main.qml" \
+            || { log_error "could not render the $layout switcher"; return 1; }
+        chmod 644 "$dest/metadata.json" "$dest/contents/ui/main.qml"
+        unset SWITCHER_LAYOUT SWITCHER_SUFFIX SWITCHER_LABEL
+        log_step "installed $dest"
+    done
 }
 
 # The colour schemes are installed by a plain apply, before anything is
@@ -649,7 +668,14 @@ case "$cmd" in
         colors_revert_scheme
         gtk_revert
         remove_colors
-        for d in "$SWITCHER_DEST" "$DESKTOPTHEME_DEST"; do
+        for spec in "${SWITCHER_LAYOUTS[@]}"; do
+            IFS='|' read -r _ suffix _ <<< "$spec"
+            d=$(switcher_dest "$suffix")
+            [ -d "$d" ] || continue
+            rm -rf "$d"
+            log_step "removed $d"
+        done
+        for d in "$DESKTOPTHEME_DEST"; do
             [ -d "$d" ] || continue
             rm -rf "$d"
             log_step "removed $d"

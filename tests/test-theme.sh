@@ -138,6 +138,13 @@ check "package installed"     "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/metadata.
 check "our OSD shipped"       "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml" ] && echo yes)" "yes"
 check "colour schemes shipped" "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")" "2"
 check "switcher shipped"       "$([ -f "$KWIN_SWITCHER_DIR/$SLUG/contents/ui/main.qml" ] && echo yes)" "yes"
+# The design draws Alt+Tab three ways and a layout inside kwin_wayland cannot
+# read our configuration, so each way is its own package and picking one is
+# picking a package.
+check "three layouts installed" "$(ls -1d "$KWIN_SWITCHER_DIR/$SLUG" "$KWIN_SWITCHER_DIR/$SLUG-grid" "$KWIN_SWITCHER_DIR/$SLUG-icons" 2>/dev/null | wc -l)" "3"
+check "each says which it is"  "$(grep -l 'property string layout: "grid"' "$KWIN_SWITCHER_DIR/$SLUG-grid/contents/ui/main.qml" >/dev/null && echo yes)" "yes"
+check "and none is a template" "$(grep -c '@SWITCHER' "$KWIN_SWITCHER_DIR/$SLUG-icons/contents/ui/main.qml")" "0"
+check "named apart in KWin"    "$(jq -r '.KPlugin.Name' "$KWIN_SWITCHER_DIR/$SLUG-icons/metadata.json")" "$DISPLAY_NAME (icons)"
 check "splash rendered"        "$(grep -c '@' "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/splash/Splash.qml")" "0"
 check "splash names the project" "$(grep -c "$DISPLAY_NAME" "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/splash/Splash.qml")" "1"
 check "desktop theme shipped"  "$([ -f "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors" ] && echo yes)" "yes"
@@ -265,6 +272,7 @@ echo "== revert =="
 check "package removed"            "$([ -d "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID" ] && echo yes || echo no)" "no"
 check "colour schemes removed"     "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")" "0"
 check "switcher removed"           "$([ -d "$KWIN_SWITCHER_DIR/$SLUG" ] && echo yes || echo no)" "no"
+check "and its other layouts"      "$(ls -1d "$KWIN_SWITCHER_DIR/$SLUG"* 2>/dev/null | wc -l)" "0"
 check "desktop theme removed"      "$([ -d "$PLASMA_DESKTOPTHEME_DIR/$SLUG" ] && echo yes || echo no)" "no"
 check "their Alt+Tab layout back"  "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "thumbnail_grid"
 check "user colour scheme back"    "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
