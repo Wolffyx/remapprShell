@@ -507,6 +507,15 @@
             "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
         },
         {
+            "id": "shortcuts",
+            "label": "Shortcuts",
+            "icon": "preferences-desktop-keyboard-shortcut",
+            "glyph": "keyboard",
+            "page": "shortcuts",
+            "description": "Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.",
+            "keys": {}
+        },
+        {
             "id": "switching",
             "label": "Switching windows",
             "icon": "preferences-system-tabbox",

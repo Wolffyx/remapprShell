@@ -157,6 +157,13 @@ What happens when the pointer is pushed into a corner or an edge of the screen, 
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
+### Shortcuts
+
+Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Switching windows
 
 What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws the window switcher and the Overview; another shell running beside it may be holding the keys, and nothing here moves one without being asked.

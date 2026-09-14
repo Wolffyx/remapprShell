@@ -271,6 +271,7 @@ FloatingWindow {
                                 case "widgets":   return widgetsPage;
                                 case "tray":      return trayPage;
                                 case "edges":     return edgesPage;
+                                case "shortcuts": return shortcutsPage;
                                 case "switching": return switchingPage;
                                 case "appearance": return appearancePage;
                                 case "taskbar":   return taskbarPage;
@@ -301,6 +302,7 @@ FloatingWindow {
                     Component { id: widgetsPage;   WidgetsPage   { width: parent.width } }
                     Component { id: trayPage;      TrayPage      { width: parent.width } }
                     Component { id: edgesPage;     EdgesPage     { width: parent.width } }
+                    Component { id: shortcutsPage; ShortcutsPage { width: parent.width } }
                     Component { id: switchingPage; SwitchingPage { width: parent.width } }
                     Component { id: appearancePage; AppearancePage { width: parent.width } }
                     Component {

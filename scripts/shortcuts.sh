@@ -80,6 +80,24 @@ cmd=${1:-status}
 
 case "$cmd" in
     status)
+        # The settings page reads this rather than parsing the table below:
+        # one answer to "what is bound", so the window and the terminal cannot
+        # disagree about it.
+        if [ "${1:-}" = "--json" ]; then
+            actions=$(for a in "${ACTIONS[@]}"; do
+                cur=$(action_key "$a"); [ "$cur" = none ] && cur=""
+                old=$(legacy_key "$a"); [ "$old" = none ] && old=""
+                jq -cn --arg id "$a" --arg label "$(action_label "$a")" \
+                       --arg shortcut "$cur" --arg legacy "$old" \
+                       '{id: $id, label: $label, shortcut: $shortcut, legacy: $legacy}'
+            done | jq -sc '.')
+            jq -n --arg component "$COMPONENT" \
+                  --argjson active "$(accel_component_active "$COMPONENT" | grep -qx true && echo true || echo false)" \
+                  --argjson actions "$actions" \
+                  '{component: $component, active: $active, actions: $actions}'
+            exit 0
+        fi
+
         # "active" is the whole question: a shortcut kglobalaccel has a record
         # of but no running owner for is never grabbed, and looks from the
         # outside exactly like a key that does nothing.
