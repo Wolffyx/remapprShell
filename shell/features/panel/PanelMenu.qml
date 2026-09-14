@@ -13,8 +13,8 @@ pragma ComponentBehavior: Bound
 // the CLI, which is the one implementation of each of those actions.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.domain.panel.menu
 import qs.domain.theme
 import qs.domain.windows
 import qs.ui.primitives
@@ -26,11 +26,11 @@ EdgeWindow {
     // pointer rather than in the middle of the screen.
     property real at: 0
 
-    // The system monitor, if this machine has one installed. Plasma's own
-    // first, then KDE's older one: a row that would open nothing is left off
-    // rather than shown and refusing.
-    readonly property var monitorEntry: WindowsService.entryById("org.kde.plasma.systemmonitor")
-        ?? WindowsService.entryById("org.kde.ksysguard")
+    // Which system monitor, and what else is on the menu, are settings now --
+    // PanelMenuModel answers both, and the settings page edits the same keys.
+    // A row that would open nothing is left off rather than shown and refusing.
+    readonly property var monitorEntry: PanelMenuModel.monitorEntry
+    readonly property var customEntries: PanelMenuModel.entries
 
     signal chosen
 
@@ -84,11 +84,36 @@ EdgeWindow {
             MenuRow {
                 width: parent.width
                 visible: !!menu.monitorEntry
-                text: "System monitor"
+                // Named as the application, so the row says which one it is
+                // about to open rather than what kind of thing it is.
+                text: menu.monitorEntry?.name || "System monitor"
                 glyph: "monitoring"
                 onActivated: {
                     WindowsService.launch(String(menu.monitorEntry?.id ?? ""), null);
                     menu.chosen();
+                }
+            }
+
+            MenuSeparator {
+                width: parent.width
+                visible: menu.customEntries.length > 0
+            }
+
+            // Whatever has been added in Settings -> Taskbar. These run a
+            // command line rather than reaching into the shell, so they go
+            // through PanelMenuModel rather than through `rmpr`.
+            Repeater {
+                model: menu.customEntries
+
+                MenuRow {
+                    required property var modelData
+                    width: rows.width
+                    text: modelData.label
+                    glyph: modelData.glyph
+                    onActivated: {
+                        PanelMenuModel.runEntry(modelData.command);
+                        menu.chosen();
+                    }
                 }
             }
 
@@ -105,18 +130,12 @@ EdgeWindow {
 
     // Nothing here acts on the shell directly: `rmpr` is the one
     // implementation of each of these, and a second one in QML is what drifts.
+    //
+    // The process that runs it belongs to PanelMenuModel rather than to this
+    // window -- see runCtl there for why a menu cannot own the process it
+    // starts as it closes.
     function run(args): void {
-        proc.running = false;
-        proc.command = [Branding.ctlBin].concat(args);
-        proc.running = true;
+        PanelMenuModel.runCtl(args);
         menu.chosen();
-    }
-
-    readonly property Process _proc: Process {
-        id: proc
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim().length > 0)
-                Log.warn("panel", `panel menu: ${text.trim().split("\n").pop()}`)
-        }
     }
 }

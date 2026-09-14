@@ -27,7 +27,11 @@
         "spacing": 6,
         "iconSize": 19,
         "autoHide": false,
-        "revealOnHover": true
+        "revealOnHover": true,
+        "menu": {
+            "systemMonitor": "auto",
+            "entries": []
+        }
     },
     "bar": {
         "entries": [

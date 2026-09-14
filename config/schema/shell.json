@@ -186,6 +186,18 @@
                     "default": false,
                     "label": "Hide until pointed at",
                     "description": "The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen."
+                },
+                "panel.menu.systemMonitor": {
+                    "type": "string",
+                    "default": "auto",
+                    "label": "System monitor",
+                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
+                },
+                "panel.menu.entries": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Custom menu entries",
+                    "description": "Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes."
                 }
             }
         },
