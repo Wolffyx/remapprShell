@@ -205,8 +205,9 @@ list of values.
 
 Snapshots of your KDE configuration. Nothing here is ever deleted automatically.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `snapshots.keep` | a number, 0 to 200 | `0` | How many restore points are kept when a new one is taken. 0 keeps every one of them, which is the default: deleting somebody's restore points without being asked is not a thing to start doing quietly. Two are never removed by pruning whatever this says -- any restore point you have locked, and the oldest, which is the state the machine was in before this shell was installed. |
 
 ### Drawn by
 

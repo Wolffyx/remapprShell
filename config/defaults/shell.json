@@ -161,5 +161,8 @@
         "overviewMinimised": true,
         "overviewStrip": true,
         "overviewCardWidth": 560
+    },
+    "snapshots": {
+        "keep": 0
     }
 }

@@ -623,7 +623,17 @@
             "icon": "document-save",
             "glyph": "history",
             "page": "snapshots",
-            "description": "Snapshots of your KDE configuration. Nothing here is ever deleted automatically."
+            "description": "Snapshots of your KDE configuration. Nothing here is ever deleted automatically.",
+            "keys": {
+                "snapshots.keep": {
+                    "type": "int",
+                    "default": 0,
+                    "min": 0,
+                    "max": 200,
+                    "label": "Restore points to keep",
+                    "description": "How many restore points are kept when a new one is taken. 0 keeps every one of them, which is the default: deleting somebody's restore points without being asked is not a thing to start doing quietly. Two are never removed by pruning whatever this says -- any restore point you have locked, and the oldest, which is the state the machine was in before this shell was installed."
+                }
+            }
         },
         {
             "id": "renderer",

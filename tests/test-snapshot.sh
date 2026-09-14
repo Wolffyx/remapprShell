@@ -102,8 +102,27 @@ snapshot_remove "$(basename "$extra")" >/dev/null 2>&1
 check "explicit remove works" "$([ -d "$extra" ] && echo yes || echo no)" "no"
 
 for i in 1 2 3; do snapshot_create "p$i" >/dev/null; sleep 1; done
+
+# `keep` is a floor, not a target. The oldest snapshot is the pre-install
+# state -- the only one that can put the machine back the way it was found --
+# and pruning never takes it, so the newest N plus that one is what remains.
+oldest=$(ls -1 "$(snapshot_root)" | sort | head -1)
 snapshot_prune 2 >/dev/null 2>&1
-check "prune keeps exactly N" "$(ls -1 "$(snapshot_root)" | wc -l)" "2"
+check "prune keeps the newest N"      "$(ls -1 "$(snapshot_root)" | sort | tail -2 | wc -l)" "2"
+check "and never the oldest"          "$([ -d "$(snapshot_root)/$oldest" ] && echo yes)" "yes"
+
+echo "== locking =="
+for i in 4 5 6; do snapshot_create "q$i" >/dev/null; sleep 1; done
+keepme=$(ls -1 "$(snapshot_root)" | sort | sed -n '2p')     # not the oldest
+snapshot_lock "$keepme" on >/dev/null 2>&1
+check "a locked snapshot reads as locked" \
+    "$(snapshot_is_locked "$(snapshot_root)/$keepme" && echo yes || echo no)" "yes"
+snapshot_prune 1 >/dev/null 2>&1
+check "pruning does not take a locked one" "$([ -d "$(snapshot_root)/$keepme" ] && echo yes)" "yes"
+snapshot_lock "$keepme" off >/dev/null 2>&1
+check "unlock lets it go"                  "$(snapshot_is_locked "$(snapshot_root)/$keepme" && echo yes || echo no)" "no"
+snapshot_prune 1 >/dev/null 2>&1
+check "and then pruning takes it"          "$([ -d "$(snapshot_root)/$keepme" ] && echo yes || echo no)" "no"
 check "prune refuses keep=0" "$(snapshot_prune 0 >/dev/null 2>&1 && echo ran || echo refused)" "refused"
 
 echo "== fail-closed =="

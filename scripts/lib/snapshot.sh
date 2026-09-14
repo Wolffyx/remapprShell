@@ -21,13 +21,20 @@
 # archive kept inside it destroys itself the moment it is used.
 snapshot_root() { printf '%s/%s-snapshots' "$XDG_STATE_HOME" "$SLUG"; }
 
-# Nothing in this project ever deletes a snapshot.
+# Nothing deletes a snapshot except pruning, and pruning is asked for.
 #
-# Not on restore, not on uninstall, not to prune old ones, not to reclaim
-# space. A restore point is worthless if the software that might need it is
-# also allowed to remove it, and the one time an earlier version deleted its
-# own archive it took a user's configuration with it. Snapshots are removed
-# only when the user asks, through `snapshot remove` or `snapshot prune`.
+# Not on restore, not on uninstall, not to reclaim space: a restore point is
+# worthless if the software that might need it is also free to remove it, and
+# the one time an earlier version deleted its own archive it took a user's
+# configuration with it.
+#
+# Pruning is the one exception, and it is narrow. It runs when someone runs
+# `snapshot prune`, or after taking one if `snapshots.keep` has been set --
+# which is off until it is set, because starting to delete somebody's restore
+# points without being asked is the same mistake in a politer form. Two are
+# never candidates however it is invoked: any snapshot with a `keep` marker,
+# and the oldest of all, which is the pre-install state and the only one that
+# can put the machine back the way it was found.
 #
 # This is the guard that enforces it: every delete path checks it first.
 snapshot_is_store_path() {
@@ -280,11 +287,12 @@ snapshot_list() {
     for d in "$root"/*/; do
         [ -d "$d" ] || continue
         found=1
-        printf '%-34s %-26s %s path(s)  %s\n' \
+        printf '%-34s %-26s %s path(s)  %s%s\n' \
             "$(basename "$d")" \
             "$(sed -n 's/^created=//p' "$d/meta" 2>/dev/null)" \
             "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo '?')" \
-            "$(du -sh "$d" 2>/dev/null | cut -f1)"
+            "$(du -sh "$d" 2>/dev/null | cut -f1)" \
+            "$(snapshot_is_locked "$d" && printf '  [locked]')"
     done
     [ "$found" = 1 ] || log_info "no snapshots"
 }
@@ -310,6 +318,41 @@ snapshot_remove() {
 }
 
 # Removes all but the newest N. Never runs on its own.
+# A snapshot with a `keep` marker in it is never deleted by pruning, manual or
+# automatic. `remove` still takes it, because a command naming one snapshot is
+# somebody saying which one they mean.
+snapshot_is_locked() {
+    [ -e "$1/keep" ]
+}
+
+snapshot_lock() {   # <name> <on|off>
+    local root name=$1 want=$2 dir
+    root=$(snapshot_root)
+    dir="$root/$(basename "$name")"
+    [ -d "$dir" ] || { log_error "no snapshot '$name'"; return 1; }
+    if [ "$want" = on ]; then
+        printf 'locked at %s\n' "$(date -Iseconds)" > "$dir/keep" || return 1
+        log_step "locked $(basename "$dir"): pruning will never remove it"
+    else
+        rm -f "$dir/keep" || return 1
+        log_step "unlocked $(basename "$dir")"
+    fi
+}
+
+# Oldest first, minus the ones pruning must never touch: anything locked, and
+# the oldest of all. The oldest is the pre-install state -- the one restore
+# point that can put the machine back the way it was found -- and it is worth
+# more than any number of recent ones.
+snapshot_prunable() {
+    local root d first=1
+    root=$(snapshot_root)
+    for d in $(ls -1 "$root" 2>/dev/null | sort); do
+        if [ "$first" = 1 ]; then first=0; continue; fi
+        snapshot_is_locked "$root/$d" && continue
+        printf '%s\n' "$d"
+    done
+}
+
 snapshot_prune() {
     local keep=${1:-5} root
     root=$(snapshot_root)
@@ -322,11 +365,37 @@ snapshot_prune() {
     total=$(ls -1 "$root" 2>/dev/null | wc -l)
     [ "$total" -gt "$keep" ] || { log_info "$total snapshot(s), keeping $keep: nothing to do"; return 0; }
 
-    local n
+    # `keep` means the newest N are kept, so they are taken out of the running
+    # first. Counting protected ones towards the total instead made the sums
+    # work and the behaviour wrong: with two protected and keep=2 it deleted
+    # every unprotected snapshot including the newest, which is the one anybody
+    # asking to "keep the newest 2" most wants.
+    #
+    # So: the newest N are safe, the locked are safe, the oldest is safe, and
+    # what is left is what goes. A machine can therefore end up holding more
+    # than `keep` -- that is the protection working, not the count failing.
+    local newest removed=0 n
+    newest=$(ls -1 "$root" | sort | tail -n "$keep")
+
     while IFS= read -r n; do
+        grep -qxF -- "$n" <<< "$newest" && continue
         rm -rf "$root/$n"
         log_info "  removed $n"
-    done < <(ls -1 "$root" | sort | head -n "$((total - keep))")
+        removed=$((removed + 1))
+    done < <(snapshot_prunable)
 
-    log_step "pruned $((total - keep)), kept $keep"
+    local left=$((total - removed))
+    log_step "pruned $removed, $left left"
+    [ "$left" -gt "$keep" ] && log_info "more than $keep remain: the rest are locked or the oldest"
+    return 0
+}
+
+# Called after taking one. Off unless `snapshots.keep` says otherwise, because
+# deleting restore points is not a thing to start doing to somebody quietly.
+snapshot_autoprune() {
+    local keep
+    keep=$(config_get '.snapshots.keep' 0 2>/dev/null) || keep=0
+    case "$keep" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$keep" -ge 1 ] || return 0
+    snapshot_prune "$keep"
 }
