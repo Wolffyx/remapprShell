@@ -423,11 +423,20 @@ class WindowIcons:
         """A cached PNG for this application, or None."""
         if not self._available or not app_id or not pid:
             return None
-        # Once per application, not once per update: the answer cannot change
-        # while the window lives, and xprop over every window on every KWin
-        # event would be a poor way to draw a panel.
+        # Once per application, not once per update: xprop over every window on
+        # every KWin event would be a poor way to draw a panel.
+        #
+        # What is cached is a path, not a picture, and a path can stop being
+        # true: restoring a snapshot, or clearing the state directory, takes
+        # the file out from under it. The shell was then handed a path to a
+        # file that is gone, drew nothing, and said so only in the journal --
+        # which is what "some icons stopped working" was, after a restore
+        # removed the cache directory. So a cached hit is trusted only while
+        # the file behind it is still there; otherwise it is read again.
         if app_id in self._cache:
-            return self._cache[app_id]
+            cached = self._cache[app_id]
+            if cached is None or os.path.exists(cached):
+                return cached
 
         self._cache[app_id] = None
         try:

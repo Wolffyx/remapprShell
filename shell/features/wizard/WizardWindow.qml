@@ -133,14 +133,16 @@ FloatingWindow {
 
         if (root.renderer !== "quickshell") {
             root.status = `Switching to the ${root.renderer} renderer...`;
-            rendererProc.command = [Branding.ctlBin, "renderer", "set", root.renderer, "--yes"];
-            rendererProc.running = true;
+            // Detached, and not a Process owned by this window. `_markDone`
+            // below ends with `finished()`, which the LazyLoader in shell.qml
+            // answers by destroying this window -- and a Process destroyed in
+            // the same turn it is told to start never spawns anything, quietly.
+            // The renderer the wizard was asked for was never switched to.
+            Quickshell.execDetached([Branding.ctlBin, "renderer", "set", root.renderer, "--yes"]);
         }
 
         root._markDone();
     }
-
-    readonly property Process _renderer: Process { id: rendererProc }
 
     function finish() {
         root.status = "Applying...";
