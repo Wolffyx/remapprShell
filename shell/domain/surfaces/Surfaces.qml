@@ -9,6 +9,7 @@ pragma Singleton
 // two full-screen things at once is never what was meant.
 
 import QtQuick
+import qs.core
 import Quickshell
 
 QtObject {
@@ -95,6 +96,13 @@ QtObject {
             if (root.windowSwitcher || root.overview)
                 root.heldClosedAt = Date.now();
         }
+        // Every transition, named. "It did not close" and "it closed and came
+        // straight back" look identical on screen and are different faults.
+        if (root.windowSwitcher !== (which === "windowSwitcher") || root.overview !== (which === "overview"))
+            Log.debug("surfaces", `held surface: ${which.length > 0 ? which : "none"}`
+                + ` (was ${root.windowSwitcher ? "windowSwitcher" : root.overview ? "overview" : "none"}`
+                + `, ${root.heldClosedAt > 0 ? Math.round(Date.now() - root.heldClosedAt) + "ms since the last close" : "none closed yet"})`);
+
         root.sidebar = which === "sidebar";
         root.keys = which === "keys";
         root.session = which === "session";

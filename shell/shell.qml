@@ -415,6 +415,14 @@ ShellRoot {
         target: "shell"
 
         function reload(): void { Quickshell.reload(false); }
+
+        // Debug logging, without a restart. The faults worth logging are the
+        // ones that happen on a real keyboard under real load, and restarting
+        // to enable logging is restarting away the state that caused them.
+        function debug(on: string): string {
+            Log.debugEnabled = on !== "false" && on !== "0" && on !== "off";
+            return Log.debugEnabled ? "debug logging on" : "debug logging off";
+        }
     }
 
     // The sidebar, the key sheet and the session screen, from a key: `rmpr
