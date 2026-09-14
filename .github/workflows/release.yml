@@ -1,0 +1,74 @@
+# Publishes a release when a `v*` tag is pushed.
+#
+# The tag is the trigger, not the decision: a release is cut by bumping
+# VERSION on main and tagging that commit. This workflow refuses a tag whose
+# name disagrees with the VERSION file it points at, because the version a
+# CLI reports and the version on the forge being two different numbers is
+# the kind of thing nobody notices until it matters.
+#
+# Delivery stays git. `scripts/update.sh` installs by following a branch
+# (`--channel`, default main), so a release is main moving plus a tag to name
+# where it moved to. Nothing here builds an artefact the updater would ignore.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# Needed to create the release; nothing else is written.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Sy --noconfirm --needed git jq make qt6-declarative xorg-server-xvfb tar kconfig github-cli
+
+      - uses: actions/checkout@v4
+        with:
+          # The whole history: release notes are generated from the commits
+          # since the previous tag, and a shallow clone has neither.
+          fetch-depth: 0
+
+      # git refuses a repository it does not think belongs to the user running
+      # it, which inside the container is every checkout. Set before the lints
+      # rather than after: lint-slug falls back from `git grep` to `grep -r`
+      # when git refuses, so without this it would quietly do the slow thing.
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # A tag that disagrees with VERSION is a mistake every time, and it is
+      # cheaper to refuse it than to delete a published release.
+      - name: The tag and VERSION must agree
+        run: |
+          tag=${GITHUB_REF_NAME#v}
+          file=$(cat VERSION)
+          if [ "$tag" != "$file" ]; then
+            echo "tag $GITHUB_REF_NAME says $tag, VERSION says $file" >&2
+            exit 1
+          fi
+          echo "releasing $file"
+
+      - name: Generate branding
+        run: ./scripts/gen-branding.sh
+
+      # The same gate as CI. A tag can be pushed at any commit, including one
+      # that never went through a pull request, so this does not assume CI has
+      # already had a look at it.
+      - name: Lint
+        run: make lint
+
+      - name: Tests
+        run: xvfb-run -a ./scripts/test.sh
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag

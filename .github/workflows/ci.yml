@@ -1,8 +1,15 @@
+# Every check `make lint` runs, plus the test suite.
+#
+# The steps are named one per lint rather than a single `make lint`, so a
+# red run says which check failed from the job list alone, without opening
+# the log. They must stay in step with the `lint` target in the Makefile:
+# a lint that runs locally and not here is one that fails on someone else's
+# machine first.
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:
@@ -28,6 +35,21 @@ jobs:
 
       - name: QML lint
         run: ./scripts/lint-qml.sh
+
+      # Fails on widget mistakes qmllint cannot see.
+      - name: Widget lint
+        run: ./scripts/lint-widgets.sh
+
+      # Fails if a QML test imports a module that needs a running shell --
+      # which makes the suite pass here and fail for anyone running it.
+      - name: Test import lint
+        run: ./scripts/lint-tests.sh
+
+      # Fails if docs/config.md is not what the schema would generate. The
+      # reference is committed because people read it on the forge, where
+      # nothing runs, so a stale one is trusted and wrong.
+      - name: Docs lint
+        run: ./scripts/lint-docs.sh
 
       - name: Tests
         run: xvfb-run -a ./scripts/test.sh
