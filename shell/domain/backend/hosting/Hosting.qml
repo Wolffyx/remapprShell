@@ -60,6 +60,52 @@ QtObject {
     // (`enabled`) is about Plasma's applets, and does not enter into it.
     //
     // Returns { serve, reason }.
+    // Which windows belong to the applets this shell started, and so should be
+    // closed on sight.
+    //
+    // `plasmawindowed --statusnotifier` keeps an applet alive after its window
+    // is closed -- that is the flag's whole purpose -- but it opens the window
+    // first. On every start of the shell that put the clipboard history and
+    // the device notifier on screen as though the user had asked for them.
+    //
+    // Identifying them is harder than it looks, and two obvious answers are
+    // wrong:
+    //
+    // - **The pid is not ours to know.** plasmawindowed is a unique
+    //   application: the second invocation hands its applet to the first
+    //   process and exits, so the pid of the command we ran belongs to
+    //   something already gone, while one surviving process owns a window per
+    //   applet.
+    // - **The title is the applet's name in the user's language**, which is a
+    //   translation catalogue away from anything this shell can read.
+    //
+    // So: the application id, which every plasmawindowed window shares, while
+    // we are *expecting* windows -- for a few seconds after hosting, and no
+    // more of them than the applets we started. The same programme opened
+    // deliberately from a popout's "..." button comes later than that, and
+    // even if it did not, the cost is a window closing and the applet staying
+    // in the tray.
+    function windowsToClose(s) {
+        const closed = s.closed ?? ({});
+        const appId = s.appId ?? "";
+        let remaining = s.remaining ?? 0;
+        if (!s.armed || remaining <= 0 || appId.length === 0)
+            return [];
+
+        const out = [];
+        for (const window of s.windows ?? []) {
+            if (remaining <= 0)
+                break;
+            if (!window || !window.uuid || closed[window.uuid])
+                continue;
+            if (String(window.appId ?? "") !== appId)
+                continue;
+            out.push(window.uuid);
+            remaining -= 1;
+        }
+        return out;
+    }
+
     function serveNotifications(s) {
         if (s?.notificationServer !== "shell")
             return { serve: false, reason: "Plasma draws them (notifications.server)" };

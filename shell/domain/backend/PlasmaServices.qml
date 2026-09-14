@@ -34,6 +34,7 @@ import qs.core
 import qs.platform.kde
 import qs.domain.config
 import qs.domain.backend.hosting
+import qs.domain.windows
 
 QtObject {
     id: root
@@ -147,10 +148,75 @@ QtObject {
             const s = root.services.find(x => x.applet === applet);
             root.started = Object.assign({}, root.started, { [applet]: true });
             Log.info("services", `hosting Plasma's ${s.what} (${applet}): nothing else provides it under this renderer`);
-            Quickshell.execDetached(["plasmawindowed", "--statusnotifier", applet]);
+            root._host(applet);
         }
         if (root.decision.start.length === 0)
             Log.debug("services", `not hosting: ${root.decision.reason}`);
+    }
+
+    // ---- hosting an applet without putting it on screen ------------------
+    //
+    // `plasmawindowed --statusnotifier` keeps the applet alive once its window
+    // is closed, which is what we want -- but it opens the window first, and
+    // on every start of the shell the clipboard history and the device
+    // notifier appeared as though the user had opened them.
+    //
+    // So each window is closed as it is seen. Which windows are ours is the
+    // awkward part, and Hosting.windowsToClose carries the reasoning: it comes
+    // down to the host application's own windows, for a few seconds after
+    // hosting, and no more of them than the applets we started.
+    readonly property string hostApp: "org.kde.plasmawindowed"
+
+    // How long after hosting a window is still expected. Generous: a cold
+    // start of an applet on a busy machine is seconds, and the cost of being
+    // generous is a window the user opened in that moment closing again.
+    readonly property int windowGrace: 20000
+
+    property real _expectingUntil: 0
+    property int _expecting: 0
+    property var _closedWindows: ({})
+
+    readonly property bool _expectingWindows: root._expecting > 0
+        && Date.now() < root._expectingUntil
+
+    function _host(applet) {
+        Quickshell.execDetached(["plasmawindowed", "--statusnotifier", applet]);
+        root._expecting += 1;
+        root._expectingUntil = Date.now() + root.windowGrace;
+        graceOver.restart();
+    }
+
+    // Stops expecting, so a window opened later is the user's own. A timer
+    // rather than only the timestamp above, because the window list can sit
+    // unchanged for minutes and nothing would re-evaluate it.
+    readonly property Timer _graceOver: Timer {
+        id: graceOver
+        interval: root.windowGrace
+        onTriggered: root._expecting = 0
+    }
+
+    // The window list is followed rather than polled: the applet's window
+    // appears when it appears, and on a slow start that can be seconds.
+    readonly property Connections _windows: Connections {
+        target: WindowsService
+
+        function onWindowsChanged(): void {
+            if (!root._expectingWindows)
+                return;
+            const closing = Hosting.windowsToClose({
+                windows: WindowsService.windows,
+                appId: root.hostApp,
+                armed: true,
+                remaining: root._expecting,
+                closed: root._closedWindows
+            });
+            for (const uuid of closing) {
+                root._closedWindows = Object.assign({}, root._closedWindows, { [uuid]: true });
+                root._expecting = Math.max(0, root._expecting - 1);
+                Log.info("services", "closing a hosted applet's window; the applet stays in the tray");
+                WindowsService.close(uuid);
+            }
+        }
     }
 
     onEnabledChanged: root.reconcile()

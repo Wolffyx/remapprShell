@@ -64,6 +64,60 @@ TestCase {
         compare(Hosting.decide(state({ shellPackage: "" })).start, []);
     }
 
+    // The window of an applet we started for its service is closed on sight;
+    // the same programme opened by the user is not. Told apart by pid, since
+    // every plasmawindowed window shares one application id and the title is
+    // in the user's language.
+    readonly property string hostedApp: "org.kde.plasmawindowed"
+
+    function hostedWindows() {
+        return [
+            { uuid: "a", appId: hostedApp },
+            { uuid: "b", appId: hostedApp },
+            { uuid: "c", appId: "org.kde.dolphin" }
+        ];
+    }
+
+    // Only the host application's windows, only while windows are expected,
+    // and never more than the applets that were started.
+    function test_the_hosted_applets_windows_are_closed() {
+        const out = Hosting.windowsToClose({
+            windows: hostedWindows(), appId: hostedApp, armed: true, remaining: 2
+        });
+        compare(out.length, 2);
+        compare(out[0], "a");
+        compare(out[1], "b");
+    }
+
+    function test_no_more_than_were_started() {
+        const out = Hosting.windowsToClose({
+            windows: hostedWindows(), appId: hostedApp, armed: true, remaining: 1
+        });
+        compare(out.length, 1);
+        compare(out[0], "a");
+    }
+
+    function test_a_window_already_closed_is_not_closed_again() {
+        const out = Hosting.windowsToClose({
+            windows: hostedWindows(), appId: hostedApp, armed: true, remaining: 2,
+            closed: { a: true }
+        });
+        compare(out.length, 1);
+        compare(out[0], "b");
+    }
+
+    // Unarmed is the ordinary case: a window this shell did not cause, which
+    // includes the one a popout's "..." button opens.
+    function test_nothing_closes_while_nothing_is_expected() {
+        compare(Hosting.windowsToClose({
+            windows: hostedWindows(), appId: hostedApp, armed: false, remaining: 2
+        }).length, 0);
+        compare(Hosting.windowsToClose({
+            windows: hostedWindows(), appId: hostedApp, armed: true, remaining: 0
+        }).length, 0);
+        compare(Hosting.windowsToClose({}).length, 0);
+    }
+
     function test_an_owned_name_is_provided() {
         verify(Hosting.provided({ applet: "a", name: "org.x" }, { "org.x": true }, []));
         verify(!Hosting.provided({ applet: "a", name: "org.x" }, { "org.x": false }, []));
