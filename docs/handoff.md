@@ -107,16 +107,106 @@ Everything below was read off the running system rather than remembered.
 
 ### Where the last session left off, and what to pick up
 
-**Read this first, 2026-09-14 (evening).** Work goes on `dev` now, not `main`
--- the two are release channels, and docs/releasing.md is the whole of it. That
-session fixed the panel's right-click menu (every row ran nothing: a Process
-owned by a window a LazyLoader destroys in the same turn never spawns, and says
-nothing when it does not), made that menu configurable in Settings → Taskbar,
-fixed the switcher's key release calling a function that does not exist, and
-got CI green for the first time in the project's life. Three things it could
-not check itself, because no session here can produce a click: the panel menu's
-rows acting, the two menus no longer opening side by side, and Meta+Tab
-committing on release.
+**Read this first -- 2026-09-14 evening into 2026-09-15, 25 commits on `dev`.**
+
+Work goes on `dev`, not `main`: the two are release channels and
+docs/releasing.md is the whole of it. `main` moves on a release. Nothing is
+half-written; `make lint` is clean (seven lints now) and `make test` is 376 QML
+cases and 75 shell cases green.
+
+**The one thing to understand before touching anything.** A configuration this
+user had built over days was destroyed during the session, and it took an hour
+to find out why. The cause was a chain, and every link is now fixed, but the
+shape of it is worth carrying: restoring a snapshot old enough that its
+manifest predates the configuration directory made the restore read that
+absence as "we added this since" and delete `~/.config/<slug>` entire, every
+profile in it; the state directory then went back to the snapshot's, which has
+no `wizard-done`; the shell therefore decided it was a first run and showed the
+wizard; and the wizard's finish wrote a fresh profile over what was left. One
+click, from the settings window, no confirmation. `rmpr doctor` and the journal
+told the story only because the kconfig ledger's mtime matched a snapshot's
+name exactly.
+
+What came out of that: the restore never removes the configuration directory
+now; `preset apply` saves what it replaces as a *profile* (the old backup lived
+in the state directory, which is what a restore rolls back -- the safety net
+shared a fate with the thing it protected); `state.json` is written atomically,
+because a redirect truncates and the shell reads a parse error as "stay on
+`default`", which looks exactly like a reset; and restoring from the settings
+window arms on the first click and goes on the second.
+
+**Four faults of one shape.** A `Process` owned by a window a `LazyLoader`
+destroys in the same turn never spawns, and reports nothing at all: no stderr,
+no exit code, no error. It cost the panel menu's rows, the wizard's renderer
+switch, and hours. If something "does nothing and says nothing", look there
+first.
+
+**Three faults of another shape**, all found by reading qmllint output rather
+than trusting `make lint`: an undefined singleton (`WindowEvents` in both
+switchers, `Log` in Surfaces.qml) is reported as `Unqualified access`, and
+lint-qml.sh prints warnings and then logs "qml lint clean" regardless. Making
+`[unqualified]` fatal for `shell/` is still open, and wants a cleanup pass
+first -- there are five known false positives in Panel.qml (outer-scope ids in
+a LazyLoader, no `ComponentBehavior: Bound`) and one in HeldModifiers.qml
+(qmllint cannot resolve the compiled module).
+
+**Alt+Tab and Meta+Tab are KWin's now, by the user's choice**, and the reason
+generalises: this shell is not the compositor, so a held key's press and its
+release each cross kglobalaccel, the session daemon, the CLI and the IPC, as
+two detached processes that race. Both switchers got a real fix (a second QML
+module, `ShellInput`, exposing `queryKeyboardModifiers`, so a release arriving
+while the surface is up can be told from a Tab), and the choice now warns what
+it costs. **The structural fix is named and unbuilt**: caelestia binds
+shortcuts in-process, and this project already has the idiom for it --
+`shell/core/BusLine.qml`, a `busctl monitor` process the window list already
+uses. Pointing that at kglobalaccel would delete the whole class.
+
+**The defaults now ship the setup that is in use**, and two files that both
+declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
+any disagreement, in `make lint` and in CI.
+
+**Open, in the order they are worth doing:**
+
+1. **The wizard replaces the active profile with no backup**, and treats a
+   profile full of real settings as a first run whenever `wizard-done` is
+   missing. It is the last link of the chain above and the only one unfixed.
+2. **Shortcuts in-process**, per BusLine above. Ends the switcher race class
+   rather than patching its instances, and would make this shell's own
+   switcher worth choosing again.
+3. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
+   none)` is hardcoded and caelestia is detected by a hardcoded unit name.
+   Discovery is easy -- every Quickshell config is a directory in
+   `~/.config/quickshell/` -- but `renderer set` must then start and stop an
+   arbitrary discovered shell, which is the substantial half.
+4. **caelestia is still running beside this shell** and provides two things
+   this shell does not: it holds the notification service (ours waits and takes
+   over when released -- `doctor` says so), and the sidebar's edge drag is
+   entirely its own. This shell has no screen-edge trigger at all: KWin's edges
+   run KWin's own actions only, so ours needs the KWin script in `kwin/`
+   extended to register an edge that calls our IPC. The user was asked whether
+   to take those over or to acknowledge caelestia as the provider, and **has
+   not answered** -- that decision shapes what install-time "apply everywhere"
+   should do.
+5. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
+   and right zones' `implicitWidth` depend on each other through the middle.
+   A warning only; the panel lays out. Fixing it is a zone-budget redesign.
+6. Snapshot names are a timestamp plus a label and the second line no longer
+   repeats the timestamp, but the list is still cramped on a narrow window.
+
+**What is live on the user's machine**: profile `recovered-appearance` (their
+settings, recovered from the 13:02 snapshot, with `launcher.provider` put back
+to `builtin` -- `auto` chose kickoff, which reports itself available whenever
+Plasma is running and opens nothing when plasmashell runs another shell's
+package). Alt+Tab is KWin's drawing `remappr-shell` (the Meridian row layout,
+which was never installed until this session). Meta+S opens the sidebar.
+`snapshots.keep` is 0, so nothing is pruned until they set it.
+
+**What no session here can check**: a click or a keystroke. There is no
+key-injection tool on this machine. Screenshots work (`spectacle -b -f -n -o`),
+but a surface holding exclusive keyboard focus may not survive being
+photographed. Racing the two CLI commands the daemon itself spawns *is* a
+faithful reproduction of a fast Alt+Tab, and is how both switcher fixes were
+verified -- do that rather than arguing from the code.
 
 Otherwise nothing is half-written: `make lint` clean, `make test` 376
 QML cases and every shell suite green. The shell is **running** and the user
