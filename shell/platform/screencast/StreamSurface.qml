@@ -11,6 +11,7 @@
 // That is why this file is small: everything that can be missing is in it.
 
 import QtQuick
+import qs.core
 import org.kde.pipewire as PipeWire
 import KWinScreencast
 
@@ -36,6 +37,12 @@ Item {
         id: stream
         windowId: root.windowId
         active: root.active
+
+        // Which window got a node, and which did not. Debug rather than info:
+        // a shell with a preview open asks for one of these a second.
+        onNodeIdChanged: Log.debug("screencast", `${root.windowId}: node ${stream.nodeId}`)
+        onErrorChanged: if (stream.error)
+            Log.warn("screencast", `${root.windowId}: ${stream.error}`)
     }
 
     PipeWire.PipeWireSourceItem {
