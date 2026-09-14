@@ -75,8 +75,15 @@ KWin.TabBoxSwitcher {
             // the row scrolls rather than running off both edges.
             readonly property int maxWidth: tabBox.screenGeometry.width * 0.86
 
+            // `contentWidth` is the row as laid out -- the cards plus their
+            // spacing. It was `implicitContentWidth`, which no ListView has:
+            // the sum came out NaN, the dialog had no width to be given, and
+            // KWin's switcher drew nothing at all on every machine this
+            // package was selected on. qmllint said so from the start
+            // ("Did you mean implicitWidth?") and it was read as noise about
+            // KWin's own unresolvable types.
             implicitWidth: Math.min(content.maxWidth,
-                                    cards.implicitContentWidth + 2 * tabBox.pad)
+                                    cards.contentWidth + 2 * tabBox.pad)
             implicitHeight: header.height + cards.height + footer.height + 3 * tabBox.pad / 2
 
             // ---- header: what this is, and that Alt is still held ----------
