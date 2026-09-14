@@ -203,7 +203,7 @@ list of values.
 
 ### Restore points
 
-Snapshots of your KDE configuration. Nothing here is ever deleted automatically.
+Snapshots of your KDE configuration. Nothing is removed when reverting or uninstalling. They are removed here, or by pruning if you have set how many to keep -- and pruning never takes one you have locked, nor the oldest, which is the state the machine was in before this shell was installed.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
