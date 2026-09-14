@@ -297,6 +297,9 @@ Item {
             if (popout.wanted) {
                 popout.wantedAt = Date.now();
                 enter.restart();
+                // Any popout, not only a modal one: a hover preview beside an
+                // open panel menu is still two cards on screen at once.
+                PanelModel.closeOpenMenu();
             }
             if (!root.bar)
                 return;

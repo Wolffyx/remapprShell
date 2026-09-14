@@ -213,7 +213,23 @@ PanelWindow {
 
     // Whether the panel's own menu is up. Held here rather than in the menu so
     // a click anywhere else can close it, the way a popout is closed.
+    //
+    // Told to PanelModel as it changes, because a popout and this menu are the
+    // same kind of thing to everyone looking at the screen, and only one of
+    // them should be up. See PanelModel.menuOpened.
     property bool menuOpen: false
+
+    onMenuOpenChanged: {
+        if (root.menuOpen)
+            PanelModel.menuOpened(root);
+        else
+            PanelModel.menuClosed(root);
+    }
+
+    // Asked for by PanelModel when something else wants the screen.
+    function closeMenu(): void {
+        root.menuOpen = false;
+    }
 
     // Where along the panel the click that opened it was. Held here, not on
     // the menu: an id inside a LazyLoader's component cannot be reached from
