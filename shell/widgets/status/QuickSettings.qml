@@ -1033,11 +1033,11 @@ Item {
                         width: parent.width
                         spacing: 2
 
-                        // powerdevil's own name for the display ("display0")
-                        // is an id, not a name anybody chose. Its label is the
-                        // monitor -- "Acer Technologies XV322QU P" -- which is
-                        // what the brightness widget has always shown and what
-                        // this page said instead of it.
+                        // powerdevil's own name for a display ("display0")
+                        // is an id, not a name anybody chose; its label is the
+                        // monitor's own, as the manufacturer wrote it. The
+                        // brightness widget has always shown the label and
+                        // this page showed the id instead.
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
