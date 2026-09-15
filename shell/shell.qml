@@ -261,6 +261,21 @@ ShellRoot {
             return name;
         }
 
+        // The panel's own right-click menu, as if the pointer had opened it on
+        // empty panel. `at` is how far along the panel the click was; -1, the
+        // default, centres it. The only way to open this without a mouse, and
+        // the only way a session with no pointer can see whether it opens at
+        // all -- which is how "a right click on the bottom of the taskbar does
+        // nothing" was told apart from "it opens the menu I did not expect".
+        function menu(screen: string, at: string): string {
+            const name = screen || (Quickshell.screens[0]?.name ?? "");
+            const along = at ? parseFloat(at) : -1;
+            PanelModel.menuRequested(name, isNaN(along) ? -1 : along);
+            return name;
+        }
+
+        function closeMenu(): void { PanelModel.closeOpenMenu(); }
+
         function screens(): string { return Quickshell.screens.map(s => s.name).join("\n"); }
 
         // Where each shown widget is on that screen's panel, in screen

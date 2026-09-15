@@ -33,6 +33,12 @@ QtObject {
     // rested on it.
     signal tooltipRequested(string widgetId, string screen)
 
+    // The panel's own right-click menu, on `screen`, `at` pixels along the
+    // panel -- the one thing on the panel a pointer opens that no key and no
+    // command could, and therefore the one thing no session without a hand on
+    // the mouse could check. It was built, shipped, and never opened once.
+    signal menuRequested(string screen, real at)
+
     // Every slot on every panel, so `panel layout` can say where each one
     // actually is -- the question a screenshot answers badly and a person
     // without a pointer cannot answer at all. Slots add and remove

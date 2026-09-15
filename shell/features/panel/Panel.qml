@@ -231,6 +231,20 @@ PanelWindow {
         root.menuOpen = false;
     }
 
+    // The same menu the right click opens, asked for by name -- see
+    // PanelModel.menuRequested. Centred on the panel when no position is
+    // given, since a command has no pointer to say where the click was.
+    Connections {
+        target: PanelModel
+        function onMenuRequested(screen: string, at: real): void {
+            if (screen !== root.screenName)
+                return;
+            const along = root.horizontal ? root.width : root.height;
+            root.menuAt = at >= 0 ? at : along / 2;
+            root.menuOpen = true;
+        }
+    }
+
     // Where along the panel the click that opened it was. Held here, not on
     // the menu: an id inside a LazyLoader's component cannot be reached from
     // outside it.
