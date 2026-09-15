@@ -41,13 +41,21 @@ shot() {
     echo "    $OUT/$name.png"
 }
 
-# What renders honestly with no compositor behind it: a page, a card, a list.
+# The panel, in the three styles it draws: a strip along the edge, a floating
+# bar, islands. panel.qml renders two thinner ones under those, which say
+# nothing a reader of the README needs, so the picture stops after three.
 #
-# Not here, and deliberately: the panel itself and the taskbar's window
-# previews. Both are mostly the things they are showing -- open windows, live
-# thumbnails, a real tray -- and offscreen there are none, so the picture is an
-# empty bar and a row of placeholder squares. Those two are taken on a real
-# screen and cropped, and are noted as such where they are used.
+# The one picture not here is the taskbar's window previews. Its cards are
+# pictures of windows, a picture of a window needs a compositor, and offscreen
+# there is none -- so it renders as a row of application icons, which is the
+# honest fallback and the wrong advertisement. That one is taken on a real
+# screen, against windows opened for the purpose, and cropped to the card.
+if wanted panel; then
+    echo "==> panel"
+    PREVIEW_DEMO=1 bash "$HERE/preview.sh" "$HERE/panel.qml" "$OUT/panel.png" 1400 320 light >/dev/null
+    magick "$OUT/panel.png" -crop 1400x290+0+10 +repage "$OUT/panel.png"
+    echo "    $OUT/panel.png"
+fi
 
 PREVIEW_WIDGET=status \
     shot quick-settings "$HERE/popout.qml" "$OUT/quick-settings.png" 560 800 light 3000

@@ -38,11 +38,13 @@ default.
 
 ## What it looks like
 
-The cards below are rendered from the components themselves, offscreen, by
+These are rendered from the components themselves, offscreen, by
 `dev/preview/readme-shots.sh` — so a picture here cannot show something the shell does
-not do, and re-taking them is one command. The two that are mostly the things they are
-showing — the panel at the top, and the window previews at the bottom — are real
-screenshots, because offscreen there are no windows to draw.
+not do, and re-taking them after a change is one command. None of them is a photograph
+of anybody's desktop: the account, the network, the windows, the tray and the
+configuration are all invented, which is what `PREVIEW_DEMO=1` is for.
+
+The one exception is the last, and it says why underneath it.
 
 | Quick settings | The notification centre |
 | --- | --- |
@@ -62,6 +64,8 @@ reference and the shell cannot disagree about what a setting is.
 ![Window previews](docs/images/window-previews.png)
 
 An application with several windows shows a picture of each, and each one is a target.
+This is the one real screenshot here, because a picture of a window needs a compositor
+and there is none offscreen — the windows in it were opened for the photograph.
 
 ## Requirements
 
@@ -92,9 +96,13 @@ dev/preview/readme-shots.sh          # the pictures above, again
 compositor, no display, nothing reaching the real session. It is how a page is looked at
 while it is being built, and it is where the README's pictures come from.
 
-`PREVIEW_DEMO=1` gives the shot a plausible stranger -- an account name, a network, a
-sound card -- because a published screenshot should not carry whoever took it, and
-because the pictures should be re-takeable on a machine that is not this one.
+`PREVIEW_DEMO=1` gives the shot a plausible stranger: an account and a host, a network,
+a sound card, five invented windows of four applications, a tray of four generic icons,
+and an empty configuration directory so the picture shows the shipped defaults rather
+than whatever this machine has pinned and rearranged. A published screenshot should not
+carry whoever took it, and the pictures should be re-takeable on a machine that is not
+this one. Every substitution is checked, because a silent miss would leave a picture
+that looks right and still has a real name in it.
 
 ### Command line
 

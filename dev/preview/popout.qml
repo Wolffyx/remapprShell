@@ -70,6 +70,13 @@ Rectangle {
             if (Quickshell.env("PREVIEW_MENU")) {
                 menuTimer.start();
             }
+            // The taskbar's hover card is about a button, and which one is
+            // normally answered by the pointer. PREVIEW_GROUP picks the first
+            // button with more than one window, which is the case the card
+            // exists for.
+            if (Quickshell.env("PREVIEW_GROUP")) {
+                groupTimer.start();
+            }
         }
     }
 
@@ -86,6 +93,21 @@ Rectangle {
                 return;
             }
             w.item.openMenu(items[0]);
+        }
+    }
+
+    Timer {
+        id: groupTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            const items = w.item?.items ?? [];
+            const group = items.find(i => i.windows.length > 1) ?? items[0] ?? null;
+            if (!group) {
+                console.warn("preview: no taskbar button to preview");
+                return;
+            }
+            w.item.previewItem = group;
         }
     }
 
