@@ -167,18 +167,15 @@ any disagreement, in `make lint` and in CI.
 
 **Open, in the order they are worth doing:**
 
-1. **The wizard replaces the active profile with no backup**, and treats a
-   profile full of real settings as a first run whenever `wizard-done` is
-   missing. It is the last link of the chain above and the only one unfixed.
-2. **Shortcuts in-process**, per BusLine above. Ends the switcher race class
+1. **Shortcuts in-process**, per BusLine above. Ends the switcher race class
    rather than patching its instances, and would make this shell's own
    switcher worth choosing again.
-3. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
+2. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
    none)` is hardcoded and caelestia is detected by a hardcoded unit name.
    Discovery is easy -- every Quickshell config is a directory in
    `~/.config/quickshell/` -- but `renderer set` must then start and stop an
    arbitrary discovered shell, which is the substantial half.
-4. **caelestia is still running beside this shell** and provides two things
+3. **caelestia is still running beside this shell** and provides two things
    this shell does not: it holds the notification service (ours waits and takes
    over when released -- `doctor` says so), and the sidebar's edge drag is
    entirely its own. This shell has no screen-edge trigger at all: KWin's edges
@@ -187,11 +184,45 @@ any disagreement, in `make lint` and in CI.
    to take those over or to acknowledge caelestia as the provider, and **has
    not answered** -- that decision shapes what install-time "apply everywhere"
    should do.
-5. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
+4. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
    and right zones' `implicitWidth` depend on each other through the middle.
    A warning only; the panel lays out. Fixing it is a zone-budget redesign.
-6. Snapshot names are a timestamp plus a label and the second line no longer
+5. Snapshot names are a timestamp plus a label and the second line no longer
    repeats the timestamp, but the list is still cramped on a narrow window.
+
+### The session of 2026-09-15, afternoon
+
+**The chain that destroyed a configuration on 2026-09-14 has no links left.**
+Item 1 is done.
+
+"The wizard has never run here" was one question with one answer: a marker
+file in the state directory. The state directory is what a restore point
+rolls back, so the marker went missing on a machine configured over days,
+the shell read its absence as a first run, and the wizard's Finish wrote a
+fresh profile over what was left.
+
+It is two questions now -- `shell/domain/config/FirstRun.qml`. The marker
+says whether the wizard has finished here; `ConfigStore.configured` says
+whether anybody has ever set anything, which is any key in the profile other
+than the `schemaVersion` the shell writes itself. Only a machine where both
+say no is a first run. A configured machine with no marker gets the marker
+written back, quietly. Both directions were tried on this machine: taking
+the marker away wrote it back and showed nothing; forcing the configuration
+check off brought the wizard up, which is the fresh-install path.
+
+The reverse is deliberately not symmetric. A marker with an empty profile is
+ordinary -- somebody skipped the wizard -- and showing it again would make
+the skip button a lie.
+
+**And Finish keeps what it replaces.** `rmpr wizard` re-runs this on a
+machine set up months ago, so the last step now says what the button is
+about to do, and the profile is copied aside first. The routine is
+`preset apply`'s, moved to `scripts/lib/profiles.sh` and exposed as
+`rmpr profile keep <label>`, so there is one implementation rather than one
+and a missing one. Keeping is skipped when there is nothing to keep, and
+"nothing" means what the shell means by it; a profile that does not parse is
+kept anyway, being the one somebody most wants back. `tests/test-profiles.sh`
+pins all of it, and found two faults in the old code doing so.
 
 ### The session of 2026-09-15, morning
 
