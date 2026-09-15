@@ -174,6 +174,9 @@ BarWidget {
     property var menuItem: null
 
     wantsHover: true
+    // A right click opens the button's menu (TaskMenu), so the panel's own
+    // menu stays out of the way here.
+    wantsRightClick: true
     popoutClosesOnOutsideClick: root.popoutMode === "menu"
 
     // How long a button flashes once its window asks for attention, before

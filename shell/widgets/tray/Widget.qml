@@ -92,6 +92,9 @@ BarWidget {
     tooltipCentre: root.hoveredIndex < 0 ? -1 : root.hoveredIndex * root.stride + root.cell / 2
 
     wantsHover: true
+    // A right click opens the item's own menu, which is the whole of what a
+    // tray icon offers.
+    wantsRightClick: true
     wantsWheel: true
 
     implicitWidth: Math.max(root.cell, row.implicitWidth)
