@@ -578,6 +578,21 @@
             }
         },
         {
+            "id": "sound",
+            "label": "Sound",
+            "icon": "audio-volume-high",
+            "glyph": "volume_up",
+            "description": "What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.",
+            "keys": {
+                "audio.raiseMaxVolume": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Raise maximum volume",
+                    "description": "Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch."
+                }
+            }
+        },
+        {
             "id": "osd",
             "label": "On-screen display",
             "icon": "audio-volume-high",

@@ -113,6 +113,9 @@
         "hints": true,
         "pinned": []
     },
+    "audio": {
+        "raiseMaxVolume": false
+    },
     "osd": {
         "enabled": false,
         "timeout": 1800

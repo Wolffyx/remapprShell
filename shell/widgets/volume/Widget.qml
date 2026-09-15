@@ -20,7 +20,12 @@ BarWidget {
     id: root
 
     readonly property int step: root.widgetConfig?.step ?? 5
-    readonly property real maxVolume: (root.widgetConfig?.maxVolume ?? 100) / 100
+    // The ceiling this widget scrolls and slides to. Zero follows the shell's
+    // own -- Settings -> Sound, "Raise maximum volume" -- which is what every
+    // other slider reads; a widget that kept a second answer to the same
+    // question is how two controls come to stop at different numbers.
+    readonly property int ownMax: root.widgetConfig?.maxVolume ?? 0
+    readonly property real maxVolume: root.ownMax > 0 ? root.ownMax / 100 : AudioStatus.maxVolume
     readonly property bool showMicrophone: root.widgetConfig?.showMicrophone ?? true
 
     wantsWheel: true
@@ -128,6 +133,7 @@ BarWidget {
                     width: parent.width
                     title: AudioStatus.nameOf(AudioStatus.source)
                     level: AudioStatus.micVolume
+                    ceiling: root.maxVolume
                     iconName: StatusIcons.micIcon(AudioStatus.micVolume, AudioStatus.micMuted)
                     onSetLevel: value => AudioStatus.setMicVolume(value)
                     onToggleMute: AudioStatus.toggleMicMute()
