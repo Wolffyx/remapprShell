@@ -152,10 +152,9 @@ ShellRoot {
         NotificationPopups {}
     }
 
-    // Shown once, on a machine that has never run it. The marker lives in the
-    // state directory rather than in the profile: a profile with no overrides
-    // in it is an ordinary thing to have, so "the config is empty" cannot be
-    // the signal for "this person has never seen this".
+    // Shown once, on a machine that has never been set up. Which machines
+    // those are is FirstRun's question, and it is a harder one than it looks
+    // -- see the note at the top of that file for the day it was got wrong.
     LazyLoader {
         id: wizard
         loading: false
@@ -167,15 +166,11 @@ ShellRoot {
         }
     }
 
-    FileView {
-        path: Paths.wizardDoneFile
-        printErrors: false
-
-        onLoadFailed: err => {
-            if (err === FileViewError.FileNotFound) {
-                Log.info("wizard", "first run; showing the wizard");
+    Connections {
+        target: FirstRun
+        function onWantedChanged(): void {
+            if (FirstRun.wanted)
                 wizard.activeAsync = true;
-            }
         }
     }
 

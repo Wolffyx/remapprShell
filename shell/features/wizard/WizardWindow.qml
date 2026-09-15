@@ -15,12 +15,18 @@ pragma ComponentBehavior: Bound
 //     configuration, not a config write, so it runs the same command the CLI
 //     does -- restore point, verification and rollback included -- and says so
 //     on screen before it does.
+//   * Finish REPLACES what is in the profile, and `rmpr wizard` runs this on a
+//     machine that has been configured for months. So whatever is there is
+//     kept first, as a profile that can be switched back to -- by the same
+//     call `preset apply` makes, for the same reason. Once, not twice: a
+//     preset keeps it itself, under a name that says which preset displaced
+//     it, and two copies of one configuration under two names is not twice as
+//     safe, it is a profile list nobody can read.
 
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
-import qs.platform.system
 import qs.domain.config
 import qs.domain.theme
 import qs.ui.primitives
@@ -66,6 +72,10 @@ FloatingWindow {
 
     property var presets: []
     property string status: ""
+
+    // The profile the old configuration was kept as, once it has been. Empty
+    // on a real first run, where there was nothing to keep.
+    property string kept: ""
 
     title: `Welcome to ${Branding.displayName}`
     implicitWidth: 640
@@ -115,10 +125,24 @@ FloatingWindow {
 
     readonly property Process _apply: Process {
         id: applyProc
-        onRunningChanged: if (!running) root._afterPreset()
+        onRunningChanged: if (!running) root._write()
     }
 
-    function _afterPreset() {
+    // Copies the active profile aside under a name that says what displaced
+    // it. Prints the name it saved, or nothing when there was nothing worth
+    // saving, which is the ordinary case on a real first run.
+    readonly property Process _keep: Process {
+        id: keepProc
+        command: [Branding.ctlBin, "profile", "keep", "before-wizard"]
+        stdout: StdioCollector {
+            onStreamFinished: root.kept = text.trim()
+        }
+        onRunningChanged: if (!running) root._write()
+    }
+
+    // Everything the wizard writes, once whatever was there has been kept and
+    // whatever preset was chosen has landed.
+    function _write() {
         // Written after the preset has landed, so these win over it.
         ConfigStore.set("panel.position", root.position);
         ConfigStore.set("panel.thickness", root.thickness);
@@ -147,11 +171,16 @@ FloatingWindow {
     function finish() {
         root.status = "Applying...";
         if (root.preset.length > 0) {
+            // `preset apply` keeps the profile it replaces; see the header.
             applyProc.command = [Branding.ctlBin, "preset", "apply", root.preset];
-            applyProc.running = true;   // _afterPreset runs when it exits
-        } else {
-            root._afterPreset();
+            applyProc.running = true;   // _write runs when it exits
+            return;
         }
+        // A Process, not a synchronous copy: keeping the profile is the CLI's
+        // one implementation of it, and this window must not grow a second.
+        // It runs before anything is written, because what it is keeping is
+        // what the next line overwrites.
+        keepProc.running = true;        // _write runs when it exits
     }
 
     function skip() {
@@ -161,17 +190,14 @@ FloatingWindow {
     }
 
     function _markDone() {
-        Fs.ensureDir(Paths.stateDir);
-        doneView.setText(`${Branding.version}\n`);
-        Log.info("wizard", "finished");
+        // The marker is FirstRun's, not this window's: it is read there to
+        // decide whether to show this at all, and a second writer of one file
+        // is how the two come to disagree.
+        FirstRun.markDone();
+        Log.info("wizard", root.kept.length > 0
+            ? `finished; what was there is now the profile '${root.kept}'`
+            : "finished");
         root.finished();
-    }
-
-    readonly property FileView _done: FileView {
-        id: doneView
-        path: Paths.wizardDoneFile
-        atomicWrites: true
-        printErrors: false
     }
 
     Column {
@@ -373,6 +399,21 @@ FloatingWindow {
                     ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
                     : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
             }
+        }
+
+        // What Finish is about to do to a configuration that already exists.
+        // `rmpr wizard` runs this on a machine set up months ago, and the
+        // button that replaces its settings should say so before it is
+        // pressed rather than after. On a real first run there is nothing
+        // here to warn about and this says nothing.
+        PanelText {
+            visible: root.step === root.stepCount - 1 && ConfigStore.configured
+            width: parent.width
+            wrapMode: Text.WordWrap
+            color: Theme.warning
+            font.pixelSize: 11
+            text: `Finish replaces the settings in profile "${ConfigStore.profile}". `
+                + `What is there now is kept as a profile you can switch back to.`
         }
 
         PanelText {

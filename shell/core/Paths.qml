@@ -26,9 +26,13 @@ QtObject {
 
     // Written once the first-run wizard has been through. It lives in state
     // rather than in the profile because "have you seen this window" is ours to
-    // remember, not a setting the user would ever want to type -- and because a
-    // profile with no overrides in it is a perfectly ordinary thing to have, so
-    // an empty config cannot be the signal.
+    // remember, not a setting the user would ever want to type.
+    //
+    // It is not on its own enough to decide a first run, and this file used to
+    // say it was. The state directory is what a restore point rolls back, so
+    // the marker can go missing on a machine configured for months -- see
+    // FirstRun, which reads this one alongside the configuration and takes
+    // both answers before deciding.
     readonly property string wizardDoneFile: `${root.stateDir}/wizard-done`
 
     // Widgets the user installed, deliberately outside the Quickshell config
