@@ -112,6 +112,7 @@ CardGrid {
                             switch (row.spec.type) {
                                 case "bool": return boolControl;
                                 case "enum": return enumControl;
+                                case "set": return setControl;
                                 case "int":
                                 case "number": return numberControl;
                                 default: return textControl;
@@ -155,6 +156,56 @@ CardGrid {
                                 values: row.spec.values ?? []
                                 currentIndex: Math.max(0, (row.spec.values ?? []).indexOf(row.current))
                                 onPicked: value => root.writeValue(row.path, value)
+                            }
+                        }
+                    }
+
+                    // A fixed set of named things, any of which may be on:
+                    // which tiles the quick settings draws, and anything else
+                    // shaped like that. The value stored is the list of the
+                    // ones that are on, in the schema's own order -- so a
+                    // machine that gains a choice later starts with it in the
+                    // place the schema puts it rather than at the end.
+                    //
+                    // A `list` with no `values` is still free-form text: the
+                    // tray's pinned ids are not a set, they are whatever the
+                    // machine happens to have.
+                    Component {
+                        id: setControl
+
+                        Column {
+                            id: set
+
+                            readonly property var values: row.spec.values ?? []
+                            readonly property var labels: row.spec.labels ?? []
+                            readonly property var chosen: Array.isArray(row.current) ? row.current : set.values
+
+                            width: parent.width
+                            spacing: 0
+
+                            function labelFor(value, i) {
+                                return set.labels[i] ?? value;
+                            }
+
+                            // The rule, and why it is not an append, is in
+                            // SettingGroups.chooseFrom.
+                            function put(value, on) {
+                                root.writeValue(row.path,
+                                    SettingGroups.chooseFrom(set.values, row.current, value, on));
+                            }
+
+                            Repeater {
+                                model: set.values
+
+                                ToggleRow {
+                                    required property string modelData
+                                    required property int index
+
+                                    width: set.width
+                                    label: set.labelFor(modelData, index)
+                                    checked: set.chosen.indexOf(modelData) >= 0
+                                    onToggled: value => set.put(modelData, value)
+                                }
                             }
                         }
                     }

@@ -4,6 +4,7 @@
 #   list            what exists, and which is active
 #   use <name>      switch to one
 #   new <name>      create one from the current configuration
+#   keep <label>    copy the active profile aside before something replaces it
 #   monitors        per-output overrides in the active profile
 #
 # A profile is a directory holding shell.json and any per-output overrides.
@@ -14,13 +15,12 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/profiles.sh"
 
 state_file="$CONFIG_DIR/state.json"
 profiles_dir="$CONFIG_DIR/profiles"
 
-active_profile() {
-    [ -f "$state_file" ] && jq -r '.profile // "default"' "$state_file" 2>/dev/null || echo default
-}
+# active_profile() comes from lib/brand.sh, so every command agrees.
 
 cmd=${1:-list}
 [ $# -gt 0 ] && shift
@@ -46,7 +46,16 @@ case "$cmd" in
         name=${1:?usage: $ALIAS profile use <name>}
         [ -d "$profiles_dir/$name" ] || die "no profile called '$name' (create it with: $ALIAS profile new $name)"
         mkdir -p "$CONFIG_DIR"
-        jq -n --arg p "$name" '{profile: $p}' > "$state_file"
+        # Written whole, then moved into place. The shell watches this file,
+        # and a redirect truncates before it writes: a read landing in that
+        # window gets a parse error, and the shell answers it by staying on
+        # whichever profile it already has -- which at startup is 'default'.
+        # Switching profiles then looks like the configuration resetting
+        # itself, with a JSON error the only trace.
+        tmp_state=$(mktemp "$(dirname "$state_file")/.state.XXXXXX") || die "could not write $state_file"
+        jq -n --arg p "$name" '{profile: $p}' > "$tmp_state" \
+            || { rm -f "$tmp_state"; die "could not write $state_file"; }
+        mv -f "$tmp_state" "$state_file" || { rm -f "$tmp_state"; die "could not write $state_file"; }
         log_step "active profile: $name"
         log_info "the shell switches immediately; no restart needed"
         ;;
@@ -68,6 +77,29 @@ case "$cmd" in
         log_info "switch to it: $ALIAS profile use $name"
         ;;
 
+    keep)
+        # For anything that is about to replace the profile rather than edit
+        # it. `new` refuses a name already taken, which is right when somebody
+        # is naming a profile and wrong here: this is a safety net, and a net
+        # that declines to catch you the second time is not one. The rules are
+        # in lib/profiles.sh, shared with `preset apply`.
+        #
+        # Prints the name it saved, and nothing when there was nothing worth
+        # saving -- so a caller can pass it on without deciding what "nothing"
+        # looks like.
+        label=${1:-before-change}
+        case "$label" in
+            *[!A-Za-z0-9._-]*) die "a label may hold letters, digits, dot, dash and underscore only" ;;
+        esac
+        keep_profile "$label"
+        if [ -z "$KEPT_PROFILE" ]; then
+            log_info "nothing to keep: profile '$(active_profile)' is empty or does not exist yet"
+            exit 0
+        fi
+        printf '%s\n' "$KEPT_PROFILE"
+        say_kept_profile
+        ;;
+
     monitors)
         d="$profiles_dir/$(active_profile)/monitors"
         if [ -d "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ]; then
@@ -81,5 +113,5 @@ case "$cmd" in
         fi
         ;;
 
-    *) die "unknown command: $cmd (expected list, use, new or monitors)" ;;
+    *) die "unknown command: $cmd (expected list, use, new, keep or monitors)" ;;
 esac

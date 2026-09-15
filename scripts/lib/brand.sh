@@ -134,6 +134,22 @@ DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 # reloaded KWin on every test run.
 session_available() { [ -z "${!NO_SESSION_VAR:-}" ]; }
 
+
+# Which profile the shell is actually reading. Held in one small file so that
+# switching cannot damage the profile being switched away from.
+#
+# Here rather than in profile.sh because more than one command needs the
+# answer, and the one that did not ask -- `preset apply` -- wrote to
+# profiles/default while the shell read another profile entirely. Every layout
+# chosen in the settings window landed in a file nothing was reading.
+active_profile() {
+    local state="$CONFIG_DIR/state.json"
+    [ -f "$state" ] && jq -r '.profile // "default"' "$state" 2>/dev/null || echo default
+}
+
+profile_dir() { printf '%s/profiles/%s' "$CONFIG_DIR" "$(active_profile)"; }
+profile_file() { printf '%s/shell.json' "$(profile_dir)"; }
+
 export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        REPO_PUSH REPO_FETCH VERSION \
        QS_CONFIG_DIR CONFIG_DIR DATA_DIR STATE_DIR BIN_DIR SYSTEMD_USER_DIR \

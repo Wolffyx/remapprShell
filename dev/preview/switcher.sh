@@ -10,10 +10,16 @@
 # So: a stub of the one type KWin provides, a model of fake windows, and the
 # real file on top. Errors print; "loaded" means it loaded.
 #
-# It checks that the file loads, not how it looks. Outside KWin there is no
-# colour scheme and no Plasma dialog behind it, so a picture taken here is
-# white on white and would say nothing true about the design. For the look,
-# press Alt+Tab.
+# It checks that the file loads, not how it looks -- but it can now also take
+# a picture, which it could not when this was written. Outside KWin there is
+# no platform theme unless one is asked for, so Kirigami.Theme answered white
+# on white and a picture said nothing true. QT_QPA_PLATFORMTHEME=kde reads
+# kdeglobals the way the real session does, and the colours are the real ones.
+#
+#   SWITCHER_SHOT=/path/to.png dev/preview/switcher.sh row
+#
+# What it still cannot show is the window behind it, because the thumbnails
+# are KWin's to draw. For that, press Alt+Tab.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
@@ -39,10 +45,16 @@ THUMB
 cat > "$root/org/kde/kwin/TabBoxSwitcher.qml" <<'STUB'
 import QtQuick
 
-Window {
-    visible: true
-    // `visible` is Item's already; redeclaring it is an error, and the error
-    // is reported against the stub rather than the file under test.
+// An Item, not a Window. KWin's own type is a window, and a window loaded
+// inside a Loader draws in a window of its own rather than on the stage --
+// which is why the picture was an empty gradient the first time it was tried.
+// As an Item the switcher draws where it is put, and can be grabbed.
+//
+// `visible` is Item's already, so it is not redeclared here: doing so is an
+// error, and the error is reported against this stub rather than against the
+// file under test.
+Item {
+    anchors.fill: parent ? parent : undefined
     property var model: fake
     property int currentIndex: 1
     property rect screenGeometry: Qt.rect(0, 0, 2560, 1440)
@@ -68,19 +80,41 @@ Window {
     width: 1700; height: 560
     color: "#00000000"
 
-    Loader {
-        id: load
+    // The switcher draws itself over whatever is behind it, and behind it
+    // here is nothing. A plain field rather than transparency, so the shadow
+    // and the card's own edge have something to sit on.
+    Rectangle {
+        id: stage
         anchors.fill: parent
-        source: Qt.resolvedUrl("main.qml")
-        onStatusChanged: {
-            if (status === Loader.Error) { console.warn("switcher: FAILED to load"); Qt.exit(1); }
-            if (status === Loader.Ready) console.warn("switcher: loaded");
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: "#c8d5ef" }
+            GradientStop { position: 0.5; color: "#e6dcd2" }
+            GradientStop { position: 1; color: "#f2d7c4" }
+        }
+
+        Loader {
+            id: load
+            anchors.fill: parent
+            source: Qt.resolvedUrl("main.qml")
+            onStatusChanged: {
+                if (status === Loader.Error) { console.warn("switcher: FAILED to load"); Qt.exit(1); }
+                if (status === Loader.Ready) console.warn("switcher: loaded");
+            }
         }
     }
 
+    readonly property string shot: "${SWITCHER_SHOT:-}"
+
     Timer {
         interval: 1200; running: true
-        onTriggered: Qt.exit(0)
+        onTriggered: {
+            if (shot.length === 0) {
+                Qt.exit(0);
+                return;
+            }
+            stage.grabToImage(r => { r.saveToFile(shot); console.warn("switcher: wrote " + shot); Qt.exit(0); });
+        }
     }
 }
 HARNESS
@@ -93,15 +127,40 @@ source "$WT/scripts/lib/brand.sh"
 source "$WT/scripts/lib/render.sh"
 
 
-for layout in row grid icons; do
+for layout in ${1:-row grid icons}; do
     echo "== $layout =="
     SWITCHER_LAYOUT=$layout SWITCHER_SUFFIX="" SWITCHER_LABEL="" \
         render_template "$WT/theme/windowswitcher/contents/ui/main.qml.in" "$root/main.qml" \
         || { echo "switcher: could not render $layout"; exit 1; }
 
+    # For a picture only: the switcher's contents live in a PlasmaCore.Dialog,
+    # which is a window of its own, and a window is not part of any grab taken
+    # of the stage -- which is why the first picture of this was an empty
+    # gradient. The dialog becomes a plain Item so the same contents draw where
+    # they are put.
+    #
+    # What is lost with it is the dialog's own background, which is Plasma's
+    # rather than this file's. A rectangle of Kirigami.Theme.backgroundColor
+    # stands in for it, with the margin Plasma's dialog puts around a mainItem
+    # -- without that the footer row draws outside the panel, which looks like
+    # a layout fault in the file and is not one. So the picture is
+    # the real cards, the real layout and the real colours, on a stand-in for
+    # the surface under them. Everything a reader would look at is the file's.
+    if [ -n "${SWITCHER_SHOT:-}" ]; then
+        sed -i -E 's/^    PlasmaCore\.Dialog \{/    Item {/;
+            /^        location: PlasmaCore\.Types\.Floating$/d;
+            /^        visible: tabBox\.visible$/d;
+            /^        flags: Qt\.Popup/d;
+            /^        x: tabBox\.screenGeometry/d;
+            /^        y: tabBox\.screenGeometry/d;
+            s/^        mainItem: Item \{/        anchors.centerIn: parent\n        width: content.implicitWidth + tabBox.pad\n        height: content.implicitHeight + tabBox.pad\n\n        Rectangle {\n            anchors.fill: parent\n            radius: tabBox.radius\n            color: Kirigami.Theme.backgroundColor\n        }\n\n        Item {/' \
+            "$root/main.qml"
+    fi
+
     # /usr/bin/qml is Qt5's and answers "Did not load any objects" whatever it
     # is given, exactly as /usr/bin/qmllint is Qt5's. Use Qt6's.
-    env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
+    env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen \
+        QT_QPA_PLATFORMTHEME=kde XDG_CURRENT_DESKTOP=KDE QT_FORCE_STDERR_LOGGING=1 \
         timeout 30 /usr/lib/qt6/bin/qml -I "$root" "$root/preview.qml" 2>&1 \
       | grep -viE 'KWindowShadow|installEventFilter|platform plugin|propertyCache|support raise' \
       | grep -vE '^\s*$' | head -20

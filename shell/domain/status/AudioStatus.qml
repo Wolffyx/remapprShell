@@ -9,6 +9,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell.Services.Pipewire
+import qs.domain.config
 import qs.domain.status.icons
 
 QtObject {
@@ -25,9 +26,25 @@ QtObject {
     readonly property string icon: StatusIcons.volumeIcon(root.volume, root.muted)
     readonly property string glyph: StatusIcons.volumeGlyph(root.volume, root.muted)
 
-    // Devices to play through: hardware outputs, not applications' streams.
+    // Devices to play through, and to record from: hardware nodes, not the
+    // streams applications open on them.
     readonly property var sinks: (Pipewire.nodes?.values ?? [])
         .filter(n => n && n.isSink && !n.isStream && n.audio)
+    readonly property var sources: (Pipewire.nodes?.values ?? [])
+        .filter(n => n && !n.isSink && !n.isStream && n.audio)
+
+    // How far a volume slider goes. PipeWire will happily amplify past 1.0 and
+    // distort doing it, so the ceiling is 100% until someone asks for the
+    // headroom -- the same choice, under the same name, as Plasma's applet.
+    //
+    // A level already above the ceiling raises it rather than being dragged
+    // down by the control drawn for it: something else set that, and a slider
+    // is not the place to find out.
+    readonly property bool raiseMax: ConfigStore.value("audio.raiseMaxVolume", false) === true
+    readonly property real maxVolume: root.raiseMax ? 1.5 : 1
+    function ceilingFor(value) {
+        return Math.max(root.maxVolume, value);
+    }
 
     function nameOf(node) {
         return node?.description || node?.nickname || node?.name || "";
@@ -60,6 +77,11 @@ QtObject {
             Pipewire.preferredDefaultAudioSink = node;
     }
 
+    function useSource(node) {
+        if (node)
+            Pipewire.preferredDefaultAudioSource = node;
+    }
+
     function summary() {
         return {
             ready: Pipewire.ready,
@@ -70,6 +92,8 @@ QtObject {
             micVolume: root.micVolume,
             micMuted: root.micMuted,
             outputs: root.sinks.map(n => root.nameOf(n)),
+            inputs: root.sources.map(n => root.nameOf(n)),
+            maxVolume: root.maxVolume,
             icon: root.icon
         };
     }

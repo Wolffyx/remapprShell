@@ -2,9 +2,11 @@
 # Restore points.
 #
 #   create [label]     take one now
-#   list               show what exists, with sizes
-#   remove <name>      delete one   (the only way a snapshot is ever deleted)
+#   list [--json]      show what exists, with sizes
+#   remove <name>      delete one
 #   prune [--keep N]   delete all but the newest N
+#   lock <name>        never prune this one
+#   unlock <name>      let pruning consider it again
 #
 # Nothing in this project deletes a snapshot on its own -- not on restore, not
 # on uninstall, not to reclaim space. Removal happens only through the two
@@ -22,8 +24,17 @@ cmd=${1:-list}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
-    create) snapshot_create "${1:-manual}" >/dev/null ;;
-    list)   snapshot_list ;;
+    create)
+        snapshot_create "${1:-manual}" >/dev/null
+        # Only if `snapshots.keep` says so; off until then.
+        snapshot_autoprune
+        ;;
+
+    lock)   snapshot_lock "${1:?usage: $ALIAS snapshot lock <name>}" on ;;
+    unlock) snapshot_lock "${1:?usage: $ALIAS snapshot unlock <name>}" off ;;
+    list)
+        if [ "${1:-}" = "--json" ]; then snapshot_list_json; else snapshot_list; fi
+        ;;
 
     remove)
         name=${1:?usage: $ALIAS snapshot remove <name>}
@@ -56,5 +67,5 @@ case "$cmd" in
         snapshot_prune "$keep"
         ;;
 
-    *) die "unknown command: $cmd (expected create, list, remove or prune)" ;;
+    *) die "unknown command: $cmd (expected create, list, remove, prune, lock or unlock)" ;;
 esac

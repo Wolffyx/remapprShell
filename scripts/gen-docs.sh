@@ -41,6 +41,9 @@ accepts() {
             else printf 'a number'; fi ;;
         bool) printf '`true` or `false`' ;;
         list) printf 'a list' ;;
+        # A fixed set: the members are the whole of what may be in the list, so
+        # the reference names them rather than saying "a list" and stopping.
+        set)  jq -r '[.values[] | "`\(.)`"] | join(", ")' <<< "$spec" ;;
         *)    printf 'text' ;;
     esac
 }

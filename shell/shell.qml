@@ -152,10 +152,9 @@ ShellRoot {
         NotificationPopups {}
     }
 
-    // Shown once, on a machine that has never run it. The marker lives in the
-    // state directory rather than in the profile: a profile with no overrides
-    // in it is an ordinary thing to have, so "the config is empty" cannot be
-    // the signal for "this person has never seen this".
+    // Shown once, on a machine that has never been set up. Which machines
+    // those are is FirstRun's question, and it is a harder one than it looks
+    // -- see the note at the top of that file for the day it was got wrong.
     LazyLoader {
         id: wizard
         loading: false
@@ -167,15 +166,11 @@ ShellRoot {
         }
     }
 
-    FileView {
-        path: Paths.wizardDoneFile
-        printErrors: false
-
-        onLoadFailed: err => {
-            if (err === FileViewError.FileNotFound) {
-                Log.info("wizard", "first run; showing the wizard");
+    Connections {
+        target: FirstRun
+        function onWantedChanged(): void {
+            if (FirstRun.wanted)
                 wizard.activeAsync = true;
-            }
         }
     }
 
@@ -260,6 +255,21 @@ ShellRoot {
             PanelModel.tooltipRequested(widgetId, name);
             return name;
         }
+
+        // The panel's own right-click menu, as if the pointer had opened it on
+        // empty panel. `at` is how far along the panel the click was; -1, the
+        // default, centres it. The only way to open this without a mouse, and
+        // the only way a session with no pointer can see whether it opens at
+        // all -- which is how "a right click on the bottom of the taskbar does
+        // nothing" was told apart from "it opens the menu I did not expect".
+        function menu(screen: string, at: string): string {
+            const name = screen || (Quickshell.screens[0]?.name ?? "");
+            const along = at ? parseFloat(at) : -1;
+            PanelModel.menuRequested(name, isNaN(along) ? -1 : along);
+            return name;
+        }
+
+        function closeMenu(): void { PanelModel.closeOpenMenu(); }
 
         function screens(): string { return Quickshell.screens.map(s => s.name).join("\n"); }
 
@@ -415,6 +425,14 @@ ShellRoot {
         target: "shell"
 
         function reload(): void { Quickshell.reload(false); }
+
+        // Debug logging, without a restart. The faults worth logging are the
+        // ones that happen on a real keyboard under real load, and restarting
+        // to enable logging is restarting away the state that caused them.
+        function debug(on: string): string {
+            Log.debugEnabled = on !== "false" && on !== "0" && on !== "off";
+            return Log.debugEnabled ? "debug logging on" : "debug logging off";
+        }
     }
 
     // The sidebar, the key sheet and the session screen, from a key: `rmpr

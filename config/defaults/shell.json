@@ -5,7 +5,7 @@
         "accent": "plasma",
         "translucent": true,
         "shadows": false,
-        "rounding": 28,
+        "rounding": 8,
         "animationMs": 180,
         "desktop": {
             "enabled": true,
@@ -22,10 +22,10 @@
     "panel": {
         "renderer": "quickshell",
         "position": "bottom",
-        "thickness": 56,
+        "thickness": 52,
         "style": "full",
-        "spacing": 6,
-        "iconSize": 19,
+        "spacing": 5,
+        "iconSize": 18,
         "autoHide": false,
         "revealOnHover": true,
         "menu": {
@@ -46,37 +46,27 @@
                 "enabled": true
             },
             {
-                "id": "taskview",
-                "zone": "left",
-                "enabled": true
-            },
-            {
-                "id": "divider",
-                "zone": "left",
-                "enabled": true
-            },
-            {
-                "id": "workspaces",
-                "zone": "left",
-                "enabled": true
-            },
-            {
                 "id": "tasks",
-                "zone": "middle",
+                "zone": "left",
                 "enabled": true
             },
             {
-                "id": "media",
+                "id": "tray",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "volume",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "brightness",
                 "zone": "right",
                 "enabled": true
             },
             {
                 "id": "clipboard",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "tray",
                 "zone": "right",
                 "enabled": true
             },
@@ -91,17 +81,7 @@
                 "enabled": true
             },
             {
-                "id": "divider",
-                "zone": "right",
-                "enabled": true
-            },
-            {
                 "id": "status",
-                "zone": "right",
-                "enabled": true
-            },
-            {
-                "id": "clock",
                 "zone": "right",
                 "enabled": true
             },
@@ -111,15 +91,20 @@
                 "enabled": true
             },
             {
-                "id": "power",
+                "id": "clock",
+                "zone": "right",
+                "enabled": true
+            },
+            {
+                "id": "showdesktop",
                 "zone": "right",
                 "enabled": true
             }
         ]
     },
     "launcher": {
-        "provider": "auto",
-        "searchProvider": "auto",
+        "provider": "builtin",
+        "searchProvider": "builtin",
         "kickoffMode": "menu",
         "command": [],
         "layout": "twopane",
@@ -128,14 +113,17 @@
         "hints": true,
         "pinned": []
     },
+    "audio": {
+        "raiseMaxVolume": false
+    },
     "osd": {
         "enabled": false,
         "timeout": 1800
     },
     "notifications": {
-        "history": false,
+        "history": true,
         "historySize": 50,
-        "server": "plasma",
+        "server": "shell",
         "popupTimeout": 6,
         "popupPosition": "auto",
         "centreStyle": "grouped"
@@ -155,11 +143,45 @@
     },
     "switching": {
         "windows": "plasma",
-        "desktops": "shell",
+        "desktops": "plasma",
         "overviewHold": true,
         "overviewTitles": true,
         "overviewMinimised": true,
         "overviewStrip": true,
         "overviewCardWidth": 560
+    },
+    "snapshots": {
+        "keep": 0
+    },
+    "widgets": {
+        "clock": {
+            "format": "HH:mm",
+            "showDate": true,
+            "dateFormat": "ddd d MMM",
+            "hour12": false,
+            "showSeconds": true
+        },
+        "launcher": {
+            "icon": "start-here-kde"
+        },
+        "tray": {
+            "iconSize": 22
+        },
+        "workspaces": {
+            "style": "icons"
+        },
+        "tasks": {
+            "showTitles": false
+        }
+    },
+    "desktop": {
+        "border": false,
+        "clock": true,
+        "borderInset": 0,
+        "borderRadius": 13,
+        "clockPosition": "bottom-right",
+        "clockSize": 92,
+        "clockDate": true,
+        "clockInk": "auto"
     }
 }

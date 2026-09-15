@@ -9,6 +9,7 @@ pragma Singleton
 // two full-screen things at once is never what was meant.
 
 import QtQuick
+import qs.core
 import Quickshell
 
 QtObject {
@@ -95,6 +96,13 @@ QtObject {
             if (root.windowSwitcher || root.overview)
                 root.heldClosedAt = Date.now();
         }
+        // Every transition, named. "It did not close" and "it closed and came
+        // straight back" look identical on screen and are different faults.
+        if (root.windowSwitcher !== (which === "windowSwitcher") || root.overview !== (which === "overview"))
+            Log.debug("surfaces", `held surface: ${which.length > 0 ? which : "none"}`
+                + ` (was ${root.windowSwitcher ? "windowSwitcher" : root.overview ? "overview" : "none"}`
+                + `, ${root.heldClosedAt > 0 ? Math.round(Date.now() - root.heldClosedAt) + "ms since the last close" : "none closed yet"})`);
+
         root.sidebar = which === "sidebar";
         root.keys = which === "keys";
         root.session = which === "session";
@@ -122,9 +130,16 @@ QtObject {
     // Asked for by the key coming up. Held as a wish rather than acted on
     // here: this layer does not know which window is selected, and the
     // surface that does may not exist yet.
+    // Emitted once the wish is fully recorded. A watcher cannot use the
+    // property changes: `heldCommitAt` is assigned first, so anything waking on
+    // it sees `heldCommitWanted` still false and `heldCommitFresh` still false.
+    // One signal, after both, leaves nothing to get the order wrong.
+    signal heldCommitAsked
+
     function commitHeld() {
         root.heldCommitAt = Date.now();
         root.heldCommitWanted = true;
+        root.heldCommitAsked();
     }
 
 

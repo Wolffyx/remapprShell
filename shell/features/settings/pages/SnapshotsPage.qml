@@ -34,22 +34,32 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [root.ctl, "snapshot", "list"]
+        // JSON, not the printed table: that is padded to columns, and a name
+        // wider than its column leaves one space instead of two -- which this
+        // page, splitting on runs of spaces, read as part of the name. Long
+        // names arrived with the date stuck to them and the date line short.
+        command: [root.ctl, "snapshot", "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const rows = [];
-                for (const line of text.split("\n")) {
-                    const t = line.trim();
-                    if (t.length === 0 || t.startsWith("no snapshots"))
-                        continue;
-                    // "<name>  <created>  <n> path(s)  <size>"
-                    const parts = t.split(/\s{2,}/);
-                    rows.push({ name: parts[0], created: parts[1] ?? "", paths: parts[2] ?? "", size: parts[3] ?? "" });
+                try {
+                    root.snapshots = JSON.parse(text);
+                } catch (e) {
+                    root.snapshots = [];
+                    Log.warn("settings", `snapshot list: ${e}`);
                 }
-                root.snapshots = rows;
             }
         }
     }
+
+    // Pruning never takes the oldest, so the page does not offer to.
+    readonly property string oldest: root.snapshots.length > 0
+        ? root.snapshots.map(s => s.name).sort()[0] : ""
+
+    // Restoring replaces configuration and cannot be undone, so it is asked
+    // twice. One click used to do it, with `--yes` already on the command --
+    // and restoring an old enough restore point is what removed a user's
+    // profiles, from this page, in one click.
+    property string armed: ""
 
     readonly property Process _run: Process {
         id: runProc
@@ -93,14 +103,17 @@ CardGrid {
             color: Theme.mut
             font.pixelSize: 12
             lineHeight: 1.35
-            text: "Restore points are never removed automatically -- not when reverting, not when uninstalling, not to save space. Removing one is permanent."
+            text: "Restore points are never removed when reverting or uninstalling. They are removed only here, or by pruning, which never takes a locked one or the oldest. Removing one is permanent."
         }
     }
 
     Card {
         id: saved
 
-        width: root.cellWidth
+        // The whole row, not half of it. These names are a timestamp and a
+        // label and there is no shortening them usefully -- at half width they
+        // elided to the point where two restore points looked the same.
+        width: root.width
         spacing: 6
 
         SectionLabel { text: "Saved" }
@@ -126,10 +139,15 @@ CardGrid {
 
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 90
+                        width: parent.width - 150
                         spacing: 1
 
                         PanelText {
+                            // A Text in a Column takes its width from its own
+                            // content, so without this the name ran under the
+                            // buttons and off the card.
+                            width: parent.width
+                            elide: Text.ElideRight
                             text: snap.modelData.name
                             font.pixelSize: 14
                         }
@@ -137,21 +155,68 @@ CardGrid {
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: `${snap.modelData.created}   ${snap.modelData.paths}   ${snap.modelData.size}`
+                            text: `${snap.modelData.paths} path(s)   ${snap.modelData.size}`
                             font.pixelSize: 12
                             color: Theme.mut
                         }
                     }
 
+                    // Locked ones are never pruned. The oldest never is
+                    // either, and cannot be unlocked into being, so it says
+                    // so instead of offering a switch that changes nothing.
                     IconButton {
                         anchors.verticalCenter: parent.verticalCenter
+                        visible: snap.modelData.name !== root.oldest
+                        glyph: snap.modelData.locked ? "lock" : "lock_open"
+                        iconName: snap.modelData.locked ? "object-locked" : "object-unlocked"
+                        tooltip: snap.modelData.locked
+                            ? "Locked: pruning will never remove this"
+                            : "Lock this against pruning"
+                        color: snap.modelData.locked ? Theme.acc : Theme.fg
+                        onActivated: root.run(["snapshot",
+                            snap.modelData.locked ? "unlock" : "lock", snap.modelData.name])
+                    }
+
+                    Item {
+                        // Same footprint as the lock button it stands in for,
+                        // so every row's buttons line up down the card.
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: snap.modelData.name === root.oldest
+                        width: 34
+                        height: 34
+
+                        Glyph {
+                            anchors.centerIn: parent
+                            name: "lock"
+                            fallback: "object-locked"
+                            size: 17
+                            color: Theme.acc
+                        }
+                    }
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        glyph: root.armed === snap.modelData.name ? "check" : "history"
                         iconName: "document-revert"
-                        onActivated: root.run(["restore", "--snapshot", snap.modelData.name, "--yes"])
+                        tooltip: root.armed === snap.modelData.name
+                            ? "Click again to restore -- this replaces configuration and cannot be undone"
+                            : "Restore this point"
+                        color: root.armed === snap.modelData.name ? Theme.error : Theme.fg
+                        onActivated: {
+                            if (root.armed === snap.modelData.name) {
+                                root.armed = "";
+                                root.run(["restore", "--snapshot", snap.modelData.name, "--yes"]);
+                            } else {
+                                root.armed = String(snap.modelData.name);
+                            }
+                        }
                     }
 
                     IconButton {
                         anchors.verticalCenter: parent.verticalCenter
                         iconName: "edit-delete"
+                        glyph: "delete"
+                        tooltip: "Remove this restore point, permanently"
                         onActivated: root.run(["snapshot", "remove", snap.modelData.name, "--yes"])
                     }
                 }

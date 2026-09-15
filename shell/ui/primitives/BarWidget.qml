@@ -41,6 +41,13 @@ Item {
     property bool wantsHover: false
     property bool wantsWheel: false
 
+    // Whether a right click on this widget means anything to it. A widget that
+    // says nothing gets the panel's own menu instead, the way a right click on
+    // a plasmoid with no menu of its own opens Plasma's panel menu -- so the
+    // click always does something, rather than being swallowed by whichever
+    // widget happened to be under the pointer.
+    property bool wantsRightClick: false
+
     // Shown when the widget is activated. Null means the widget has no popout.
     // The panel builds the window; the widget supplies only the contents, so a
     // widget never has to know where on the panel it sits or which edge the

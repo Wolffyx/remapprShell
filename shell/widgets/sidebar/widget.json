@@ -1,0 +1,13 @@
+{
+    "id": "sidebar",
+    "apiVersion": 1,
+    "name": "Sidebar",
+    "description": "Opens this shell's sidebar, which slides in from the right. The same panel Meta+S opens.",
+    "icon": "sidebar-expand-left",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" }
+    },
+    "config": {}
+}

@@ -82,6 +82,16 @@ QtObject {
 
     readonly property bool defaultsLoaded: Object.keys(root.defaults).length > 0
 
+    // Whether anybody has ever set anything here. `schemaVersion` is written
+    // by the shell itself when it seeds a profile, so a profile carrying only
+    // that is still an empty one and must not be mistaken for a configuration.
+    //
+    // Read by FirstRun, which is the whole reason it exists: "this machine has
+    // never been configured" is a claim worth being sure of before acting on
+    // it, and the profile is the only thing that can answer it.
+    readonly property bool configured: root.profileLoaded
+        && Object.keys(root.profileData).some(k => k !== "schemaVersion")
+
     // True once the profile has been read, or found not to be there, or found
     // unreadable -- in every case, once the answer is as good as it is going
     // to get. Anything whose *existence* depends on a setting must wait for

@@ -33,6 +33,12 @@ QtObject {
     // rested on it.
     signal tooltipRequested(string widgetId, string screen)
 
+    // The panel's own right-click menu, on `screen`, `at` pixels along the
+    // panel -- the one thing on the panel a pointer opens that no key and no
+    // command could, and therefore the one thing no session without a hand on
+    // the mouse could check. It was built, shipped, and never opened once.
+    signal menuRequested(string screen, real at)
+
     // Every slot on every panel, so `panel layout` can say where each one
     // actually is -- the question a screenshot answers badly and a person
     // without a pointer cannot answer at all. Slots add and remove
@@ -74,6 +80,34 @@ QtObject {
     function pressed(slot) {
         if (root.openPopoutSlot && root.openPopoutSlot !== slot)
             root.closeOpenPopout();
+    }
+
+    // The panel's own right-click menu is the other thing that can be open,
+    // and it is not a popout: it belongs to a panel rather than to a slot, so
+    // it never passed through any of the above.
+    //
+    // It is held here anyway. "One of these on screen at a time" is a single
+    // rule, and it was split across two owners that knew nothing of each
+    // other -- which is exactly how a right click on the panel and then on a
+    // task button left a jump list and the panel menu open side by side.
+    property var openMenuPanel: null
+
+    function menuOpened(panel) {
+        const previous = root.openMenuPanel;
+        root.openMenuPanel = panel;
+        if (previous && previous !== panel)
+            previous.closeMenu();
+        // The other direction: whatever popout was up is not wanted beside it.
+        root.closeOpenPopout();
+    }
+
+    function menuClosed(panel) {
+        if (root.openMenuPanel === panel)
+            root.openMenuPanel = null;
+    }
+
+    function closeOpenMenu() {
+        root.openMenuPanel?.closeMenu();
     }
 
     // Per-output values. A panel reads these rather than the ones above, so a

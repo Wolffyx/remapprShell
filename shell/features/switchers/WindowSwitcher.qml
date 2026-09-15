@@ -97,6 +97,44 @@ PanelWindow {
             win.commit();
     }
 
+    // The release that lands just *after* this surface opened.
+    //
+    // The read above covers a commit that beat the surface onto the screen.
+    // The other order was uncovered: for a fast enough Alt+Tab the key is
+    // already up by the time the surface exists, so nothing more will reach
+    // the key handler below -- and the switcher stayed on screen with no way
+    // left to close it, which is what "if I go too fast it stays open" was.
+    //
+    // It could not simply act on the commit, because a commit arriving while
+    // the switcher is up means either "Alt came up, choose" or "Tab came up,
+    // Alt is still down, stay", and kglobalaccel reports the same thing for
+    // both. Timing cannot separate them; the keyboard can. So the modifier is
+    // asked, and the switcher closes only when it really has been let go.
+    //
+    // Without the compiled module there is no one to ask, and this does
+    // nothing at all -- leaving exactly the behaviour that shipped before it.
+    readonly property Connections _lateCommit: Connections {
+        target: Surfaces
+
+        function onHeldCommitAsked(): void {
+            if (!Surfaces.heldCommitFresh || modifiers.status !== Loader.Ready)
+                return;
+            // Called on the item rather than through a typed cast: naming the
+            // type here would mean importing the optional module into this
+            // file, which is the one thing the Loader exists to avoid -- and
+            // an unimported name casts to null, so the call would throw and
+            // the fix would quietly do nothing.
+            Log.debug("surfaces", `window switcher: a release arrived while up; the key is ${modifiers.item?.held() ? "still down" : "up"}`);
+            if (modifiers.item && !modifiers.item.held())
+                win.commit();
+        }
+    }
+
+    readonly property Loader _modifiers: Loader {
+        id: modifiers
+        source: Qt.resolvedUrl("../../platform/input/HeldModifiers.qml")
+    }
+
     Item {
         id: content
         anchors.fill: parent

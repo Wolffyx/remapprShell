@@ -8,12 +8,16 @@
     `currentIndex` when the switcher chooses -- so those names are exactly as
     KWin expects and everything else is presentation.
 
-    What KWin offers a layout is `caption`, `icon`, `minimized` and `windowId`,
-    and nothing else: there are no window previews here, because KWin does not
-    advertise the screencast protocol to ordinary clients (see "No window
-    thumbnails" in docs/handoff.md). The design's cards are tinted panels with
-    the application's icon over them rather than photographs of the windows,
-    which is what it asks for and all that can be drawn.
+    What KWin offers a layout is `caption`, `icon`, `minimized`, `windowId` --
+    and `KWin.WindowThumbnail`, which draws the window itself. Inside KWin a
+    preview costs nothing; it is the one place that is true. Everywhere else in
+    this project a preview means speaking the screencast protocol in C++ and
+    feeding PipeWire, which is what plugin/ exists for.
+
+    An earlier note here said there were no previews in this file. That was
+    true when it was written and has not been since; it is corrected rather
+    than deleted because "KWin will not give us one" was believed for four
+    days and is worth being explicit about.
 
     Colours come from the active colour scheme through Kirigami.Theme, which is
     the whole point of shipping one: this matches the panel without either

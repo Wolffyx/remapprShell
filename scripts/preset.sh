@@ -13,6 +13,7 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/profiles.sh"
 
 # Shipped presets, plus any the user has added.
 preset_dirs() {
@@ -27,7 +28,7 @@ find_preset() {
     return 1
 }
 
-profile_file() { printf '%s/profiles/default/shell.json' "$CONFIG_DIR"; }
+# profile_file() comes from lib/brand.sh: it follows the active profile.
 
 cmd=${1:-list}
 [ $# -gt 0 ] && shift
@@ -64,20 +65,20 @@ case "$cmd" in
         # The current profile is kept before it is replaced. This is the user's
         # own configuration, so trying a preset must not be a one-way door --
         # and a preset replaces rather than merges, because merging two layouts
-        # produces a third that is neither.
-        if [ -f "$target" ]; then
-            backup="$STATE_DIR/profile-backups/$(date +%Y%m%d-%H%M%S)-before-$name.json"
-            mkdir -p "$(dirname "$backup")"
-            cp -a "$target" "$backup"
-            log_info "previous profile saved to $backup"
-        fi
+        # produces a third that is neither. How it is kept, and why twice, is
+        # in lib/profiles.sh; the wizard's Finish replaces the profile the same
+        # way and keeps it with the same call.
+        keep_profile "before-$name"
 
         schema=$(jq -r '.schemaVersion // 1' "$f" 2>/dev/null)
         jq --argjson v "${schema:-1}" '.config + {schemaVersion: $v}' "$f" > "$target"
 
-        log_step "applied preset '$name'"
+        log_step "applied preset '$name' to profile '$(active_profile)'"
         log_info "the shell picks it up immediately; no restart needed"
-        log_info "undo with: cp $backup $target"
+        # Nothing is said on the very first apply: there was nothing to keep,
+        # and offering a way back to it would be offering a way back to
+        # nowhere.
+        say_kept_profile
         ;;
 
     *) die "unknown command: $cmd (expected list, show or apply)" ;;

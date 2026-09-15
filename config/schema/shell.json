@@ -50,7 +50,7 @@
                     "min": 0,
                     "max": 36,
                     "step": 2,
-                    "default": 28,
+                    "default": 8,
                     "label": "Corner rounding",
                     "description": "The radius of the largest surfaces -- the start menu, quick settings, a floating panel. Smaller things are rounded in proportion."
                 },
@@ -144,7 +144,7 @@
                     "min": 28,
                     "max": 96,
                     "step": 2,
-                    "default": 56,
+                    "default": 52,
                     "label": "Thickness",
                     "description": "Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it."
                 },
@@ -163,7 +163,7 @@
                     "type": "int",
                     "min": 2,
                     "max": 16,
-                    "default": 6,
+                    "default": 5,
                     "label": "Spacing",
                     "description": "The gap between widgets, in pixels."
                 },
@@ -171,7 +171,7 @@
                     "type": "int",
                     "min": 15,
                     "max": 26,
-                    "default": 19,
+                    "default": 18,
                     "label": "Tray icon size",
                     "description": "The size of the tray's and the status icons, in pixels."
                 },
@@ -228,7 +228,7 @@
                         "rofi",
                         "custom"
                     ],
-                    "default": "auto",
+                    "default": "builtin",
                     "label": "Application menu",
                     "description": "Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one."
                 },
@@ -243,7 +243,7 @@
                         "rofi",
                         "custom"
                     ],
-                    "default": "auto",
+                    "default": "builtin",
                     "label": "Search",
                     "description": "KRunner is Plasma's own search."
                 },
@@ -313,7 +313,7 @@
                         "plasma",
                         "shell"
                     ],
-                    "default": "plasma",
+                    "default": "shell",
                     "label": "Drawn by",
                     "description": "plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it."
                 },
@@ -352,7 +352,7 @@
                 },
                 "notifications.history": {
                     "type": "bool",
-                    "default": false,
+                    "default": true,
                     "label": "Keep a history",
                     "description": "Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all."
                 },
@@ -406,7 +406,7 @@
                     "type": "int",
                     "min": 0,
                     "max": 40,
-                    "default": 10,
+                    "default": 0,
                     "label": "Border width",
                     "description": "How far in from each edge the frame is painted, in pixels."
                 },
@@ -415,14 +415,14 @@
                     "type": "int",
                     "min": 0,
                     "max": 48,
-                    "default": 26,
+                    "default": 13,
                     "label": "Corner radius",
                     "description": "How round the painted corners are, in pixels."
                 },
                 "desktop.clock": {
                     "group": "Desktop clock",
                     "type": "bool",
-                    "default": false,
+                    "default": true,
                     "label": "Clock on the desktop",
                     "description": "The time and date on the wallpaper, under every window."
                 },
@@ -507,6 +507,15 @@
             "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
         },
         {
+            "id": "shortcuts",
+            "label": "Shortcuts",
+            "icon": "preferences-desktop-keyboard-shortcut",
+            "glyph": "keyboard",
+            "page": "shortcuts",
+            "description": "Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.",
+            "keys": {}
+        },
+        {
             "id": "switching",
             "label": "Switching windows",
             "icon": "preferences-system-tabbox",
@@ -522,7 +531,7 @@
                     ],
                     "default": "plasma",
                     "label": "Alt+Tab is drawn by",
-                    "description": "plasma is KWin's own switcher, in this shell's colours, and it is the only one that can show a picture of each window -- KWin renders those for its own switcher and for nothing else. shell is this shell's card row, drawn here, which shows each application's icon instead. Changing this rebinds Alt+Tab to whichever draws it."
+                    "description": "plasma is KWin's own switcher, in this shell's colours. It is the default, it is the only one that can show a picture of each window -- KWin renders those for its own switcher and for nothing else -- and being inside the compositor it sees the keyboard directly. shell is this shell's card row, drawn here, which shows each application's icon instead. Choose it knowing the cost: the shell is not the compositor, so the key going down and the key coming up each cross kglobalaccel, the session daemon, the CLI and the IPC to reach it, and the two race. A quick enough Alt+Tab can leave the switcher on screen after the key is let go. Changing this rebinds Alt+Tab to whichever draws it."
                 },
                 "switching.desktops": {
                     "type": "enum",
@@ -530,7 +539,7 @@
                         "plasma",
                         "shell"
                     ],
-                    "default": "shell",
+                    "default": "plasma",
                     "label": "Meta+Tab is drawn by",
                     "description": "shell is this shell's own desktop overview -- every desktop, what is open on each, and one more at the end -- drawn here in the panel's colours. plasma is KWin's Overview, which shows a real picture of every window but cannot be restyled: it is compiled into KWin rather than shipped as a package. Changing this rebinds Meta+Tab, taking it from whatever holds it; `rmpr switcher revert` gives it back."
                 },
@@ -565,6 +574,21 @@
                     "max": 720,
                     "label": "Widest a window card gets",
                     "description": "In pixels. Cards share the room between them, three to a row at most, and never grow past this."
+                }
+            }
+        },
+        {
+            "id": "sound",
+            "label": "Sound",
+            "icon": "audio-volume-high",
+            "glyph": "volume_up",
+            "description": "What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.",
+            "keys": {
+                "audio.raiseMaxVolume": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Raise maximum volume",
+                    "description": "Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch."
                 }
             }
         },
@@ -614,7 +638,17 @@
             "icon": "document-save",
             "glyph": "history",
             "page": "snapshots",
-            "description": "Snapshots of your KDE configuration. Nothing here is ever deleted automatically."
+            "description": "Snapshots of your KDE configuration. Nothing is removed when reverting or uninstalling. They are removed here, or by pruning if you have set how many to keep -- and pruning never takes one you have locked, nor the oldest, which is the state the machine was in before this shell was installed.",
+            "keys": {
+                "snapshots.keep": {
+                    "type": "int",
+                    "default": 0,
+                    "min": 0,
+                    "max": 200,
+                    "label": "Restore points to keep",
+                    "description": "How many restore points are kept when a new one is taken. 0 keeps every one of them, which is the default: deleting somebody's restore points without being asked is not a thing to start doing quietly. Two are never removed by pruning whatever this says -- any restore point you have locked, and the oldest, which is the state the machine was in before this shell was installed."
+                }
+            }
         },
         {
             "id": "renderer",

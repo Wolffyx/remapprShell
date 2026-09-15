@@ -83,8 +83,21 @@ Item {
     readonly property bool wantsWheel: root.widget?.wantsWheel ?? false
     readonly property bool interactive: root.wantsHover || root.wantsWheel || !!root.widget?.popout
 
-    implicitWidth: host.implicitWidth
-    implicitHeight: host.implicitHeight
+    // As thick as the bar, whatever the widget's own size. The widget still
+    // draws at the size it asked for, centred, but the strip above and below
+    // it belongs to it: on a bottom panel the last row of pixels on the screen
+    // is the one a pointer thrown at the edge lands on, and a right click
+    // there used to miss every widget and fall through to the panel itself.
+    // A taskbar that is only clickable through its middle is the one thing
+    // Fitts's law says a taskbar must not be.
+    //
+    // Only across the panel. The length along it is the widget's, as before --
+    // a slot that claimed more would leave gaps in the row.
+    readonly property bool horizontal: root.bar?.horizontal ?? true
+    readonly property int barThickness: root.bar?.thickness ?? 0
+
+    implicitWidth: root.horizontal ? host.implicitWidth : Math.max(host.implicitWidth, root.barThickness)
+    implicitHeight: root.horizontal ? Math.max(host.implicitHeight, root.barThickness) : host.implicitHeight
 
     // The zone is a positioner, and a positioner skips invisible children, so
     // a widget with nothing to show leaves no gap and no stray spacing.
@@ -132,9 +145,14 @@ Item {
         onTriggered: root.tooltipForced = false
     }
 
+    // Centred in the slot, at its own size across the panel: the slot grew to
+    // the bar's thickness above, and a widget stretched to fill that would
+    // draw a taller button rather than the same button in a taller target.
     WidgetHost {
         id: host
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: root.horizontal ? parent.width : host.implicitWidth
+        height: root.horizontal ? host.implicitHeight : parent.height
         entry: root.entry
         bar: root.bar
         screenName: root.screenName
@@ -180,7 +198,19 @@ Item {
             root.widget.handleWheel(delta);
         }
 
-        onClicked: event => root.widget?.handleActivate(event.button)
+        // A right click the widget has no use for opens the panel's own menu,
+        // as it would have done had the click landed between two widgets.
+        // Without this the strip above and below a widget -- which is the
+        // widget's target now, and which is where a pointer thrown at the
+        // screen edge lands -- swallowed the click and answered nothing.
+        onClicked: event => {
+            if (event.button === Qt.RightButton && !(root.widget?.wantsRightClick ?? false)) {
+                const p = root.mapToItem(null, event.x, event.y);
+                PanelModel.menuRequested(root.screenName, (root.bar?.horizontal ?? true) ? p.x : p.y);
+                return;
+            }
+            root.widget?.handleActivate(event.button);
+        }
     }
 
     // A widget that declares a popout gets a window for it, beside itself. The
@@ -297,6 +327,9 @@ Item {
             if (popout.wanted) {
                 popout.wantedAt = Date.now();
                 enter.restart();
+                // Any popout, not only a modal one: a hover preview beside an
+                // open panel menu is still two cards on screen at once.
+                PanelModel.closeOpenMenu();
             }
             if (!root.bar)
                 return;

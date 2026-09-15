@@ -21,11 +21,11 @@
         },
         "maxVolume": {
             "type": "int",
-            "default": 100,
-            "min": 100,
+            "default": 0,
+            "min": 0,
             "max": 150,
             "label": "Loudest by scrolling",
-            "description": "Scrolling and the slider stop here. Above 100 is amplification, which can distort."
+            "description": "Percent. 0 follows Settings \u2192 Sound, where \"Raise maximum volume\" lives and which every other slider in this shell reads; anything else is this widget's own ceiling."
         },
         "showMicrophone": {
             "type": "bool",

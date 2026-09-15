@@ -145,7 +145,11 @@ Column {
             from: 0
             to: 36
             stepSize: 2
-            value: ConfigStore.value("theme.rounding", 18)
+            // Theme.rounding, not the configuration key with a fallback of
+            // its own: this slider carried 18 while the shipped default is 28,
+            // so with the key unset it sat in the wrong place and jumped the
+            // moment it was touched. The theme is the one that decides.
+            value: Theme.rounding
             onMoved: value => ConfigStore.set("theme.rounding", Math.round(value))
         }
 

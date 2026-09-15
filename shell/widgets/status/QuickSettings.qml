@@ -13,6 +13,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Networking
 import qs.core
+import qs.domain.config
 import qs.domain.status
 import qs.domain.status.icons
 import qs.domain.notifications
@@ -39,7 +40,11 @@ Item {
         id: pages
         width: parent.width
         sourceComponent: qs.widget.page === "wifi" ? wifiPage
+                       : qs.widget.page === "ethernet" ? ethernetPage
                        : qs.widget.page === "bluetooth" ? bluetoothPage
+                       : qs.widget.page === "volume" ? volumePage
+                       : qs.widget.page === "microphone" ? microphonePage
+                       : qs.widget.page === "brightness" ? brightnessPage
                        : mainPage
         onLoaded: slide.restart()
 
@@ -59,20 +64,32 @@ Item {
     // What is here depends on what the machine has: no Bluetooth adapter, no
     // Bluetooth tile; GameMode and a VPN only where they exist.
 
-    readonly property var tiles: {
+    // Every tile the machine could show, by id. What is here depends on what
+    // the machine has: no Bluetooth adapter, no Bluetooth tile; GameMode and a
+    // VPN only where they exist.
+    //
+    // Wi-Fi and the cable are two tiles, not one. A desktop with both plugged
+    // in had a single "Wi-Fi" tile and no way to see the wired link at all,
+    // which is the wrong answer on the machines most likely to have both.
+    readonly property var available: {
         const t = [];
-        const wifiDevice = NetworkStatus.wifiDevices.length > 0;
-        if (NetworkStatus.available) {
-            const wifi = NetworkStatus.connections.find(c => c.kind !== "wired");
+        if (NetworkStatus.available && NetworkStatus.wifiDevices.length > 0) {
+            const wifi = NetworkStatus.connections.find(c => c.kind === "wifi");
+            t.push({ id: "wifi", title: "Wi-Fi", page: "wifi", on: NetworkStatus.wifiEnabled,
+                     glyph: !NetworkStatus.wifiEnabled ? "wifi_off" : StatusIcons.wifiGlyph(wifi?.strength ?? 0),
+                     sub: !NetworkStatus.wifiEnabled ? "Off" : wifi ? wifi.name : "Not connected" });
+        }
+        // The cable earns a tile once it carries something, or where there is
+        // no Wi-Fi to speak of -- a port with nothing in it, on a machine with
+        // a network already, is a tile that says "Not connected" for ever.
+        if (NetworkStatus.available && NetworkStatus.wiredDevices.length > 0) {
             const wired = NetworkStatus.connections.find(c => c.kind === "wired");
-            t.push(wifiDevice ? {
-                id: "wifi", title: "Wi-Fi", page: "wifi", on: NetworkStatus.wifiEnabled,
-                glyph: !NetworkStatus.wifiEnabled ? "wifi_off" : StatusIcons.wifiGlyph(wifi?.strength ?? 0),
-                sub: !NetworkStatus.wifiEnabled ? "Off" : wifi ? wifi.name : "Not connected"
-            } : {
-                id: "network", title: "Network", page: "", on: !!wired, glyph: NetworkStatus.glyph,
-                sub: wired ? wired.name : "Not connected", act: () => PlasmaApplets.open("org.kde.plasma.networkmanagement")
-            });
+            if (wired || NetworkStatus.wifiDevices.length === 0) {
+                t.push({ id: "ethernet", title: "Ethernet", page: "ethernet", on: !!wired,
+                         glyph: wired ? "settings_ethernet" : "lan",
+                         sub: wired ? [wired.name, StatusIcons.linkSpeed(wired.speed)].filter(x => x).join(" · ")
+                                    : "Not connected" });
+            }
         }
         if (BluetoothStatus.present) {
             const n = BluetoothStatus.connectedCount;
@@ -81,9 +98,9 @@ Item {
                      sub: !BluetoothStatus.enabled ? "Off" : n === 0 ? "On" : n === 1 ? "1 device" : `${n} devices` });
         }
         if (AudioStatus.source) {
-            t.push({ id: "microphone", title: "Microphone", page: "", on: !AudioStatus.micMuted,
+            t.push({ id: "microphone", title: "Microphone", page: "microphone", on: !AudioStatus.micMuted,
                      glyph: StatusIcons.micGlyph(AudioStatus.micVolume, AudioStatus.micMuted),
-                     sub: AudioStatus.micMuted ? "Muted" : "On", act: () => AudioStatus.toggleMicMute() });
+                     sub: AudioStatus.micMuted ? "Muted" : AudioStatus.nameOf(AudioStatus.source) });
         }
         t.push({ id: "dnd", title: "Do not disturb", page: "", on: DoNotDisturb.active,
                  glyph: DoNotDisturb.active ? "do_not_disturb_on" : "do_not_disturb_off",
@@ -105,6 +122,11 @@ Item {
         }
         return t;
     }
+
+    // Which of them are drawn, in the order the setting lists them. A machine
+    // that has none of what is chosen shows no grid rather than an empty one.
+    readonly property var chosen: qs.widget.tiles
+    readonly property var tiles: qs.chosen.map(id => qs.available.find(t => t.id === id)).filter(t => !!t)
 
     function activate(tile) {
         if (tile.page)
@@ -465,6 +487,11 @@ Item {
                     width: parent.width - 32
                     spacing: 12
 
+                    // Each level has a page behind it, reached by the chevron
+                    // at its end: the devices to play through or record from,
+                    // and a slider per display. The tiles have had that since
+                    // the design was drawn and the sliders had not, which left
+                    // the output device pickable only in Plasma's own applet.
                     Row {
                         visible: !!AudioStatus.sink
                         width: parent.width
@@ -480,17 +507,25 @@ Item {
 
                         NumberSlider {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - muteButton.width - parent.spacing
+                            width: parent.width - muteButton.width - soundMore.width - 2 * parent.spacing
                             live: true
                             from: 0
-                            to: Math.max(100, Math.round(AudioStatus.volume * 100))
+                            to: Math.round(AudioStatus.ceilingFor(AudioStatus.volume) * 100)
                             value: AudioStatus.volume * 100
                             onMoved: v => AudioStatus.setVolume(v / 100)
                         }
+
+                        IconButton {
+                            id: soundMore
+                            anchors.verticalCenter: parent.verticalCenter
+                            glyph: "chevron_right"
+                            iconName: "go-next"
+                            onActivated: qs.widget.page = "volume"
+                        }
                     }
 
-                    // Every display powerdevil can dim, at once; each has a
-                    // slider of its own in the brightness widget.
+                    // Every display powerdevil can dim, at once; the page
+                    // behind this has a slider per display.
                     Row {
                         visible: BrightnessStatus.displays.length > 0
                         width: parent.width
@@ -505,7 +540,11 @@ Item {
 
                         NumberSlider {
                             anchors.verticalCenter: parent.verticalCenter
+                            // A Row skips a hidden child but its width is
+                            // still its own, so the room it would have taken
+                            // has to be given back by hand.
                             width: parent.width - sun.width - parent.spacing
+                                   - (brightnessMore.visible ? brightnessMore.width + parent.spacing : 0)
                             live: true
                             from: 1
                             to: 100
@@ -515,6 +554,18 @@ Item {
                                     BrightnessStatus.setBrightness(d.name, Math.max(StatusIcons.brightnessFloor(d.max),
                                                                                     Math.round(v * d.max / 100)));
                             }
+                        }
+
+                        IconButton {
+                            id: brightnessMore
+                            anchors.verticalCenter: parent.verticalCenter
+                            glyph: "chevron_right"
+                            iconName: "go-next"
+                            // One display and no night light to speak of is a
+                            // page with the slider already on this one on it.
+                            visible: BrightnessStatus.displays.length > 1
+                                     || BrightnessStatus.nightState !== "unavailable"
+                            onActivated: qs.widget.page = "brightness"
                         }
                     }
                 }
@@ -727,6 +778,330 @@ Item {
                 text: "Networks and VPN…"
                 onActivated: {
                     PlasmaApplets.open("org.kde.plasma.networkmanagement");
+                    qs.close();
+                }
+            }
+        }
+    }
+
+    // ---- Ethernet ----------------------------------------------------------
+    //
+    // Read-only, like the rest of what this shell does with NetworkManager:
+    // bringing a wired connection up or down, or editing one, is Plasma's
+    // applet's job and it does it properly.
+
+    Component {
+        id: ethernetPage
+
+        Column {
+            spacing: 12
+
+            PageHeader {
+                title: "Ethernet"
+                switchable: false
+            }
+
+            PanelText {
+                visible: NetworkStatus.wiredDevices.length === 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Theme.mut
+                font.pixelSize: 12
+                leftPadding: 4
+                text: "No wired device."
+            }
+
+            Column {
+                width: parent.width
+                spacing: 2
+
+                Repeater {
+                    model: NetworkStatus.wiredDevices
+
+                    ItemRow {
+                        required property var modelData
+                        glyph: modelData.connected ? "settings_ethernet" : "lan"
+                        title: modelData.network?.name && modelData.network.name !== modelData.name
+                            ? modelData.network.name : "Ethernet"
+                        sub: [modelData.name,
+                              modelData.connected ? StatusIcons.linkSpeed(modelData.linkSpeed ?? 0) : "Cable out"]
+                            .filter(x => x).join(" · ")
+                        current: modelData.connected
+                        mark: modelData.connected ? "check" : ""
+                        onActivated: {
+                            PlasmaApplets.open("org.kde.plasma.networkmanagement");
+                            qs.close();
+                        }
+                    }
+                }
+            }
+
+            TextButton {
+                glyph: "settings_ethernet"
+                iconName: "network-wired"
+                text: "Networks and VPN…"
+                onActivated: {
+                    PlasmaApplets.open("org.kde.plasma.networkmanagement");
+                    qs.close();
+                }
+            }
+        }
+    }
+
+    // ---- sound, and the microphone -----------------------------------------
+    //
+    // One component for both: an output and an input differ in which node they
+    // write to and in nothing else anybody looking at the page would name.
+    // Two copies of this drifted apart in every shell that has written them.
+
+    component LevelPage: Column {
+        id: level
+
+        property string title: ""
+        property string glyph: ""
+        property var devices: []
+        property var current: null
+        property real volume: 0
+        property bool muted: false
+        property string emptyText: ""
+
+        signal setLevel(real value)
+        signal setMuted(bool value)
+        signal use(var node)
+
+        spacing: 12
+
+        PageHeader {
+            title: level.title
+            switchedOn: !level.muted
+            onSwitched: on => level.setMuted(!on)
+        }
+
+        // The level itself, so the page it was reached from is not the only
+        // place to set it.
+        Row {
+            width: parent.width
+            spacing: 10
+
+            IconButton {
+                id: levelIcon
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: level.glyph
+                onActivated: level.setMuted(!level.muted)
+            }
+
+            NumberSlider {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - levelIcon.width - parent.spacing
+                live: true
+                enabled: !level.muted
+                from: 0
+                to: Math.round(AudioStatus.ceilingFor(level.volume) * 100)
+                value: level.volume * 100
+                onMoved: v => level.setLevel(v / 100)
+            }
+        }
+
+        PanelText {
+            visible: level.devices.length === 0
+            width: parent.width
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            leftPadding: 4
+            text: level.emptyText
+        }
+
+        Column {
+            width: parent.width
+            spacing: 2
+
+            Repeater {
+                model: level.devices
+
+                ItemRow {
+                    required property var modelData
+                    glyph: level.glyph
+                    title: AudioStatus.nameOf(modelData)
+                    current: modelData === level.current
+                    mark: modelData === level.current ? "check" : ""
+                    onActivated: level.use(modelData)
+                }
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Theme.out
+        }
+
+        // The one thing on these pages that is a setting rather than a state:
+        // it is written to the configuration and every slider in the shell
+        // reads it, which is why it is here rather than being a mode this
+        // popout remembers by itself.
+        ToggleRow {
+            width: parent.width
+            label: "Raise maximum volume"
+            description: "Up to 150%, amplified in software. It distorts on most hardware."
+            checked: AudioStatus.raiseMax
+            onToggled: value => ConfigStore.set("audio.raiseMaxVolume", value)
+        }
+
+        TextButton {
+            glyph: "tune"
+            iconName: "preferences-desktop-sound"
+            text: "Sound settings…"
+            onActivated: {
+                PlasmaApplets.openSettings("kcm_pulseaudio");
+                qs.close();
+            }
+        }
+    }
+
+    Component {
+        id: volumePage
+
+        LevelPage {
+            title: "Sound"
+            glyph: AudioStatus.glyph
+            devices: AudioStatus.sinks
+            current: AudioStatus.sink
+            volume: AudioStatus.volume
+            muted: AudioStatus.muted
+            emptyText: "No sound output."
+            onSetLevel: value => AudioStatus.setVolume(value)
+            onSetMuted: value => { if (value !== AudioStatus.muted) AudioStatus.toggleMute(); }
+            onUse: node => AudioStatus.useSink(node)
+        }
+    }
+
+    Component {
+        id: microphonePage
+
+        LevelPage {
+            title: "Microphone"
+            glyph: StatusIcons.micGlyph(AudioStatus.micVolume, AudioStatus.micMuted)
+            devices: AudioStatus.sources
+            current: AudioStatus.source
+            volume: AudioStatus.micVolume
+            muted: AudioStatus.micMuted
+            emptyText: "No input device."
+            onSetLevel: value => AudioStatus.setMicVolume(value)
+            onSetMuted: value => { if (value !== AudioStatus.micMuted) AudioStatus.toggleMicMute(); }
+            onUse: node => AudioStatus.useSource(node)
+        }
+    }
+
+    // ---- brightness --------------------------------------------------------
+
+    Component {
+        id: brightnessPage
+
+        Column {
+            spacing: 12
+
+            PageHeader {
+                title: "Brightness"
+                switchable: false
+            }
+
+            PanelText {
+                visible: BrightnessStatus.displays.length === 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Theme.mut
+                font.pixelSize: 12
+                leftPadding: 4
+                text: "No display powerdevil can dim."
+            }
+
+            // One slider per display, rather than the one on the first page
+            // that moves all of them together.
+            Column {
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: BrightnessStatus.displays
+
+                    Column {
+                        id: display
+
+                        required property var modelData
+
+                        width: parent.width
+                        spacing: 2
+
+                        // powerdevil's own name for the display ("display0")
+                        // is an id, not a name anybody chose. Its label is the
+                        // monitor -- "Acer Technologies XV322QU P" -- which is
+                        // what the brightness widget has always shown and what
+                        // this page said instead of it.
+                        PanelText {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: display.modelData.label || display.modelData.name
+                            font.pixelSize: 12
+                            color: Theme.mut
+                            leftPadding: 4
+                        }
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            IconButton {
+                                id: displayIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                glyph: StatusIcons.brightnessGlyph((display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max))
+                            }
+
+                            NumberSlider {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - displayIcon.width - parent.spacing
+                                live: true
+                                from: 1
+                                to: 100
+                                value: 100 * (display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max)
+                                onMoved: v => BrightnessStatus.setBrightness(display.modelData.name,
+                                    Math.max(StatusIcons.brightnessFloor(display.modelData.max),
+                                             Math.round(v * display.modelData.max / 100)))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: BrightnessStatus.nightState !== "unavailable"
+                width: parent.width
+                height: 1
+                color: Theme.out
+            }
+
+            // Said the way the brightness widget says it -- the state in
+            // words, and when it next changes -- rather than in wording of
+            // this page's own. Two screens describing one thing differently
+            // is how a reader ends up believing they are two things.
+            ToggleRow {
+                visible: BrightnessStatus.nightState !== "unavailable"
+                width: parent.width
+                label: StatusIcons.nightLightLabel(BrightnessStatus.nightLight)
+                description: BrightnessStatus.nightState === "off"
+                    ? "Off in System Settings, which is the only place that turns it on."
+                    : BrightnessStatus.nightDetail
+                enabled: BrightnessStatus.nightState !== "off"
+                checked: BrightnessStatus.nightState === "warm" || BrightnessStatus.nightState === "day"
+                onToggled: BrightnessStatus.toggleNightLight()
+            }
+
+            TextButton {
+                glyph: "display_settings"
+                iconName: "preferences-desktop-display"
+                text: "Display settings…"
+                onActivated: {
+                    PlasmaApplets.openSettings("kcm_kscreen");
                     qs.close();
                 }
             }

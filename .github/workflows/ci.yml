@@ -62,6 +62,10 @@ jobs:
       # Fails if docs/config.md is not what the schema would generate. The
       # reference is committed because people read it on the forge, where
       # nothing runs, so a stale one is trusted and wrong.
+      # Fails if the documented default and the shipped default disagree.
+      - name: Defaults lint
+        run: ./scripts/lint-defaults.sh
+
       - name: Docs lint
         run: ./scripts/lint-docs.sh
 

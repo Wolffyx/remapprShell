@@ -97,15 +97,199 @@ Everything below was read off the running system rather than remembered.
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | our Look-and-Feel package is active and **every part is now installed**: 2 colour schemes, the switcher (selected -- `active Alt+Tab: remappr-shell`), the desktop theme, the splash. The colour scheme in force is **BreezeLight**, the user's own, and the icon theme `breeze-dark`. `theme apply` themes the desktop by default now, by parts the user chooses -- see `theme.desktop` in Settings → Appearance |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
-| Window list | KWin script loaded, daemon answering, 9 windows |
+| Window list | KWin script loaded, daemon answering, 10 windows -- **put back on 2026-09-15**: after the restore of 2026-09-14 the script was gone from `~/.local/share/kwin/scripts/`, the kwinrc key was unset and the ledger had no `windows` scope at all, so the taskbar drew nothing and said nothing. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it |
 | Also running | **nothing else**: caelestia's Quickshell bar was stopped on 2026-09-13 and not restarted. krohnkite is installed but **not loaded** (`krohnkiteEnabled=false`) |
+| Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
+| CI | **green, for the first time.** It had never passed: five causes, each hiding the next (see 2026-09-14 below). It now runs all six lints rather than three |
 | Screen edges | nothing bound, snapping on -- KWin's defaults; no `edges` ledger entries |
 | Shortcuts | **Ours, and grabbed for the first time** (2026-09-13): the component `remappr-shell` is active, with Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Alt+Tab and Alt+Shift+Tab (this shell's switcher). Meta+Tab is KWin's Overview. Alt+Tab was taken from KWin, Meta+Shift+R from Krohnkite; `rmpr switcher revert` and `rmpr shortcuts revert` give them back. **Alt+Tab was pressed and works** -- the first key this project has ever bound that does anything. The other five are registered and read back off kglobalaccel but have not been pressed. **Spectacle has no shortcut**: `kglobalshortcutsrc [services][org.kde.spectacle.desktop] _launch=none`, so Print does nothing. Nothing in this project writes that key and nothing else holds Print -- it was not us. The user was given the command to put it back and had not run it |
 | `rmpr doctor` | no problems, 3 warnings (2026-09-13, shell running). One is the ledgered key no longer set -- `plasmashellrc [PlasmaViews][Panel 811] shell`, left behind when the Phase 6b revert purged that group; harmless |
 
 ### Where the last session left off, and what to pick up
 
-`main` is clean and nothing is half-written: `make lint` clean, `make test` 376
+**Read this first -- 2026-09-14 evening into 2026-09-15, 25 commits on `dev`.**
+
+Work goes on `dev`, not `main`: the two are release channels and
+docs/releasing.md is the whole of it. `main` moves on a release. Nothing is
+half-written; `make lint` is clean (seven lints now) and `make test` is 376 QML
+cases and 75 shell cases green.
+
+**The one thing to understand before touching anything.** A configuration this
+user had built over days was destroyed during the session, and it took an hour
+to find out why. The cause was a chain, and every link is now fixed, but the
+shape of it is worth carrying: restoring a snapshot old enough that its
+manifest predates the configuration directory made the restore read that
+absence as "we added this since" and delete `~/.config/<slug>` entire, every
+profile in it; the state directory then went back to the snapshot's, which has
+no `wizard-done`; the shell therefore decided it was a first run and showed the
+wizard; and the wizard's finish wrote a fresh profile over what was left. One
+click, from the settings window, no confirmation. `rmpr doctor` and the journal
+told the story only because the kconfig ledger's mtime matched a snapshot's
+name exactly.
+
+What came out of that: the restore never removes the configuration directory
+now; `preset apply` saves what it replaces as a *profile* (the old backup lived
+in the state directory, which is what a restore rolls back -- the safety net
+shared a fate with the thing it protected); `state.json` is written atomically,
+because a redirect truncates and the shell reads a parse error as "stay on
+`default`", which looks exactly like a reset; and restoring from the settings
+window arms on the first click and goes on the second.
+
+**Four faults of one shape.** A `Process` owned by a window a `LazyLoader`
+destroys in the same turn never spawns, and reports nothing at all: no stderr,
+no exit code, no error. It cost the panel menu's rows, the wizard's renderer
+switch, and hours. If something "does nothing and says nothing", look there
+first.
+
+**Three faults of another shape**, all found by reading qmllint output rather
+than trusting `make lint`: an undefined singleton (`WindowEvents` in both
+switchers, `Log` in Surfaces.qml) is reported as `Unqualified access`, and
+lint-qml.sh prints warnings and then logs "qml lint clean" regardless. Making
+`[unqualified]` fatal for `shell/` is still open, and wants a cleanup pass
+first -- there are five known false positives in Panel.qml (outer-scope ids in
+a LazyLoader, no `ComponentBehavior: Bound`) and one in HeldModifiers.qml
+(qmllint cannot resolve the compiled module).
+
+**Alt+Tab and Meta+Tab are KWin's now, by the user's choice**, and the reason
+generalises: this shell is not the compositor, so a held key's press and its
+release each cross kglobalaccel, the session daemon, the CLI and the IPC, as
+two detached processes that race. Both switchers got a real fix (a second QML
+module, `ShellInput`, exposing `queryKeyboardModifiers`, so a release arriving
+while the surface is up can be told from a Tab), and the choice now warns what
+it costs. **The structural fix is named and unbuilt**: caelestia binds
+shortcuts in-process, and this project already has the idiom for it --
+`shell/core/BusLine.qml`, a `busctl monitor` process the window list already
+uses. Pointing that at kglobalaccel would delete the whole class.
+
+**The defaults now ship the setup that is in use**, and two files that both
+declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
+any disagreement, in `make lint` and in CI.
+
+**Open, in the order they are worth doing:**
+
+1. **Shortcuts in-process**, per BusLine above. Ends the switcher race class
+   rather than patching its instances, and would make this shell's own
+   switcher worth choosing again.
+2. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
+   none)` is hardcoded and caelestia is detected by a hardcoded unit name.
+   Discovery is easy -- every Quickshell config is a directory in
+   `~/.config/quickshell/` -- but `renderer set` must then start and stop an
+   arbitrary discovered shell, which is the substantial half.
+3. **caelestia is still running beside this shell** and provides two things
+   this shell does not: it holds the notification service (ours waits and takes
+   over when released -- `doctor` says so), and the sidebar's edge drag is
+   entirely its own. This shell has no screen-edge trigger at all: KWin's edges
+   run KWin's own actions only, so ours needs the KWin script in `kwin/`
+   extended to register an edge that calls our IPC. The user was asked whether
+   to take those over or to acknowledge caelestia as the provider, and **has
+   not answered** -- that decision shapes what install-time "apply everywhere"
+   should do.
+4. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
+   and right zones' `implicitWidth` depend on each other through the middle.
+   A warning only; the panel lays out. Fixing it is a zone-budget redesign.
+5. Snapshot names are a timestamp plus a label and the second line no longer
+   repeats the timestamp, but the list is still cramped on a narrow window.
+
+### The session of 2026-09-15, afternoon
+
+**The chain that destroyed a configuration on 2026-09-14 has no links left.**
+Item 1 is done.
+
+"The wizard has never run here" was one question with one answer: a marker
+file in the state directory. The state directory is what a restore point
+rolls back, so the marker went missing on a machine configured over days,
+the shell read its absence as a first run, and the wizard's Finish wrote a
+fresh profile over what was left.
+
+It is two questions now -- `shell/domain/config/FirstRun.qml`. The marker
+says whether the wizard has finished here; `ConfigStore.configured` says
+whether anybody has ever set anything, which is any key in the profile other
+than the `schemaVersion` the shell writes itself. Only a machine where both
+say no is a first run. A configured machine with no marker gets the marker
+written back, quietly. Both directions were tried on this machine: taking
+the marker away wrote it back and showed nothing; forcing the configuration
+check off brought the wizard up, which is the fresh-install path.
+
+The reverse is deliberately not symmetric. A marker with an empty profile is
+ordinary -- somebody skipped the wizard -- and showing it again would make
+the skip button a lie.
+
+**And Finish keeps what it replaces.** `rmpr wizard` re-runs this on a
+machine set up months ago, so the last step now says what the button is
+about to do, and the profile is copied aside first. The routine is
+`preset apply`'s, moved to `scripts/lib/profiles.sh` and exposed as
+`rmpr profile keep <label>`, so there is one implementation rather than one
+and a missing one. Keeping is skipped when there is nothing to keep, and
+"nothing" means what the shell means by it; a profile that does not parse is
+kept anyway, being the one somebody most wants back. `tests/test-profiles.sh`
+pins all of it, and found two faults in the old code doing so.
+
+### The session of 2026-09-15, morning
+
+The first session after the shell started drawing at login, and both things
+the user reported were real.
+
+**The taskbar was empty because the window list was off.** Not a widget bug:
+the KWin script had been removed from `~/.local/share/kwin/scripts/`, the
+kwinrc key was unset, and the kconfig ledger had no `windows` scope -- the
+restore of the night before rolled the state directory back past the day it
+was enabled, and took the script with it, exactly as it took the unit file.
+`rmpr windows enable` put it back and the daemon answered with ten windows.
+
+What is worth carrying is that **nothing on the screen says so**. The task
+list with no daemon behind it is a widget with nothing to show, which the
+panel correctly draws as no widget at all, and `rmpr doctor` is the only
+thing in the project that reports the state. Anything a restore can take
+away should be checked after one -- the unit file is already recorded here
+as such, and this is the second.
+
+**A widget's click target was smaller than the bar it sat in.** `panel
+layout` gave the measurement: on a 52px panel, every widget but the task
+list was 33 to 37px tall and centred, leaving an 8px strip along the top and
+the bottom of the bar that belonged to no widget. The bottom one is the
+strip a pointer thrown at the screen edge lands on. A slot is the bar's
+thickness now, and a right click a widget has no use for opens the panel's
+own menu rather than being swallowed -- `wantsRightClick` in the widget
+contract, declared by the task list and the tray.
+
+**The panel's own menu does open**, and there is now a picture of it. It had
+been shipped unopened; `quickshell ipc call panel menu <screen> <along>`
+opens it the way the right click does, which is how it was checked without a
+pointer -- and how "the click does nothing" was told apart from "the click
+opens a menu I did not expect". `panel closeMenu` puts it away.
+
+**This shell starts at login now** (2026-09-15). `remappr-shell.service` is
+enabled -- the standing "keep the unit disabled, they start it by hand" rule is
+gone -- and plasmashell's shell package is `remappr-shell.desktop` rather than
+caelestia's. Plasma's lock screen still draws; ours is built and deliberately
+not enabled.
+
+**caelestia is kept on purpose** and still autostarts, so both draw at login
+and both want the same global shortcuts. That is the user's choice: they keep
+it to take ideas from. `systemctl --user disable app-caelestiashell@autostart`
+is the one command that changes it, and nothing should run it uninvited.
+
+Note the unit file at `~/.config/systemd/user/remappr-shell.service` is written
+by `make link` and is in `owned_paths`, so a restore deletes it -- systemd then
+keeps running an in-memory copy while `is-enabled` reports `not-found`. Check
+both after any restore.
+
+**What is live on the user's machine**: profile `recovered-appearance` (their
+settings, recovered from the 13:02 snapshot, with `launcher.provider` put back
+to `builtin` -- `auto` chose kickoff, which reports itself available whenever
+Plasma is running and opens nothing when plasmashell runs another shell's
+package). Alt+Tab is KWin's drawing `remappr-shell` (the Meridian row layout,
+which was never installed until this session). Meta+S opens the sidebar.
+`snapshots.keep` is 0, so nothing is pruned until they set it.
+
+**What no session here can check**: a click or a keystroke. There is no
+key-injection tool on this machine. Screenshots work (`spectacle -b -f -n -o`),
+but a surface holding exclusive keyboard focus may not survive being
+photographed. Racing the two CLI commands the daemon itself spawns *is* a
+faithful reproduction of a fast Alt+Tab, and is how both switcher fixes were
+verified -- do that rather than arguing from the code.
+
+Otherwise nothing is half-written: `make lint` clean, `make test` 376
 QML cases and every shell suite green. The shell is **running** and the user
 has been using it all afternoon, which is why most of what follows is theirs to
 press rather than ours to build.
