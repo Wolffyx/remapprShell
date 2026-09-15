@@ -8,22 +8,60 @@ to draw a good panel, *retheme* Plasma's own components, and *expose* Plasma's s
 not to replace subsystems that already work. Every replacement is opt-in and never the
 default.
 
-> Status: early. Phase 0 (skeleton) is in place — the shell starts and draws a panel on
-> every monitor. It is not yet useful as a daily driver.
+![The panel](docs/images/panel.png)
 
-## What it aims to be
+> Status: it draws the author's desktop, every day, from login. It is not packaged, it has
+> had no users but its author, and it is version 0.1.0 for a reason — but "does it work"
+> and "is it finished" are different questions, and the answer to the first is yes.
+
+## What it does
 
 - **One panel, two renderers.** A Quickshell layer-shell panel (default, total visual
   freedom) or a native Plasma panel generated from the same configuration — selectable in
-  settings, and mutually exclusive so two panels can never overlap.
+  settings, and mutually exclusive so two panels can never overlap. Along any edge, as a
+  strip, a floating bar or islands, with auto-hide.
+- **Twenty-three widgets**, each declaring what it is rather than being special-cased by
+  the panel: the taskbar, the tray, the launcher and search, the clock, workspaces, quick
+  settings, volume, brightness, network, Bluetooth, battery, media, the clipboard, the
+  recording indicator, and more. Drop a directory with a `widget.json` and a QML file into
+  the widgets path and the panel hosts it; no core code changes.
+- **Real window previews.** The taskbar's hover card, the desktop overview and this
+  shell's own Alt+Tab draw live pictures of the windows, through KWin's screencast
+  protocol.
 - **Pluggable launcher and search.** Kickoff, KRunner, a built-in launcher, rofi, fuzzel or
   a custom command, chosen at runtime.
 - **Configurable everywhere.** A sparse JSON config with live reload, layered as
-  defaults → profile → per-monitor, plus an in-shell settings GUI generated from the schema.
-- **Widget plugins.** Drop a directory with a `widget.json` and a QML file into the widgets
-  path; no core code changes.
+  defaults → profile → per-monitor, plus an in-shell settings GUI generated from the
+  schema — so a new setting is a schema entry, not a page.
 - **Reversible.** Every change to KDE configuration is recorded in a ledger with its prior
-  value, and `rmpr restore` puts it back.
+  value, and `rmpr restore` puts it back. Restore points are never deleted automatically.
+
+## What it looks like
+
+The cards below are rendered from the components themselves, offscreen, by
+`dev/preview/readme-shots.sh` — so a picture here cannot show something the shell does
+not do, and re-taking them is one command. The two that are mostly the things they are
+showing — the panel at the top, and the window previews at the bottom — are real
+screenshots, because offscreen there are no windows to draw.
+
+| Quick settings | The notification centre |
+| --- | --- |
+| ![Quick settings](docs/images/quick-settings.png) | ![Notifications](docs/images/notifications.png) |
+
+Quick settings has a page behind every tile and every slider: the networks, the paired
+devices, the outputs and inputs to pick between, a brightness slider per display. Which
+tiles it draws is a setting.
+
+![The settings window](docs/images/settings.png)
+
+Every page of the settings window is generated from `config/schema/shell.json` and the
+widget manifests. Nothing in it is hand-laid-out, and
+[`docs/config.md`](docs/config.md) is generated from the same file, so the window, the
+reference and the shell cannot disagree about what a setting is.
+
+![Window previews](docs/images/window-previews.png)
+
+An application with several windows shows a picture of each, and each one is a target.
 
 ## Requirements
 
@@ -43,6 +81,21 @@ make uninstall
 
 `make help` lists every target.
 
+### Pictures
+
+```bash
+dev/preview/preview.sh <target.qml> <out.png> [w] [h] [light|dark]
+dev/preview/readme-shots.sh          # the pictures above, again
+```
+
+`preview.sh` renders any QML offscreen against a copy of the worktree's shell: no
+compositor, no display, nothing reaching the real session. It is how a page is looked at
+while it is being built, and it is where the README's pictures come from.
+
+`PREVIEW_DEMO=1` gives the shot a plausible stranger -- an account name, a network, a
+sound card -- because a published screenshot should not carry whoever took it, and
+because the pictures should be re-takeable on a machine that is not this one.
+
 ### Command line
 
 ```bash
@@ -54,7 +107,12 @@ rmpr theme apply        # install and activate the look and feel
 rmpr renderer list      # what can draw the panel here
 rmpr renderer set plasma --dry-run   # the applet layout it would install
 rmpr renderer set plasma             # switch, with a restore point and a rollback
-rmpr wizard             # re-run the first-run wizard
+rmpr wizard             # re-run the first-run wizard (it keeps the profile it replaces)
+rmpr profile list       # configuration profiles, and which is active
+rmpr preset apply <n>   # a whole panel layout, keeping what it replaces
+rmpr windows enable     # the open-window list (opt-in; see below)
+rmpr settings [page]    # the settings window
+rmpr doctor             # check everything and report fixes
 rmpr report create      # write a local diagnostic bundle
 rmpr report show        # read the newest one
 rmpr lockscreen status  # which lock screen the next lock will draw

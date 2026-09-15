@@ -46,6 +46,45 @@ sed -i "s|\${Branding.dataDir}/config/schema|$WT/config/schema|" "$root/domain/c
 sed -i "s|\${Branding.dataDir}/config/defaults|$WT/config/defaults|" "$root/core/Paths.qml"
 sed -i -E 's/^FloatingWindow \{/Item {/; /^    title: /d; /^    color: Theme\.s1$/d' "$root/features/settings/SettingsWindow.qml"
 
+# PREVIEW_DEMO=1: a picture fit to publish.
+#
+# A shot of the real shell carries whoever took it -- the account name, the
+# network they are on, the sound card they own. That is fine in a bug report
+# and wrong in a README, and it also means the pictures can only ever be
+# retaken on one machine. So the copied tree is given a plausible stranger
+# instead, in the one place each answer is produced.
+#
+# Only names. Nothing here changes a layout, a size or a colour, so a demo
+# shot and a real one differ in the words and in nothing else.
+if [ "${PREVIEW_DEMO:-}" = "1" ]; then
+    # Each substitution is checked. A silent miss would be worse than no demo
+    # mode at all: the shot would look right and still carry a real name.
+    demo() {
+        local file=$1 from=$2 to=$3
+        grep -qF "$from" "$file" || { echo "demo: no longer present in $(basename "$file"): $from" >&2; exit 1; }
+        python3 - "$file" "$from" "$to" <<'PYEOF'
+import sys
+path, frm, to = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path).read()
+open(path, "w").write(text.replace(frm, to, 1))
+PYEOF
+    }
+
+    demo "$root/domain/session/Session.qml" \
+        'Quickshell.env("USER") ?? ""' '"alex"'
+    demo "$root/domain/session/Session.qml" \
+        'property string hostName: ""' 'property string hostName: "orion"'
+    # The hostname is read from a file a moment later, which puts the real one
+    # back over the value above.
+    demo "$root/domain/session/Session.qml" \
+        'onLoaded: root.hostName = text().trim()' 'onLoaded: {}'
+    demo "$root/domain/status/NetworkStatus.qml" \
+        'name: joined?.name ?? ""' 'name: "Home Wi-Fi"'
+    demo "$root/domain/status/AudioStatus.qml" \
+        'return node?.description || node?.nickname || node?.name || "";' \
+        'return node ? (node.isSink ? "Desk speakers" : "Desk microphone") : "";'
+fi
+
 WT_SCRIPTS="$WT/scripts" env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
     WT_SCRIPTS="$WT/scripts" PREVIEW_OUT="$out" PREVIEW_W="$W" PREVIEW_H="$H" PREVIEW_MODE="$MODE" PREVIEW_DELAY="$DELAY" \
     timeout 40 quickshell -n -p "$root/preview.qml" 2>&1 | grep -vE 'DEBUG|^\s*$' | grep -iE 'warn|error|fail|preview|qml:' | head -40 || true
