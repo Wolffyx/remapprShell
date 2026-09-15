@@ -166,6 +166,37 @@ BarWidget {
     // handler per button.
     property int hoveredIndex: -1
 
+    // Which button the preview is *about*, which is not the same question.
+    // Reaching the card means taking the pointer off the button, so a card
+    // that read `hoveredIndex` emptied itself on the way there and could never
+    // be clicked -- which is exactly what "the popup disappears" was.
+    property var previewItem: null
+
+    // And the card stays up while the pointer crosses the gap to it. Leaving
+    // the button starts a short countdown rather than closing; entering the
+    // card stops it. Windows and Plasma both do this, and without it a hover
+    // preview can only ever be looked at.
+    property bool pointerInPopout: false
+
+    readonly property Timer _closeDelay: Timer {
+        interval: 280
+        onTriggered: {
+            if (root.popoutMode === "menu" || root.pointerInPopout || root.hoveredIndex >= 0)
+                return;
+            root.popoutVisible = false;
+            root.previewItem = null;
+        }
+    }
+
+    function beginClose() {
+        if (root.popoutMode !== "menu")
+            root._closeDelay.restart();
+    }
+
+    function cancelClose() {
+        root._closeDelay.stop();
+    }
+
     // What the popout shows: the preview while the pointer is over a button,
     // or a button's menu after a right click. The menu stays put while the
     // pointer travels to it, and a click anywhere else closes it; the preview
@@ -192,10 +223,14 @@ BarWidget {
         if (root.popoutMode === "menu")
             return;
         if (root.hoveredIndex >= 0) {
+            root.cancelClose();
+            root.previewItem = root.items[root.hoveredIndex];
             root.popoutVisible = true;
             root.requestPopout("tasks", root.centreOf(root.hoveredIndex));
         } else {
-            root.popoutVisible = false;
+            // Between two buttons, still on the widget. The card goes, but not
+            // instantly: crossing a 5px gap should not cost the card.
+            root.beginClose();
         }
     }
 
@@ -205,8 +240,7 @@ BarWidget {
     // leaving is how it reaches an open menu, so the menu stays.
     onDismissPopout: {
         root.hoveredIndex = -1;
-        if (root.popoutMode !== "menu")
-            root.popoutVisible = false;
+        root.beginClose();
     }
 
     // However it closed -- chosen from, clicked away from, replaced by another
@@ -215,6 +249,9 @@ BarWidget {
         if (!root.popoutVisible) {
             root.popoutMode = "preview";
             root.menuItem = null;
+            root.previewItem = null;
+            root.pointerInPopout = false;
+            root.cancelClose();
         }
     }
 
@@ -469,9 +506,13 @@ BarWidget {
     //
     // It shows a live picture of the window where the compositor gives one --
     // KWin's screencast protocol, through this project's one compiled part
-    // (plugin/) -- and the application's icon where it does not. The text is
-    // the same either way: the application's real name rather than its window
-    // class, the full title, and the state the window is in.
+    // (plugin/) -- and the application's icon where it does not.
+    //
+    // A group of several windows is a picture each, not a list of titles, and
+    // every one of them is a target: hovering a grouped button and then being
+    // unable to say which window you meant is the whole complaint against a
+    // grouped taskbar, and "click to move through them" is an answer only for
+    // somebody who already knows which one is next.
     //
     // The previous note here said a picture was impossible. It was wrong in an
     // instructive way: the protocol is restricted rather than absent, and KWin
@@ -480,21 +521,42 @@ BarWidget {
         Item {
             id: preview
 
-            readonly property var item: root.items[root.hoveredIndex] ?? null
+            readonly property var item: root.previewItem
             readonly property var windows: preview.item?.windows ?? []
+            readonly property bool many: preview.windows.length > 1
+
+            // Three across before it wraps. Four Chrome windows in a row is
+            // wider than a laptop screen, and a card wider than the screen is
+            // clamped -- which puts the cards under a button they did not come
+            // from.
+            readonly property int columns: Math.min(3, Math.max(1, preview.windows.length))
+            readonly property int cellWidth: 176
+            readonly property int cellHeight: 99
 
             implicitWidth: Math.max(260, body.implicitWidth + 24)
             implicitHeight: body.implicitHeight + 14
+
+            // The pointer being on the card is what keeps the card. Declared
+            // here rather than on each cell so the gaps between them count as
+            // being on it too.
+            HoverHandler {
+                id: cardHover
+                onHoveredChanged: {
+                    root.pointerInPopout = cardHover.hovered;
+                    if (cardHover.hovered)
+                        root.cancelClose();
+                    else
+                        root.beginClose();
+                }
+            }
 
             Column {
                 id: body
                 anchors.centerIn: parent
                 spacing: 8
 
-                // The window itself, when there is one window to show and a
-                // compositor willing to show it. A group of several is a list
-                // of titles rather than a gallery: which of five Chrome
-                // windows a picture belongs to is not obvious at this size.
+                // One window: the picture is the card, as big as it is worth
+                // drawing, and the title sits under the application below.
                 WindowThumbnail {
                     visible: preview.windows.length === 1
                     width: 300
@@ -529,8 +591,8 @@ BarWidget {
 
                         PanelText {
                             visible: text.length > 0
-                            text: preview.windows.length > 1
-                                ? `${preview.windows.length} windows — click to move through them`
+                            text: preview.many
+                                ? `${preview.windows.length} windows — pick one`
                                 : preview.windows.length === 0 ? "Pinned — click to start it" : ""
                             color: Theme.foregroundInactive
                             font.pixelSize: 11
@@ -538,38 +600,137 @@ BarWidget {
                     }
                 }
 
-                // Then every window it has, which is the part a grouped button
-                // otherwise hides. KDE puts a thumbnail beside each of these;
-                // the protocol that would give us one is not offered to us, so
-                // this is the title and the state instead.
-                Repeater {
-                    model: preview.windows
+                // Every window it has, each with its own picture and each a
+                // target. Only `columns` is set -- see ZoneRow for why setting
+                // both goes wrong.
+                Grid {
+                    visible: preview.many
+                    columns: preview.columns
+                    spacing: 8
 
-                    Row {
-                        id: line
-
-                        required property var modelData
-
-                        spacing: 6
+                    Repeater {
+                        model: preview.many ? preview.windows : []
 
                         Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 3
-                            height: 12
-                            radius: 1.5
-                            color: line.modelData.active ? Theme.accent : "transparent"
-                        }
+                            id: cell
 
-                        PanelText {
-                            id: lineTitle
-                            width: Math.min(lineTitle.implicitWidth, 320)
-                            elide: Text.ElideRight
-                            text: WindowEvents.label(line.modelData)
-                            color: line.modelData.minimized ? Theme.foregroundInactive
-                                                            : Theme.foreground
-                            font.pixelSize: 12
-                            font.italic: line.modelData.minimized
+                            required property var modelData
+                            required property int index
+
+                            width: preview.cellWidth
+                            height: preview.cellHeight + cellTitle.implicitHeight + 14
+                            radius: Theme.radiusOf(12)
+                            color: cell.modelData.active ? Theme.accC
+                                 : cellPointer.hovered ? Theme.s2
+                                                       : "transparent"
+                            Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+                            WindowThumbnail {
+                                id: shot
+                                x: 4
+                                y: 4
+                                width: preview.cellWidth - 8
+                                height: preview.cellHeight
+                                windowId: cell.modelData.uuid ?? ""
+                                iconName: preview.item?.iconName ?? ""
+                                iconFile: preview.item?.iconFile ?? ""
+                                iconScale: 0.4
+                                sourceAspect: WindowEvents.aspectOf(cell.modelData)
+                                // A picture is a screencast stream, and one
+                                // per window is one per window. Eight is more
+                                // than anybody picks from at a glance; past
+                                // that the cards are icons, which is what a
+                                // thumbnail falls back to anyway.
+                                live: cell.index < 8
+                                opacity: cell.modelData.minimized ? 0.55 : 1
+                            }
+
+                            PanelText {
+                                id: cellTitle
+                                x: 6
+                                width: cell.width - 12
+                                anchors.top: shot.bottom
+                                anchors.topMargin: 4
+                                elide: Text.ElideRight
+                                text: WindowEvents.label(cell.modelData)
+                                color: cell.modelData.minimized ? Theme.foregroundInactive : Theme.foreground
+                                font.pixelSize: 11
+                                font.italic: cell.modelData.minimized
+                            }
+
+                            // Closing a window from its own picture, as every
+                            // taskbar preview does. Only under the pointer:
+                            // a row of crosses on a card somebody is only
+                            // reading is an invitation to lose a window.
+                            Rectangle {
+                                id: closeButton
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 6
+                                width: 20
+                                height: 20
+                                radius: 10
+                                visible: cellPointer.hovered
+                                color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.background, 0.75)
+
+                                Glyph {
+                                    anchors.centerIn: parent
+                                    name: "close"
+                                    fallback: "window-close"
+                                    size: 13
+                                    color: closePointer.hovered ? Theme.errorFg : Theme.foreground
+                                }
+
+                                HoverHandler { id: closePointer; cursorShape: Qt.PointingHandCursor }
+                                TapHandler {
+                                    onTapped: {
+                                        WindowsService.close(cell.modelData.uuid);
+                                        // The card stays: closing one of five
+                                        // windows is usually the first of
+                                        // several, and a card that vanished
+                                        // would make the second a fresh hunt.
+                                        // It closes itself when the last one
+                                        // goes, because the group does.
+                                        root.cancelClose();
+                                    }
+                                }
+                            }
+
+                            HoverHandler { id: cellPointer; cursorShape: Qt.PointingHandCursor }
+                            TapHandler {
+                                // The whole cell, not the picture: a target
+                                // the size of the thing it stands for.
+                                onTapped: {
+                                    WindowsService.activate(cell.modelData.uuid);
+                                    root.popoutVisible = false;
+                                }
+                            }
                         }
+                    }
+                }
+
+                // One window's title, under the picture of it. A group says
+                // its titles on the cards above instead.
+                Row {
+                    visible: preview.windows.length === 1
+                    spacing: 6
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 3
+                        height: 12
+                        radius: 1.5
+                        color: preview.windows[0]?.active ? Theme.accent : "transparent"
+                    }
+
+                    PanelText {
+                        id: soleTitle
+                        width: Math.min(soleTitle.implicitWidth, 320)
+                        elide: Text.ElideRight
+                        text: preview.windows[0] ? WindowEvents.label(preview.windows[0]) : ""
+                        color: preview.windows[0]?.minimized ? Theme.foregroundInactive : Theme.foreground
+                        font.pixelSize: 12
+                        font.italic: preview.windows[0]?.minimized === true
                     }
                 }
             }
