@@ -2,7 +2,7 @@
     "id": "status",
     "apiVersion": 1,
     "name": "Quick settings",
-    "description": "Network, Bluetooth, sound and battery in one place on the panel, and quick settings a click away: Wi-Fi and Bluetooth, the microphone, do not disturb, Night Light, and game mode and VPN where there are any, with the volume and the brightness. Scroll to change the volume, middle-click to mute.",
+    "description": "Network, Bluetooth, sound and battery in one place on the panel, and quick settings a click away: Wi-Fi and Ethernet, Bluetooth, the microphone, do not disturb, Night Light, and game mode and VPN where there are any, with the volume and the brightness -- each with a page of its own for the devices behind it. Choose which tiles are drawn. Scroll to change the volume, middle-click to mute.",
     "icon": "preferences-system",
     "zones": ["left", "middle", "right"],
     "orientation": ["horizontal", "vertical"],
@@ -10,6 +10,14 @@
         "quickshell": { "entry": "Widget.qml" }
     },
     "config": {
+        "tiles": {
+            "type": "set",
+            "values": ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"],
+            "labels": ["Wi-Fi", "Ethernet", "Bluetooth", "Microphone", "Do not disturb", "Night Light", "Game mode", "VPN"],
+            "default": ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"],
+            "label": "Tiles",
+            "description": "Which switches the grid draws, in this order. A tile for hardware the machine does not have is left out whether or not it is on here -- no Bluetooth adapter, no Bluetooth tile."
+        },
         "density": {
             "type": "enum",
             "values": ["roomy", "dense"],

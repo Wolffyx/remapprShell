@@ -178,6 +178,14 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 | `switching.overviewStrip` | `true` or `false` | `true` | The row along the bottom with every desktop, what is on each, and a tile for one more. Off gives the whole surface to the selected desktop's windows, and the desktops move on the arrows alone. |
 | `switching.overviewCardWidth` | a number, 260 to 720 | `560` | In pixels. Cards share the room between them, three to a row at most, and never grow past this. |
 
+### Sound
+
+What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
+
 ### On-screen display
 
 The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
@@ -433,6 +441,7 @@ without `tray` it stands on the panel alone.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `tiles` | `wifi`, `ethernet`, `bluetooth`, `microphone`, `dnd`, `night`, `game`, `vpn` | `["wifi","ethernet","bluetooth","microphone","dnd","night","game","vpn"]` | Which switches the grid draws, in this order. A tile for hardware the machine does not have is left out whether or not it is on here -- no Bluetooth adapter, no Bluetooth tile. |
 | `density` | `roomy`, `dense` | `roomy` | roomy: a grid of tiles. dense: a list of rows, each with its switch. |
 | `step` | a number, 1 to 25 | `5` | Percent per notch of the wheel. |
 
@@ -468,7 +477,7 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
-| `maxVolume` | a number, 100 to 150 | `100` | Scrolling and the slider stop here. Above 100 is amplification, which can distort. |
+| `maxVolume` | a number, 0 to 150 | `0` | Percent. 0 follows Settings → Sound, where "Raise maximum volume" lives and which every other slider in this shell reads; anything else is this widget's own ceiling. |
 | `showMicrophone` | `true` or `false` | `true` | A second slider in the popout, for the default input. |
 
 ### `widgets.workspaces`

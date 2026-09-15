@@ -19,6 +19,11 @@ BarWidget {
     id: root
 
     readonly property string density: root.widgetConfig?.density ?? "roomy"
+
+    // Which tiles the grid draws, in this order. The manifest's default is
+    // every one of them; what the machine actually has still decides.
+    readonly property var tiles: root.widgetConfig?.tiles
+        ?? ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"]
     readonly property int step: root.widgetConfig?.step ?? 5
     readonly property bool vertical: !(root.bar?.horizontal ?? true)
     readonly property real k: Math.max(0.7, root.unit)
@@ -103,7 +108,7 @@ BarWidget {
     onDismissPopout: root.hoveredIndex = -1
 
     function handleWheel(delta) {
-        AudioStatus.setVolume(StatusIcons.stepVolume(AudioStatus.volume, delta, root.step, 1));
+        AudioStatus.setVolume(StatusIcons.stepVolume(AudioStatus.volume, delta, root.step, AudioStatus.maxVolume));
     }
 
     function handleActivate(button) {
