@@ -16,7 +16,9 @@ pragma ComponentBehavior: Bound
 // tray it has rather than an empty strip and a chevron. Pin anything and the
 // rest move behind the chevron -- which is the moment the chevron first
 // appears, so it is never furniture with nothing behind it. The chevron sits
-// after the icons, at the end of the tray, as the design has it.
+// after the icons, at the end of the tray, as the design has it -- or before
+// them, which is where Plasma puts it and where it stays still while the
+// icons beside it come and go.
 //
 // Every interaction an application expects is here. A tray icon whose menu
 // does not open is a broken tray icon, and `secondaryActivate` on right-click
@@ -43,6 +45,11 @@ BarWidget {
     // The panel's tray icon size, unless this tray has one of its own.
     readonly property int configuredIconSize: root.widgetConfig?.iconSize ?? 0
     readonly property int size: root.configuredIconSize > 0 ? root.configuredIconSize : root.panelIconSize
+    // Where the chevron sits along the tray. Everything below counts in
+    // cells, so this is the one place the two arrangements differ: the cell
+    // the chevron occupies, and therefore what each other cell holds.
+    readonly property bool chevronFirst: (root.widgetConfig?.chevron ?? "after") === "before"
+
     readonly property var pinned: root.widgetConfig?.pinned ?? []
     readonly property var hidden: root.widgetConfig?.hidden ?? []
 
@@ -66,12 +73,19 @@ BarWidget {
 
     popoutPadding: root.popoutMode === "menu" ? 8 : 12
 
-    // Which cell the pointer is over, or -1: an icon, or -- one past the
-    // last -- the chevron. The panel reports a position along the widget;
+    // Which cell the pointer is over, or -1: an icon, or the chevron at
+    // whichever end it sits. The panel reports a position along the widget;
     // turning that into an index is arithmetic rather than a handler per icon
     // -- the same approach the task buttons take.
     property int hoveredIndex: -1
-    readonly property bool overChevron: root.hasOverflow && root.hoveredIndex === root.shown.length
+    readonly property int chevronCell: root.chevronFirst ? 0 : root.shown.length
+    readonly property bool overChevron: root.hasOverflow && root.hoveredIndex === root.chevronCell
+
+    // Which cell an icon occupies, and which icon a cell holds -- the inverse
+    // of each other, and the whole of what moving the chevron changes.
+    function cellOf(index) {
+        return root.chevronFirst && root.hasOverflow ? index + 1 : index;
+    }
 
     // The icon under the pointer names itself, in the application's words.
     // A description may carry the markup the tray protocol allows; a tooltip
@@ -106,8 +120,10 @@ BarWidget {
     readonly property string inward: ({ expand_less: "expand_more", expand_more: "expand_less",
                                         chevron_right: "chevron_left", chevron_left: "chevron_right" })[root.outward]
 
-    function itemAt(index) {
-        return root.shown[index] ?? null;
+    function itemAt(cell) {
+        if (cell < 0)
+            return null;
+        return root.shown[root.chevronFirst && root.hasOverflow ? cell - 1 : cell] ?? null;
     }
 
     function handleHover(position, horizontal) {
@@ -145,7 +161,7 @@ BarWidget {
         root.menuItem = null;
         root.popoutMode = "overflow";
         root.popoutVisible = true;
-        root.requestPopout("tray", root.shown.length * root.stride + root.cell / 2);
+        root.requestPopout("tray", root.chevronCell * root.stride + root.cell / 2);
     }
 
     function showMenu(item, centre) {
@@ -214,6 +230,12 @@ BarWidget {
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 
+        // Drawn first when it comes first. A Grid lays its children out in
+        // the order they are declared, and `visible: false` is skipped -- so
+        // the two are one component used twice rather than a Repeater over a
+        // list with a hole in it.
+        Chevron { shown: root.hasOverflow && root.chevronFirst }
+
         Repeater {
             model: ScriptModel { values: root.shown }
 
@@ -233,7 +255,7 @@ BarWidget {
                 Rectangle {
                     anchors.fill: parent
                     radius: Math.round(12 * Math.max(0.7, root.unit))
-                    color: root.hoveredIndex === entry.index ? Theme.s2 : "transparent"
+                    color: root.hoveredIndex === root.cellOf(entry.index) ? Theme.s2 : "transparent"
                     Behavior on color { ColorAnimation { duration: Theme.durationFast } }
                 }
 
@@ -249,26 +271,32 @@ BarWidget {
             }
         }
 
-        // Shown only when something is behind it.
-        Item {
-            visible: root.hasOverflow
-            width: root.hasOverflow ? root.cell : 0
-            height: root.cell
+        Chevron { shown: root.hasOverflow && !root.chevronFirst }
+    }
 
-            Rectangle {
-                anchors.fill: parent
-                radius: Math.round(12 * Math.max(0.7, root.unit))
-                color: root.popoutVisible && root.popoutMode === "overflow" || root.overChevron ? Theme.s2 : "transparent"
-                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
-            }
+    // Shown only when something is behind it.
+    component Chevron: Item {
+        id: chevron
 
-            Glyph {
-                anchors.centerIn: parent
-                name: root.popoutVisible && root.popoutMode === "overflow" ? root.inward : root.outward
-                fallback: "arrow-up"
-                size: root.size
-                color: Theme.mut
-            }
+        required property bool shown
+
+        visible: chevron.shown
+        width: chevron.shown ? root.cell : 0
+        height: root.cell
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Math.round(12 * Math.max(0.7, root.unit))
+            color: root.popoutVisible && root.popoutMode === "overflow" || root.overChevron ? Theme.s2 : "transparent"
+            Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+        }
+
+        Glyph {
+            anchors.centerIn: parent
+            name: root.popoutVisible && root.popoutMode === "overflow" ? root.inward : root.outward
+            fallback: "arrow-up"
+            size: root.size
+            color: Theme.mut
         }
     }
 

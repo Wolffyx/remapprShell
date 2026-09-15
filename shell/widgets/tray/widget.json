@@ -30,6 +30,13 @@
             "label": "Icon size",
             "description": "0 follows the panel's tray icon size."
         },
+        "chevron": {
+            "type": "enum",
+            "values": ["after", "before"],
+            "default": "after",
+            "label": "The hidden-icons button sits",
+            "description": "after: at the end of the tray, past the icons, as the design has it. before: at the start, so the icons that come and go do not push it around -- which is what Plasma's tray does."
+        },
         "pinned": {
             "type": "list",
             "default": [],

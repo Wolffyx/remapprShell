@@ -469,6 +469,7 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's tray icon size. |
+| `chevron` | `after`, `before` | `after` | after: at the end of the tray, past the icons, as the design has it. before: at the start, so the icons that come and go do not push it around -- which is what Plasma's tray does. |
 | `pinned` | a list | `[]` | StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids. |
 | `hidden` | a list | `[]` | Ids left out altogether, not even behind the chevron. |
 
