@@ -80,4 +80,46 @@ TestCase {
         compare(SettingGroups.split(null, "Section").length, 0);
         compare(SettingGroups.split(undefined, "Section").length, 0);
     }
+
+    // ---- set keys ----------------------------------------------------------
+    //
+    // Which tiles the quick settings draw is a `set`: a fixed list of members,
+    // any of which may be on. The order they are stored in is the order they
+    // are drawn in, which is why turning one off and on again must not move
+    // it.
+
+    readonly property var members: ["wifi", "ethernet", "bluetooth", "dnd"]
+
+    function test_turning_one_off_leaves_the_rest_in_order() {
+        const out = SettingGroups.chooseFrom(members, members, "bluetooth", false);
+        compare(out, ["wifi", "ethernet", "dnd"]);
+    }
+
+    // The one that started this: an append would have put it last, and a tile
+    // would wander down the grid every time it was switched.
+    function test_turning_one_back_on_puts_it_where_the_schema_has_it() {
+        const without = SettingGroups.chooseFrom(members, members, "ethernet", false);
+        compare(SettingGroups.chooseFrom(members, without, "ethernet", true),
+                ["wifi", "ethernet", "bluetooth", "dnd"]);
+    }
+
+    // Nothing stored means everything, so a fresh machine draws the lot.
+    function test_no_stored_value_means_every_member() {
+        compare(SettingGroups.chooseFrom(members, undefined, "dnd", false),
+                ["wifi", "ethernet", "bluetooth"]);
+    }
+
+    // A member the stored list has never heard of -- the schema gained one
+    // since it was written -- is off until it is asked for, and the ones that
+    // were chosen keep their places.
+    function test_a_member_the_stored_list_never_had_stays_out() {
+        compare(SettingGroups.chooseFrom(members, ["wifi", "dnd"], "wifi", true),
+                ["wifi", "dnd"]);
+    }
+
+    // Turning on something that is not a member of the set changes nothing:
+    // the schema decides what the members are.
+    function test_a_value_outside_the_set_is_not_added() {
+        compare(SettingGroups.chooseFrom(members, ["wifi"], "vpn", true), ["wifi"]);
+    }
 }

@@ -41,4 +41,18 @@ QtObject {
         }
         return out;
     }
+
+    // A `set` key holds the chosen members of a fixed list. Turning one on or
+    // off rebuilds that list from the schema's own order rather than appending
+    // to what is stored -- otherwise turning a tile off and on again moves it
+    // to the end of the grid, which is not what anybody meant by a switch.
+    //
+    // `chosen` being absent means every member: a machine that has never
+    // touched the setting shows the lot, and so does one whose stored value
+    // predates a member the schema has since gained.
+    function chooseFrom(values, chosen, value, on) {
+        const all = values ?? [];
+        const now = Array.isArray(chosen) ? chosen : all;
+        return all.filter(v => v === value ? on : now.indexOf(v) >= 0);
+    }
 }
