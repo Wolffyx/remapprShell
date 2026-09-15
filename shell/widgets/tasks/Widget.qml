@@ -536,6 +536,52 @@ BarWidget {
             implicitWidth: Math.max(260, body.implicitWidth + 24)
             implicitHeight: body.implicitHeight + 14
 
+            // Closing a window from its own picture, as every taskbar preview
+            // does -- and from the single window's picture too, which had none
+            // and is the commonest case there is.
+            //
+            // Drawn faintly rather than only under the pointer. A cross nobody
+            // can see is a feature nobody finds, and this one is small, in a
+            // corner, and on a card that is already a deliberate hover; the
+            // risk it guards against is a row of bright crosses over something
+            // somebody is only reading, which dimming answers just as well.
+            component CloseButton: Rectangle {
+                id: closeButton
+
+                required property string uuid
+
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 6
+                width: 20
+                height: 20
+                radius: 10
+                opacity: closePointer.hovered ? 1 : 0.55
+                color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.background, 0.8)
+                Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
+
+                Glyph {
+                    anchors.centerIn: parent
+                    name: "close"
+                    fallback: "window-close"
+                    size: 13
+                    color: closePointer.hovered ? Theme.errorFg : Theme.foreground
+                }
+
+                HoverHandler { id: closePointer; cursorShape: Qt.PointingHandCursor }
+                TapHandler {
+                    onTapped: {
+                        WindowsService.close(closeButton.uuid);
+                        // The card stays: closing one of five windows is
+                        // usually the first of several, and a card that
+                        // vanished would make the second a fresh hunt. It
+                        // closes itself when the last one goes, because the
+                        // group does.
+                        root.cancelClose();
+                    }
+                }
+            }
+
             // The pointer being on the card is what keeps the card. Declared
             // here rather than on each cell so the gaps between them count as
             // being on it too.
@@ -557,16 +603,36 @@ BarWidget {
 
                 // One window: the picture is the card, as big as it is worth
                 // drawing, and the title sits under the application below.
-                WindowThumbnail {
+                Item {
+                    id: sole
+
                     visible: preview.windows.length === 1
                     width: 300
                     height: 169
-                    windowId: preview.windows[0]?.uuid ?? ""
-                    iconName: preview.item?.iconName ?? ""
-                    iconFile: preview.item?.iconFile ?? ""
-                    iconScale: 0.3
-                    sourceAspect: WindowEvents.aspectOf(preview.windows[0])
-                    live: preview.windows.length === 1
+
+                    WindowThumbnail {
+                        anchors.fill: parent
+                        windowId: preview.windows[0]?.uuid ?? ""
+                        iconName: preview.item?.iconName ?? ""
+                        iconFile: preview.item?.iconFile ?? ""
+                        iconScale: 0.3
+                        sourceAspect: WindowEvents.aspectOf(preview.windows[0])
+                        live: preview.windows.length === 1
+                        opacity: preview.windows[0]?.minimized ? 0.55 : 1
+                    }
+
+                    CloseButton { uuid: preview.windows[0]?.uuid ?? "" }
+
+                    // The picture behaves as the cells below do: the thing
+                    // itself is the target. Under the close button, which
+                    // takes its own taps first.
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        onTapped: {
+                            WindowsService.activate(preview.windows[0]?.uuid ?? "");
+                            root.popoutVisible = false;
+                        }
+                    }
                 }
 
                 // The application, once, however many windows it has.
@@ -658,43 +724,7 @@ BarWidget {
                                 font.italic: cell.modelData.minimized
                             }
 
-                            // Closing a window from its own picture, as every
-                            // taskbar preview does. Only under the pointer:
-                            // a row of crosses on a card somebody is only
-                            // reading is an invitation to lose a window.
-                            Rectangle {
-                                id: closeButton
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.margins: 6
-                                width: 20
-                                height: 20
-                                radius: 10
-                                visible: cellPointer.hovered
-                                color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.background, 0.75)
-
-                                Glyph {
-                                    anchors.centerIn: parent
-                                    name: "close"
-                                    fallback: "window-close"
-                                    size: 13
-                                    color: closePointer.hovered ? Theme.errorFg : Theme.foreground
-                                }
-
-                                HoverHandler { id: closePointer; cursorShape: Qt.PointingHandCursor }
-                                TapHandler {
-                                    onTapped: {
-                                        WindowsService.close(cell.modelData.uuid);
-                                        // The card stays: closing one of five
-                                        // windows is usually the first of
-                                        // several, and a card that vanished
-                                        // would make the second a fresh hunt.
-                                        // It closes itself when the last one
-                                        // goes, because the group does.
-                                        root.cancelClose();
-                                    }
-                                }
-                            }
+                            CloseButton { uuid: cell.modelData.uuid ?? "" }
 
                             HoverHandler { id: cellPointer; cursorShape: Qt.PointingHandCursor }
                             TapHandler {
