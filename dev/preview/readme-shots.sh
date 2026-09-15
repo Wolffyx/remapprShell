@@ -69,5 +69,27 @@ PREVIEW_PAGE=appearance \
 PREVIEW_WIDGET=notifications PREVIEW_NOTES=1 \
     shot notifications "$HERE/popout.qml" "$OUT/notifications.png" 640 700 light 3000
 
+# The start menu. Its pinned applications, its recent files, what is playing
+# and what the machine is doing are all somebody's, so all four are replaced --
+# see PREVIEW_DEMO in preview.sh, and the pins below, which are KDE's own
+# applications because those are the ones a reader of a KDE project will have.
+PREVIEW_WIDGET=launcher \
+PREVIEW_RUNTIME='{"launcher.pinned":["org.kde.dolphin","org.kde.konsole","org.kde.kate","org.kde.kcalc","systemsettings","org.kde.gwenview"]}' \
+    shot launcher "$HERE/popout.qml" "$OUT/launcher.png" 1020 760 light 3200
+
+# Alt+Tab. Not preview.sh's to render: the switcher is a KWin package rather
+# than part of the shell, so it has a harness of its own -- which also holds
+# the five invented windows it is drawn against.
+#
+# The crop is fixed because the picture is: the same five windows, the same
+# layout, the same stage every time. Change the model in switcher.sh and this
+# wants looking at again.
+if wanted switcher; then
+    echo "==> switcher"
+    SWITCHER_SHOT="$OUT/switcher.png" bash "$HERE/switcher.sh" row >/dev/null
+    magick "$OUT/switcher.png" -crop 1146x334+282+114 +repage "$OUT/switcher.png"
+    echo "    $OUT/switcher.png"
+fi
+
 echo
 echo "done. The README links these by path; nothing else needs changing."

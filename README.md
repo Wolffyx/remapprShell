@@ -54,6 +54,19 @@ Quick settings has a page behind every tile and every slider: the networks, the 
 devices, the outputs and inputs to pick between, a brightness slider per display. Which
 tiles it draws is a setting.
 
+![The start menu](docs/images/launcher.png)
+
+The built-in start menu: pinned applications, recent files, what is playing, what the
+machine is doing, and a search that also runs actions. It is one of six launchers the
+shell can open — Kickoff, KRunner, rofi, fuzzel or a command of your own are the others,
+chosen at runtime.
+
+![Alt+Tab](docs/images/switcher.png)
+
+Alt+Tab, in three layouts. This one is a KWin switcher package rather than part of the
+shell, which is what lets KWin draw it with its own live thumbnails where the coloured
+panels are here.
+
 ![The settings window](docs/images/settings.png)
 
 Every page of the settings window is generated from `config/schema/shell.json` and the

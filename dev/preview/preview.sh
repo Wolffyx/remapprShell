@@ -139,6 +139,59 @@ PYEOF
         'root.windows = list;' \
         '// demo: the list above is fixed'
 
+    # The start menu's "Recent" is read straight out of recently-used.xbel,
+    # which is a list of the last dozen things somebody opened. An invented
+    # one instead, in the same format, so the section is shown rather than
+    # emptied -- a menu with a heading and nothing under it says the feature
+    # does not work.
+    cat > "$root/demo-recent.xbel" <<'XBEL'
+<?xml version="1.0" encoding="UTF-8"?>
+<xbel version="1.0">
+  <bookmark href="file:///home/alex/Documents/notes.md" modified="2026-09-15T09:12:00Z"><info><metadata><mime:mime-type type="text/markdown"/></metadata></info></bookmark>
+  <bookmark href="file:///home/alex/Documents/layout.csv" modified="2026-09-15T08:40:00Z"><info><metadata><mime:mime-type type="text/csv"/></metadata></info></bookmark>
+  <bookmark href="file:///home/alex/Pictures/coast-road.jpg" modified="2026-09-14T19:05:00Z"><info><metadata><mime:mime-type type="image/jpeg"/></metadata></info></bookmark>
+  <bookmark href="file:///home/alex/Projects/shell.json" modified="2026-09-14T17:22:00Z"><info><metadata><mime:mime-type type="application/json"/></metadata></info></bookmark>
+</xbel>
+XBEL
+    demo "$root/domain/launcher/RecentFiles.qml" \
+        'path: `${Quickshell.env("XDG_DATA_HOME") || (Quickshell.env("HOME") + "/.local/share")}/recently-used.xbel`' \
+        "path: \"$root/demo-recent.xbel\""
+    demo "$root/domain/launcher/RecentFiles.qml" \
+        'Quickshell.env("HOME") ?? ""' '"/home/alex"'
+
+    # The machine itself: how much memory it has, how big its disk is, how hot
+    # it runs. Not identifying, but it is still an answer to "what do you
+    # have", and a plausible machine says the same thing about the widget.
+    demo "$root/domain/system/SystemStats.qml" \
+        'property real cpu: 0
+    property int cpuTemp: -1
+    property real memTotal: 0
+    property real memUsed: 0
+    property real diskSize: 0
+    property real diskFree: 0
+    property real gpu: -1
+    property int gpuTemp: -1
+    property real netRate: 0' \
+        'property real cpu: 0.21
+    property int cpuTemp: 44
+    property real memTotal: 16 * 1024 * 1024 * 1024
+    property real memUsed: 6.1 * 1024 * 1024 * 1024
+    property real diskSize: 512 * 1000 * 1000 * 1000
+    property real diskFree: 214 * 1000 * 1000 * 1000
+    property real gpu: 0.12
+    property int gpuTemp: 39
+    property real netRate: 0'
+    demo "$root/domain/system/SystemStats.qml" \
+        'readonly property bool running: root.watchers > 0' \
+        'readonly property bool running: false'
+
+    # What is playing is the most personal thing on a start menu, cover art and
+    # all. Nothing is playing in a demo, which also spares the picture a card
+    # that would be about something other than the shell.
+    demo "$root/domain/status/MediaStatus.qml" \
+        'readonly property var current: root.picked.current >= 0 ? root.all[root.picked.current] : null' \
+        'readonly property var current: null'
+
     # The tray is the last thing that says whose desktop this is: it is a row
     # of the applications somebody chose to run. Four generic ones instead,
     # which also makes the chevron worth drawing.
