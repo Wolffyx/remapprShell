@@ -37,7 +37,15 @@ BarWidget {
     // take the keyboard from the window in use.
     property bool typing: false
 
+    // The privacy indicator comes first and is drawn in the warning colour,
+    // as the widget of its own is: something recording is the one thing here
+    // that is news rather than state, and it takes no room the rest of the
+    // time. Without it, a panel carrying only this widget said nothing at all
+    // while a browser tab listened.
     readonly property var parts: [
+        { id: "privacy", shown: PrivacyStatus.present, alert: true,
+          glyph: StatusIcons.privacyGlyph(PrivacyStatus.users, AudioStatus.micMuted),
+          icon: StatusIcons.privacyIcon(PrivacyStatus.users, AudioStatus.micMuted) },
         { id: "network", shown: NetworkStatus.available, glyph: NetworkStatus.glyph, icon: NetworkStatus.icon },
         { id: "bluetooth", shown: BluetoothStatus.present, glyph: BluetoothStatus.glyph, icon: BluetoothStatus.icon },
         { id: "volume", shown: true, glyph: AudioStatus.glyph, icon: AudioStatus.icon },
@@ -46,6 +54,12 @@ BarWidget {
 
     function tipFor(id) {
         switch (id) {
+        case "privacy":
+            return [StatusIcons.privacyTooltip(PrivacyStatus.users, AudioStatus.micMuted),
+                    PrivacyStatus.users.microphone.length > 0
+                        ? (AudioStatus.micMuted ? "Middle-click to unmute the microphone"
+                                                : "Middle-click to mute the microphone")
+                        : ""].filter(s => s).join("\n");
         case "network": {
             const lines = NetworkStatus.connections.map(c => c.kind === "wired"
                 ? [c.name, StatusIcons.linkSpeed(c.speed)].filter(s => s).join(" · ")
@@ -113,7 +127,13 @@ BarWidget {
 
     function handleActivate(button) {
         if (button === Qt.MiddleButton) {
-            AudioStatus.toggleMute();
+            // Over the privacy glyph the microphone is what a middle click is
+            // about, as it is on the privacy widget and in Plasma's tray. Over
+            // the rest of the row it is the output, as it has always been.
+            if (root.parts[root.hoveredIndex]?.id === "privacy" && PrivacyStatus.users.microphone.length > 0)
+                AudioStatus.toggleMicMute();
+            else
+                AudioStatus.toggleMute();
             return;
         }
         root.popoutVisible = !root.popoutVisible;
@@ -159,7 +179,7 @@ BarWidget {
                 name: modelData.glyph
                 fallback: modelData.icon
                 size: root.panelIconSize
-                color: Theme.fg
+                color: modelData.alert === true ? Theme.warning : Theme.fg
             }
         }
     }
