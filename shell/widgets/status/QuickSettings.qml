@@ -1033,10 +1033,15 @@ Item {
                         width: parent.width
                         spacing: 2
 
+                        // powerdevil's own name for the display ("display0")
+                        // is an id, not a name anybody chose. Its label is the
+                        // monitor -- "Acer Technologies XV322QU P" -- which is
+                        // what the brightness widget has always shown and what
+                        // this page said instead of it.
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: display.modelData.name
+                            text: display.modelData.label || display.modelData.name
                             font.pixelSize: 12
                             color: Theme.mut
                             leftPadding: 4
@@ -1075,13 +1080,17 @@ Item {
                 color: Theme.out
             }
 
+            // Said the way the brightness widget says it -- the state in
+            // words, and when it next changes -- rather than in wording of
+            // this page's own. Two screens describing one thing differently
+            // is how a reader ends up believing they are two things.
             ToggleRow {
                 visible: BrightnessStatus.nightState !== "unavailable"
                 width: parent.width
-                label: "Night Light"
+                label: StatusIcons.nightLightLabel(BrightnessStatus.nightLight)
                 description: BrightnessStatus.nightState === "off"
                     ? "Off in System Settings, which is the only place that turns it on."
-                    : "Warms the screen on the schedule System Settings holds."
+                    : BrightnessStatus.nightDetail
                 enabled: BrightnessStatus.nightState !== "off"
                 checked: BrightnessStatus.nightState === "warm" || BrightnessStatus.nightState === "day"
                 onToggled: BrightnessStatus.toggleNightLight()
