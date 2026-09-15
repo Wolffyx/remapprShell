@@ -377,7 +377,7 @@ show the bug. Do not repeat that: see "Looking at the real screen".
    window with a real provider behind it. The claude-code path opens a
    terminal; that was exercised only with a fake terminal.
 7. **Scroll on the volume icon, and middle-click it.** Reading PipeWire is
-   proven -- the popout showed the Scarlett at 100%, as `wpctl` does. Writing
+   proven -- the popout showed the USB interface at 100%, as `wpctl` does. Writing
    to it is not: no session can scroll. Then drag a slider in its popout;
    `NumberSlider` gained a live mode for it.
 8. **Click a paired Bluetooth device, and the Wi-Fi switch.** Each is one
@@ -994,7 +994,7 @@ are not.
   Plasma's microphone-in-use icon is `MicrophoneIndicator`, which lives only
   in the volume applet's own plugin (`libplasma-volume-declarative`), and its
   camera icon is the `cameraindicator` tray applet. Under our renderer both
-  were gone: Chrome was recording the Scarlett's microphone during this
+  were gone: a browser was recording the interface's microphone during this
   session with nothing on screen to say so. The widget is present only while
   something records. The tooltip names the applications, and a click mutes
   the default microphone, as Plasma's indicator does. `PrivacyStatus`
@@ -2393,7 +2393,7 @@ were broken and are fixed above; everything else drew what it should.
 
 Worth knowing when reading a status source: **the first read of one is cold**.
 `status audio` answered `ready: false` with empty fields, and a second read a
-moment later had the Scarlett 2i2, every output, and the levels. Same for
+moment later had the USB interface, every output, and the levels. Same for
 bluetooth (`present: false`, then "1 device") and the DDC displays. They poll
 on demand. A script that reads one once and believes it will be wrong.
 
@@ -2408,7 +2408,8 @@ What is built, works, and is simply **not turned on here**:
   search, session, task view, virtual desktops, active window, camera and
   microphone in use. All in the defaults and the presets, none in this
   profile; Settings → Widgets lists them. Quick settings was rendered and is
-  live -- Wi-Fi "Leo 5G", Bluetooth "1 device", Night Light "Suspended".
+  live -- the joined Wi-Fi network by name, Bluetooth "1 device", Night
+  Light "Suspended".
 - **The desktop clock and the rounded screen border**, both off by default.
 
 ### Global shortcuts: what was wrong, and what was done about it

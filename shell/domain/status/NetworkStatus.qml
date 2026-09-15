@@ -43,8 +43,8 @@ QtObject {
     // One entry per connected device: [{ kind, device, name, speed | strength }].
     readonly property var connections: {
         const out = [];
-        // A wired network is named after its device ("enp7s0"), which the
-        // detail line already shows -- so it is called what it is instead.
+        // A wired network is named after its interface, which the detail
+        // line already shows -- so it is called what it is instead.
         for (const d of root.wiredDevices) {
             if (!d.connected)
                 continue;

@@ -375,19 +375,21 @@ TestCase {
 
     // ---- brightness ------------------------------------------------------
 
-    // The reply powerdevil really gave here for an ASUS monitor over DDC.
-    readonly property string asus: '{"type":"a{sv}","data":[{"Brightness":{"type":"i","data":7500},'
-        + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"ASUSTek COMPUTER INC XG32AQ"},'
+    // The shape powerdevil replies with for an external monitor over DDC,
+    // with the model name it carries replaced by a stand-in: what is under
+    // test is the flattening, and the label is a string like any other.
+    readonly property string external: '{"type":"a{sv}","data":[{"Brightness":{"type":"i","data":7500},'
+        + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"EXA Displays 27Q"},'
         + '"MaxBrightness":{"type":"i","data":10000}}]}'
 
     function test_bus_props_are_flattened() {
-        compare(StatusIcons.busProps(JSON.parse(asus).data).Label, "ASUSTek COMPUTER INC XG32AQ");
+        compare(StatusIcons.busProps(JSON.parse(external).data).Label, "EXA Displays 27Q");
         compare(Object.keys(StatusIcons.busProps(null)).length, 0);
         compare(Object.keys(StatusIcons.busProps([])).length, 0);
     }
 
     function test_displays_are_read_one_per_line() {
-        const d = StatusIcons.brightnessDisplays([`display0 ${asus}`, ""]);
+        const d = StatusIcons.brightnessDisplays([`display0 ${external}`, ""]);
         compare(d.length, 1);
         compare(d[0].name, "display0");
         compare(d[0].brightness, 7500);
@@ -498,15 +500,15 @@ TestCase {
         };
     }
 
-    // What PipeWire really had here: Chrome recording the Scarlett's
-    // microphone (two links), caelestia reading the speakers' monitor for a
-    // visualiser, and the Scarlett's own split feeding its virtual sources.
-    // Only Chrome is recording anyone.
+    // The four link shapes that turn up together: a browser recording a
+    // microphone (two links, one per channel), another shell reading the
+    // speakers' monitor for a visualiser, and an interface's own split
+    // feeding its virtual sources. Only the browser is recording anyone.
     function test_only_a_microphone_being_recorded_counts() {
         const r = StatusIcons.recorders([
             link("Audio/Source", "Stream/Input/Audio", "Google Chrome input"),
             link("Audio/Source", "Stream/Input/Audio", "Google Chrome input"),
-            link("Audio/Sink", "Stream/Input/Audio", "caelestia-shell"),
+            link("Audio/Sink", "Stream/Input/Audio", "another-shell"),
             link("Audio/Source/Internal", "Stream/Input/Audio/Internal", "alsa_input.Mic1.split")
         ]);
         compare(r.microphone, ["Google Chrome input"]);

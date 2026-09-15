@@ -397,8 +397,8 @@ QtObject {
     // capture stream. Three things that look like it are not:
     //   - reading a speaker's monitor (the source is an Audio/Sink): a
     //     visualiser, or a recorder taking the desktop's sound;
-    //   - PipeWire's own plumbing, whose streams are marked /Internal -- the
-    //     Scarlett's split into two virtual microphones is one;
+    //   - PipeWire's own plumbing, whose streams are marked /Internal -- an
+    //     interface split into several virtual microphones is one;
     //   - a screencast, which is a Video/Source too but not a camera.
     function recorders(links) {
         const mic = new Set();
