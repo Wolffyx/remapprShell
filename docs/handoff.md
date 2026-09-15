@@ -97,7 +97,7 @@ Everything below was read off the running system rather than remembered.
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | our Look-and-Feel package is active and **every part is now installed**: 2 colour schemes, the switcher (selected -- `active Alt+Tab: remappr-shell`), the desktop theme, the splash. The colour scheme in force is **BreezeLight**, the user's own, and the icon theme `breeze-dark`. `theme apply` themes the desktop by default now, by parts the user chooses -- see `theme.desktop` in Settings → Appearance |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
-| Window list | KWin script loaded, daemon answering, 9 windows |
+| Window list | KWin script loaded, daemon answering, 10 windows -- **put back on 2026-09-15**: after the restore of 2026-09-14 the script was gone from `~/.local/share/kwin/scripts/`, the kwinrc key was unset and the ledger had no `windows` scope at all, so the taskbar drew nothing and said nothing. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it |
 | Also running | **nothing else**: caelestia's Quickshell bar was stopped on 2026-09-13 and not restarted. krohnkite is installed but **not loaded** (`krohnkiteEnabled=false`) |
 | Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
 | CI | **green, for the first time.** It had never passed: five causes, each hiding the next (see 2026-09-14 below). It now runs all six lints rather than three |
@@ -192,6 +192,40 @@ any disagreement, in `make lint` and in CI.
    A warning only; the panel lays out. Fixing it is a zone-budget redesign.
 6. Snapshot names are a timestamp plus a label and the second line no longer
    repeats the timestamp, but the list is still cramped on a narrow window.
+
+### The session of 2026-09-15, morning
+
+The first session after the shell started drawing at login, and both things
+the user reported were real.
+
+**The taskbar was empty because the window list was off.** Not a widget bug:
+the KWin script had been removed from `~/.local/share/kwin/scripts/`, the
+kwinrc key was unset, and the kconfig ledger had no `windows` scope -- the
+restore of the night before rolled the state directory back past the day it
+was enabled, and took the script with it, exactly as it took the unit file.
+`rmpr windows enable` put it back and the daemon answered with ten windows.
+
+What is worth carrying is that **nothing on the screen says so**. The task
+list with no daemon behind it is a widget with nothing to show, which the
+panel correctly draws as no widget at all, and `rmpr doctor` is the only
+thing in the project that reports the state. Anything a restore can take
+away should be checked after one -- the unit file is already recorded here
+as such, and this is the second.
+
+**A widget's click target was smaller than the bar it sat in.** `panel
+layout` gave the measurement: on a 52px panel, every widget but the task
+list was 33 to 37px tall and centred, leaving an 8px strip along the top and
+the bottom of the bar that belonged to no widget. The bottom one is the
+strip a pointer thrown at the screen edge lands on. A slot is the bar's
+thickness now, and a right click a widget has no use for opens the panel's
+own menu rather than being swallowed -- `wantsRightClick` in the widget
+contract, declared by the task list and the tray.
+
+**The panel's own menu does open**, and there is now a picture of it. It had
+been shipped unopened; `quickshell ipc call panel menu <screen> <along>`
+opens it the way the right click does, which is how it was checked without a
+pointer -- and how "the click does nothing" was told apart from "the click
+opens a menu I did not expect". `panel closeMenu` puts it away.
 
 **This shell starts at login now** (2026-09-15). `remappr-shell.service` is
 enabled -- the standing "keep the unit disabled, they start it by hand" rule is
