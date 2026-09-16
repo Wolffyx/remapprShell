@@ -102,6 +102,75 @@ QtObject {
             .trim();
     }
 
+    // ---- what a notification points at -------------------------------------
+    //
+    // Two things live in the hints rather than in the spec's arguments, and
+    // both are what a person means when they click a notification.
+    //
+    // `x-kde-urls` is every KDE application's "this is the file I am telling
+    // you about" -- Spectacle's saved screenshot, a finished download, a
+    // received file. It arrives as an array of strings, and as a single
+    // string from senders that write it that way.
+    //
+    // `desktop-entry` is which application sent it, which is what Plasma
+    // activates when a notification has nothing else to act on. Without that
+    // fallback a click on a notification whose sender declared no `default`
+    // action does nothing at all but close it -- which is the bug this was
+    // written for.
+
+    function urlsOf(hints) {
+        const raw = hints?.["x-kde-urls"] ?? null;
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        return list.map(u => String(u ?? "").trim())
+                   .filter(u => u.startsWith("file://") || u.startsWith("/"))
+                   .map(u => u.startsWith("/") ? `file://${u}` : u);
+    }
+
+    readonly property var pictureTypes: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"]
+
+    function isPicture(url) {
+        const path = String(url ?? "").split("?")[0].toLowerCase();
+        const dot = path.lastIndexOf(".");
+        return dot > 0 && root.pictureTypes.indexOf(path.slice(dot + 1)) >= 0;
+    }
+
+    // The picture to draw at the size it was taken at, rather than as a
+    // 20-pixel icon: a file this notification names that is an image. A
+    // screenshot notification is the case that matters -- Spectacle sends no
+    // image at all, only the path it saved to.
+    //
+    // Only a local file, and only one whose name ends in an image type: this
+    // is a path chosen by whoever sent the notification, so it decides what
+    // the shell loads.
+    function pictureOf(hints) {
+        const hinted = String(hints?.["image-path"] ?? hints?.["image_path"] ?? "").trim();
+        const direct = hinted.startsWith("/") ? `file://${hinted}` : hinted;
+        if (direct.startsWith("file://") && root.isPicture(direct))
+            return direct;
+        return root.urlsOf(hints).find(u => root.isPicture(u)) ?? "";
+    }
+
+    // What a click on the body should do, as { kind, value }:
+    //
+    //   action  the sender's own `default` action -- always first, because it
+    //           is the one thing the sender asked for
+    //   url     a file it named, opened the way the desktop opens files
+    //   app     the application that sent it, raised or started
+    //   none    nothing to act on; the click closes the popup
+    function openTarget(notification, hints) {
+        const actions = notification?.actions ?? [];
+        const fallback = actions.find(a => String(a?.identifier ?? "") === "default");
+        if (fallback)
+            return { kind: "action", value: fallback };
+        const url = root.urlsOf(hints)[0] ?? "";
+        if (url)
+            return { kind: "url", value: url };
+        const entry = String(notification?.desktopEntry ?? "").trim();
+        if (entry)
+            return { kind: "app", value: entry.replace(/\.desktop$/, "") };
+        return { kind: "none", value: "" };
+    }
+
     // What to draw as the icon: the image the server made, else the
     // application's icon, by path or by name. Returns { kind: "image" |
     // "name", value }.

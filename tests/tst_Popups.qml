@@ -116,4 +116,44 @@ TestCase {
         compare(Popups.iconOf("", "firefox").kind, "name");
         compare(Popups.iconOf("", "").value, "dialog-information");
     }
+
+    // ---- what a click acts on ---------------------------------------------
+    //
+    // The hints in these cases were read off the session bus on 2026-09-16
+    // while Spectacle saved a screenshot, rather than made up: the array form
+    // of x-kde-urls and a "default" action called "Open" are what it sends.
+
+    function test_urls_are_local_files_only() {
+        compare(Popups.urlsOf({ "x-kde-urls": ["file:///home/a/shot.png"] }), ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": "/home/a/shot.png" }), ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": ["https://example.com/x.png"] }), []);
+        compare(Popups.urlsOf({}), []);
+        compare(Popups.urlsOf(undefined), []);
+    }
+
+    function test_a_picture_is_a_file_that_looks_like_one() {
+        compare(Popups.pictureOf({ "x-kde-urls": ["file:///home/a/Screenshot.png"] }), "file:///home/a/Screenshot.png");
+        compare(Popups.pictureOf({ "image-path": "/home/a/photo.JPG" }), "file:///home/a/photo.JPG");
+        // A name, not a file: what `notify-send -i` sends.
+        compare(Popups.pictureOf({ "image-path": "dialog-information" }), "");
+        // A file that is not a picture is not drawn as one.
+        compare(Popups.pictureOf({ "x-kde-urls": ["file:///home/a/report.pdf"] }), "");
+        compare(Popups.pictureOf({}), "");
+    }
+
+    function test_a_click_prefers_the_senders_own_action() {
+        const withDefault = { actions: [{ identifier: "default", text: "Open" }], desktopEntry: "org.kde.spectacle" };
+        compare(Popups.openTarget(withDefault, { "x-kde-urls": ["file:///a/s.png"] }).kind, "action");
+
+        // No default action: the file it named, then the application itself.
+        // This is the whole of the bug -- a click used to close the popup and
+        // do nothing else.
+        const quiet = { actions: [{ identifier: "1", text: "Annotate" }], desktopEntry: "org.kde.spectacle" };
+        compare(Popups.openTarget(quiet, { "x-kde-urls": ["file:///a/s.png"] }),
+                { kind: "url", value: "file:///a/s.png" });
+        compare(Popups.openTarget(quiet, {}), { kind: "app", value: "org.kde.spectacle" });
+        compare(Popups.openTarget({ actions: [], desktopEntry: "firefox.desktop" }, {}).value, "firefox");
+        compare(Popups.openTarget({ actions: [] }, {}).kind, "none");
+        compare(Popups.openTarget(null, {}).kind, "none");
+    }
 }

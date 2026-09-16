@@ -15,10 +15,12 @@ pragma Singleton
 // gets nothing when it does not.
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.notifications.events
+import qs.domain.windows
 
 QtObject {
     id: root
@@ -37,6 +39,39 @@ QtObject {
     readonly property var last: root.entries[0] ?? null
 
     function markSeen() { root.unseen = 0; }
+
+    // A click on an entry in the history: the file it named, or the
+    // application that sent it -- raised if it is running, started if it is
+    // not. The live popups do the same thing through
+    // ShellNotifications.activate; an entry in the history has no actions
+    // left to invoke, so these two are all there is.
+    //
+    // Answers whether there was anything to open, so a row can be drawn as
+    // clickable only when it is.
+    function open(entry) {
+        const url = (entry?.urls ?? [])[0] ?? "";
+        if (url) {
+            Quickshell.execDetached(["xdg-open", url]);
+            return true;
+        }
+        const app = String(entry?.desktopEntry ?? "").replace(/\.desktop$/, "");
+        if (app.length > 0) {
+            WindowsService.open(app);
+            return true;
+        }
+        return false;
+    }
+
+    // The picture an entry is about, for the centre to draw. The rule is
+    // NotificationEvents', which is pure and tested.
+    function pictureOf(entry) {
+        return NotificationEvents.pictureOf(entry);
+    }
+
+    // Whether `open` would do anything.
+    function openable(entry) {
+        return ((entry?.urls ?? []).length > 0) || String(entry?.desktopEntry ?? "").length > 0;
+    }
     function clear() { root.entries = []; root.unseen = 0; }
 
     function _push(entry) {

@@ -388,6 +388,20 @@ ShellRoot {
         function list(): string { return JSON.stringify(NotificationWatch.entries); }
         function clear(): void { NotificationWatch.clear(); }
 
+        // What a click on an entry in the centre does: the file it named, or
+        // the application that sent it, raised or started. Here as well as on
+        // the row because a pointer is the one thing a terminal has not got,
+        // and this is the half that can be wrong without anybody seeing it.
+        function open(index: string): string {
+            const entry = NotificationWatch.entries[parseInt(index, 10) || 0];
+            if (!entry)
+                return "no such notification";
+            if (!NotificationWatch.openable(entry))
+                return "that notification names nothing to open";
+            NotificationWatch.open(entry);
+            return entry.urls?.[0] || entry.desktopEntry;
+        }
+
         // This shell's own server (notifications.server "shell").
         function server(): string { return JSON.stringify(ShellNotifications.summary()); }
         function dnd(state: string): string { return ShellNotifications.setDnd(state) ? "on" : "off"; }

@@ -175,4 +175,33 @@ TestCase {
         compare(NotificationEvents.parse("Monitoring bus message stream."), null);
         compare(NotificationEvents.parse('{"type":"method_call","interf'), null);
     }
+
+    // The file a notification names. Read off the bus while Spectacle saved a
+    // screenshot: `x-kde-urls` is an array of strings, and busctl wraps every
+    // hint as { type, data }. Both shapes reach the history the same way,
+    // which is what lets a click on an old entry open the picture.
+    function test_the_files_a_notification_names() {
+        const line = JSON.stringify({
+            type: "method_call", interface: "org.freedesktop.Notifications", member: "Notify",
+            payload: { data: ["Spectacle", 0, "spectacle", "All Screens", "A screenshot was saved.",
+                              ["default", "Open"],
+                              { "desktop-entry": { type: "s", data: "org.kde.spectacle" },
+                                "x-kde-urls": { type: "as", data: ["file:///home/a/Screenshot.png"] } },
+                              -1] }
+        });
+        const entry = NotificationEvents.parse(line, 1000);
+        compare(entry.urls, ["file:///home/a/Screenshot.png"]);
+        compare(entry.desktopEntry, "org.kde.spectacle");
+    }
+
+    // What the history draws under an entry, when the entry is about a
+    // picture. The same rule the popups use, and the reason the notification
+    // centre could show a screenshot's file name and not the screenshot.
+    function test_the_picture_an_entry_is_about() {
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/Screenshot.png"] }),
+                "file:///home/a/Screenshot.png");
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf"] }), "");
+        compare(NotificationEvents.pictureOf({ urls: [] }), "");
+        compare(NotificationEvents.pictureOf(null), "");
+    }
 }

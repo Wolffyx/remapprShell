@@ -291,6 +291,32 @@ QtObject {
         };
     }
 
+    // An application by its desktop-entry id: raised when it already has a
+    // window, started when it does not. What clicking a notification means --
+    // "take me to the thing that told me" -- and what Plasma does with one.
+    //
+    // The window is found through the same index the task list matches on, so
+    // an entry id ("org.kde.spectacle"), a desktop file name and a window
+    // class all reach the same application.
+    function open(entryId) {
+        const key = String(entryId ?? "").replace(/\.desktop$/, "").toLowerCase();
+        if (key.length === 0)
+            return;
+        const entry = root.entryById(key);
+        const mine = root.windows.filter(w => {
+            const matched = root.entryFor(w);
+            if (matched && entry && String(matched.id).toLowerCase() === String(entry.id).toLowerCase())
+                return true;
+            return String(w.appId ?? "").toLowerCase().replace(/\.desktop$/, "") === key;
+        });
+        if (mine.length > 0) {
+            root.activateGroup({ windows: mine });
+            return;
+        }
+        if (entry)
+            entry.execute();
+    }
+
     // Starts the application -- or one of its own actions, "New Incognito
     // Window" and the like -- the way a launcher would.
     function launch(id, action) {

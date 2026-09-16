@@ -210,44 +210,110 @@ BarWidget {
                 Repeater {
                     model: card.expanded ? card.entries.slice(0, 8) : card.entries.slice(0, 1)
 
-                    Column {
+                    // One notification in the card. An Item rather than a bare
+                    // Column: a click has to land on the whole row -- the space
+                    // beside the text included -- and a Column is only as wide
+                    // as what is in it once the handler is asked.
+                    Item {
                         id: note
 
                         required property var modelData
                         required property int index
 
+                        readonly property string picture: NotificationWatch.pictureOf(note.modelData)
+                        readonly property bool openable: NotificationWatch.openable(note.modelData)
+
                         width: body.width
-                        topPadding: 10
+                        height: lines.implicitHeight + 10
 
                         Rectangle {
-                            visible: note.index > 0
-                            width: parent.width
-                            height: 1
-                            color: Theme.out
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            radius: Theme.radiusOf(12)
+                            visible: noteHover.hovered && note.openable
+                            color: Theme.alpha(Theme.fg, 0.06)
                         }
 
-                        Item { visible: note.index > 0; width: 1; height: 8 }
+                        Column {
+                            id: lines
 
-                        PanelText {
+                            y: 10
                             width: parent.width
-                            elide: Text.ElideRight
-                            text: note.modelData.summary
-                            font.pixelSize: 14
-                            font.weight: Font.Medium
-                            color: note.modelData.urgency >= 2 ? Theme.error : Theme.fg
+
+                            Rectangle {
+                                visible: note.index > 0
+                                width: parent.width
+                                height: 1
+                                color: Theme.out
+                            }
+
+                            Item { visible: note.index > 0; width: 1; height: 8 }
+
+                            PanelText {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                text: note.modelData.summary
+                                font.pixelSize: 14
+                                font.weight: Font.Medium
+                                color: note.modelData.urgency >= 2 ? Theme.error : Theme.fg
+                            }
+
+                            PanelText {
+                                visible: note.modelData.body.length > 0
+                                width: parent.width
+                                topPadding: 3
+                                text: note.modelData.body
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: card.expanded ? 4 : 2
+                                elide: Text.ElideRight
+                                font.pixelSize: 13
+                                lineHeight: 1.15
+                                color: Theme.mut
+                            }
+
+                            // What it is about, when that is a picture: a
+                            // screenshot is unrecognisable as a file name and
+                            // obvious as a thumbnail.
+                            Item {
+                                width: parent.width
+                                height: visible ? 128 : 0
+                                visible: note.picture.length > 0 && shot.status !== Image.Error
+
+                                Rectangle {
+                                    y: 8
+                                    width: parent.width
+                                    height: 120
+                                    radius: Theme.radiusOf(12)
+                                    color: Theme.s2
+                                    clip: true
+
+                                    Image {
+                                        id: shot
+                                        anchors.fill: parent
+                                        source: note.picture
+                                        sourceSize: Qt.size(760, 360)
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        cache: false
+                                    }
+                                }
+                            }
                         }
 
-                        PanelText {
-                            visible: note.modelData.body.length > 0
-                            width: parent.width
-                            topPadding: 3
-                            text: note.modelData.body
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: card.expanded ? 4 : 2
-                            elide: Text.ElideRight
-                            font.pixelSize: 13
-                            lineHeight: 1.15
-                            color: Theme.mut
+                        // The history's entries open what they are about, the
+                        // same as a live popup does: the file named, or the
+                        // application that sent it.
+                        HoverHandler {
+                            id: noteHover
+                            cursorShape: note.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        }
+
+                        TapHandler {
+                            enabled: note.openable
+                            onTapped: {
+                                NotificationWatch.open(note.modelData);
+                                root.closePopout();
+                            }
                         }
                     }
                 }
@@ -408,8 +474,19 @@ BarWidget {
                                         required property var modelData
                                         required property int index
 
+                                        readonly property string picture: NotificationWatch.pictureOf(line.modelData)
+                                        readonly property bool openable: NotificationWatch.openable(line.modelData)
+
                                         width: bucket.width
                                         height: lineBody.implicitHeight + 24
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: 2
+                                            radius: Theme.radiusOf(12)
+                                            visible: lineHover.hovered && line.openable
+                                            color: Theme.alpha(Theme.fg, 0.06)
+                                        }
 
                                         NoteIcon {
                                             y: 13
@@ -458,6 +535,33 @@ BarWidget {
                                                 font.pixelSize: 13
                                                 color: Theme.mut
                                             }
+
+                                            // The picture it is about, as in
+                                            // the grouped view.
+                                            Item {
+                                                width: parent.width
+                                                height: visible ? 108 : 0
+                                                visible: line.picture.length > 0 && streamShot.status !== Image.Error
+
+                                                Rectangle {
+                                                    y: 8
+                                                    width: parent.width
+                                                    height: 100
+                                                    radius: Theme.radiusOf(12)
+                                                    color: Theme.s2
+                                                    clip: true
+
+                                                    Image {
+                                                        id: streamShot
+                                                        anchors.fill: parent
+                                                        source: line.picture
+                                                        sourceSize: Qt.size(760, 300)
+                                                        fillMode: Image.PreserveAspectCrop
+                                                        asynchronous: true
+                                                        cache: false
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         Rectangle {
@@ -468,7 +572,18 @@ BarWidget {
                                             visible: line.index < bucket.modelData.entries.length - 1
                                         }
 
-                                        HoverHandler { id: lineHover }
+                                        HoverHandler {
+                                            id: lineHover
+                                            cursorShape: line.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        }
+
+                                        TapHandler {
+                                            enabled: line.openable
+                                            onTapped: {
+                                                NotificationWatch.open(line.modelData);
+                                                root.closePopout();
+                                            }
+                                        }
 
                                         IconButton {
                                             anchors.right: parent.right

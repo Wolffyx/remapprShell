@@ -47,8 +47,35 @@ QtObject {
         return v;
     }
 
+    // Every local file a notification names, as file:// URLs. `x-kde-urls` is
+    // what a KDE application puts the thing it is telling you about in -- a
+    // screenshot just saved, a download just finished -- and it is what makes
+    // a click on an entry in the history able to open it.
+    function _urls(hints) {
+        const raw = root._hint(hints, "x-kde-urls");
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        return list.map(u => String((u && typeof u === "object" && "data" in u) ? u.data : u ?? "").trim())
+                   .filter(u => u.startsWith("file://") || u.startsWith("/"))
+                   .map(u => u.startsWith("/") ? `file://${u}` : u);
+    }
+
+    readonly property var pictureTypes: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"]
+
+    // The picture a history entry is about, or "": a screenshot that was
+    // saved, a photograph that finished downloading. The same rule the live
+    // popups use (Popups.pictureOf) applied to what the eavesdrop kept -- a
+    // local file whose name ends in an image type, and nothing else, because
+    // the path was chosen by whoever sent the notification.
+    function pictureOf(entry) {
+        return (entry?.urls ?? []).find(u => {
+            const path = String(u ?? "").split("?")[0].toLowerCase();
+            const dot = path.lastIndexOf(".");
+            return dot > 0 && root.pictureTypes.indexOf(path.slice(dot + 1)) >= 0;
+        }) ?? "";
+    }
+
     // Returns { appName, appIcon, summary, body, actions, urgency, desktopEntry,
-    // when } or null.
+    // urls, when } or null.
     function parse(line, now) {
         // BusLine takes the pixels out and bounds the size before anything
         // here sees the line. That is the step this parser used to die in.
@@ -82,6 +109,7 @@ QtObject {
             // 0 low, 1 normal, 2 critical. Absent means normal, per the spec.
             urgency: Number.isFinite(urgency) ? urgency : 1,
             desktopEntry: String(root._hint(hints, "desktop-entry") ?? ""),
+            urls: root._urls(hints),
             when: when
         };
     }
