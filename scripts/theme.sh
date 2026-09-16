@@ -931,7 +931,7 @@ case "$cmd" in
             scheme_agrees=$material_agrees
         else
             [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" \
-                = "$DISPLAY_NAME ${variant^}" ] && [ "$colours_agree" = 1 ] || scheme_agrees=0
+                = "$SLUG-$variant" ] && [ "$colours_agree" = 1 ] || scheme_agrees=0
         fi
 
         if [ "$scheme_agrees" = 1 ] \

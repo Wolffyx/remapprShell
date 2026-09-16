@@ -93,7 +93,15 @@ desktop_parts_off ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
 
 check "look and feel active"        "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
-check "colour scheme is ours"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "colour scheme is ours"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
+# KDE resolves a scheme by the base name of its file, never by the name it
+# shows -- BreezeDark.colors is `Name=Breeze Dark` and `ColorScheme=BreezeDark`.
+# Writing the display name into kdeglobals named a scheme no file was called:
+# System Settings said it was not installed and chose the default, while the
+# colours copied into kdeglobals kept most of the desktop looking right.
+check "and names a file that exists"  "$([ -f "$COLORS_DIR/$(kreadconfig6 --file kdeglobals --group General --key ColorScheme).colors" ] && echo yes)" "yes"
+check "the file's own id matches it"  "$(kreadconfig6 --file "$COLORS_DIR/$SLUG-dark.colors" --group General --key ColorScheme)" "$SLUG-dark"
+check "and it shows a human name"     "$(kreadconfig6 --file "$COLORS_DIR/$SLUG-dark.colors" --group General --key Name)" "$DISPLAY_NAME Dark"
 check "icon theme is ours"          "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
@@ -152,7 +160,7 @@ check "one source of colours"  "$(cmp -s "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors"
 check "desktop theme selected" "$(kreadconfig6 --file plasmarc --group Theme --key name)" "$SLUG"
 check "switcher is selected"   "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "$SLUG"
 check "look and feel active"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
-check "defaults applied"      "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "defaults applied"      "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 check "nested group applied"  "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
 check "unrelated key untouched" "$(kreadconfig6 --file kwinrc --group Windows --key Unrelated)" "keepme"
 
@@ -173,7 +181,7 @@ mode '"light"'
 check "the setting is the answer"     "$("$REPO_ROOT/scripts/theme.sh" variant | sed -n 's/^resolved: *//p')" "light"
 
 "$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
-check "the light scheme is written"   "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Light"
+check "the light scheme is written"   "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-light"
 check "and light icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze"
 check "Plasma's widgets too"          "$(cmp -s "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors" "$COLORS_DIR/$SLUG-light.colors" && echo same)" "same"
 # The style, the Plasma theme, the decorations and Alt+Tab are the same either
@@ -184,7 +192,7 @@ check "nor Alt+Tab"                   "$(kreadconfig6 --file kwinrc --group TabB
 check "asking again does nothing"     "$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1 | grep -c 'already in light')" "1"
 
 "$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
-check "and back to dark"              "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "and back to dark"              "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 check "with dark icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 
 check "a variant nobody has"          "$("$REPO_ROOT/scripts/theme.sh" variant sideways >/dev/null 2>&1 && echo ran || echo refused)" "refused"
@@ -195,11 +203,11 @@ check "and whether it follows"        "$("$REPO_ROOT/scripts/theme.sh" status --
 # happens to list first.
 mode '"light"'
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
-check "an apply follows the mode"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Light"
-check "--variant overrides it"        "$("$REPO_ROOT/scripts/theme.sh" apply --variant dark >/dev/null 2>&1; kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "an apply follows the mode"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-light"
+check "--variant overrides it"        "$("$REPO_ROOT/scripts/theme.sh" apply --variant dark >/dev/null 2>&1; kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 mode ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
-check "back to dark by default"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$DISPLAY_NAME Dark"
+check "back to dark by default"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 
 # Chrome, Electron and GTK applications ask a portal rather than KDE, and the
 # GTK portal answers from dconf. A light colour scheme with that left alone is

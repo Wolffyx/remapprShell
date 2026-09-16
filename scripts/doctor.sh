@@ -419,7 +419,7 @@ theme_colours=$(config_get '.theme.desktop.colours' true)
 
 if [ "$theme_desktop" != "true" ] || [ "$theme_colours" != "true" ]; then
     ok "colour scheme left to you (theme.desktop.colours is off): $scheme_now"
-elif [ "$scheme_now" = "$DISPLAY_NAME Light" ] || [ "$scheme_now" = "$DISPLAY_NAME Dark" ]; then
+elif [ "$scheme_now" = "$SLUG-light" ] || [ "$scheme_now" = "$SLUG-dark" ]; then
     ok "colour scheme is ours: $scheme_now"
 else
     warn "the colour scheme is not ours: $scheme_now"
@@ -430,6 +430,31 @@ else
         fix "  or leave it out of it:  systemctl --user disable --now kde-material-you-colors"
     fi
     fix "put ours back: $ALIAS theme variant $([ "$variant" = dark ] && echo dark || echo light)"
+fi
+
+# A scheme KDE cannot resolve to a file. kdeglobals names a scheme by the base
+# name of its .colors file -- BreezeDark, not "Breeze Dark" -- and this project
+# wrote the display name there until 2026-09-16. The colours still reached
+# every application, because they are copied into kdeglobals as well, so the
+# desktop looked nearly right: System Settings said the scheme was not
+# installed and chose the default, and everything that resolves a scheme by
+# name rather than reading the copy stayed on whatever it had.
+#
+# Nearly right is the worst kind of wrong to find by eye, so it is checked.
+if [ -n "$scheme_now" ]; then
+    found=""
+    for dir in "$COLORS_DIR" "$XDG_DATA_HOME/color-schemes" /usr/share/color-schemes; do
+        [ -f "$dir/$scheme_now.colors" ] && { found=$dir; break; }
+    done
+    if [ -n "$found" ]; then
+        ok "the colour scheme resolves to a file: $found/$scheme_now.colors"
+    else
+        bad "kdeglobals names a colour scheme no file is called: '$scheme_now'"
+        fix "KDE identifies a scheme by its file's base name, not the name it shows"
+        fix "applications read the colours copied into kdeglobals and look right;"
+        fix "  anything that resolves the scheme by name falls back to the default"
+        fix "put ours back: $ALIAS theme apply"
+    fi
 fi
 
 # A GTK theme whose *name* is the dark half of its pair ignores every

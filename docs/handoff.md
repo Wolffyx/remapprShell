@@ -102,7 +102,7 @@ rather than remembered.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | our Look-and-Feel package is active, every part installed. The scheme in force is **Remappr Shell Light**, ours, and the GTK theme is **adw-gtk3** with `adw-gtk3-dark` as its other half -- `theme.desktop.gtkThemeLight` / `gtkThemeDark`, new on 2026-09-16. `kde-material-you-colors` is **disabled**: it applied `MaterialYouDark` at every login and was the last writer, which is what "the desktop defaults to dark" was |
+| Theme | our Look-and-Feel package is active, every part installed. The scheme in force is **`remappr-shell-dark`**, ours -- named by its file's base name since the evening of 2026-09-16, which is how KDE resolves a scheme and is what "the colour scheme is not installed" in System Settings was, and the GTK theme is **adw-gtk3** with `adw-gtk3-dark` as its other half -- `theme.desktop.gtkThemeLight` / `gtkThemeDark`, new on 2026-09-16. `kde-material-you-colors` is **disabled**: it applied `MaterialYouDark` at every login and was the last writer, which is what "the desktop defaults to dark" was |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- **put back on 2026-09-15**: after the restore of 2026-09-14 the script was gone from `~/.local/share/kwin/scripts/`, the kwinrc key was unset and the ledger had no `windows` scope at all, so the taskbar drew nothing and said nothing. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
@@ -322,6 +322,18 @@ route was the same bug as the clipboard's -- `rmpr sidebar` opened on
 sidebar` reads `workspace.cursorPos` and the sidebar comes out of the screen
 the pointer is on. Photographed: the sidebar on the pointer's monitor, cards
 folding, Bucharest at 24 °C in the weather card.
+
+**And one more, found by looking at System Settings.** kdeglobals named the
+colour scheme `Remappr Shell Dark` while the file installed is
+`remappr-shell-dark.colors`. KDE resolves a scheme by the base name of its
+file and never by the name it shows -- `BreezeDark.colors` carries
+`Name=Breeze Dark` and `ColorScheme=BreezeDark` -- so System Settings said
+the scheme was not installed and offered the default in its place. The
+colours still reached most of the desktop, because they are copied into
+kdeglobals as well, so the fault looked like "dark reached some places and
+not others" rather than like a name. `gen-colors.sh` writes the id and the
+display name separately now, the look-and-feel defaults write the id, and
+`doctor` fails on a scheme kdeglobals names that no file is called.
 
 **Open, in order:**
 
