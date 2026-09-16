@@ -85,4 +85,40 @@ TestCase {
         compare(OsdEvents.parse("Monitoring bus message stream."), null);
         compare(OsdEvents.parse('{"type":"signal","interf'), null);
     }
+
+    // ---- the events the shell raises itself ------------------------------
+
+    function test_progress_is_a_bar() {
+        const e = OsdEvents.progress("audio-volume-high", 42.4, "");
+        compare(e.icon, "audio-volume-high");
+        compare(e.value, 42);
+        compare(e.maxValue, 100);
+        compare(e.showingProgress, true);
+        compare(e.text, "");
+    }
+
+    // PipeWire will amplify past 1.0, and a bar wider than its track is a
+    // drawing bug rather than information.
+    function test_progress_is_bounded() {
+        compare(OsdEvents.progress("x", 150, "").value, 100);
+        compare(OsdEvents.progress("x", -20, "").value, 0);
+    }
+
+    function test_progress_rejects_a_value_that_is_not_one() {
+        compare(OsdEvents.progress("x", NaN, ""), null);
+        compare(OsdEvents.progress("x", undefined, ""), null);
+    }
+
+    function test_message_has_no_bar() {
+        const e = OsdEvents.message("microphone-sensitivity-muted", "Microphone muted");
+        compare(e.text, "Microphone muted");
+        compare(e.showingProgress, false);
+        compare(e.value, 0);
+    }
+
+    // An OSD with nothing in it is not worth a second and a half of screen.
+    function test_message_needs_words() {
+        compare(OsdEvents.message("x", ""), null);
+        compare(OsdEvents.message("x", null), null);
+    }
 }

@@ -77,4 +77,44 @@ QtObject {
 
         return null;
     }
+
+    // ---- events this shell raises itself ---------------------------------
+    //
+    // plasmashell is not the only thing that knows a volume moved, and on a
+    // desktop where it emits nothing (measured on 2026-09-16: the method call
+    // arrives, no signal follows) a listener draws nothing for ever. The shell
+    // already reads PipeWire and powerdevil for its panel widgets, so these
+    // turn a value it already has into the same event shape `parse` returns.
+    //
+    // Pure, and icon names come from the caller: StatusIcons owns the
+    // thresholds, and duplicating them here to keep this module importable by
+    // qmltestrunner would put the same rule in two places.
+
+    // A level with a bar: volume, brightness, anything measurable.
+    function progress(icon, percent, text) {
+        const value = Number(percent);
+        if (!isFinite(value))
+            return null;
+        return {
+            icon: String(icon ?? ""),
+            text: String(text ?? ""),
+            value: Math.max(0, Math.min(100, Math.round(value))),
+            maxValue: 100,
+            showingProgress: true
+        };
+    }
+
+    // Words with no bar: muted, a layout name, a toggle.
+    function message(icon, text) {
+        const words = String(text ?? "");
+        if (words.length === 0)
+            return null;
+        return {
+            icon: String(icon ?? ""),
+            text: words,
+            value: 0,
+            maxValue: 100,
+            showingProgress: false
+        };
+    }
 }
