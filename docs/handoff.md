@@ -102,7 +102,7 @@ rather than remembered.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | our Look-and-Feel package is active, every part installed. The scheme in force is **`remappr-shell-dark`**, ours -- named by its file's base name since the evening of 2026-09-16, which is how KDE resolves a scheme and is what "the colour scheme is not installed" in System Settings was, and the GTK theme is **adw-gtk3** with `adw-gtk3-dark` as its other half -- `theme.desktop.gtkThemeLight` / `gtkThemeDark`, new on 2026-09-16. `kde-material-you-colors` is **disabled**: it applied `MaterialYouDark` at every login and was the last writer, which is what "the desktop defaults to dark" was |
+| Theme | **two** Look-and-Feel packages now, `remappr-shell.lookandfeel` and `remappr-shell-dark.lookandfeel`, and Plasma's own "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`, on here) is pointed at the pair -- before that it swapped to Breeze and Breeze Dark at sunset and replaced this theme wholesale. The scheme in force is **`remappr-shell-dark`**, ours -- named by its file's base name since the evening of 2026-09-16, which is how KDE resolves a scheme and is what "the colour scheme is not installed" in System Settings was, and the GTK theme is **adw-gtk3** with `adw-gtk3-dark` as its other half -- `theme.desktop.gtkThemeLight` / `gtkThemeDark`, new on 2026-09-16. `kde-material-you-colors` is **disabled**: it applied `MaterialYouDark` at every login and was the last writer, which is what "the desktop defaults to dark" was |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- **put back on 2026-09-15**: after the restore of 2026-09-14 the script was gone from `~/.local/share/kwin/scripts/`, the kwinrc key was unset and the ledger had no `windows` scope at all, so the taskbar drew nothing and said nothing. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
@@ -334,6 +334,32 @@ kdeglobals as well, so the fault looked like "dark reached some places and
 not others" rather than like a name. `gen-colors.sh` writes the id and the
 display name separately now, the look-and-feel defaults write the id, and
 `doctor` fails on a scheme kdeglobals names that no file is called.
+
+**And the one underneath both of those, found in System Settings' Global Theme
+page.** Plasma 6 has a day/night switch of its own -- "Switch to Dark Mode at
+Night", `kdeglobals [KDE] AutomaticLookAndFeel` -- which applies a whole
+*global theme* at sunset. It was on, and nothing of ours was named as its two
+halves, so at sunset it applied `org.kde.breezedark.desktop`: our
+look-and-feel package, colour scheme, icons and decorations replaced in one
+write. The desktop was then half ours and half Breeze Dark, which is what
+"dark did not reach everywhere" actually was.
+
+The answer, on the user's choice, is to be the pair rather than to fight it.
+There are two packages now -- light and dark -- each carrying only its own
+variant's `defaults` lines (a file with both ends with whichever comes last,
+which is why applying ours from the Global Theme page had always given light),
+and `DefaultLightLookAndFeel` / `DefaultDarkLookAndFeel` name them. Plasma
+keeps its toggle and its schedule; what it switches between is ours.
+
+Two things measured rather than assumed, both on Plasma 6.7:
+`plasma-apply-lookandfeel` writes every line of a package's defaults **except**
+the colour scheme unless the package carries a `contents/colors` of its own --
+so each package ships its scheme inside it, and both halves were then applied
+end to end and read back. And `--apply` turns the automatic mode off unless
+`-k` is passed, which is worth knowing before running it on somebody's desktop.
+
+`doctor` fails when the switch is on and does not name ours, and says what
+sunset will do about it.
 
 **Open, in order:**
 

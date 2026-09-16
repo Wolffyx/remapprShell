@@ -45,7 +45,16 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
 LNF_SRC="$REPO_ROOT/theme/lookandfeel"
+
+# Two packages, light and dark, and LNF_DEST is the light one -- the id this
+# project has always used, so a machine that has ours already keeps it. The
+# dark one is new beside it. Why two at all: see the note in lib/brand.sh, and
+# `lnf_pair_apply` below.
 LNF_DEST="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID"
+LNF_DARK_DEST="$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID"
+
+lnf_id_for()   { [ "${1:-dark}" = light ] && printf '%s' "$LNF_PACKAGE_ID" || printf '%s' "$LNF_DARK_PACKAGE_ID"; }
+lnf_dest_for() { [ "${1:-dark}" = light ] && printf '%s' "$LNF_DEST" || printf '%s' "$LNF_DARK_DEST"; }
 SWITCHER_SRC="$REPO_ROOT/theme/windowswitcher"
 SWITCHER_DEST="$KWIN_SWITCHER_DIR/$SLUG"
 DESKTOPTHEME_SRC="$REPO_ROOT/theme/desktoptheme"
@@ -133,30 +142,111 @@ install_command() {
     printf 'sudo pacman -S --needed %s' "$1"
 }
 
-install_package() {   # install_package [variant]
-    mkdir -p "$LNF_DEST/contents"
+# One package, for one variant. Plasma reads a package's `contents/defaults`
+# and writes every line in it, so each package must carry its own variant's
+# lines and nothing of the other's -- a file with both in it ends with
+# whichever comes last, which is how applying ours from the Global Theme page
+# always gave light.
+#
+# The parts the user has turned off (theme.desktop.*) are left out of the
+# installed file too, so Plasma's own apply honours them exactly as ours does.
+# That is the whole reason the markers are in the source file rather than in
+# this script.
+install_package_variant() {   # <light|dark>
+    local variant=$1
+    local dest full line part="" marker="any" wanted=1
+    dest=$(lnf_dest_for "$variant")
+    mkdir -p "$dest/contents/splash"
 
-    # Failures here must stop the apply. A half-installed package that is then
-    # activated gives a desktop with no OSD at all.
-    render_template "$LNF_SRC/metadata.json.in" "$LNF_DEST/metadata.json" \
+    LNF_ID=$(lnf_id_for "$variant")
+    LNF_NAME="$DISPLAY_NAME$([ "$variant" = dark ] && printf ' (dark)')"
+    LNF_VARIANT="$variant"
+    export LNF_ID LNF_NAME LNF_VARIANT
+
+    render_template "$LNF_SRC/metadata.json.in" "$dest/metadata.json" \
         || { log_error "could not render the package metadata"; return 1; }
-    render_template "$LNF_SRC/contents/defaults.in" "$LNF_DEST/contents/defaults" \
-        || { log_error "could not render the package defaults"; return 1; }
 
-    cp -a "$LNF_SRC/contents/osd" "$LNF_DEST/contents/" || return 1
+    full=$(mktemp) || return 1
+    render_template "$LNF_SRC/contents/defaults.in" "$full" \
+        || { log_error "could not render the package defaults"; rm -f "$full"; return 1; }
+
+    # The same filter apply_defaults uses, applied once, at install time.
+    : > "$dest/contents/defaults"
+    while IFS= read -r line; do
+        case "$line" in
+            '# variant: '*) marker=${line#\# variant: } ;;
+            '# part: '*)
+                part=${line#\# part: }
+                marker="any"
+                desktop_part_wanted "$part" && wanted=1 || wanted=0
+                ;;
+        esac
+        case "$line" in '#'*|'') printf '%s\n' "$line" >> "$dest/contents/defaults"; continue ;; esac
+        [ "$wanted" = 1 ] || continue
+        [ "$marker" = any ] || [ "$marker" = "$variant" ] || continue
+        printf '%s\n' "$line" >> "$dest/contents/defaults"
+    done < "$full"
+    rm -f "$full"
+
+    # The scheme itself, inside the package.
+    #
+    # Naming it in `defaults` is not enough: measured on Plasma 6.7,
+    # `plasma-apply-lookandfeel` (and the day/night switch that uses the same
+    # code) writes every other line of the defaults and leaves the colour
+    # scheme alone unless the package carries a `contents/colors` of its own --
+    # which is the first thing KCMLookandFeel looks for. Without this the night
+    # switch moved the icons and the decorations to our dark package and left
+    # the colours in the other variant, which is a desktop half light and half
+    # dark: the exact fault this pair of packages was built to end.
+    if [ -f "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" ]; then
+        cp -a "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" "$dest/contents/colors" || return 1
+        chmod 644 "$dest/contents/colors"
+    fi
+
+    cp -a "$LNF_SRC/contents/osd" "$dest/contents/" || return 1
 
     # The splash names the project, so it ships as a template like every other
     # file that does.
-    render_template "$LNF_SRC/contents/splash/Splash.qml.in" "$LNF_DEST/contents/splash/Splash.qml" \
+    render_template "$LNF_SRC/contents/splash/Splash.qml.in" "$dest/contents/splash/Splash.qml" \
         || { log_error "could not render the splash"; return 1; }
-    chmod 644 "$LNF_DEST/contents/splash/Splash.qml"
+    chmod 644 "$dest/contents/splash/Splash.qml"
 
-    chmod 644 "$LNF_DEST/metadata.json" "$LNF_DEST/contents/defaults"
-    log_step "installed $LNF_DEST"
+    chmod 644 "$dest/metadata.json" "$dest/contents/defaults"
+    log_step "installed $dest"
+}
+
+install_package() {   # install_package [variant]
+    # Failures here must stop the apply. A half-installed package that is then
+    # activated gives a desktop with no OSD at all.
+    install_package_variant light || return 1
+    install_package_variant dark || return 1
 
     install_colors || return 1
     install_switcher || return 1
     install_desktoptheme "${1:-dark}"
+}
+
+# Names our two packages as the light and dark halves Plasma's own day/night
+# switch moves between. Ledgered, so `theme revert` gives back whatever was
+# there -- usually nothing, which is what makes Plasma fall back to Breeze.
+lnf_pair_apply() {
+    kconfig_set theme kdeglobals KDE DefaultLightLookAndFeel "$LNF_PACKAGE_ID"
+    kconfig_set theme kdeglobals KDE DefaultDarkLookAndFeel "$LNF_DARK_PACKAGE_ID"
+}
+
+# Whether Plasma is the one switching light and dark, and whether it has been
+# told to switch between ours. "ours", "breeze" or "off".
+lnf_pair_state() {
+    local auto light dark
+    auto=$(kreadconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --default false)
+    [ "$auto" = true ] || { printf 'off'; return 0; }
+    light=$(kreadconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel --default '')
+    dark=$(kreadconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel --default '')
+    if [ "$light" = "$LNF_PACKAGE_ID" ] && [ "$dark" = "$LNF_DARK_PACKAGE_ID" ]; then
+        printf 'ours'
+    else
+        printf 'breeze'
+    fi
 }
 
 # Is the sun up, by KWin's reckoning? "true", "false", or empty for "nobody
@@ -565,7 +655,8 @@ material_you_apply_variant() {   # <light|dark>
 # change between light and dark, and rewriting them would churn the ledger.
 apply_defaults() {
     local want=${1:-dark} variant_only=${2:-0}
-    local defaults="$LNF_DEST/contents/defaults"
+    local defaults
+    defaults="$(lnf_dest_for "$want")/contents/defaults"
     [ -f "$defaults" ] || { log_error "no defaults file at $defaults"; return 1; }
 
     local file="" group="" line key value part="" wanted=1 variant="any"
@@ -655,19 +746,30 @@ set -- "${positional[@]+"${positional[@]}"}"
 osd_mode() {
     local mode=$1
     local dest="$LNF_DEST/contents/osd/Osd.qml"
+    local pkg
 
     [ -d "$LNF_DEST" ] || die "the look-and-feel package is not installed ($ALIAS theme apply)"
 
+    # Both packages: which of the two is active changes at sunset, and an OSD
+    # silenced in one of them would come back with the other.
     case "$mode" in
         ours)
-            cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$dest" || die "could not silence Plasma's OSD"
-            chmod 644 "$dest"
+            for pkg in "$LNF_DEST" "$LNF_DARK_DEST"; do
+                [ -d "$pkg" ] || continue
+                cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$pkg/contents/osd/Osd.qml" \
+                    || die "could not silence Plasma's OSD"
+                chmod 644 "$pkg/contents/osd/Osd.qml"
+            done
             set_osd_enabled true
             log_step "Plasma's OSD is silenced; the shell draws its own"
             ;;
         plasma)
-            cp -a "$LNF_SRC/contents/osd/Osd.qml" "$dest" || die "could not restore Plasma's OSD"
-            chmod 644 "$dest"
+            for pkg in "$LNF_DEST" "$LNF_DARK_DEST"; do
+                [ -d "$pkg" ] || continue
+                cp -a "$LNF_SRC/contents/osd/Osd.qml" "$pkg/contents/osd/Osd.qml" \
+                    || die "could not restore Plasma's OSD"
+                chmod 644 "$pkg/contents/osd/Osd.qml"
+            done
             set_osd_enabled false
             log_step "Plasma draws the OSD again"
             ;;
@@ -752,8 +854,20 @@ case "$cmd" in
         fi
 
         # Activating the package is what makes our OSD, splash and logout QML
-        # take effect. It is a single key, and it is ledgered like the rest.
-        kconfig_set theme kdeglobals KDE LookAndFeelPackage "$LNF_PACKAGE_ID"
+        # take effect -- the one that matches the variant in force.
+        kconfig_set theme kdeglobals KDE LookAndFeelPackage "$(lnf_id_for "$variant")"
+
+        # And the pair Plasma's own day/night switch uses. This is the fix for
+        # the fault that made it necessary: `AutomaticLookAndFeel` swaps the
+        # whole global theme at sunset, and with nothing of ours named there it
+        # swapped to Breeze and Breeze Dark -- taking the colour scheme, the
+        # icons and the decorations with it, which reads as "dark did not reach
+        # everywhere" rather than as another writer.
+        #
+        # The switch itself is left exactly as the user has it: on, it now
+        # moves between our two packages; off, `theme variant` does the same
+        # job. Either way nobody else decides what our desktop looks like.
+        lnf_pair_apply
 
         # KDE caches installed packages; without this the new one is invisible
         # until the next login.
@@ -788,6 +902,10 @@ case "$cmd" in
             rm -rf "$d"
             log_step "removed $d"
         done
+        if [ -d "$LNF_DARK_DEST" ]; then
+            rm -rf "$LNF_DARK_DEST"
+            log_step "removed $LNF_DARK_DEST"
+        fi
         if [ -d "$LNF_DEST" ]; then
             rm -rf "$LNF_DEST"
             log_step "removed $LNF_DEST"
@@ -831,8 +949,13 @@ case "$cmd" in
                   style: $style, styles: $styles, styleCustomised: $styleCustomised}'
             exit 0
         fi
-        printf 'package:      %s\n' "$([ -d "$LNF_DEST" ] && echo "installed ($LNF_DEST)" || echo "not installed")"
+        printf 'packages:     %s\n' "$([ -d "$LNF_DEST" ] && echo "light installed" || echo "light MISSING"), $([ -d "$LNF_DARK_DEST" ] && echo "dark installed" || echo "dark MISSING")"
         printf 'active L&F:   %s\n' "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')"
+        printf 'day and night: %s\n' "$(case "$(lnf_pair_state)" in
+            ours) printf "Plasma's own switch, between our two packages" ;;
+            breeze) printf "Plasma's own switch, and NOT between ours -- it will replace this theme at sunset" ;;
+            *) printf "ours (theme.mode), Plasma's switch is off" ;;
+        esac)"
         printf 'colour:       %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
         printf 'our schemes:  %s installed\n' "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")"
         osd_mode status 2>/dev/null || true
@@ -961,6 +1084,11 @@ case "$cmd" in
         # something to do to somebody at sunset -- it is right from the next
         # start either way.
         install_desktoptheme "$variant" || die "could not recolour the desktop theme"
+
+        # The active package follows the variant too: it is where the OSD, the
+        # splash and the logout screen come from, and System Settings shows it
+        # as the global theme in force.
+        kconfig_set theme kdeglobals KDE LookAndFeelPackage "$(lnf_id_for "$variant")"
 
         notify_palette_changed
         log_step "the desktop is in $variant"

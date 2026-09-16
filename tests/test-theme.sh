@@ -92,7 +92,7 @@ echo "== apply (default: the desktop too) =="
 desktop_parts_off ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
 
-check "look and feel active"        "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "look and feel active"        "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
 check "colour scheme is ours"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 # KDE resolves a scheme by the base name of its file, never by the name it
 # shows -- BreezeDark.colors is `Name=Breeze Dark` and `ColorScheme=BreezeDark`.
@@ -115,7 +115,7 @@ desktop_parts_off '{ "colours": false }'
 check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
 check "but the icons are ours"      "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 check "and the decorations"         "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
-check "the package is still active" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "the package is still active" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
 check "status says which"           "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.colours')" "false"
 check "and which are on"            "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.icons')" "true"
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
@@ -127,7 +127,7 @@ desktop_parts_off '{ "enabled": false }'
 check "colour scheme untouched"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
 check "icons untouched"             "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "user-icons"
 check "Alt+Tab still theirs"        "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "thumbnail_grid"
-check "the shell is themed anyway"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "the shell is themed anyway"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
 check "status says so"              "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.enabled')" "false"
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
 
@@ -135,7 +135,7 @@ echo "== --package-only ignores the settings entirely =="
 desktop_parts_off ""
 "$REPO_ROOT/scripts/theme.sh" apply --package-only >/dev/null 2>&1 || { echo "apply failed" >&2; exit 1; }
 check "nothing but the package"     "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "UserScheme"
-check "the package is active"       "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "the package is active"       "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
 desktop_parts_off ""
 
@@ -144,6 +144,36 @@ echo "== apply --appearance =="
 
 check "package installed"     "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/metadata.json" ] && echo yes)" "yes"
 check "our OSD shipped"       "$([ -f "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml" ] && echo yes)" "yes"
+# Two packages, because Plasma's own day/night switch moves the whole global
+# theme between two named ones -- and with ours not named there it moved to
+# Breeze and Breeze Dark at sunset, taking the colour scheme and the icons with
+# it. Each carries its own variant's lines and none of the other's: a defaults
+# file with both in it ends with whichever comes last.
+check "the dark package too"  "$([ -f "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/metadata.json" ] && echo yes)" "yes"
+check "light package: light colours only" \
+      "$(grep -c "ColorScheme=$SLUG-light" "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/defaults")" "1"
+check "and no dark line in it" \
+      "$(grep -c "ColorScheme=$SLUG-dark" "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/defaults")" "0"
+check "dark package: dark colours only" \
+      "$(grep -c "ColorScheme=$SLUG-dark" "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/contents/defaults")" "1"
+check "each names itself"     "$(jq -r '.KPlugin.Id' "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/metadata.json")" "$LNF_DARK_PACKAGE_ID"
+# The scheme inside the package, not only named in its defaults. Measured on
+# Plasma 6.7: `plasma-apply-lookandfeel` writes every other line of the
+# defaults and leaves the colour scheme alone unless the package carries a
+# `contents/colors` -- which would leave the night switch moving the icons to
+# dark and the colours to nothing.
+check "the light package carries its colours" \
+      "$(kreadconfig6 --file "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/colors" --group General --key ColorScheme)" "$SLUG-light"
+check "and the dark one carries its own" \
+      "$(kreadconfig6 --file "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/contents/colors" --group General --key ColorScheme)" "$SLUG-dark"
+check "and has a name of its own" \
+      "$(jq -r '.KPlugin.Name' "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/metadata.json")" "$DISPLAY_NAME (dark)"
+
+# Plasma's switch is told to move between ours rather than Breeze's.
+check "the light half is ours" \
+      "$(kreadconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel)" "$LNF_PACKAGE_ID"
+check "the dark half is ours" \
+      "$(kreadconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel)" "$LNF_DARK_PACKAGE_ID"
 check "colour schemes shipped" "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")" "2"
 check "switcher shipped"       "$([ -f "$KWIN_SWITCHER_DIR/$SLUG/contents/ui/main.qml" ] && echo yes)" "yes"
 # The design draws Alt+Tab three ways and a layout inside kwin_wayland cannot
@@ -159,7 +189,7 @@ check "desktop theme shipped"  "$([ -f "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors" ]
 check "one source of colours"  "$(cmp -s "$PLASMA_DESKTOPTHEME_DIR/$SLUG/colors" "$COLORS_DIR/$SLUG-dark.colors" && echo same)" "same"
 check "desktop theme selected" "$(kreadconfig6 --file plasmarc --group Theme --key name)" "$SLUG"
 check "switcher is selected"   "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName)" "$SLUG"
-check "look and feel active"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_PACKAGE_ID"
+check "look and feel active"  "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
 check "defaults applied"      "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 check "nested group applied"  "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
 check "unrelated key untouched" "$(kreadconfig6 --file kwinrc --group Windows --key Unrelated)" "keepme"

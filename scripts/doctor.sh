@@ -457,6 +457,39 @@ if [ -n "$scheme_now" ]; then
     fi
 fi
 
+# Who switches light and dark. Plasma's own switch (kdeglobals [KDE]
+# AutomaticLookAndFeel) applies a whole *global theme* at sunset -- and with
+# nothing of ours named as its two halves it applies Breeze and Breeze Dark,
+# which replaces this project's look-and-feel package, colour scheme, icons and
+# decorations in one write. Found on 2026-09-16 with the desktop half ours and
+# half Breeze Dark, which looks exactly like a theme that did not finish
+# applying.
+lnf_auto=$(kreadconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --default false)
+lnf_light=$(kreadconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel --default '')
+lnf_dark=$(kreadconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel --default '')
+lnf_now=$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')
+
+if [ "$theme_desktop" != "true" ]; then
+    ok "day and night left to you (theme.desktop.enabled is off)"
+elif [ "$lnf_auto" != true ]; then
+    ok "light and dark are ours to switch (Plasma's own switch is off)"
+elif [ "$lnf_light" = "$LNF_PACKAGE_ID" ] && [ "$lnf_dark" = "$LNF_DARK_PACKAGE_ID" ]; then
+    ok "Plasma switches light and dark between our two packages"
+else
+    bad "Plasma's 'Switch to Dark Mode at Night' is on and does not name ours"
+    fix "at sunset it applies '${lnf_dark:-org.kde.breezedark.desktop}' over this theme -- the"
+    fix "  colour scheme, the icons and the decorations go with it"
+    fix "name ours as its two halves: $ALIAS theme apply"
+    fix "or turn the switch off in System Settings -> Colors & Themes -> Global Theme"
+fi
+
+if [ "$lnf_now" = "$LNF_PACKAGE_ID" ] || [ "$lnf_now" = "$LNF_DARK_PACKAGE_ID" ]; then
+    ok "the global theme in force is ours: $lnf_now"
+elif [ "$theme_desktop" = "true" ]; then
+    warn "the global theme in force is not ours: ${lnf_now:-<unset>}"
+    fix "put ours back: $ALIAS theme apply"
+fi
+
 # A GTK theme whose *name* is the dark half of its pair ignores every
 # preference we write and stays dark in each mode. The preference agreeing is
 # not the same as the theme agreeing.

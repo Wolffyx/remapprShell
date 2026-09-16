@@ -72,7 +72,14 @@ KWIN_SCRIPT_ID="$SLUG-windows"
 # packages also mean enabling one does not enable the other.
 KWIN_EDGES_SCRIPT_ID="$SLUG-edges"
 SYSTEMD_UNIT="$SLUG.service"
+# Two look-and-feel packages, light and dark, because Plasma's own day/night
+# switch (kdeglobals [KDE] AutomaticLookAndFeel) swaps the *whole global theme*
+# between two named packages. With ours not named there it swapped to Breeze
+# and Breeze Dark at sunset, taking the colour scheme, the icons and the
+# decorations with it -- which is what "dark did not reach everywhere" was on
+# 2026-09-16. Naming both of ours makes Plasma's switch ours.
 LNF_PACKAGE_ID="$SLUG.lookandfeel"
+LNF_DARK_PACKAGE_ID="$SLUG-dark.lookandfeel"
 
 # The Plasma renderer needs a shell package of its own rather than a flag on
 # the first one. plasmashell namespaces both the applet layout
@@ -160,5 +167,6 @@ export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        PLASMA_SHELLS_DIR PLASMA_LNF_DIR PLASMA_PLASMOIDS_DIR PLASMA_DESKTOPTHEME_DIR \
        KWIN_SWITCHER_DIR KWIN_SCRIPTS_DIR DBUS_SERVICES_DIR \
        COLORS_DIR APPLICATIONS_DIR \
-       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID KWIN_EDGES_SCRIPT_ID SYSTEMD_UNIT LNF_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
+       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID KWIN_EDGES_SCRIPT_ID SYSTEMD_UNIT \
+       LNF_PACKAGE_ID LNF_DARK_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
        SAFE_MODE_VAR DEBUG_VAR NO_SESSION_VAR
