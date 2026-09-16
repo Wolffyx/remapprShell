@@ -6,6 +6,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import qs.domain.launcher.apps
 import qs.domain.launcher.providers
 import qs.domain.theme
 import qs.ui.primitives
@@ -75,6 +76,16 @@ Rectangle {
                 Keys.onEnterPressed: card.provider.activateSelected()
                 Keys.onEscapePressed: card.provider.close()
 
+                // Pins what is selected, from the list rather than from a
+                // settings page. Ctrl+P because P is what it does and Ctrl
+                // is the only modifier a field being typed into can spare.
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)) {
+                        card.provider.togglePin(card.provider.selectedApp);
+                        event.accepted = true;
+                    }
+                }
+
                 // Completes to the chosen result: an action's full name after
                 // the prefix, an application's name.
                 Keys.onTabPressed: {
@@ -115,11 +126,37 @@ Rectangle {
             Repeater {
                 model: card.provider.results.slice(0, 9)
 
-                Rectangle {
-                    id: row
+                // A row, under the heading of its kind when it is the first
+                // of that kind. The heading is drawn inside the delegate
+                // rather than as a second model, so the list stays flat: the
+                // selection is an index, and Up and Down still step one row.
+                Column {
+                    id: group
 
                     required property var modelData
                     required property int index
+
+                    width: parent.width
+
+                    readonly property string heading: Results.headingAt(card.provider.results, group.index)
+
+                    PanelText {
+                        visible: group.heading.length > 0
+                        leftPadding: 18
+                        topPadding: group.index === 0 ? 2 : 10
+                        bottomPadding: 4
+                        text: group.heading.toUpperCase()
+                        font.family: Theme.monoFamily
+                        font.pixelSize: 11
+                        font.letterSpacing: 1
+                        color: Theme.mut
+                    }
+
+                Rectangle {
+                    id: row
+
+                    readonly property var modelData: group.modelData
+                    readonly property int index: group.index
                     readonly property bool selected: row.index === card.provider.selectedIndex
 
                     width: parent.width
@@ -136,13 +173,16 @@ Rectangle {
 
                         PanelIcon {
                             anchors.fill: parent
-                            visible: row.modelData.kind === "app"
+                            // An open window carries an icon exactly as an
+                            // application does, so this is asked of the row
+                            // rather than of its kind.
+                            visible: String(row.modelData.icon ?? "").length > 0
                             iconName: row.modelData.icon ?? ""
                         }
 
                         Glyph {
                             anchors.centerIn: parent
-                            visible: row.modelData.kind !== "app"
+                            visible: String(row.modelData.icon ?? "").length === 0
                             name: row.modelData.glyph ?? ""
                             size: 24
                             color: row.selected ? Theme.acc : Theme.mut
@@ -152,7 +192,7 @@ Rectangle {
                     Column {
                         anchors.left: rowIcon.right
                         anchors.leftMargin: 16
-                        anchors.right: enterBadge.left
+                        anchors.right: pin.left
                         anchors.rightMargin: 12
                         anchors.verticalCenter: parent.verticalCenter
 
@@ -173,6 +213,25 @@ Rectangle {
                             font.pixelSize: 13
                             color: row.selected ? Theme.alpha(Theme.accCFg, 0.75) : Theme.mut
                         }
+                    }
+
+                    // Pinned, or pinnable: shown on the row being looked at,
+                    // and on every pinned row whether or not it is.
+                    Glyph {
+                        id: pin
+
+                        readonly property bool pinned: card.provider.isPinned(row.modelData.app)
+
+                        anchors.right: enterBadge.left
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: row.modelData.kind === "app" && (pin.pinned || row.selected || rowHover.hovered)
+                        name: pin.pinned ? "keep" : "keep_off"
+                        size: 18
+                        opacity: pin.pinned ? 1 : 0.55
+                        color: row.selected ? Theme.accCFg : Theme.mut
+
+                        TapHandler { onTapped: card.provider.togglePin(row.modelData.app) }
                     }
 
                     Rectangle {
@@ -202,6 +261,7 @@ Rectangle {
                         onHoveredChanged: if (hovered) card.provider.selectedIndex = row.index
                     }
                     TapHandler { onTapped: card.provider.activate(row.modelData) }
+                }
                 }
             }
 
@@ -236,7 +296,7 @@ Rectangle {
                 spacing: 24
 
                 Repeater {
-                    model: ["↑↓ navigate", "⏎ run", "⇥ complete", "esc dismiss"]
+                    model: ["↑↓ navigate", "⏎ run", "⇥ complete", "⌃P pin", "esc dismiss"]
 
                     PanelText {
                         required property string modelData

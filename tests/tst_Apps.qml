@@ -95,4 +95,68 @@ TestCase {
         compare(r[2].dir, "/etc");
         compare(Apps.parseRecent(xbel, "/home/me", 1).length, 1);
     }
+
+    // ---- what the system opens things with ---------------------------------
+
+    readonly property string mimeapps: `[Added Associations]
+text/html=firefox.desktop;google-chrome.desktop;
+
+[Default Applications]
+# a comment
+text/html=google-chrome.desktop;firefox.desktop;
+x-scheme-handler/https=google-chrome.desktop;
+image/png=org.kde.gwenview.desktop;
+broken-line
+inode/directory=org.kde.dolphin.desktop
+`
+
+    function test_only_the_defaults_and_only_the_first() {
+        const ids = Apps.parseDefaultApps(mimeapps);
+        // Added Associations are what *can* open a thing, not what does.
+        compare(ids.indexOf("firefox"), -1);
+        // The first id of a line is the default; the rest are fallbacks.
+        verify(ids.indexOf("google-chrome") >= 0);
+        verify(ids.indexOf("org.kde.gwenview") >= 0);
+        // A line with no semicolon at the end is still a line.
+        verify(ids.indexOf("org.kde.dolphin") >= 0);
+        // Each id once, however many types it is the default for.
+        compare(ids.filter(id => id === "google-chrome").length, 1);
+    }
+
+    function test_nothing_in_nothing_out() {
+        compare(Apps.parseDefaultApps("").length, 0);
+        compare(Apps.parseDefaultApps(undefined).length, 0);
+    }
+
+    function test_one_key_of_one_group() {
+        const kdeglobals = `[General]
+BrowserApplication=google-chrome.desktop
+TerminalApplication=alacritty
+
+[Icons]
+Theme=breeze-dark
+`
+        compare(Apps.iniValue(kdeglobals, "General", "TerminalApplication"), "alacritty");
+        compare(Apps.iniValue(kdeglobals, "Icons", "Theme"), "breeze-dark");
+        // A key of another group is not this group's.
+        compare(Apps.iniValue(kdeglobals, "Icons", "TerminalApplication"), "");
+        compare(Apps.iniValue(kdeglobals, "Nothing", "Theme"), "");
+    }
+
+    function test_what_xdg_mime_answered() {
+        // One line per type asked about, in order; a type nothing handles
+        // answers with an empty line, and a type with fallbacks answers with
+        // the default first.
+        const answers = `google-chrome.desktop
+
+org.kde.gwenview.desktop
+org.kde.okular.desktop;org.kde.gwenview.desktop;
+
+google-chrome.desktop
+`
+        const ids = Apps.parseQueriedDefaults(answers);
+        compare(ids.join(","), "google-chrome,org.kde.gwenview,org.kde.okular");
+        compare(Apps.parseQueriedDefaults("").length, 0);
+        compare(Apps.parseQueriedDefaults(undefined).length, 0);
+    }
 }

@@ -20,6 +20,19 @@ Column {
     readonly property bool builtinMenu: LauncherService.appsProvider?.providerId === "builtin"
     readonly property bool builtinSearch: LauncherService.searchProvider?.providerId === "builtin"
 
+    readonly property var sources: ConfigStore.value("launcher.searchSources",
+                                                     ["apps", "windows", "files", "settings"]) ?? []
+
+    // Written back in the order the switches are drawn, not the order they
+    // were turned on: the file is read by people as well as by the shell.
+    function setSource(id, on) {
+        const all = ["apps", "windows", "files", "settings"];
+        const chosen = root.sources.slice().filter(s => s !== id);
+        if (on)
+            chosen.push(id);
+        ConfigStore.set("launcher.searchSources", all.filter(s => chosen.indexOf(s) >= 0));
+    }
+
     spacing: 14
 
     Card {
@@ -96,6 +109,62 @@ Column {
             label: "Key hints along the bottom"
             checked: ConfigStore.value("launcher.hints", true) === true
             onToggled: value => ConfigStore.set("launcher.hints", value)
+        }
+    }
+
+    Card {
+        width: root.width
+        opacity: root.builtinSearch ? 1 : 0.6
+
+        SectionLabel { text: "What search looks through" }
+
+        // One switch per source, written back as the list the shell reads.
+        // A list rather than a key each: the order results appear in is the
+        // shell's, and what a person wants to say here is "not my files".
+        Repeater {
+            model: [
+                { id: "apps", label: "Applications", description: "Everything installed, by name, by the binary, or by its initials." },
+                { id: "windows", label: "Open windows", description: "By their titles, so a window can be raised by the page it is showing." },
+                { id: "files", label: "Recent files", description: "What KDE and GTK applications record having opened." },
+                { id: "settings", label: "This shell's settings", description: "The pages of this window, by name." }
+            ]
+
+            ToggleRow {
+                required property var modelData
+
+                label: modelData.label
+                description: modelData.description
+                checked: root.sources.indexOf(modelData.id) >= 0
+                onToggled: value => root.setSource(modelData.id, value)
+            }
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "What it remembers" }
+
+        ToggleRow {
+            label: "Learn what you open"
+            description: "What has been opened before is offered first, and an empty search suggests it. Kept on this machine and sent nowhere."
+            checked: ConfigStore.value("launcher.learn", true) === true
+            onToggled: value => ConfigStore.set("launcher.learn", value)
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: `${Object.keys(Frecency.entries).length} thing(s) remembered.`
+            font.pixelSize: 12
+            color: Theme.mut
+        }
+
+        TextButton {
+            glyph: "delete_history"
+            iconName: "edit-clear-history"
+            text: "Forget what I have opened"
+            onActivated: Frecency.forget()
         }
     }
 

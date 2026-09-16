@@ -111,6 +111,13 @@
         "actionPrefix": ">",
         "dense": false,
         "hints": true,
+        "searchSources": [
+            "apps",
+            "windows",
+            "files",
+            "settings"
+        ],
+        "learn": true,
         "pinned": []
     },
     "audio": {

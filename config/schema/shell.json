@@ -281,6 +281,23 @@
                     "label": "Key hints",
                     "description": "The keys the built-in search answers to, under its results."
                 },
+                "launcher.searchSources": {
+                    "type": "list",
+                    "default": [
+                        "apps",
+                        "windows",
+                        "files",
+                        "settings"
+                    ],
+                    "label": "Search results",
+                    "description": "What the built-in search looks through. apps: everything installed. windows: the open ones, by their titles, so a window can be raised by name. files: what was opened recently. settings: this shell's own pages. Remove a name to stop searching it."
+                },
+                "launcher.learn": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Learn what you open",
+                    "description": "What has been opened before is offered first, and an empty search suggests it. Kept in the state directory and never sent anywhere; turning this off stops it being read, and Forget clears what is there."
+                },
                 "launcher.pinned": {
                     "type": "list",
                     "default": [],

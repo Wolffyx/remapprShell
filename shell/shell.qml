@@ -511,6 +511,18 @@ ShellRoot {
         function close(): void { LauncherService.close(); }
         function query(text: string): void { LauncherService.openWithQuery(text); }
         function provider(): string { return LauncherService.appsProvider.providerId; }
+
+        // What the built-in search would draw for what has been typed.
+        //
+        // The only way to check a search from outside the session: a result
+        // list is a window holding the keyboard, which no screenshot survives
+        // and no test can type into. `query <text>` then `results` is how the
+        // ranking was checked on the machine it was built for.
+        function results(): string {
+            return JSON.stringify(LauncherService.builtin.results.map(r => ({
+                kind: r.kind, group: r.group ?? "", name: r.name, description: r.description ?? ""
+            })));
+        }
         function searchProvider(): string { return LauncherService.searchProvider.providerId; }
     }
 

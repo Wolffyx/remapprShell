@@ -89,6 +89,8 @@ What opens when you press the start button, and what opens when you search.
 | `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
 | `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
 | `launcher.hints` | `true` or `false` | `true` | The keys the built-in search answers to, under its results. |
+| `launcher.searchSources` | a list | `["apps","windows","files","settings"]` | What the built-in search looks through. apps: everything installed. windows: the open ones, by their titles, so a window can be raised by name. files: what was opened recently. settings: this shell's own pages. Remove a name to stop searching it. |
+| `launcher.learn` | `true` or `false` | `true` | What has been opened before is offered first, and an empty search suggests it. Kept in the state directory and never sent anywhere; turning this off stops it being read, and Forget clears what is there. |
 | `launcher.pinned` | a list | `[]` | Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed. |
 | `launcher.kickoffMode` | `menu`, `windowed` | `menu` | Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus. |
 
