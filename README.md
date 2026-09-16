@@ -85,6 +85,41 @@ and there is none offscreen — the windows in it were opened for the photograph
 - KDE Plasma 6, Wayland
 - `quickshell`, `qt6-declarative`, `jq`
 
+## Installing it
+
+```bash
+make setup          # the guided install: every choice asked once, then applied
+```
+
+One pass over everything an install decides -- the restore point, whether the files
+are copied or symlinked, what draws the panel, which keys this shell takes, who
+switches windows, the look and feel, and whether it starts at login. Each step runs
+the command you would otherwise run by hand (`install.sh`, `renderer set`,
+`theme apply`, `shortcuts set`, `switcher use`), so the guided path and the manual
+one cannot drift apart.
+
+Nothing is written until the summary is confirmed: the questions come first, the plan
+is shown, and one answer applies it. A restore point is taken before the first change,
+and `rmpr restore` undoes the lot.
+
+It asks in whatever front end the machine has -- KDE's own dialogs in a graphical
+session, `whiptail` in a terminal, numbered prompts when there is neither, and none
+at all when nobody is attached:
+
+```bash
+rmpr setup --dry-run        # the plan, and the commands it would run
+rmpr setup --unattended     # ask nothing, take every default
+rmpr setup --ui whiptail    # kdialog | whiptail | dialog | plain | none
+rmpr setup --no-snapshot    # skip the restore point (not advised)
+rmpr setup --no-preflight   # skip the machine check
+```
+
+The defaults are the setup this project is developed against: the files copied, this
+shell drawing the panel, `Meta` for the application menu and `Meta+Space` for search,
+Alt+Tab left with KWin drawing our switcher layout, the look and feel applied, and the
+user service enabled so it starts at login. A key another shell already holds is taken
+from it and said so; `rmpr shortcuts revert` gives it back.
+
 ## Development
 
 ```bash
@@ -120,6 +155,7 @@ that looks right and still has a real name in it.
 ### Command line
 
 ```bash
+rmpr setup              # the guided install (see above)
 rmpr preflight          # what would change, and whether this machine is ready
 rmpr snapshot create    # take a restore point now
 rmpr snapshot list      # what exists, with sizes
