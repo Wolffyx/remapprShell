@@ -10,6 +10,9 @@
         "desktop": {
             "enabled": true,
             "followMode": false,
+            "gtkThemeLight": "",
+            "gtkThemeDark": "",
+            "materialYou": false,
             "colours": true,
             "gtk": true,
             "icons": true,

@@ -401,12 +401,51 @@ gtk_remember_scheme() {
     log_debug "gtk: color-scheme was ${before:-<unset>}"
 }
 
+# The theme a variant should wear, when the settings name one. Empty means
+# leave the theme name alone, which is the default and was the only behaviour
+# until 2026-09-16.
+#
+# Asking for the preference is not the same as asking for a theme. A GTK theme
+# whose name *is* the dark one -- Nordic, adw-gtk3-dark -- ignores
+# `color-scheme` and `gtk-application-prefer-dark-theme` entirely and stays
+# dark in every mode, which is what "dark mode is still active" was here with
+# both preferences reading light and correct. Themes ship in pairs and the
+# pair's two names are the only thing that separates them, so following the
+# mode means writing the name.
+#
+# Not guessed. A counterpart derived by adding or removing "-dark" is right for
+# adw-gtk3 and wrong for Nordic, whose light half is Nordic-Polar, and a wrong
+# guess puts the user in a theme they never chose. Both names are named.
+gtk_theme_for() {   # <light|dark>
+    config_get ".theme.desktop.gtkTheme${1^}" ""
+}
+
+# The theme name gsettings had, kept beside the colour-scheme note. Separate
+# from gtk_remember_scheme because that one returns early once the ledger
+# exists, and this key was added to it later: a desktop themed before today
+# has the file without the field.
+gtk_remember_theme() {
+    local led before tmp
+    led=$(gtk_ledger)
+    [ -f "$led" ] || return 0
+    jq -e 'has("theme")' "$led" >/dev/null 2>&1 && return 0
+
+    before=""
+    command -v gsettings >/dev/null 2>&1 \
+        && before=$(gsettings get "$GSETTINGS_SCHEMA" gtk-theme 2>/dev/null | tr -d "'")
+
+    tmp=$(mktemp)
+    jq --arg v "$before" '. + {theme: $v}' "$led" > "$tmp" && mv "$tmp" "$led" || rm -f "$tmp"
+    log_debug "gtk: gtk-theme was ${before:-<unset>}"
+}
+
 gtk_apply_variant() {   # <light|dark>
     local variant=$1
-    local want file
+    local want file theme
     [ "$variant" = "light" ] && want="prefer-light" || want="prefer-dark"
 
     gtk_remember_scheme
+    gtk_remember_theme
     if command -v gsettings >/dev/null 2>&1; then
         gsettings set "$GSETTINGS_SCHEMA" color-scheme "$want" 2>/dev/null \
             || log_warn "could not set GTK's colour scheme preference"
@@ -419,6 +458,18 @@ gtk_apply_variant() {   # <light|dark>
             "$([ "$variant" = "light" ] && printf 'false' || printf 'true')"
     done
     log_step "GTK applications asked to prefer $variant"
+
+    theme=$(gtk_theme_for "$variant")
+    [ -n "$theme" ] || return 0
+
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set "$GSETTINGS_SCHEMA" gtk-theme "$theme" 2>/dev/null \
+            || log_warn "could not set the GTK theme to $theme"
+    fi
+    for file in "${GTK_INIS[@]}"; do
+        kconfig_set theme "$file" Settings gtk-theme-name "$theme"
+    done
+    log_step "GTK theme: $theme"
 }
 
 gtk_revert() {
@@ -430,6 +481,12 @@ gtk_revert() {
     if [ -n "$before" ] && command -v gsettings >/dev/null 2>&1; then
         gsettings set "$GSETTINGS_SCHEMA" color-scheme "$before" 2>/dev/null || true
         log_step "GTK's colour scheme preference back to $before"
+    fi
+
+    before=$(jq -r '.theme // ""' "$led" 2>/dev/null)
+    if [ -n "$before" ] && command -v gsettings >/dev/null 2>&1; then
+        gsettings set "$GSETTINGS_SCHEMA" gtk-theme "$before" 2>/dev/null || true
+        log_step "GTK theme back to $before"
     fi
 
     # An ini file we created, with nothing left in it once the ledger has put
@@ -447,6 +504,56 @@ gtk_revert() {
     done < <(jq -r '.created[]? // empty' "$led" 2>/dev/null)
 
     rm -f "$led"
+}
+
+# ---- kde-material-you-colors, which is not ours either --------------------
+#
+# A third-party service that derives a Material You colour scheme from the
+# wallpaper (or a fixed seed) and applies it to the Plasma session. It has one
+# `light` switch in its own config and applies MaterialYouLight or
+# MaterialYouDark accordingly -- once at login, and again whenever the
+# wallpaper changes.
+#
+# Left alone it is the last writer at every login, so `theme.mode: auto` reads
+# its answer rather than the other way round: measured here on 2026-09-16,
+# `light = False` applied MaterialYouDark at 09:31:16 and the whole desktop was
+# dark by day with every one of this project's own settings reading light and
+# correct.
+#
+# So following it means writing that one key and restarting the unit. Off by
+# default and for the usual reason: it is somebody else's service, installed by
+# somebody else's dotfiles, and a shell that quietly rewrote a config it does
+# not own would be exactly the behaviour this project refuses elsewhere.
+MATERIAL_YOU_CONF="kde-material-you-colors/config.conf"
+MATERIAL_YOU_UNIT="kde-material-you-colors.service"
+
+material_you_wanted() {
+    [ "$(config_get '.theme.desktop.enabled' true)" = "true" ] || return 1
+    [ "$(config_get '.theme.desktop.materialYou' false)" = "true" ] || return 1
+    [ -f "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" ]
+}
+
+material_you_apply_variant() {   # <light|dark>
+    local variant=$1 want have
+
+    want=$([ "$variant" = "light" ] && printf 'True' || printf 'False')
+    have=$(kreadconfig6 --file "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" \
+                        --group CUSTOM --key light --default '' 2>/dev/null)
+
+    # Its config is read by Python's configparser, which does not care that
+    # kwriteconfig6 drops the spaces around the "=" the file was written with.
+    # Nothing is restarted when nothing changed: a restart re-applies the
+    # scheme, which wakes every Qt application on the machine.
+    [ "$have" = "$want" ] && return 0
+
+    kconfig_set theme "$MATERIAL_YOU_CONF" CUSTOM light "$want"
+    log_step "kde-material-you-colors: light = $want"
+
+    session_available || return 0
+    systemctl --user cat "$MATERIAL_YOU_UNIT" >/dev/null 2>&1 || return 0
+    systemctl --user restart "$MATERIAL_YOU_UNIT" >/dev/null 2>&1 \
+        && log_step "restarted $MATERIAL_YOU_UNIT so it re-applies" \
+        || log_warn "could not restart $MATERIAL_YOU_UNIT; its scheme follows at the next login"
 }
 
 # apply_defaults [variant] [variant-only]
@@ -637,6 +744,7 @@ case "$cmd" in
             apply_defaults "$variant" || die "could not write the defaults; run '$ALIAS theme revert'"
             desktop_part_wanted colours && colors_apply_scheme "$variant"
             desktop_part_wanted gtk && gtk_apply_variant "$variant"
+            material_you_wanted && material_you_apply_variant "$variant"
             log_info "the desktop is in $variant (theme.mode: $(config_get '.theme.mode' 'auto'))"
         else
             log_info "leaving the desktop alone (theme.desktop.enabled is off)"
@@ -793,10 +901,42 @@ case "$cmd" in
         if desktop_part_wanted gtk && command -v gsettings >/dev/null 2>&1; then
             want_gtk=$([ "$variant" = "light" ] && printf 'prefer-light' || printf 'prefer-dark')
             [ "$(gsettings get "$GSETTINGS_SCHEMA" color-scheme 2>/dev/null | tr -d "'")" = "$want_gtk" ] || gtk_agrees=0
+
+            # The theme name as well, when one is configured. Without this the
+            # early exit below calls a desktop "already light" whose GTK theme
+            # is the dark half of its pair -- which is the state this key was
+            # added to end.
+            want_theme=$(gtk_theme_for "$variant")
+            if [ -n "$want_theme" ]; then
+                [ "$(gsettings get "$GSETTINGS_SCHEMA" gtk-theme 2>/dev/null | tr -d "'")" = "$want_theme" ] \
+                    || gtk_agrees=0
+            fi
         fi
-        if [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" = "$DISPLAY_NAME ${variant^}" ] \
+
+        material_agrees=1
+        if material_you_wanted; then
+            want_my=$([ "$variant" = "light" ] && printf 'True' || printf 'False')
+            [ "$(kreadconfig6 --file "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" \
+                              --group CUSTOM --key light --default '' 2>/dev/null)" = "$want_my" ] \
+                || material_agrees=0
+        fi
+        # Whose colour scheme is on the desktop. Normally it must be ours by
+        # name and by value; with kde-material-you-colors following, it is
+        # deliberately theirs -- they apply MaterialYouLight or MaterialYouDark
+        # after us and are meant to. Asking for our name there would make this
+        # check fail for ever, and every start would re-apply the lot and
+        # restart their unit, which wakes every Qt application on the machine.
+        scheme_agrees=1
+        if material_you_wanted; then
+            scheme_agrees=$material_agrees
+        else
+            [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" \
+                = "$DISPLAY_NAME ${variant^}" ] && [ "$colours_agree" = 1 ] || scheme_agrees=0
+        fi
+
+        if [ "$scheme_agrees" = 1 ] \
            && cmp -s "$REPO_ROOT/theme/colors/$SLUG-$variant.colors" "$DESKTOPTHEME_DEST/colors" 2>/dev/null \
-           && [ "$gtk_agrees" = 1 ] && [ "$colours_agree" = 1 ]; then
+           && [ "$gtk_agrees" = 1 ]; then
             log_info "the desktop is already in $variant"
             exit 0
         fi
@@ -812,6 +952,8 @@ case "$cmd" in
         else
             log_info "leaving GTK alone (theme.desktop.gtk is off)"
         fi
+
+        material_you_wanted && material_you_apply_variant "$variant"
 
         # Plasma's own widgets read the desktop theme, not the colour scheme,
         # so the variant has to reach both or a light desktop keeps dark applet

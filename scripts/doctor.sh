@@ -14,6 +14,7 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 
 problems=0
 warnings=0
@@ -219,7 +220,7 @@ fi
 # The headline failure mode of having two renderers: both drawing at once.
 # Counted rather than assumed, because the case that matters is the one where
 # the configuration and what is on screen have come apart.
-configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo unknown)
+configured_renderer=$(config_get '.panel.renderer' quickshell)
 [ "$configured_renderer" = "null" ] && configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$defaults_file" 2>/dev/null || echo quickshell)
 
 case "$configured_renderer" in
@@ -346,7 +347,7 @@ fi
 section "open windows"
 
 profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
-    "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo "")
+    "$(profile_file)" 2>/dev/null || echo "")
 [ -n "$profile_entries" ] || profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
     "$defaults_file" 2>/dev/null || echo "")
 
@@ -378,7 +379,7 @@ esac
 
 section "on-screen display"
 
-osd_enabled=$(jq -r '.osd.enabled // false' "$CONFIG_DIR/profiles/default/shell.json" 2>/dev/null || echo false)
+osd_enabled=$(config_get '.osd.enabled' false)
 lnf_active=$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')
 osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
 osd_silenced=no
@@ -400,6 +401,55 @@ elif [ "$osd_silenced" = yes ]; then
 else
     warn "our OSD is on and Plasma's is not silenced; you will see two"
     fix "silence Plasma's: $ALIAS theme osd ours"
+fi
+
+# ----------------------------------------------------------- light and dark
+
+section "light and dark"
+
+# Who has the last word on the colour scheme. Nothing here is this project's
+# to own -- a second thing writing kdeglobals is allowed -- but it must be
+# said out loud, because the symptom is indistinguishable from this shell
+# being broken: every setting reads light and correct, and the desktop is
+# dark. Found on 2026-09-16 only by reading another service's journal.
+variant=$(config_get '.theme.mode' auto)
+scheme_now=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')
+theme_desktop=$(config_get '.theme.desktop.enabled' true)
+theme_colours=$(config_get '.theme.desktop.colours' true)
+
+if [ "$theme_desktop" != "true" ] || [ "$theme_colours" != "true" ]; then
+    ok "colour scheme left to you (theme.desktop.colours is off): $scheme_now"
+elif [ "$scheme_now" = "$DISPLAY_NAME Light" ] || [ "$scheme_now" = "$DISPLAY_NAME Dark" ]; then
+    ok "colour scheme is ours: $scheme_now"
+else
+    warn "the colour scheme is not ours: $scheme_now"
+    fix "something else wrote it after we did, and theme.mode ($variant) reads its answer"
+    if systemctl --user cat kde-material-you-colors.service >/dev/null 2>&1; then
+        fix "kde-material-you-colors is installed here and applies a scheme at every login"
+        fix "  it follows this shell:  turn on theme.desktop.materialYou"
+        fix "  or leave it out of it:  systemctl --user disable --now kde-material-you-colors"
+    fi
+    fix "put ours back: $ALIAS theme variant $([ "$variant" = dark ] && echo dark || echo light)"
+fi
+
+# A GTK theme whose *name* is the dark half of its pair ignores every
+# preference we write and stays dark in each mode. The preference agreeing is
+# not the same as the theme agreeing.
+if [ "$(config_get '.theme.desktop.gtk' true)" = "true" ] && command -v gsettings >/dev/null 2>&1; then
+    gtk_pref=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null | tr -d "'")
+    gtk_theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
+    named_light=$(config_get '.theme.desktop.gtkThemeLight' "")
+    named_dark=$(config_get '.theme.desktop.gtkThemeDark' "")
+
+    if [ -n "$named_light" ] || [ -n "$named_dark" ]; then
+        ok "GTK theme follows the mode: $gtk_theme ($gtk_pref)"
+    elif [ "$gtk_pref" = "prefer-light" ] && printf '%s' "$gtk_theme" | grep -qi 'dark'; then
+        warn "GTK prefers light but its theme is $gtk_theme"
+        fix "a theme named for the dark half of its pair ignores the preference"
+        fix "name both halves: theme.desktop.gtkThemeLight and .gtkThemeDark"
+    else
+        ok "GTK: $gtk_theme ($gtk_pref)"
+    fi
 fi
 
 # ---------------------------------------------------------------- lock screen
