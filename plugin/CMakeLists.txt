@@ -18,6 +18,11 @@ project(shell-screencast VERSION 0.1 LANGUAGES CXX C)
 
 find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Qml Quick WaylandClient)
 
+# KGuiAddons, for KModifierKeyInfo: the lock keys. On Wayland it binds KWin's
+# own org_kde_kwin_keystate global, which is how a client with no keyboard
+# focus can be told that Caps Lock went on -- see src/lockkeys.h.
+find_package(KF6GuiAddons REQUIRED)
+
 qt_standard_project_setup(REQUIRES 6.6)
 
 # Where the QML module lands. The default install prefix is the user's own Qt
@@ -65,10 +70,10 @@ qt_add_library(shellinput SHARED)
 qt6_add_qml_module(shellinput
     URI ShellInput
     VERSION 1.0
-    SOURCES src/modifiers.cpp src/modifiers.h
+    SOURCES src/modifiers.cpp src/modifiers.h src/lockkeys.cpp src/lockkeys.h
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/ShellInput"
 )
-target_link_libraries(shellinput PRIVATE Qt6::Core Qt6::Gui Qt6::Qml)
+target_link_libraries(shellinput PRIVATE Qt6::Core Qt6::Gui Qt6::Qml KF6::GuiAddons)
 # The generated type registration includes <modifiers.h> by name, so src/ must
 # be on the include path -- without it the header is not found, the type is
 # unknown, and the failure is reported in the generated file rather than ours.

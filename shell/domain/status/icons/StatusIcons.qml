@@ -563,6 +563,13 @@ QtObject {
             return "keyboard";
         if (/brightness/.test(i))
             return root.brightnessGlyph(fraction);
+        // Before the general keyboard rule below, which would otherwise take
+        // both of these: a lock key is not "the keyboard", and the glyph is
+        // the whole message when there is no bar to read.
+        if (/caps/.test(i))
+            return "keyboard_capslock";
+        if (/num-?(lock|on|off)/.test(i))
+            return "dialpad";
         if (/touchpad/.test(i))
             return /off|disabled/.test(i) ? "touchpad_mouse_off" : "touchpad_mouse";
         if (/keyboard|input-kb/.test(i))
