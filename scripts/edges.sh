@@ -12,6 +12,10 @@
 #   effect <name> <edge|none>
 #                          the same as `set <edge> <name>`; with `none`, take
 #                          that effect off every edge
+#   follow                 make KWin's edges agree with the sidebar's own
+#                          settings: an edge on the side it opens from when
+#                          sidebar.trigger is "hover", and no edge at all when
+#                          it is anything else
 #   snap on|off            Aero-Snap style edge tiling and maximise
 #   disable-all            the master switch: every mouse trigger off
 #   enable-all             ...and back on, exactly as they were
@@ -29,6 +33,7 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 
 # KWin's ElectricBorder enum. 9 is ElectricNone -- a binding set to 9 is off,
 # which is why an edge can read as "configured" and still do nothing.
@@ -444,6 +449,44 @@ case "$cmd" in
     # a side effect of choosing a side.
     #
     # Called by hand, and by the shell itself when the setting changes.
+    follow)
+        want=Right
+        [ "$(config_get '.sidebar.position' right)" = left ] && want=Left
+        trigger=$(config_get '.sidebar.trigger' drag)
+
+        raw=$(shell_bindings_raw)
+        have=""
+        local_ifs=$IFS; IFS=','
+        for pair in $raw; do
+            [ "${pair#*:}" = sidebar ] && have=${pair%%:*}
+        done
+        IFS=$local_ifs
+
+        # The sidebar is pulled out by its own strip now (sidebar.trigger
+        # "drag"), so KWin's edge would open it a second way -- on a pointer
+        # that merely reaches the edge, which is the thing the strip exists to
+        # stop. Choosing anything but "hover" gives the edge back.
+        if [ "$trigger" != hover ]; then
+            if [ -n "$have" ]; then
+                exec "$0" shell "$have" none
+            fi
+            log_info "sidebar.trigger is '$trigger'; no screen edge opens the sidebar"
+            exit 0
+        fi
+
+        if [ -z "$have" ]; then
+            log_info "sidebar.trigger is 'hover'; binding the $want edge"
+            exec "$0" shell "$want" sidebar
+        fi
+        if [ "$have" = "$want" ]; then
+            log_info "the sidebar's edge is already $want"
+            exit 0
+        fi
+
+        "$0" shell "$have" none >/dev/null || die "could not free the $have edge"
+        exec "$0" shell "$want" sidebar
+        ;;
+
     revert)
         # The switch first: its records hold what the corners were after our
         # own changes, and reverting ours afterwards is what gets back to the

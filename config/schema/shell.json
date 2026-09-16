@@ -220,6 +220,163 @@
             }
         },
         {
+            "id": "sidebar",
+            "label": "Sidebar",
+            "icon": "sidebar-show",
+            "glyph": "view_sidebar",
+            "description": "The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.",
+            "keys": {
+                "sidebar.position": {
+                    "type": "enum",
+                    "values": [
+                        "right",
+                        "left"
+                    ],
+                    "default": "right",
+                    "label": "Edge",
+                    "description": "Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on."
+                },
+                "sidebar.trigger": {
+                    "type": "enum",
+                    "values": [
+                        "drag",
+                        "hover",
+                        "none"
+                    ],
+                    "default": "drag",
+                    "label": "Opened by",
+                    "description": "'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in."
+                },
+                "sidebar.handleWidth": {
+                    "type": "int",
+                    "min": 2,
+                    "max": 24,
+                    "step": 1,
+                    "default": 6,
+                    "label": "Grab strip",
+                    "description": "How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out goes to it rather than to the window beneath."
+                },
+                "sidebar.width": {
+                    "type": "int",
+                    "min": 280,
+                    "max": 720,
+                    "step": 4,
+                    "default": 396,
+                    "label": "Width",
+                    "description": "How wide the panel is, in pixels."
+                },
+                "sidebar.margin": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 64,
+                    "step": 2,
+                    "default": 16,
+                    "label": "Margin",
+                    "description": "The gap between the panel and the screen's edges."
+                },
+                "sidebar.reserveSpace": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Push windows aside",
+                    "description": "While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape."
+                },
+                "sidebar.expanded": {
+                    "type": "list",
+                    "default": [
+                        "media"
+                    ],
+                    "label": "Open cards",
+                    "description": "Which cards start expanded, by id: media, day, weather, machine, notifications. Every card can be folded away and opened again from the sidebar itself; this is what it remembers.",
+                    "values": [
+                        "media",
+                        "day",
+                        "weather",
+                        "machine",
+                        "notifications"
+                    ],
+                    "labels": [
+                        "Playing",
+                        "Today",
+                        "Weather",
+                        "Machine",
+                        "Notifications"
+                    ]
+                },
+                "sidebar.cards": {
+                    "type": "list",
+                    "default": [
+                        "media",
+                        "day",
+                        "weather",
+                        "machine",
+                        "notifications"
+                    ],
+                    "label": "Cards",
+                    "description": "Which cards the sidebar draws, in order. Leave a card out to hide it entirely.",
+                    "values": [
+                        "media",
+                        "day",
+                        "weather",
+                        "machine",
+                        "notifications"
+                    ],
+                    "labels": [
+                        "Playing",
+                        "Today",
+                        "Weather",
+                        "Machine",
+                        "Notifications"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "weather",
+            "label": "Weather",
+            "icon": "weather-few-clouds",
+            "glyph": "partly_cloudy_day",
+            "description": "Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.",
+            "keys": {
+                "weather.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Show the weather",
+                    "description": "Fetches a forecast for your place. Nothing is sent but the coordinates being asked about; nothing is stored but the answer, in memory."
+                },
+                "weather.place": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Place",
+                    "description": "A town or city to look up -- \"Cluj-Napoca\", \"Lisbon\". Left empty, the place is worked out once from this machine's IP address, which is a guess a network can get wrong; naming it is exact and asks nobody."
+                },
+                "weather.coordinates": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Coordinates",
+                    "description": "\"46.77,23.60\" -- latitude, longitude. Set, this wins over the place and no lookup of any kind is made."
+                },
+                "weather.units": {
+                    "type": "enum",
+                    "values": [
+                        "metric",
+                        "imperial"
+                    ],
+                    "default": "metric",
+                    "label": "Units",
+                    "description": "Celsius and km/h, or Fahrenheit and mph."
+                },
+                "weather.refresh": {
+                    "type": "int",
+                    "min": 10,
+                    "max": 360,
+                    "step": 5,
+                    "default": 30,
+                    "label": "Refresh every",
+                    "description": "Minutes between forecasts. The forecast itself changes hourly at best."
+                }
+            }
+        },
+        {
             "id": "windows",
             "label": "Windows",
             "icon": "preferences-system-windows",

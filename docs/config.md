@@ -73,6 +73,33 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
 | `panel.menu.entries` | a list | `[]` | Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes. |
 
+### Sidebar
+
+The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `sidebar.position` | `right`, `left` | `right` | Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on. |
+| `sidebar.trigger` | `drag`, `hover`, `none` | `drag` | 'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in. |
+| `sidebar.handleWidth` | a number, 2 to 24 | `6` | How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out goes to it rather than to the window beneath. |
+| `sidebar.width` | a number, 280 to 720 | `396` | How wide the panel is, in pixels. |
+| `sidebar.margin` | a number, 0 to 64 | `16` | The gap between the panel and the screen's edges. |
+| `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape. |
+| `sidebar.expanded` | a list | `["media"]` | Which cards start expanded, by id: media, day, weather, machine, notifications. Every card can be folded away and opened again from the sidebar itself; this is what it remembers. |
+| `sidebar.cards` | a list | `["media","day","weather","machine","notifications"]` | Which cards the sidebar draws, in order. Leave a card out to hide it entirely. |
+
+### Weather
+
+Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `weather.enabled` | `true` or `false` | `false` | Fetches a forecast for your place. Nothing is sent but the coordinates being asked about; nothing is stored but the answer, in memory. |
+| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the place is worked out once from this machine's IP address, which is a guess a network can get wrong; naming it is exact and asks nobody. |
+| `weather.coordinates` | text | `` | "46.77,23.60" -- latitude, longitude. Set, this wins over the place and no lookup of any kind is made. |
+| `weather.units` | `metric`, `imperial` | `metric` | Celsius and km/h, or Fahrenheit and mph. |
+| `weather.refresh` | a number, 10 to 360 | `30` | Minutes between forecasts. The forecast itself changes hourly at best. |
+
 ### Windows
 
 What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
@@ -356,6 +383,7 @@ when two copies of a widget should differ.
 | Task view | `taskview` | left, middle, right | **not supported** |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
 | Volume | `volume` | left, middle, right | `org.kde.plasma.volume` (in the tray) |
+| Weather | `weather` | left, middle, right | **not supported** |
 | Virtual desktops | `workspaces` | left, middle, right | `org.kde.plasma.pager` |
 
 A widget with no Plasma applet is left out of the panel under the `plasma`
@@ -485,6 +513,14 @@ without `tray` it stands on the panel alone.
 | `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
 | `maxVolume` | a number, 0 to 150 | `0` | Percent. 0 follows Settings → Sound, where "Raise maximum volume" lives and which every other slider in this shell reads; anything else is this widget's own ceiling. |
 | `showMicrophone` | `true` or `false` | `true` | A second slider in the popout, for the default input. |
+
+### `widgets.weather`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showTemperature` | `true` or `false` | `true` | Beside the icon. Off leaves the icon alone, which is narrower on a full panel. |
+| `showPlace` | `true` or `false` | `false` | The town the forecast is for, after the temperature. |
+| `days` | a number, 1 to 6 | `5` | How many days of the forecast the popout lists. |
 
 ### `widgets.workspaces`
 

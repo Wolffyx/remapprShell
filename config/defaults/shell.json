@@ -193,5 +193,33 @@
         "clockSize": 92,
         "clockDate": true,
         "clockInk": "auto"
+    },
+    "sidebar": {
+        "position": "right",
+        "trigger": "drag",
+        "handleWidth": 6,
+        "width": 396,
+        "margin": 16,
+        "reserveSpace": false,
+        "expanded": [
+            "media"
+        ],
+        "cards": [
+            "media",
+            "day",
+            "weather",
+            "machine",
+            "notifications"
+        ]
+    },
+    "weather": {
+        "enabled": false,
+        "place": "",
+        "coordinates": "",
+        "units": "metric",
+        "refresh": 30
+    },
+    "clipboard": {
+        "history": "own"
     }
 }

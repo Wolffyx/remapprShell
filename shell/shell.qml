@@ -43,6 +43,11 @@ ShellRoot {
     // `theme.desktop.followMode`, and it does nothing at all while that is off.
     DesktopVariant {}
 
+    // The screen edge that opens the sidebar, kept on the side the sidebar is
+    // on. Does nothing until `sidebar.position` changes, and nothing at all
+    // when no edge is bound to the sidebar.
+    SidebarEdge {}
+
     // Drawn only when this renderer is the one selected. The Plasma renderer
     // draws the same panel through plasmashell, and both drawing at once is
     // the two-panels-at-one-edge bug the renderer key exists to prevent -- so
@@ -88,6 +93,14 @@ ShellRoot {
             : []
 
         SearchOverlay {}
+    }
+
+    // The strip the sidebar is pulled out by, on every screen -- so it comes
+    // out of the monitor it was dragged on. `sidebar.trigger` chooses between
+    // this, KWin's screen edge, and neither.
+    Variants {
+        model: ConfigStore.value("sidebar.trigger", "drag") === "drag" ? Quickshell.screens : []
+        SidebarHandle {}
     }
 
     // The sidebar, the key sheet and the session screen: one at a time, on
@@ -408,6 +421,16 @@ ShellRoot {
         function dismissAll(): void { ShellNotifications.dismissAll(); }
         // renderer.sh, before switching to a renderer with a Plasma tray.
         function release(): void { PlasmaServices.releaseNotifications(); }
+    }
+
+    // The weather, for the CLI and for a report: what it thinks the place is
+    // and when it last asked. No coordinates, for the reason WeatherStatus
+    // gives -- a located machine is somebody's home.
+    IpcHandler {
+        target: "weather"
+
+        function status(): string { return JSON.stringify(WeatherStatus.summary()); }
+        function refresh(): void { WeatherStatus.refresh(true); }
     }
 
     IpcHandler {
