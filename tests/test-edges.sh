@@ -126,6 +126,41 @@ check "ours gone, not resurrected" "$(key ElectricBorders BottomRight)" "<unset>
 check "reads as on"                "$(js .triggers)" "true"
 check "ledger holds no edges"      "$(( $(scoped edges) + $(scoped edges-off) ))" "0"
 
+echo "== this shell's own edges =="
+edges shell Left sidebar
+check "binding written"          "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:sidebar"
+check "script switched on"       "$(key Plugins "${KWIN_EDGES_SCRIPT_ID}Enabled")" "true"
+check "script rendered"          "$([ -f "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js" ] && echo yes || echo no)" "yes"
+# ElectricBorder 6 is Left. A wrong number here is an edge that silently does
+# nothing, which is indistinguishable from the script not loading.
+check "rendered as the border"   "$(sed -n 's/^const BINDINGS = //p' "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js")" '[[6,"sidebar"]];'
+check "no placeholder left"      "$(grep -c '@[A-Z_]*@' "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js")" "0"
+
+# An edge runs one action. Binding it again replaces rather than stacking.
+edges shell Left launcher
+check "rebound, not doubled"     "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:launcher"
+
+edges shell Right sidebar
+check "a second edge is kept"    "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:launcher,Right:sidebar"
+
+check "rejects unknown action"   "$(edges shell Top nonsense && echo ran || echo refused)" "refused"
+check "rejects unknown edge"     "$(edges shell Nowhere sidebar && echo ran || echo refused)" "refused"
+
+edges shell Left none
+check "one edge released"        "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Right:sidebar"
+
+# The last one going takes the package with it: a loaded script claiming no
+# edge is a thing to explain rather than a thing to keep.
+edges shell Right none
+check "last edge released"       "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" ""
+check "script switched off"      "$(key Plugins "${KWIN_EDGES_SCRIPT_ID}Enabled")" "false"
+check "script removed"           "$([ -d "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID" ] && echo yes || echo no)" "no"
+
+edges shell Left sidebar
+edges revert
+check "revert takes it away"     "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "<unset>"
+check "revert removes the script" "$([ -d "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID" ] && echo yes || echo no)" "no"
+
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/edges.sh" revert >/dev/null 2>&1

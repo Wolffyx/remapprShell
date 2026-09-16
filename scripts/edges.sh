@@ -5,6 +5,10 @@
 #                          mouse triggers are on
 #   actions                what an edge can be set to
 #   set <edge> <action>    bind a corner or edge to one action
+#   shell [<edge> <action|none>]
+#                          this shell's own actions on an edge: KWin's edges
+#                          run KWin's actions only, so ours needs a KWin
+#                          script of its own. No arguments lists what is bound
 #   effect <name> <edge|none>
 #                          the same as `set <edge> <name>`; with `none`, take
 #                          that effect off every edge
@@ -24,6 +28,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
+source "$REPO_ROOT/scripts/lib/render.sh"
 
 # KWin's ElectricBorder enum. 9 is ElectricNone -- a binding set to 9 is off,
 # which is why an edge can read as "configured" and still do nothing.
@@ -177,6 +182,84 @@ status_json() {
         }'
 }
 
+# ---- this shell's own edges ----------------------------------------------
+#
+# Everything above configures KWin's edges, which run KWin's actions: the
+# overview, the desktop grid, KRunner. None of them can open a surface this
+# shell draws, and no KWin setting makes them able to -- so a sidebar that
+# appears when the pointer reaches the left of the screen needs an edge this
+# project registers itself. `kwin/edges/` is that script.
+#
+# The bindings live in kwinrc, in the script's own group, so they are ledgered
+# and `revert` puts them back with everything else. The script is re-rendered
+# from them and reloaded on every change: a KWin script can only read its
+# configuration through a KConfigXT file, and one setting in two places drifts.
+EDGES_SCRIPT_SRC="$REPO_ROOT/kwin/edges"
+EDGES_SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID"
+EDGES_GROUP="Script-$KWIN_EDGES_SCRIPT_ID"
+
+# The actions an edge can run: the shortcut actions, which is the same list a
+# key can be bound to. Read from the daemon rather than repeated here, so the
+# two can never disagree about what exists.
+shell_actions() {
+    sed -n '/^SHORTCUT_ACTIONS = {/,/^}/p' "$REPO_ROOT/bin/windowsd.py.in" \
+        | sed -n 's/^    "\([a-z-]*\)":.*/\1/p'
+}
+
+shell_bindings_raw() {
+    kreadconfig6 --file kwinrc --group "$EDGES_GROUP" --key Bindings --default ''
+}
+
+# "left:sidebar,right:launcher" -> the JS array the script is rendered with.
+shell_bindings_js() {
+    local raw=$1 pair edge action idx out=""
+    local IFS=','
+    for pair in $raw; do
+        [ -n "$pair" ] || continue
+        edge=${pair%%:*}; action=${pair#*:}
+        idx=$(edge_index "$edge") || continue
+        out="$out[$idx,\"$action\"],"
+    done
+    printf '[%s]' "${out%,}"
+}
+
+shell_install() {
+    local raw js
+    raw=$(shell_bindings_raw)
+    js=$(shell_bindings_js "$raw")
+
+    mkdir -p "$EDGES_SCRIPT_DEST/contents/code"
+    EDGE_BINDINGS=$js render_template "$EDGES_SCRIPT_SRC/metadata.json.in" \
+        "$EDGES_SCRIPT_DEST/metadata.json" \
+        || { log_error "could not render the edge script metadata"; return 1; }
+    EDGE_BINDINGS=$js render_template "$EDGES_SCRIPT_SRC/contents/code/main.js.in" \
+        "$EDGES_SCRIPT_DEST/contents/code/main.js" \
+        || { log_error "could not render the edge script"; return 1; }
+    chmod 644 "$EDGES_SCRIPT_DEST/metadata.json" "$EDGES_SCRIPT_DEST/contents/code/main.js"
+}
+
+edges_script() {
+    session_available || return 1
+    qdbus6 org.kde.KWin /Scripting "org.kde.kwin.Scripting.$1" "${@:2}" 2>/dev/null
+}
+
+shell_reload() {
+    session_available || { log_info "not loading it now: no session"; return 0; }
+    # Unloaded first: KWin ignores loading a script it already has, so without
+    # this a re-render keeps running the old bindings -- the same trap the
+    # window list documents.
+    edges_script unloadScript "$KWIN_EDGES_SCRIPT_ID" >/dev/null
+    edges_script loadScript "$EDGES_SCRIPT_DEST/contents/code/main.js" "$KWIN_EDGES_SCRIPT_ID" >/dev/null
+    edges_script start >/dev/null
+}
+
+shell_remove() {
+    edges_script unloadScript "$KWIN_EDGES_SCRIPT_ID" >/dev/null
+    [ -d "$EDGES_SCRIPT_DEST" ] || return 0
+    rm -rf "$EDGES_SCRIPT_DEST"
+    log_step "removed $EDGES_SCRIPT_DEST"
+}
+
 cmd=${1:-status}
 [ $# -gt 0 ] && shift
 
@@ -283,11 +366,90 @@ case "$cmd" in
         kwin_reconfigure
         ;;
 
+    shell)
+        edge=${1:-}
+        action=${2:-}
+
+        if [ -z "$edge" ]; then
+            raw=$(shell_bindings_raw)
+            if [ -z "$raw" ]; then
+                echo "nothing bound to an edge by this shell"
+            else
+                printf '%s\n' "$raw" | tr ',' '\n' | while IFS=: read -r e a; do
+                    [ -n "$e" ] || continue
+                    printf '  %-12s %s\n' "$e" "$a"
+                done
+            fi
+            echo
+            if [ "$(kreadconfig6 --file kwinrc --group Plugins --key "${KWIN_EDGES_SCRIPT_ID}Enabled" --default false)" = true ]; then
+                if [ "$(edges_script isScriptLoaded "$KWIN_EDGES_SCRIPT_ID")" = "true" ]; then
+                    echo "the edge script is enabled and loaded"
+                else
+                    echo "the edge script is enabled but KWin has not loaded it"
+                fi
+            else
+                echo "the edge script is not enabled"
+            fi
+            echo
+            echo "actions: $(shell_actions | tr '\n' ' ')"
+            exit 0
+        fi
+
+        [ -n "$action" ] || die "usage: $ALIAS edges shell <edge> <action|none>"
+        edge_index "$edge" >/dev/null \
+            || die "unknown edge: $edge (one of: ${EDGE_NAMES[*]})"
+        [ "$action" = none ] || shell_actions | grep -qxF "$action" \
+            || die "unknown action: $action (one of: $(shell_actions | tr '\n' ' '))"
+
+        # Rebuilt rather than appended to: an edge can run one action, and
+        # setting it twice must replace rather than bind it twice over.
+        raw=$(shell_bindings_raw)
+        kept=""
+        local_ifs=$IFS; IFS=','
+        for pair in $raw; do
+            [ -n "$pair" ] || continue
+            [ "${pair%%:*}" = "$edge" ] && continue
+            kept="$kept$pair,"
+        done
+        IFS=$local_ifs
+        [ "$action" = none ] || kept="$kept$edge:$action,"
+        kept=${kept%,}
+
+        kconfig_set edges kwinrc "$EDGES_GROUP" Bindings "$kept"
+        kconfig_set edges kwinrc Plugins "${KWIN_EDGES_SCRIPT_ID}Enabled" \
+            "$([ -n "$kept" ] && printf 'true' || printf 'false')"
+
+        if [ -z "$kept" ]; then
+            shell_remove
+            log_step "no edge is this shell's any more"
+            exit 0
+        fi
+
+        shell_install || die "nothing was loaded"
+        shell_reload
+        if [ "$(edges_script isScriptLoaded "$KWIN_EDGES_SCRIPT_ID")" = "true" ]; then
+            log_step "$edge -> $action"
+        else
+            log_warn "KWin did not report the edge script as loaded"
+            log_info "  it is enabled in kwinrc and will load at the next login"
+            log_info "  see why: journalctl --user -u plasma-kwin_wayland.service -n 30"
+        fi
+        ;;
+
+    # The sidebar draws down one side (sidebar.position) and is opened by an
+    # edge. Pushing the pointer into the right-hand edge and having a panel
+    # appear on the left is nobody's idea of following, so this moves the edge
+    # to the side the panel is on -- and does nothing at all when no edge is
+    # bound to the sidebar, because binding one is the user's decision, not
+    # a side effect of choosing a side.
+    #
+    # Called by hand, and by the shell itself when the setting changes.
     revert)
         # The switch first: its records hold what the corners were after our
         # own changes, and reverting ours afterwards is what gets back to the
         # user's.
         triggers_off && kconfig_revert edges-off
+        shell_remove
         kconfig_revert edges
         kwin_reconfigure
         ;;

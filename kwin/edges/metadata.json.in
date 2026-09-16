@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "@KWIN_EDGES_SCRIPT_ID@",
+        "Name": "@DISPLAY_NAME@ screen edges",
+        "Description": "Runs @DISPLAY_NAME@'s own actions when the pointer reaches a screen edge.",
+        "Icon": "preferences-desktop-display",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

@@ -115,6 +115,21 @@ SHORTCUT_COMPONENT = "@SLUG@"
 SHORTCUT_COMPONENT_PATH = "/component/" + "@SLUG@".replace("-", "_").replace(".", "_")
 SHORTCUT_INTERFACE = "@DBUS_NAME@.Shortcuts"
 SHORTCUT_OBJECT_PATH = "/Shortcuts"
+
+# Triggered: what the screen-edge KWin script calls when the pointer reaches an
+# edge it claimed. A KWin script can call DBus and never be called, so the edge
+# arrives here and is run here.
+EDGE_INTROSPECTION = """
+<node>
+  <interface name="@DBUS_NAME@.Edges">
+    <method name="Triggered">
+      <arg type="s" name="action" direction="in"/>
+    </method>
+  </interface>
+</node>
+"""
+
+EDGE_OBJECT_PATH = "/Edges"
 CTL = "@BIN_DIR@/@CTL_BIN@"
 
 # Every key this project can bind: action id -> (friendly name, what it runs).
@@ -387,6 +402,43 @@ class GlobalShortcuts:
             )
 
 
+class ScreenEdges:
+    """An edge of the screen, run as one of this shell's actions.
+
+    The action names are the shortcuts' own: an edge can do anything a key can,
+    and there is no second list to keep in step. The KWin script names the
+    action rather than the edge, so which edge means what is settled where it
+    is configured -- `@ALIAS@ edges shell` -- and nothing here has to know
+    about borders at all.
+
+    Detached, like a key press, and for the same reason: `registerScreenEdge`
+    runs its callback inside kwin_wayland, so anything that waited for a shell
+    window to appear would hold the compositor while it did.
+    """
+
+    def __init__(self, shortcuts):
+        self._shortcuts = shortcuts
+
+    def handle_call(self, _connection, _sender, _path, _interface, method, params, invocation):
+        if method != "Triggered":
+            invocation.return_error_literal(
+                Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
+            )
+            return
+
+        action = params[0] if params else ""
+        entry = SHORTCUT_ACTIONS.get(action)
+        if entry is None:
+            # Answered rather than raised: the caller is a KWin script, and an
+            # error raised into the compositor's script engine is a warning
+            # nobody reads. The name is printed here instead, where the
+            # journal has it.
+            print(f"unknown edge action: {action!r}", file=sys.stderr)
+        else:
+            self._shortcuts._run(action, entry[1])
+        invocation.return_value(None)
+
+
 class WindowIcons:
     """Icons taken from the windows themselves.
 
@@ -573,8 +625,10 @@ class WindowList:
 def main():
     windows = WindowList()
     shortcuts = GlobalShortcuts()
+    edges = ScreenEdges(shortcuts)
     node = Gio.DBusNodeInfo.new_for_xml(INTROSPECTION)
     shortcut_node = Gio.DBusNodeInfo.new_for_xml(SHORTCUT_INTROSPECTION)
+    edge_node = Gio.DBusNodeInfo.new_for_xml(EDGE_INTROSPECTION)
     loop = GLib.MainLoop()
 
     def on_bus_acquired(connection, name):
@@ -585,6 +639,10 @@ def main():
         connection.register_object(
             SHORTCUT_OBJECT_PATH, shortcut_node.interfaces[0],
             shortcuts.handle_call, None, None
+        )
+        connection.register_object(
+            EDGE_OBJECT_PATH, edge_node.interfaces[0],
+            edges.handle_call, None, None
         )
         # Left unstarted where this is not the owning copy: Reload then does
         # nothing, which is the whole point -- see SHORTCUT_OWNER above.
