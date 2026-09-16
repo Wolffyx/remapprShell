@@ -4,7 +4,8 @@
 #   status              what is bound, and what would conflict
 #   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard,
 #                                     sidebar, keys, switcher, switcher-reverse,
-#                                     overview, overview-reverse)
+#                                     overview, overview-reverse, screenshot,
+#                                     screenshot-screen, screenshot-window)
 #   clear <action>      unbind one
 #   migrate             move keys off the old desktop-file entries
 #   revert              undo everything this project bound
@@ -33,7 +34,7 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 
 ACTIONS=(launcher search settings ask clipboard sidebar keys switcher switcher-reverse
-         overview overview-reverse)
+         overview overview-reverse screenshot screenshot-screen screenshot-window)
 
 # The component every action belongs to, and the group it is kept in.
 COMPONENT=$SLUG
@@ -51,6 +52,9 @@ action_label() {
         switcher) printf 'Window switcher' ;;
         switcher-reverse) printf 'Window switcher (backwards)' ;;
         overview) printf 'Desktops' ;;
+        screenshot) printf 'Screenshot of a region' ;;
+        screenshot-screen) printf 'Screenshot of the screen' ;;
+        screenshot-window) printf 'Screenshot of the active window' ;;
         overview-reverse) printf 'Desktops (backwards)' ;;
     esac
 }
@@ -137,6 +141,14 @@ case "$cmd" in
         action=${1:?usage: $ALIAS shortcuts set <action> <key>}
         key=${2:?usage: $ALIAS shortcuts set <action> <key>}
         valid_action "$action" || die "unknown action '$action' (one of: ${ACTIONS[*]})"
+
+        # A key this machine cannot convert to kglobalaccel's integer is
+        # refused here rather than written. The write itself always succeeds
+        # -- it is a line in a file -- so binding an unconvertible key used to
+        # report success and grab nothing, which is indistinguishable from a
+        # key another component is holding.
+        accel_keycode "$key" >/dev/null \
+            || die "'$key' is not a key this can bind -- write it as kglobalaccel does (Meta+Shift+S, Meta+/, Meta+Print)"
 
         # Taken from whoever holds it, each named as it goes (accel_take), so
         # the key does not end up claimed twice with the winner left to chance.

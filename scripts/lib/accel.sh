@@ -233,6 +233,22 @@ _accel_base_code() {
         Equal)        printf '61' ;;
         Minus)        printf '45' ;;
         Plus)         printf '43' ;;
+        # The same keys as the file actually spells them. QKeySequence prints
+        # the character, so kglobalshortcutsrc holds "Meta+/" and never
+        # "Meta+Slash" -- and a key this table did not know used to be
+        # reported as bound and grabbed nothing.
+        /)            printf '47' ;;
+        ,)            printf '44' ;;
+        .)            printf '46' ;;
+        ';')          printf '59' ;;
+        =)            printf '61' ;;
+        -)            printf '45' ;;
+        '[')          printf '91' ;;
+        ']')          printf '93' ;;
+        '\\')         printf '92' ;;
+        "'")          printf '39' ;;
+        '`')          printf '96' ;;
+        '*')          printf '42' ;;
         *) return 1 ;;
     esac
 }

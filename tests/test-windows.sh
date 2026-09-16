@@ -238,6 +238,9 @@ for name, spec, want in [
     ("a modifier nobody knows", "Hyper+Q", None),
     ("a key nobody knows", "Meta+Banana", None),
     ("nothing at all", "", None),
+    ("Meta+/, as the file spells it", "Meta+/", 268435503),
+    ("Meta+Slash, spelled out", "Meta+Slash", 268435503),
+    ("Meta+Shift+S", "Meta+Shift+S", 301989971),
 ]:
     case(name, keycode(spec), want)
 

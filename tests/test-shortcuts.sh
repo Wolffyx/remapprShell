@@ -113,6 +113,32 @@ check "a modifier nobody knows" "$(accel_keycode 'Hyper+Q' || echo refused)"   "
 check "nothing at all"        "$(accel_keycode '' || echo refused)"            "refused"
 check "a key nobody knows"    "$(accel_keycode 'Meta+Banana' || echo refused)" "refused"
 
+# Punctuation as the file spells it. kglobalshortcutsrc holds what
+# QKeySequence prints -- "Meta+/", never "Meta+Slash" -- and this table not
+# knowing that is what made `shortcuts set keys "Meta+/"` report success and
+# bind nothing.
+check "Meta+/"                "$(accel_keycode 'Meta+/')"             "268435503"
+check "Meta+Slash, spelled out" "$(accel_keycode 'Meta+Slash')"       "268435503"
+check "Meta+,"                "$(accel_keycode 'Meta+,')"             "268435500"
+check "Meta+Shift+["          "$(accel_keycode 'Meta+Shift+[')"       "301989979"
+
+echo "== a key that cannot be converted is refused, not reported bound =="
+out=$("$REPO_ROOT/scripts/shortcuts.sh" set keys 'Meta+Banana' 2>&1 && echo ran || echo refused)
+check "set refuses it"        "$(printf '%s' "$out" | tail -n1)" "refused"
+check "and wrote nothing"     "$(binding keys)" "<unset>"
+sc set keys 'Meta+/' >/dev/null
+check "and takes one it knows" "$(binding keys)" "Meta+/,none,Keyboard shortcuts"
+sc clear keys >/dev/null
+
+echo "== the screenshot action =="
+sc set screenshot 'Meta+Shift+S' >/dev/null
+check "region capture bound"  "$(binding screenshot)" "Meta+Shift+S,none,Screenshot of a region"
+check "the script chooses a tool" \
+      "$("$REPO_ROOT/scripts/screenshot.sh" status --json 2>/dev/null | jq -r '.modes | length')" "3"
+check "an unknown mode is refused" \
+      "$("$REPO_ROOT/scripts/screenshot.sh" nonsense >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+sc clear screenshot >/dev/null
+
 echo "== the live session =="
 check "nothing reached the session"  "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&1

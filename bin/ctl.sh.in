@@ -26,6 +26,7 @@ usage: @ALIAS@ <command> [options]
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)
   shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page|pages]             open the settings window on a page; list the pages
+  screenshot region|screen|window   take a screenshot with whatever is installed
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   sidebar                           open or close the sidebar (bind: shortcuts set sidebar)
   keys                              open or close the key sheet (bind: shortcuts set keys)
@@ -121,6 +122,7 @@ case "$cmd" in
     switcher)  require_repo; exec "$REPO_ROOT/scripts/switcher.sh" "$@" ;;
     lockscreen) require_repo; exec "$REPO_ROOT/scripts/lockscreen.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
+    screenshot) require_repo; exec "$REPO_ROOT/scripts/screenshot.sh" "$@" ;;
 
     # Both talk to the running shell rather than reimplementing the choice, so
     # a keybinding and the panel button always open the same thing.
