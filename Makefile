@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults docs brand test clean plugin plugin-clean
+.PHONY: help setup link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults docs brand test clean plugin plugin-clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -18,6 +18,9 @@ brand: ## Regenerate all generated files (branding, qmldir, widget index)
 	@scripts/gen-qmldir.sh
 	@scripts/gen-widget-index.sh
 	@scripts/gen-colors.sh
+
+setup: ## Guided install: ask every install-time choice, then apply them
+	@scripts/setup.sh
 
 link: ## Symlink the shell into place (development; widget edits need `rmpr reload`)
 	@scripts/install.sh --link

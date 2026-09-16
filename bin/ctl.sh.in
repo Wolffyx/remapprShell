@@ -11,6 +11,7 @@ usage() {
 
 usage: @ALIAS@ <command> [options]
 
+  setup [--unattended|--dry-run]    the guided install: ask, then apply
   preflight [--suggest-snapshots]   check this machine, report what may change
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
@@ -103,6 +104,7 @@ cmd=${1:-help}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
+    setup)     require_repo; exec "$REPO_ROOT/scripts/setup.sh" "$@" ;;
     preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;

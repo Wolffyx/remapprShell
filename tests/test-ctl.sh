@@ -121,6 +121,12 @@ out=$(bash "$CTL" session nonsense 2>&1); rc=$?
 check "an unknown kind refused"   "$rc" "1"
 check "and says which are valid"  "$(printf '%s' "$out" | grep -c 'promptShutDown')" "1"
 
+# The guided install is the first thing somebody runs, so it has to be
+# reachable from the CLI rather than only from a checkout's Makefile.
+echo "== the guided install =="
+check "it is listed"        "$("$CTL" --help 2>&1 | grep -c '^  setup ')" "1"
+check "and it dispatches"   "$("$CTL" setup --help 2>&1 | grep -c -- '--unattended')" "1"
+
 echo "== no command left naming the installed path outright =="
 check "none hardcoded" "$(grep -c 'ipc --path "@QS_CONFIG_DIR@' "$REPO_ROOT/bin/ctl.sh.in")" "0"
 
