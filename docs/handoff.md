@@ -361,20 +361,50 @@ end to end and read back. And `--apply` turns the automatic mode off unless
 `doctor` fails when the switch is on and does not name ours, and says what
 sunset will do about it.
 
-**Open, in order:**
+**Open, in order. The first four are work the user has already said yes to**
+-- asked as "what next?", answered "I want all of them" -- so they are a
+queue rather than a menu. The rest are what the evening left behind.
 
-1. **Commit.** The tree is now five sessions deep. Today's evening splits
-   cleanly: screenshot action + keycode fix / notification clicks and pictures
-   / clipboard at the pointer and its images / sidebar position and folding
-   cards / weather.
-2. **Press the keys, and pull the strip.** Meta+Shift+S and Meta+V are bound
+1. **Shortcuts in-process.** The structural fix this file has carried for
+   three sessions. A key press travels kglobalaccel -> the session daemon ->
+   the CLI -> the shell's IPC, as detached processes that race: that is the
+   whole switcher class of bugs, and about 200 ms on every shortcut. The idiom
+   is already here -- `shell/core/BusLine.qml` is a `busctl monitor` the window
+   list uses; pointing one at kglobalaccel's `globalShortcutPressed` deletes
+   the chain. Ends the race rather than patching its instances, and would make
+   this shell's own Alt+Tab worth choosing again.
+2. **Polish what landed on 2026-09-16.** Named by the user, in their words:
+   the sidebar has no keyboard navigation; the clipboard menu has no search or
+   filter; the weather has no per-widget place (one place for the machine); the
+   sidebar handle does not follow the drag -- it opens at a threshold rather
+   than sliding out under the pointer.
+3. **Renderer discovery.** "Drawn by" has `RENDERERS=(quickshell plasma
+   caelestia none)` hardcoded and detects caelestia by a hardcoded unit name.
+   Discovery is the easy half -- every Quickshell config is a directory in
+   `~/.config/quickshell/`; `renderer set` then having to start and stop an
+   arbitrary discovered shell is the substantial one.
+4. **Housekeeping.** caelestia's `kwin_workspace_tracker` KWin effect is still
+   retrying a dead socket every 2 seconds (`kwriteconfig6 --file kwinrc --group
+   Plugins --key kwin_workspace_trackerEnabled false`). The binding loop at
+   `ZoneRow.qml:27` via `PanelSurface.qml:187` -- the left and right zones'
+   `implicitWidth` depend on each other through the middle; a warning only, and
+   fixing it is a zone-budget redesign. And making qmllint's `[unqualified]`
+   fatal for `shell/`, which wants a cleanup pass first: five known false
+   positives in Panel.qml (outer-scope ids in a LazyLoader, no
+   `ComponentBehavior: Bound`) and one in HeldModifiers.qml.
+
+5. **Press the keys, and pull the strip.** Meta+Shift+S and Meta+V are bound
    and the sidebar's handle is drawn on both screens; the drag itself has been
    seen on a screen and never performed.
-3. A fullscreen game sat above every layer surface on that monitor for the
+6. **Watch one sunrise.** Plasma's day/night switch now names our two
+   packages, and both halves were applied by hand through Plasma's own path and
+   read back. What has not happened yet is the switch firing on its own.
+7. A fullscreen game sat above every layer surface on that monitor for the
    whole session, which is why the sidebar and the popups were photographed
    only on the other screen. Worth knowing before concluding a surface is
    missing.
-4. The weather card in the sidebar has never been on a screen.
+8. The weather card in the sidebar has been photographed; the panel widget has
+   not, and is not on the panel -- Settings -> Widgets adds it.
 
 ### The session of 2026-09-16
 
