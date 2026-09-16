@@ -16,6 +16,16 @@ QtObject {
     id: root
 
     property bool sidebar: false
+
+    // The clipboard history, opened where the pointer is rather than under a
+    // panel widget. Its own flag rather than one of `_only`'s: it is a small
+    // menu, not a full-screen surface, and closing the sidebar to show it
+    // would be surprising.
+    property bool clipboard: false
+    property real clipboardX: 0
+    property real clipboardY: 0
+    property string clipboardScreen: ""
+
     property bool keys: false
     property bool session: false
 
@@ -166,5 +176,25 @@ QtObject {
         root._only("session", screen);
     }
 
-    function closeAll() { root._only(""); }
+    // Where the pointer was, from the KWin script that read it -- in the
+    // compositor's own coordinates, which cover every screen. The surface
+    // turns that into a position on its own screen.
+    function openClipboardAt(x, y, output) {
+        if (root.clipboard) {
+            root.clipboard = false;
+            return;
+        }
+        root.clipboardX = Number(x) || 0;
+        root.clipboardY = Number(y) || 0;
+        root.clipboardScreen = String(output ?? "");
+        root.clipboard = true;
+        Log.debug("surfaces", `clipboard at ${root.clipboardX},${root.clipboardY} on ${root.clipboardScreen || "?"}`);
+    }
+
+    function closeClipboard() { root.clipboard = false; }
+
+    function closeAll() {
+        root.clipboard = false;
+        root._only("");
+    }
 }

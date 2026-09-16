@@ -167,6 +167,7 @@ Plasma's notifications, its clipboard history and its device notifier live insid
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
+| `clipboard.history` | `own`, `auto`, `plasma` | `own` | Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other. |
 
 ### Widgets
 

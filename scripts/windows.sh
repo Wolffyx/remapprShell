@@ -7,6 +7,13 @@
 #   show      the windows as the daemon currently has them
 #   close ID  close one window, by the uuid the list reports -- what the task
 #             list's "Close window" runs
+#   pointer ACTION
+#             open one of this shell's surfaces where the pointer is --
+#             clipboard, or sidebar, which then comes out of the screen the
+#             pointer is on rather than the first one. Wayland tells a client
+#             the pointer's position only over its own windows, so KWin is
+#             asked: a one-shot script reads workspace.cursorPos and hands it
+#             to the session daemon, which passes it to the shell
 #
 #   behaviour status [--json]     what KWin does with windows: how focus is
 #                                 given, whether hovering raises, whether a
@@ -114,6 +121,44 @@ case "$cmd" in
         busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List 2>/dev/null \
             | jq -r '.data[0] | fromjson | .[] | "\(if .active then "*" else " " end) \(if .minimized then "_" else " " end) \(.appId)  \(.title)"' \
             || log_info "nothing yet"
+        ;;
+
+    # The pointer, from the only process that knows where it is. The action
+    # name goes into the script's source, so it is checked against the list
+    # the daemon accepts rather than passed through.
+    pointer)
+        action=${1:-}
+        case "$action" in
+            clipboard|sidebar) ;;
+            *) die "not an action that opens under the pointer: '${action:-}' (one of: clipboard sidebar)" ;;
+        esac
+        session_available || die "no session to read the pointer in"
+
+        name="${KWIN_SCRIPT_ID}-pointer"
+        file=$(mktemp --suffix=.js "${XDG_RUNTIME_DIR:-/tmp}/${KWIN_SCRIPT_ID}-pointer.XXXXXX") \
+            || die "could not write the script"
+        trap 'rm -f "$file"' EXIT
+        cat > "$file" <<JS
+const pos = workspace.cursorPos;
+let output = "";
+for (const screen of workspace.screens) {
+    const g = screen.geometry;
+    if (pos.x >= g.x && pos.x < g.x + g.width && pos.y >= g.y && pos.y < g.y + g.height) {
+        output = String(screen.name);
+        break;
+    }
+}
+callDBus("$DBUS_NAME", "/Pointer", "$DBUS_NAME.Pointer", "At",
+         "$action", Math.round(pos.x), Math.round(pos.y), output);
+JS
+        kwin_script unloadScript "$name" >/dev/null
+        kwin_script loadScript "$file" "$name" >/dev/null || die "KWin did not load the script"
+        kwin_script start >/dev/null
+        # Long enough for the call to leave KWin, short enough not to be felt
+        # on a key press. The script is taken away again either way: a loaded
+        # script that has already run is a name in KWin's list and nothing more.
+        sleep 0.2
+        kwin_script unloadScript "$name" >/dev/null
         ;;
 
     close)

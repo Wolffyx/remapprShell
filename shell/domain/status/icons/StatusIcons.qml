@@ -220,6 +220,39 @@ QtObject {
         return [{ text: text, image: false }].concat(rest).slice(0, Math.max(1, limit));
     }
 
+    // An image that was copied. The file is ours -- written by the watcher
+    // into the cache -- so the same picture copied twice is two files, and the
+    // older entry (with its file) falls off the end of the list like any
+    // other. The path is carried rather than the pixels: a clipboard image is
+    // megabytes, and QML holding several of them as data is a shell that grows
+    // all day.
+    function clipboardAddImage(list, path, width, height, limit) {
+        const rest = (list ?? []).filter(e => e && e.path !== path);
+        return [{ text: "", image: true, path: String(path), width: Number(width) || 0,
+                  height: Number(height) || 0 }]
+            .concat(rest).slice(0, Math.max(1, limit));
+    }
+
+    // The image files an old list has that a new one does not: what the
+    // watcher deletes after the list is trimmed, so the cache cannot grow
+    // without bound. Pure, because getting it wrong deletes a file.
+    function clipboardOrphans(before, after) {
+        const kept = new Set((after ?? []).filter(e => e && e.image).map(e => String(e.path)));
+        return (before ?? []).filter(e => e && e.image && !kept.has(String(e.path)))
+                             .map(e => String(e.path));
+    }
+
+    // What an entry says on one line, whether it is text or a picture.
+    function clipboardLabel(entry, max) {
+        if (!entry)
+            return "";
+        if (entry.image) {
+            const size = (entry.width > 0 && entry.height > 0) ? ` · ${entry.width}×${entry.height}` : "";
+            return `Image${size}`;
+        }
+        return root.clipboardPreview(entry.text, max);
+    }
+
     // One line to show for an entry: runs of whitespace, newlines included,
     // collapsed to a space, and cut at `max` characters.
     function clipboardPreview(text, max) {

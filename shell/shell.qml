@@ -29,7 +29,10 @@ import qs.features.launcher
 import qs.features.desktop
 import qs.features.overlays
 import qs.domain.surfaces
+import qs.domain.surfaces.place
 import qs.domain.theme
+import qs.domain.sidebar
+import qs.domain.weather
 
 ShellRoot {
     id: root
@@ -113,6 +116,33 @@ ShellRoot {
     Variants {
         model: Surfaces.keys ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
         KeysOverlay {}
+    }
+
+    // The clipboard history, under the pointer. The screen is whichever one
+    // the pointer was on, by the name KWin gave it; by the coordinates when
+    // the name did not come through.
+    Variants {
+        model: Surfaces.clipboard
+            ? Quickshell.screens.filter(s => Surfaces.clipboardScreen.length > 0
+                                             ? s.name === Surfaces.clipboardScreen
+                                             : Place.contains(s, Surfaces.clipboardX, Surfaces.clipboardY)).slice(0, 1)
+            : []
+        ClipboardOverlay {}
+    }
+
+    // "Open this where the pointer is", from the KWin script the CLI loads.
+    // Nothing else can answer the question on Wayland; see PointerRequests.
+    Connections {
+        target: PointerRequests
+
+        function onRequested(action, x, y, output) {
+            const name = output.length > 0 ? output
+                : (Quickshell.screens.find(s => Place.contains(s, x, y))?.name ?? "");
+            if (action === "clipboard")
+                Surfaces.openClipboardAt(x, y, output);
+            else if (action === "sidebar")
+                Surfaces.toggleSidebar(name);
+        }
     }
 
     Variants {
@@ -478,6 +508,14 @@ ShellRoot {
         target: "surfaces"
 
         function sidebar(): void { Surfaces.toggleSidebar(""); }
+
+        // The clipboard menu, at a position given in the compositor's own
+        // coordinates. What the KWin script's route ends in -- and what makes
+        // the placement testable from a terminal, since a pointer cannot be
+        // moved from one.
+        function clipboardAt(x: string, y: string, output: string): void {
+            Surfaces.openClipboardAt(parseInt(x, 10) || 0, parseInt(y, 10) || 0, output ?? "");
+        }
         function keys(): void { Surfaces.toggleKeys(""); }
         function session(kind: string): void { Surfaces.openSession(kind || "promptAll", ""); }
         function switcher(): void { Surfaces.openWindowSwitcher("", 1); }

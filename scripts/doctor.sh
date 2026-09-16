@@ -640,6 +640,29 @@ for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipb
     fi
 done
 
+# Which clipboard history Meta+V actually shows, which is a setting and not
+# whoever happens to hold the name. Worth saying because the two differ where
+# it matters: Klipper's DBus hands out text only, so an image in its history
+# can be seen and never chosen.
+clip_history=$(jq -r '.clipboard.history // "own"' <<< "$merged_cfg" 2>/dev/null)
+klipper_up=$(busctl --user status org.kde.klipper >/dev/null 2>&1 && echo yes || echo no)
+case "$clip_history" in
+    own)    ok "clipboard history shown: this shell's own (images can be chosen)" ;;
+    plasma) if [ "$klipper_up" = yes ]; then
+                ok "clipboard history shown: Klipper's (clipboard.history), text only"
+            else
+                warn "clipboard.history is 'plasma' and Klipper is not running: the menu is empty"
+                fix "ours has one meanwhile: $ALIAS settings services, clipboard.history 'own' or 'auto'"
+            fi ;;
+    auto)   if [ "$klipper_up" = yes ]; then
+                ok "clipboard history shown: Klipper's while it runs (clipboard.history auto) -- its images cannot be chosen"
+            else
+                ok "clipboard history shown: this shell's own (Klipper is not running)"
+            fi ;;
+    *)      warn "clipboard.history is '$clip_history', which is not a value this knows"
+            fix "one of: own, auto, plasma" ;;
+esac
+
 # ------------------------------------------------------------------- optional
 
 section "optional components"

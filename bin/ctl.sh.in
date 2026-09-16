@@ -130,16 +130,39 @@ case "$cmd" in
         exec quickshell ipc --path "$(shell_ipc_path)" call launcher toggle
         ;;
 
-    # The clipboard widget's popout. Meta+V is Klipper's, and under our own
-    # renderer Klipper is not running, so this is what to bind it to instead.
+    # The clipboard history. Meta+V is Klipper's, and under our own renderer
+    # Klipper is not running, so this is what to bind it to instead.
+    #
+    # Where the pointer is, when KWin can say -- which is a one-shot KWin
+    # script, because Wayland tells a client the pointer's position only over
+    # its own windows. Without a session, or with the window-list script not
+    # installed, it falls back to the panel widget's popout, which opens
+    # against the panel: the right answer in the wrong place beats nothing.
     clipboard)
+        # Not require_repo: that exits, and a missing tree here is a reason to
+        # fall back rather than to fail.
+        if [ -d "$REPO_ROOT/scripts" ] \
+           && "$REPO_ROOT/scripts/windows.sh" pointer clipboard >/dev/null 2>&1; then
+            exit 0
+        fi
         exec quickshell ipc --path "$(shell_ipc_path)" call clipboard toggle
         ;;
 
-    # The sidebar and the key sheet: each opens on the first screen, and a
-    # second press closes it.
-    sidebar|keys)
+    # The key sheet: opens on the first screen, and a second press closes it.
+    keys)
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces "$cmd"
+        ;;
+
+    # The sidebar, on the screen the pointer is on -- which is the one the
+    # person pressing the key is looking at, and not the first screen, which
+    # is what it used to be. Same one-shot KWin script as the clipboard; the
+    # IPC is the fallback when there is no session to ask.
+    sidebar)
+        if [ -d "$REPO_ROOT/scripts" ] \
+           && "$REPO_ROOT/scripts/windows.sh" pointer sidebar >/dev/null 2>&1; then
+            exit 0
+        fi
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces sidebar
         ;;
 
     # The session screen: log out, restart, sleep, shut down. The kind picks

@@ -20,6 +20,11 @@ TestCase {
         compare(StatusIcons.osdGlyph("audio-volume-muted", 0.6), "volume_off");
         compare(StatusIcons.osdGlyph("microphone-sensitivity-muted", 0), "mic_off");
         compare(StatusIcons.osdGlyph("video-display-brightness", 0.2), "brightness_low");
+        // A lock key is not "the keyboard": both would otherwise fall to the
+        // generic keyboard rule, and the glyph is the whole message here.
+        compare(StatusIcons.osdGlyph("input-caps-on", 0), "keyboard_capslock");
+        compare(StatusIcons.osdGlyph("input-num-on", 0), "dialpad");
+        compare(StatusIcons.osdGlyph("input-keyboard", 0), "keyboard");
         compare(StatusIcons.osdGlyph("input-keyboard-brightness", 0.5), "keyboard");
         compare(StatusIcons.osdGlyph("input-touchpad-off", 0), "touchpad_mouse_off");
         compare(StatusIcons.osdGlyph("something-else", 0), "");
@@ -351,6 +356,35 @@ TestCase {
     function test_clipboard_is_capped() {
         const h = StatusIcons.clipboardAdd([{ text: "a" }, { text: "b" }, { text: "c" }], "d", 3);
         compare(texts(h), ["d", "a", "b"]);
+    }
+
+    // An image is kept as a file, and the file has to be deleted when the
+    // entry falls off the end -- so what to delete is worked out here, where
+    // it can be tested, rather than inside the watcher that does the deleting.
+    function test_clipboard_images_are_files() {
+        let h = StatusIcons.clipboardAddImage([], "/tmp/a.png", 800, 600, 2);
+        compare(h[0].image, true);
+        compare(h[0].path, "/tmp/a.png");
+        compare(StatusIcons.clipboardLabel(h[0], 40), "Image · 800×600");
+
+        h = StatusIcons.clipboardAddImage(h, "/tmp/b.png", 0, 0, 2);
+        compare(h.length, 2);
+        compare(StatusIcons.clipboardLabel(h[0], 40), "Image");
+
+        // Past the cap, the oldest goes -- and its file with it.
+        const before = h;
+        const after = StatusIcons.clipboardAddImage(h, "/tmp/c.png", 1, 1, 2);
+        compare(after.length, 2);
+        compare(StatusIcons.clipboardOrphans(before, after), ["/tmp/a.png"]);
+        // Clearing the history orphans every file.
+        compare(StatusIcons.clipboardOrphans(after, []), ["/tmp/c.png", "/tmp/b.png"]);
+        // Text entries own no files.
+        compare(StatusIcons.clipboardOrphans([{ text: "a", image: false }], []), []);
+    }
+
+    function test_clipboard_label_falls_back_to_the_text() {
+        compare(StatusIcons.clipboardLabel({ text: "hello there", image: false }, 40), "hello there");
+        compare(StatusIcons.clipboardLabel(null, 40), "");
     }
 
     function test_clipboard_preview_is_one_line() {
