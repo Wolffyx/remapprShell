@@ -115,7 +115,7 @@ and the rest still say what 2026-09-16 found.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | *(2026-09-22)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on, only GTK's theme and dark preference and our Plasma desktop theme. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
+| Theme | *(2026-09-22)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on and Plasma is keeping up, only GTK's theme and dark preference and our Plasma desktop theme. When Plasma's switch misses a sunset (it did, on 2026-09-22; see that night's entry) `theme.desktop.rescuePlasmaSwitch` writes the variant after twenty seconds' grace. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- put back twice now, on 2026-09-15 after a restore and on **2026-09-22** after the caelestia uninstall unset the kwinrc key again. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it. *(2026-09-22)* **The hover previews draw real windows for the first time**: the compiled `KWinScreencast` module had been installed and unreachable since the day it was built, because `~/.local/lib/qt6/qml` was not on the session's `QML2_IMPORT_PATH` |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
@@ -241,6 +241,48 @@ keyboard; nothing is half-written and `make lint`/`make test` are clean.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The night of 2026-09-22, after the handoff was written
+
+**One commit on `dev` (`0588f48`), and one thing that was not ours at all.**
+
+**The desktop stayed light behind a dark shell.** The shell turned dark at
+sunset and every application, and System Settings itself, stayed in
+`remappr-shell-light`. Nothing in the configuration was wrong:
+`AutomaticLookAndFeel` was on, `DefaultLightLookAndFeel` and
+`DefaultDarkLookAndFeel` named our two packages, and the autoswitcher's own
+schedule had today's sunset at **19:13 -> 19:42**. `kdeglobals` was last
+written at **18:34**. Plasma's switch simply never fired.
+
+Why: `kded6` had been running since **09:56**, and a Frameworks upgrade at
+**10:56** (`kservice 6.29.0 -> 6.30.0`, among others) replaced **130** of the
+libraries mapped into it. Unloading and reloading the module by hand applied
+dark instantly, so the module is fine -- its timer was not. Worth knowing:
+
+    qdbus6 org.kde.kded6 /kded unloadModule lookandfeelautoswitcher
+    qdbus6 org.kde.kded6 /kded loadModule lookandfeelautoswitcher
+
+**Our part in it.** `theme variant` hard-coded `scheme_agrees=1` whenever
+Plasma was the one switching, on the reasoning that whether Plasma had caught
+up was Plasma's business and asking would make us race its write. The
+reasoning is still right; the conclusion was too strong. It reads
+`LookAndFeelPackage` now, and on a mismatch waits **twenty seconds** for
+Plasma before writing the variant itself, `LookAndFeelPackage` included so the
+next start does not rescue all over again. `theme.desktop.rescuePlasmaSwitch`
+turns it off, on by default, in the settings window beside the switch it
+covers. `doctor` says so outright when the desktop is in the wrong half for
+the hour, because nothing in the configuration is wrong when it happens.
+`night_light_daylight` moved to `kwin.sh`, which doctor already sourced.
+
+**The whole DE crashed, and it was not the shell.** `kwin_wayland` SIGSEGV at
+21:53, its stack ending in `/usr/lib/libKF6Service.so.6.29.0 (deleted)`;
+Xwayland SIGABRT at 21:48. Same cause as the missed sunset: a full system
+upgrade at 10:57-11:04 replaced the libraries under a running session.
+Separately, `amdgpu: GPU reset succeeded` at 20:50, which is where the
+`GL_CONTEXT_LOST` storm before the crash came from. **The remedy for the first
+is a reboot after updating; the GPU reset is driver or hardware and wants
+watching.** Before blaming this shell for a session-wide crash, check
+`grep -c deleted /proc/<pid>/maps` on the process that died.
 
 ### The session of 2026-09-22
 
