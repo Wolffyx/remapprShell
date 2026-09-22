@@ -41,7 +41,7 @@ Column {
             text: root.server === "shell"
                 ? (ShellNotifications.active
                     ? "The shell holds org.freedesktop.Notifications and draws the popups below."
-                    : `Not drawing them: ${ShellNotifications.reason}. Nothing is taken from whoever holds the name; the shell waits for it to be let go of.`)
+                    : `Not drawing them${ShellNotifications.reason ? ": " + ShellNotifications.reason : " yet"}. Nothing is taken from whoever holds the name; the shell waits for it to be let go of.`)
                 : "Plasma's own notifications, through the applet this shell hosts outside the panel. Its history and do-not-disturb are in that applet."
             font.pixelSize: 12
             lineHeight: 1.35

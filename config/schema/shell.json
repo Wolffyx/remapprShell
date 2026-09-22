@@ -234,7 +234,11 @@
                     ],
                     "default": "right",
                     "label": "Edge",
-                    "description": "Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on."
+                    "description": "Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on.",
+                    "labels": [
+                        "Right",
+                        "Left"
+                    ]
                 },
                 "sidebar.trigger": {
                     "type": "enum",
@@ -245,7 +249,12 @@
                     ],
                     "default": "drag",
                     "label": "Opened by",
-                    "description": "'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in."
+                    "description": "'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in.",
+                    "labels": [
+                        "Pulled from its strip",
+                        "Pointer at the edge",
+                        "Only a key or the launcher"
+                    ]
                 },
                 "sidebar.handleWidth": {
                     "type": "int",
@@ -363,7 +372,11 @@
                     ],
                     "default": "metric",
                     "label": "Units",
-                    "description": "Celsius and km/h, or Fahrenheit and mph."
+                    "description": "Celsius and km/h, or Fahrenheit and mph.",
+                    "labels": [
+                        "Metric (°C, km/h)",
+                        "Imperial (°F, mph)"
+                    ]
                 },
                 "weather.refresh": {
                     "type": "int",
@@ -628,7 +641,13 @@
                         "bottom-right"
                     ],
                     "default": "bottom-right",
-                    "label": "Where it sits"
+                    "label": "Where it sits",
+                    "labels": [
+                        "Top left",
+                        "Top right",
+                        "Bottom left",
+                        "Bottom right"
+                    ]
                 },
                 "desktop.clockSize": {
                     "group": "Desktop clock",
@@ -655,7 +674,12 @@
                     ],
                     "default": "auto",
                     "label": "Ink",
-                    "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed."
+                    "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed.",
+                    "labels": [
+                        "Follow the colour scheme",
+                        "Light",
+                        "Dark"
+                    ]
                 }
             }
         },
@@ -681,7 +705,12 @@
                     ],
                     "default": "own",
                     "label": "Clipboard history",
-                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other."
+                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other.",
+                    "labels": [
+                        "This shell's own",
+                        "Klipper's while it runs",
+                        "Always Klipper's"
+                    ]
                 }
             }
         },
@@ -899,7 +928,8 @@
                     "type": "list",
                     "default": [],
                     "label": "Custom command",
-                    "description": "For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input."
+                    "description": "For the `custom` provider: a command and its arguments. `%report` is replaced with the path of the redacted bundle; without it, the bundle arrives on standard input.",
+                    "format": "words"
                 },
                 "ai.ollamaUrl": {
                     "type": "string",

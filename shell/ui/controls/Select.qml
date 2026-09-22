@@ -11,7 +11,14 @@ ComboBox {
     id: root
 
     property var values: []
+    // What each value is called, by position. A value with no label is shown
+    // as itself, which is what every Select did before there were labels.
+    property var labels: []
     signal picked(string value)
+
+    function labelAt(i) {
+        return String((root.labels ?? [])[i] ?? root.values[i] ?? "");
+    }
 
     model: root.values
     implicitWidth: 180
@@ -38,7 +45,7 @@ ComboBox {
     contentItem: Text {
         leftPadding: 12
         rightPadding: 30
-        text: root.displayText
+        text: root.currentIndex >= 0 ? root.labelAt(root.currentIndex) : root.displayText
         color: Theme.fg
         font.family: Theme.fontFamily
         font.pixelSize: 13
@@ -66,7 +73,7 @@ ComboBox {
 
         contentItem: Text {
             leftPadding: 8
-            text: option.modelData
+            text: root.labelAt(option.index)
             color: option.index === root.currentIndex ? Theme.accCFg : Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: 13

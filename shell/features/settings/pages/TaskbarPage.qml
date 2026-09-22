@@ -171,11 +171,18 @@ Column {
     }
 
     Card {
+        id: clockCard
         width: root.width
 
         SectionLabel { text: "Clock" }
 
+        // A format of the person's own wins over the three choices below, so
+        // while there is one they say so rather than switching nothing.
+        readonly property string customFormat: ConfigStore.value("widgets.clock.format", "") ?? ""
+
         Segmented {
+            enabled: clockCard.customFormat.length === 0
+            opacity: enabled ? 1 : 0.5
             width: parent.width
             values: ["24", "12"]
             labels: ["24-hour", "12-hour"]
@@ -191,9 +198,27 @@ Column {
         }
 
         ToggleRow {
+            enabled: clockCard.customFormat.length === 0
             label: "Show seconds"
             checked: ConfigStore.value("widgets.clock.showSeconds", false) === true
             onToggled: value => ConfigStore.set("widgets.clock.showSeconds", value)
+        }
+
+        TextInputRow {
+            width: parent.width
+            placeholderText: "HH:mm"
+            text: clockCard.customFormat
+            onCommitted: value => ConfigStore.set("widgets.clock.format", value.trim())
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            color: Theme.mut
+            font.pixelSize: 12
+            text: clockCard.customFormat.length > 0
+                ? `A format of your own, "${clockCard.customFormat}", is in use, so the choices above wait. Empty the field to use them again.`
+                : "A format of your own, as Qt writes one -- \"ddd HH:mm\", say -- wins over the choices above. Empty for those."
         }
     }
 

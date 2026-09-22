@@ -32,7 +32,7 @@ CardGrid {
     // Read from configuration rather than from `switcher status`: these are
     // this shell's own settings, and the shell already has them.
     readonly property string drawnByWindows: ConfigStore.value("switching.windows", "plasma")
-    readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "shell")
+    readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "plasma")
     readonly property var keys: root.switcherState?.keys ?? []
 
     count: 4

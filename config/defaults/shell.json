@@ -165,11 +165,11 @@
     },
     "widgets": {
         "clock": {
-            "format": "HH:mm",
+            "format": "",
             "showDate": true,
             "dateFormat": "ddd d MMM",
             "hour12": false,
-            "showSeconds": true
+            "showSeconds": false
         },
         "launcher": {
             "icon": "start-here-kde"

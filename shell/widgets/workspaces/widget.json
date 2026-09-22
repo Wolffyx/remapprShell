@@ -29,6 +29,11 @@
                 "icons",
                 "dots"
             ],
+            "labels": [
+                "Numbers",
+                "Application icons",
+                "Dots"
+            ],
             "default": "numbers",
             "label": "Pills show",
             "description": "numbers: the desktop's number. icons: the icons of the windows on it. dots: a dot. An empty desktop is always a dot."

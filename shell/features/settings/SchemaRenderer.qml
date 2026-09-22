@@ -113,6 +113,12 @@ CardGrid {
                                 case "bool": return boolControl;
                                 case "enum": return enumControl;
                                 case "set": return setControl;
+                                // A list with its members named is a choice of
+                                // them that keeps its order; one without is
+                                // typed. Both store a real list -- a text field
+                                // here once saved `"a,b"`, a string, and the
+                                // sidebar threw on it.
+                                case "list": return (row.spec.values ?? []).length > 0 ? setControl : listControl;
                                 case "int":
                                 case "number": return numberControl;
                                 default: return textControl;
@@ -154,6 +160,7 @@ CardGrid {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width
                                 values: row.spec.values ?? []
+                                labels: row.spec.labels ?? []
                                 currentIndex: Math.max(0, (row.spec.values ?? []).indexOf(row.current))
                                 onPicked: value => root.writeValue(row.path, value)
                             }
@@ -178,7 +185,10 @@ CardGrid {
 
                             readonly property var values: row.spec.values ?? []
                             readonly property var labels: row.spec.labels ?? []
-                            readonly property var chosen: Array.isArray(row.current) ? row.current : set.values
+                            readonly property bool ordered: row.spec.type === "list"
+                            readonly property var chosen: Array.isArray(row.current) ? row.current
+                                : typeof row.current === "string" && row.current.length > 0
+                                    ? SettingGroups.parseList(row.current, "items") : set.values
 
                             width: parent.width
                             spacing: 0
@@ -190,8 +200,9 @@ CardGrid {
                             // The rule, and why it is not an append, is in
                             // SettingGroups.chooseFrom.
                             function put(value, on) {
-                                root.writeValue(row.path,
-                                    SettingGroups.chooseFrom(set.values, row.current, value, on));
+                                root.writeValue(row.path, set.ordered
+                                    ? SettingGroups.chooseInOrder(set.values, row.current, value, on)
+                                    : SettingGroups.chooseFrom(set.values, row.current, value, on));
                             }
 
                             Repeater {
@@ -219,6 +230,17 @@ CardGrid {
                             stepSize: row.spec.step ?? 1
                             value: Number(row.current ?? row.spec.default ?? 0)
                             onMoved: value => root.writeValue(row.path, Math.round(value))
+                        }
+                    }
+
+                    // `format: "words"` for a command line, items split on
+                    // commas otherwise. See SettingGroups.parseList.
+                    Component {
+                        id: listControl
+                        TextInputRow {
+                            width: parent.width
+                            text: SettingGroups.formatList(row.current ?? [], row.spec.format)
+                            onCommitted: value => root.writeValue(row.path, SettingGroups.parseList(value, row.spec.format))
                         }
                     }
 
