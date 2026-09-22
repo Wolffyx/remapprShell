@@ -1,7 +1,13 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on the **evening of 2026-09-16,
+sessions, and added to since -- most recently on **2026-09-22, a session spent
+almost entirely on two shapes of fault: something was written and nobody was
+told, and something was installed and nothing could reach it**. It also ended
+the queue's first item (shortcuts are in-process now) and found that **a key
+can be pressed from inside a session after all**, which this file had said four
+times it could not. Read "The session of 2026-09-22" first. Before it, the
+**evening of 2026-09-16,
 six things asked for after a day of using it, every one of them a case of the
 shell being right and the place being wrong**: a screenshot key, a clipboard
 menu that opens under the pointer with its pictures pickable, notifications
@@ -90,32 +96,34 @@ written before any of it had been seen.
 
 ## The state of this machine, right now
 
-Updated **2026-09-16**. Everything below was read off the running system
-rather than remembered.
+Updated **2026-09-22**. Everything below was read off the running system
+rather than remembered; the rows marked *(2026-09-22)* were re-read that day
+and the rest still say what 2026-09-16 found.
 
 | | |
 | --- | --- |
-| Shell | installed via `make link` as `remappr-shell.service`, **inactive and deliberately not enabled**: the user starts and stops it by hand for testing (`rmpr start` / `rmpr stop`). Do not enable it or suggest enabling it. At the end of 2026-09-13 it was **running from the working tree** under `make run`, not from the installed copy -- `rmpr status` says which |
+| Shell | *(2026-09-22)* installed via `make link` as `remappr-shell.service`, **enabled and active** -- it autostarts with the session, and has since 2026-09-15; the old rule to keep it disabled is gone. `rmpr status` says whether it runs from the installed copy or the working tree |
 | plasmashell | on **`remappr-shell.desktop`** -- set again on **2026-09-16**, the key having still said `caelestia.desktop` at that session's start. That package ships a lock screen and fonts and **no `contents/layouts/`**, so plasmashell fell back to the stock template and built a Plasma panel of its own beside ours at every login. Ours refuses to: see the comment in the package's own layout js |
 | Plasma services | notifications: **this shell serves them itself** (`notifications.server: shell`) -- it holds `org.freedesktop.Notifications` since the renderer switch of 2026-09-16 let plasmashell release it. Clipboard: Klipper is on the bus (plasmashell has a clipboard applet loaded), but **`clipboard.history` is `own`** since the evening of 2026-09-16, so Meta+V shows this shell's own history -- the one whose images can actually be chosen. Device notifier: hosted |
 | Panel | bottom, **floating**, 52px, icons 18, spacing 5, rounding 8 -- the user's own settings, made through the settings window on 2026-09-13 once it started saving. Entries `launcher, tasks, notifications, tray, clock, showdesktop`. The status widgets are **not** in this profile (only in the defaults and presets); add them in Settings → Widgets |
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | **two** Look-and-Feel packages now, `remappr-shell.lookandfeel` and `remappr-shell-dark.lookandfeel`, and Plasma's own "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`, on here) is pointed at the pair -- before that it swapped to Breeze and Breeze Dark at sunset and replaced this theme wholesale. The scheme in force is **`remappr-shell-dark`**, ours -- named by its file's base name since the evening of 2026-09-16, which is how KDE resolves a scheme and is what "the colour scheme is not installed" in System Settings was, and the GTK theme is **adw-gtk3** with `adw-gtk3-dark` as its other half -- `theme.desktop.gtkThemeLight` / `gtkThemeDark`, new on 2026-09-16. `kde-material-you-colors` is **disabled**: it applied `MaterialYouDark` at every login and was the last writer, which is what "the desktop defaults to dark" was |
+| Theme | *(2026-09-22)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on, only GTK's theme and dark preference and our Plasma desktop theme. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
-| Window list | KWin script loaded, daemon answering, 10 windows -- **put back on 2026-09-15**: after the restore of 2026-09-14 the script was gone from `~/.local/share/kwin/scripts/`, the kwinrc key was unset and the ledger had no `windows` scope at all, so the taskbar drew nothing and said nothing. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it |
+| Window list | KWin script loaded, daemon answering, 10 windows -- put back twice now, on 2026-09-15 after a restore and on **2026-09-22** after the caelestia uninstall unset the kwinrc key again. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it. *(2026-09-22)* **The hover previews draw real windows for the first time**: the compiled `KWinScreencast` module had been installed and unreachable since the day it was built, because `~/.local/lib/qt6/qml` was not on the session's `QML2_IMPORT_PATH` |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
 | Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
 | CI | **green, for the first time.** It had never passed: five causes, each hiding the next (see 2026-09-14 below). It now runs all six lints rather than three |
 | Screen edges | KWin's own: nothing bound, snapping on. **Ours: none, deliberately** -- `sidebar.trigger` is `drag`, so the sidebar is pulled out by its own strip and `rmpr edges follow` gave KWin's edge back. Setting the trigger to `hover` binds the edge again, on the side `sidebar.position` names |
-| Shortcuts | **Ours, and grabbed for the first time** (2026-09-13): the component `remappr-shell` is active, with Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Alt+Tab and Alt+Shift+Tab (this shell's switcher). Meta+Tab is KWin's Overview. Alt+Tab was taken from KWin, Meta+Shift+R from Krohnkite; `rmpr switcher revert` and `rmpr shortcuts revert` give them back. **Alt+Tab was pressed and works** -- the first key this project has ever bound that does anything. The other five are registered and read back off kglobalaccel but have not been pressed. Spectacle: `_launch=Print` and `ActiveWindowScreenShot=Meta+Print`, and **`screenshot=Meta+Shift+S` is ours** (evening of 2026-09-16) -- our own action, which runs Spectacle where there is one and grim+slurp where there is not |
-| `rmpr doctor` | no problems, 2 warnings (2026-09-16, shell running and **enabled** -- it autostarts now) |
+| Shortcuts | *(2026-09-22)* **All of them were `<unbound>` at the start of that session**: the caelestia uninstall wiped this project's entries out of `kglobalshortcutsrc`, and `rmpr doctor` reported it as "19 recorded key(s) are no longer set". Rebound to the project defaults and **grabbed**: Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Meta+S (sidebar), Meta+/ (keys). Taken back from plasmashell, krunner and plasmawindowed, all recorded, `rmpr shortcuts revert` gives them back. **Still unbound and the user's to choose**: `switcher`, `overview`, and the three screenshot actions -- Alt+Tab is KWin's here, and the screenshot keys went back to Spectacle with the rest. Since 2026-09-22 a press is handled **in this shell**, off kglobalaccel's own signal, not by spawning the CLI |
+| `rmpr doctor` | *(2026-09-22)* no problems, 1 warning -- the recorded keys the caelestia uninstall took, which `revert` would still put back |
 
 ### Where the last session left off, and what to pick up
 
 **2026-09-14 evening into 2026-09-15, 25 commits on `dev`. Still true, but
-the session of 2026-09-16 is below it and is newer -- read that one first.**
+the sessions of 2026-09-16 and 2026-09-22 are below it and are newer -- read
+2026-09-22 first.**
 
 Work goes on `dev`, not `main`: the two are release channels and
 docs/releasing.md is the whole of it. `main` moves on a release. Nothing is
@@ -175,28 +183,205 @@ any disagreement, in `make lint` and in CI.
 
 **Open, in the order they are worth doing:**
 
-1. **Shortcuts in-process**, per BusLine above. Ends the switcher race class
-   rather than patching its instances, and would make this shell's own
-   switcher worth choosing again.
+1. ~~**Shortcuts in-process**~~ -- **done 2026-09-22**, see that session.
+   What is left of it is proving the held switcher's commit with a key
+   bound to `switcher`.
 2. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
    none)` is hardcoded and caelestia is detected by a hardcoded unit name.
    Discovery is easy -- every Quickshell config is a directory in
    `~/.config/quickshell/` -- but `renderer set` must then start and stop an
    arbitrary discovered shell, which is the substantial half.
-3. **caelestia is still running beside this shell** and provides two things
-   this shell does not: it holds the notification service (ours waits and takes
-   over when released -- `doctor` says so), and the sidebar's edge drag is
-   entirely its own. This shell has no screen-edge trigger at all: KWin's edges
-   run KWin's own actions only, so ours needs the KWin script in `kwin/`
-   extended to register an edge that calls our IPC. The user was asked whether
-   to take those over or to acknowledge caelestia as the provider, and **has
-   not answered** -- that decision shapes what install-time "apply everywhere"
-   should do.
+3. ~~**caelestia is still running beside this shell**~~ -- **moot since
+   2026-09-22**: the user uninstalled it. This shell serves notifications
+   itself, and the sidebar is pulled by its own strip (`sidebar.trigger:
+   drag`). What is left is the screen edges it wiped, which are the user's to
+   rebind -- `rmpr edges status`.
 4. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
    and right zones' `implicitWidth` depend on each other through the middle.
    A warning only; the panel lays out. Fixing it is a zone-budget redesign.
 5. Snapshot names are a timestamp plus a label and the second line no longer
    repeats the timestamp, but the list is still cramped on a narrow window.
+
+### The session of 2026-09-22
+
+**Seven commits, pushed to `dev` (`90104a2..5e0a3fa`).** The session began with
+the user reporting "after a new bootup Claude Code and the topbars of the
+windows are dark" and ended with the queue's first item built. Almost
+everything in between was one of two shapes: *something was written and nobody
+was told*, or *something was installed and nothing could reach it*.
+
+**The thing worth carrying: a key can be pressed from inside a session.** This
+file has said four times that it cannot -- no ydotool, no wtype, no xdotool --
+and it was wrong. kglobalaccel's own component object takes `invokeShortcut`:
+
+    busctl --user call org.kde.kglobalaccel /component/<slug with _ for -> \
+        org.kde.kglobalaccel.Component invokeShortcut s "launcher"
+
+That is a real press: kglobalaccel emits `globalShortcutPressed` exactly as it
+would for the key, and everything downstream cannot tell the difference. The
+launcher was opened this way and photographed. It only works for an action
+kglobalaccel has registered, which is every action this project binds. A
+release cannot be injected that way -- `invokeShortcut` emits the press alone.
+
+**Shortcuts are in-process. Queue item 1 is done.** `ShortcutWatch.qml` reads
+`globalShortcutPressed` off the bus with the `BusLine` idiom, and the press and
+its release now arrive on one connection in order, so neither can overtake the
+other -- which was the whole switcher race. The daemon still registers the keys
+and still owns the component, because a key is only grabbed while its component
+has a running owner; it no longer *runs* anything for what the shell takes
+(`SHELL_ACTIONS` in `bin/windowsd.py.in` names the QML, which names it back).
+Left on the old route deliberately: `clipboard` and `sidebar`, which open where
+the pointer is and so need a KWin script for the answer; `ask`, which builds a
+redacted report before any window opens; the screenshot keys, the only ones
+worth anything with no shell running. Measured: zero `remappr-shell-ctl`
+processes across three presses, where there had been two per press.
+
+**Still unproven there**: the held switcher and overview commit. The code is
+unchanged and only its caller moved, but Alt+Tab is KWin's on this machine and
+our `switcher` action is unbound, so `HeldModifiers.held()` has no real
+modifier to read. Binding a key to it is the whole check.
+
+#### Light and dark: Plasma switches, we fill the gaps
+
+The user's instruction, in their words: *"the activated 'switch to dark mode at
+night' should remain how the user set it and we only should set the necessary
+places to make it work... we should only have some kind of watcher or trigger
+that uses the KDE switch."* So when `AutomaticLookAndFeel` is on and names our
+two packages, Plasma swaps the whole global theme and `theme variant` writes
+nothing into kdeglobals -- it fills only what a look-and-feel package cannot
+carry: GTK's theme and dark preference, which live in gsettings, and our Plasma
+desktop theme, whose colours are generated per variant. With the switch off,
+nothing switches unless `theme.desktop.followMode` says so, which is off by
+default. Asked and answered by the user: a setting, off by default, and Plasma
+wins whenever its own switch is on. Proved by forcing gsettings to
+`prefer-dark`, running the trigger, and diffing kdeglobals: empty.
+
+**Four faults behind "dark did not go away", all fixed:**
+
+- **The eight-second window at login.** kdeglobals keeps what the last switch
+  wrote, so a machine shut down at night boots dark, and the shell corrected it
+  *eight seconds* into the session -- after quickshell, the profile and Night
+  Light had all answered. Everything XDG autostart brings up, session restore
+  included, starts inside that window and reads the desktop's colours **once**;
+  an Electron application asks the portal at startup and never asks again, so
+  it spent the whole day dark. `remappr-shell-theme.service` is a oneshot
+  ordered `Before=xdg-desktop-autostart.target` that settles it in ~0.14s
+  before anything starts. `setup.sh` enables it beside the shell; `doctor`
+  reports it.
+- **`theme apply` wrote the colours and told nobody.** Only `theme variant`
+  sent the palette notification, so an apply left every open window -- KWin's
+  titlebars included -- on the colours it read at startup, until somebody
+  clicked a scheme in System Settings, which sends that same signal. That is
+  what "I still have the dark topbar" was, twice.
+- **`resolve_variant` answered dark before Night Light had answered**, which on
+  the login path is most of the time. Dark is the one guess that cannot be
+  taken back: written out, it reads back as the desktop's own darkness and auto
+  latches on its own answer. It waits now, then falls back to whatever the
+  desktop is already wearing.
+- **The light scheme's tooltip was unreadable.** `theme/colors/dump.qml` used
+  `inverseSurface` for the light tooltip while its text stayed `onSurface` --
+  Material pairs inverseSurface with *inverseOnSurface*, and KDE's
+  `[Colors:Tooltip]` takes its foreground from the one every other group uses.
+  Near-black on near-black, which is what the dark folder tooltip on a light
+  Dolphin was. Both variants use `surfaceContainerHighest` now. **Regenerate
+  with `scripts/gen-palette.sh`, not `gen-colors.sh`**: `palette.json` is the
+  cached intermediate and `gen-colors.sh` alone reads it rather than the QML.
+
+#### Installed is not the same as reachable
+
+**The window previews had never worked, and the message said why in a way that
+sent you the wrong direction.** The shell logged "the KWinScreencast module is
+not installed (build it with `make plugin`)" -- and `make plugin` reported every
+file already up to date, in `~/.local/lib/qt6/qml/KWinScreencast/`. The session
+launcher put the shell's own config root on `QML2_IMPORT_PATH` and nothing
+else, so the compiled module was unreachable from the day it was first built.
+caelestia's launcher had added that path explicitly; ours never did. One line
+in `bin/session.sh.in`. `doctor` now checks the shell can *import* it, not only
+that the library exists, so built-but-unreachable cannot go on impersonating
+never-built.
+
+**Then the previews flooded the journal with `invalid image
+"EGL_BAD_PARAMETER"`.** Not frame drops: imports of a node that did not exist.
+`WindowStream.nodeId` is `-1` while there is no stream, because that is how QML
+asks whether there is one; kpipewire's `nodeId` is **unsigned**, so binding the
+two handed it 4294967295 on every teardown and it connected to that. Every
+warning in a capture was preceded by `created successfully 4294967295`, and no
+stream with a real node id produced one. Hovering a row of taskbar buttons is a
+preview opening and closing per button: 250 streams in four minutes, 135 to a
+node that did not exist, 38 failed imports. Afterwards, none.
+
+#### A volume property that changes is not a volume that changed
+
+The user saw the volume OSD appear while hovering the taskbar, showing the
+level it was already at. `AudioStatus.volume` reads through the default sink,
+and when that node goes out from under it the value falls to zero and comes
+back -- two changes, the second of which draws a pill nobody asked for.
+PipeWire's graph churns exactly that way while previews are drawn: 120 "no
+global any more" errors in three minutes of hovering. The level is remembered
+now and a repeat of it is not an event; a sink that has gone is not one either;
+a sink that has been *replaced* records where it stands without announcing it.
+Measured after: 154 preview frames, 16 of those errors, no OSD -- and volume
+keys still draw it.
+
+**Note for anyone testing the OSD**: `_show` logs at `Log.debug`, which is
+gated behind `Log.debugEnabled`. Three captures looked like "the OSD never
+fired" when it had fired every time. `rmpr ipc shell debug on` turns it on
+without a restart.
+
+#### The taskbar preview, redesigned
+
+The popout drew two different cards. One window put the picture first, the
+application's name under it and the title under that; two or more put a header
+on top with a grid beneath -- so the same application read top-to-bottom in two
+orders depending on how many windows it had, and opening a second one reordered
+and *shrank* the first (300x169 became 176x99). An application titled after
+itself said its own name twice in a row.
+
+One card now: the header says what the application is, once, at the top, and
+every window is a cell below it -- one window is a grid of one, at the same
+size. A cell says *where* the window is rather than repeating what it is
+called, and says nothing at all when there is nothing to add. Every cell has a
+resting surface; transparent ones left each picture floating with its close
+cross beside it in open space.
+
+The popout moved out of the 700-line widget into
+`shell/widgets/tasks/TaskPreview.qml`, which is what lets
+**`dev/preview/taskpreview.qml`** render it offscreen at each window count in
+both themes. Both faults above were found by looking at that render, not by
+reading the code. Offscreen there is no screencast, so every card falls back to
+its icon -- the scene is for layout and captions.
+
+#### What the caelestia uninstall took with it
+
+The user uninstalled caelestia mid-session, and it wiped configuration this
+project owns. `rmpr doctor` said so plainly -- **"19 recorded key(s) are no
+longer set"** -- and that is the check to run after anything uninstalls
+anything. Gone and restored: the `remappr-shell-windows` KWin script's kwinrc
+key (so the taskbar had no window list and no hover previews), and **every one
+of this shell's global shortcuts**. Rebound to the project defaults: launcher
+Meta, search Meta+Space, settings Meta+Shift+R, clipboard Meta+V, sidebar
+Meta+S, keys Meta+/.
+
+**Still unset, deliberately, because they are the user's to choose**: every
+screen edge (the ledger only records that they were unset *before* us, so what
+they had is not knowable), and the three screenshot actions. `rmpr edges
+status` lists the edges.
+
+#### Two mistakes this session made
+
+**The shell was down for about two minutes.** A new method named
+`_audioChanged` collided with the auto-generated change signal of the `_audio`
+property beside it. qmllint passed it; the QML runtime refused to load
+`OsdService` and took `OsdOverlay` and the whole panel with it. **qmllint does
+not catch this class** -- a `function xChanged()` next to a `property ... x` is
+a load-time error, not a lint one. Restart the shell and check `rmpr status`
+after any singleton edit, before moving on to test something else.
+
+**A commit was made on a failing lint.** `make lint` was grepped for two
+specific lines, both of which passed, while the slug lint was erroring on a
+hardcoded project name in a new test. Grep the exit status, not the output:
+`make lint >/dev/null 2>&1; echo $?`. The commit was amended before the push,
+so the history is clean, but only because it was caught a step later.
 
 ### The session of 2026-09-16, evening
 
@@ -365,14 +550,10 @@ sunset will do about it.
 -- asked as "what next?", answered "I want all of them" -- so they are a
 queue rather than a menu. The rest are what the evening left behind.
 
-1. **Shortcuts in-process.** The structural fix this file has carried for
-   three sessions. A key press travels kglobalaccel -> the session daemon ->
-   the CLI -> the shell's IPC, as detached processes that race: that is the
-   whole switcher class of bugs, and about 200 ms on every shortcut. The idiom
-   is already here -- `shell/core/BusLine.qml` is a `busctl monitor` the window
-   list uses; pointing one at kglobalaccel's `globalShortcutPressed` deletes
-   the chain. Ends the race rather than patching its instances, and would make
-   this shell's own Alt+Tab worth choosing again.
+1. ~~**Shortcuts in-process.**~~ **Done on 2026-09-22**, exactly as described
+   here: a `BusLine` monitor on kglobalaccel's `globalShortcutPressed`. The one
+   thing left of it is proving the held switcher's commit, which needs a key
+   bound to `switcher` -- see that session.
 2. **Polish what landed on 2026-09-16.** Named by the user, in their words:
    the sidebar has no keyboard navigation; the clipboard menu has no search or
    filter; the weather has no per-widget place (one place for the machine); the
