@@ -210,8 +210,15 @@ any disagreement, in `make lint` and in CI.
    way first, then the right end from its inner side, then the left. **One
    visible change**: on an overfull bar the task list now shrinks before the
    tray is cut, where before the tray was cut to make room for tasks.
-5. Snapshot names are a timestamp plus a label and the second line no longer
-   repeats the timestamp, but the list is still cramped on a narrow window.
+5. ~~Snapshot names cramped on a narrow window~~ -- **fixed 2026-09-22**: the
+   label is the title ("Before renderer quickshell") and the time is the
+   second line, said as a person would ("Today, 09:05", "9 Sep, 20:05"), from
+   `qs.domain.settings.snapshots`, tested in `tst_Snapshots.qml`.
+6. **Found 2026-09-22, fixed, unproven on a screen**: a quick Alt+Tab
+   committed from the switcher's `Component.onCompleted`, emptying the
+   Variants model it was being created from -- a binding loop on `model` in
+   the journal. Both switchers commit a turn later now. Proven by the same
+   key press as item 1's leftover.
 
 ### The session of 2026-09-22
 
