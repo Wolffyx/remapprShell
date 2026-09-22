@@ -1,12 +1,18 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-22, a session spent
-almost entirely on two shapes of fault: something was written and nobody was
-told, and something was installed and nothing could reach it**. It also ended
-the queue's first item (shortcuts are in-process now) and found that **a key
-can be pressed from inside a session after all**, which this file had said four
-times it could not. Read "The session of 2026-09-22" first. Before it, the
+sessions, and added to since -- most recently on **2026-09-22, a long day in
+two halves**. The morning was two shapes of fault: *something was written and
+nobody was told*, and *something was installed and nothing could reach it*. It
+also ended the queue's first item (shortcuts are in-process now) and found that
+**a key can be pressed from inside a session after all**, which this file had
+said four times it could not. The afternoon and evening **emptied the rest of
+the queue** -- renderer discovery, the panel's binding loop, the restore-point
+list -- and then **went over the settings window key by key**: every setting
+the shell reads can be changed there now, and the controls that silently saved
+the wrong thing were mended. It ended on **a notification that did nothing when
+clicked**, which was a device notification with no action and a daemon as its
+sender. Read "The session of 2026-09-22" first. Before it, the
 **evening of 2026-09-16,
 six things asked for after a day of using it, every one of them a case of the
 shell being right and the place being wrong**: a screenshot key, a clipboard
@@ -180,6 +186,22 @@ uses. Pointing that at kglobalaccel would delete the whole class.
 **The defaults now ship the setup that is in use**, and two files that both
 declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
 any disagreement, in `make lint` and in CI.
+
+**What to pick up first, 2026-09-23.** Three of these want the user at the
+keyboard; nothing is half-written and `make lint`/`make test` are clean.
+
+1. **Press the keys.** Bind `switcher` to a spare key (Alt+Tab is KWin's here
+   by the user's choice) and hold it: that one press proves the held
+   switcher's commit (queue item 1's leftover) *and* the quick-Alt+Tab fix
+   (item 6). `rmpr switcher show` opens it from a terminal, with no modifier
+   held, which is not the same test.
+2. **Plug a USB stick in and click the notification.** It should open Disks &
+   Devices; only the history route has been tried from here.
+3. **Ask the user about the other notifications** they said "do not work":
+   which application, and what they expected. An application's own `default`
+   action is invoked untested.
+4. Then the settings window's remaining gaps, listed under "The settings
+   window, gone over".
 
 **Open, in the order they are worth doing:**
 
@@ -412,6 +434,14 @@ fixed, in `a55fd73`, `8aab52f` and `1875136`:
   the nav draws headings, tighter rows, and scrolls to the current page;
   dropdowns show labels (`labels` on an enum, and `Select.labels`); the Widgets
   and Tray buttons are glyphs -- as theme icons they were blank.
+
+**`snapshot create` took a flag as a label** (`89b34bf`): `--label X` made a
+restore point called `--label`, which is where the one in this machine's list
+came from. It takes `--label X` and `--label=X` now and refuses an unknown
+flag. The label is also part of a directory name and went in unchecked -- a
+slash made directories inside the snapshot root and `..` one outside it -- so
+slashes become dashes, and dashes, dots and spaces are trimmed off the front.
+Ten cases in `tests/test-snapshot.sh`.
 
 **Per monitor** the Taskbar page now sets position, thickness, style, icon
 size and hiding, with "Use the shared settings" to drop them (setting a key
