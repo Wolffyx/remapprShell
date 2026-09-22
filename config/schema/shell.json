@@ -862,16 +862,10 @@
             "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
             "keys": {
                 "panel.renderer": {
-                    "type": "enum",
-                    "values": [
-                        "quickshell",
-                        "plasma",
-                        "caelestia",
-                        "none"
-                    ],
+                    "type": "string",
                     "default": "quickshell",
                     "label": "Drawn by",
-                    "description": "Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
+                    "description": "Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
                 }
             }
         },

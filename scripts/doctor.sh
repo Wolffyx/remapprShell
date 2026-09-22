@@ -15,6 +15,7 @@ source "$REPO_ROOT/scripts/lib/accel.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 
 problems=0
 warnings=0
@@ -240,6 +241,7 @@ fi
 # the configuration and what is on screen have come apart.
 configured_renderer=$(config_get '.panel.renderer' quickshell)
 [ "$configured_renderer" = "null" ] && configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$defaults_file" 2>/dev/null || echo quickshell)
+configured_renderer=$(renderer_normalize "$configured_renderer")
 
 case "$configured_renderer" in
     plasma)     expected_pkg="$PLASMA_SHELL_PACKAGE_ID" ;;
@@ -299,7 +301,28 @@ if [ "$configured_renderer" = "quickshell" ] && [ "$shell_pkg" = "$SHELL_PACKAGE
     fi
 fi
 
+# Another Quickshell shell drawing is the configuration, not a competitor, when
+# it is the one the renderer names -- and nothing at all when it is gone.
+foreign=""
+if renderer_is_foreign "$configured_renderer"; then
+    foreign=$(renderer_config_name "$configured_renderer")
+    funit=$(renderer_unit "$foreign")
+    if [ -z "$(renderer_config_dir "$foreign")" ]; then
+        bad "the renderer is '$configured_renderer', but no Quickshell configuration named $foreign is here any more"
+        fix "nothing draws a panel; pick another: $ALIAS renderer list"
+    elif [ "$(quickshell list -j -c "$foreign" 2>/dev/null | jq 'length' 2>/dev/null)" -gt 0 ] 2>/dev/null; then
+        ok "the $foreign configuration is running and drawing the panel"
+        systemctl --user is-enabled "$funit" >/dev/null 2>&1 \
+            || { warn "$funit is not enabled, so $foreign will not start at the next login"
+                 fix "re-apply it: $ALIAS renderer set $configured_renderer"; }
+    else
+        bad "the renderer is '$configured_renderer', but $foreign is not running: nothing draws a panel"
+        fix "start it: systemctl --user enable --now $funit"
+    fi
+fi
+
 others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+[ -n "$foreign" ] && others=$(printf '%s\n' "$others" | grep -vE -- "(-c|--config)[ =]$foreign( |\$)|/quickshell/$foreign/" || true)
 if [ -n "$others" ]; then
     warn "another Quickshell shell is running"
     printf '%s\n' "$others" | sed 's/^/        /'

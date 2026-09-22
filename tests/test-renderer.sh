@@ -25,6 +25,8 @@ export HOME="$SANDBOX/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
+# Discovery reads every XDG config directory, and /etc/xdg is the real one.
+export XDG_CONFIG_DIRS="$SANDBOX/etc/xdg"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
 source "$REPO_ROOT/scripts/lib/log.sh"
@@ -297,6 +299,37 @@ jq '.bar.entries |= map(select(.id != "tray"))' "$cfg" > "$cfg.new" && mv "$cfg.
 appletsrc_generate "$SANDBOX/no-tray" "$cfg" "$index" plasma
 check "on its own without a tray"   "$(grep -c '^plugin=org.kde.plasma.volume$' "$SANDBOX/no-tray")" "1"
 check "nothing left to a tray"      "$(appletsrc_folded_into_tray "$index" "$cfg")" ""
+
+echo "== other Quickshell shells are found, not listed by hand =="
+# Where quickshell itself looks: <xdg config dir>/quickshell/<name>/shell.qml,
+# the user's directory first. Ours is not one of them, whatever it resolves to.
+qs_user="$XDG_CONFIG_HOME/quickshell"; qs_sys="$XDG_CONFIG_DIRS/quickshell"
+mkdir -p "$qs_user/fooshell" "$qs_user/notashell" "$qs_sys/barshell" "$qs_sys/fooshell"
+touch "$qs_user/fooshell/shell.qml" "$qs_sys/barshell/shell.qml" "$qs_sys/fooshell/shell.qml"
+ln -sfn "$REPO_ROOT/shell" "$qs_user/$(basename "$QS_CONFIG_DIR")"
+ids=$(rmpr_renderer list --json | jq -r '[.[].id] | join(" ")')
+check "every renderer, in order"     "$ids" "quickshell plasma quickshell:fooshell quickshell:barshell none"
+check "the user's copy of a name wins" \
+    "$(rmpr_renderer list --json | jq -r '.[] | select(.id == "quickshell:fooshell") | .note' | grep -c '~/.config/quickshell/fooshell')" "1"
+
+out=$(rmpr_renderer set quickshell:nosuch --yes 2>&1)
+check "an unknown one is refused"    "$?" "1"
+check "and says where it looked"     "$(printf '%s' "$out" | grep -c 'no Quickshell configuration named')" "1"
+
+rmpr_renderer set quickshell:barshell --yes >/dev/null 2>&1 || { echo "set quickshell:barshell failed" >&2; exit 1; }
+check "renderer written"             "$(jq -r '.panel.renderer' "$profile")" "quickshell:barshell"
+check "our package, holding no panel" "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "$SHELL_PACKAGE_ID"
+check "no panel containments"        "$(our_panels)" "0"
+check "listed as in use"             "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .id')" "quickshell:barshell"
+
+# A profile from before discovery says `caelestia`, which meant its Quickshell
+# configuration. Gone from the machine, it is still what is configured.
+jq '.panel.renderer = "caelestia"' "$profile" > "$profile.new" && mv "$profile.new" "$profile"
+check "the old name is read as the config" "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .id')" "quickshell:caelestia"
+check "and shown as gone"            "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .absent')" "true"
+mkdir -p "$qs_user/caelestia" && touch "$qs_user/caelestia/shell.qml"
+check "until it is back"             "$(rmpr_renderer list --json | jq -r '[.[] | select(.current)] | length, (.[0].absent // false)' | paste -sd' ')" "1 false"
+rm -rf "$qs_user"/{fooshell,notashell,caelestia,"$(basename "$QS_CONFIG_DIR")"} "$SANDBOX/etc"
 
 echo "== revert =="
 rmpr_renderer revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }

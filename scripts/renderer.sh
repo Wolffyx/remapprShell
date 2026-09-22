@@ -2,7 +2,7 @@
 # Chooses what draws the panel.
 #
 #   status              what is drawing the panel now, and what would change
-#   list                every renderer, and whether it is usable here
+#   list [--json]       every renderer here, other Quickshell shells included
 #   set <renderer>      switch, with a restore point and a rollback
 #   revert              put plasmashell's shell package back
 #
@@ -26,9 +26,8 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/appletsrc.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 
-RENDERERS=(quickshell plasma caelestia none)
-CAELESTIA_UNIT="app-caelestiashell@autostart.service"
 BACKUP_DIR="$STATE_DIR/renderer-backups"
 
 # --- what the shell is configured to do -----------------------------------
@@ -70,7 +69,7 @@ effective_config() {
     fi
 }
 
-configured_renderer() { effective_config | jq -r '.panel.renderer // "quickshell"'; }
+configured_renderer() { renderer_normalize "$(effective_config | jq -r '.panel.renderer // "quickshell"')"; }
 
 live_shell_package() {
     kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop'
@@ -80,11 +79,12 @@ package_for() {
     case "$1" in
         plasma)             printf '%s' "$PLASMA_SHELL_PACKAGE_ID" ;;
         quickshell)         printf '%s' "$SHELL_PACKAGE_ID" ;;
-        # Process-level only: caelestia draws its own bar from its own package,
-        # and no code of ours is involved. Ours stays the shell package so the
-        # desktop keeps the containment it already has.
-        caelestia)          printf '%s' "$SHELL_PACKAGE_ID" ;;
         none)               printf 'org.kde.plasma.desktop' ;;
+        # Process-level only: another Quickshell shell draws its own bar from
+        # its own code, and none of ours is involved. Ours stays the shell
+        # package so the desktop keeps the containment it already has, with no
+        # Plasma panel on it.
+        "$RENDERER_FOREIGN_PREFIX"*) printf '%s' "$SHELL_PACKAGE_ID" ;;
     esac
 }
 
@@ -107,7 +107,52 @@ shell_will_draw() {
     return 1
 }
 
-caelestia_available() { session_available && systemctl --user cat "$CAELESTIA_UNIT" >/dev/null 2>&1; }
+# --- another Quickshell shell ----------------------------------------------
+
+# Started under our unit template, enabled so the next login starts it too.
+start_foreign() {
+    local name=$1 unit entry
+    unit=$(renderer_unit "$name")
+    session_available || { log_debug "not starting $unit: no session"; return 0; }
+    systemctl --user daemon-reload >/dev/null 2>&1
+    if systemctl --user enable --now "$unit" >/dev/null 2>&1; then
+        log_step "started the $name configuration ($unit), and it starts with the session now"
+    else
+        log_warn "could not start $unit"
+        log_info "  is it installed? make link puts the template in place; then: systemctl --user status $unit"
+        return 1
+    fi
+    # Its own installer may have given it an autostart entry too. -n makes the
+    # second start a no-op, but switching away cannot stop what that entry
+    # brings back at the next login, so it is named now rather than then.
+    if entry=$(renderer_autostart_entry "$name"); then
+        log_info "  $entry also starts it at login; switching away will not stop that one"
+    fi
+}
+
+# Every one of them but `keep`: whatever our template runs, and any instance of
+# the configuration being left that something else started.
+stop_foreign() {
+    local keep=${1:-} leaving=${2:-} unit inst
+    session_available || return 0
+    while read -r unit; do
+        [ -n "$unit" ] || continue
+        inst=${unit#"$RENDERER_UNIT_TEMPLATE"}; inst=$(systemd-escape --unescape -- "${inst%.service}")
+        [ -n "$keep" ] && [ "$inst" = "$keep" ] && continue
+        systemctl --user disable --now "$unit" >/dev/null 2>&1 \
+            && log_step "stopped the $inst configuration ($unit)" \
+            || log_warn "could not stop $unit"
+    done < <({ systemctl --user list-units --all --plain --no-legend "${RENDERER_UNIT_TEMPLATE}*" 2>/dev/null
+               systemctl --user list-unit-files --plain --no-legend --state=enabled "${RENDERER_UNIT_TEMPLATE}*" 2>/dev/null
+             } | awk '$1 !~ /@\.service$/ {print $1}' | sort -u)
+    if [ -n "$leaving" ] && [ "$leaving" != "$keep" ]; then
+        quickshell kill -c "$leaving" >/dev/null 2>&1 && log_step "stopped the running $leaving instance"
+        if renderer_autostart_entry "$leaving" >/dev/null; then
+            log_warn "$(renderer_autostart_entry "$leaving") will start $leaving again at the next login"
+        fi
+    fi
+    return 0
+}
 
 # Whether this run may touch the running desktop at all.
 #
@@ -425,12 +470,14 @@ cmd=${1:-status}
 ASSUME_YES=0
 DRY_RUN=0
 FORCE=0
+JSON=0
 args=()
 while [ $# -gt 0 ]; do
     case "$1" in
         -y|--yes)   ASSUME_YES=1 ;;
         --force)    FORCE=1 ;;
         --dry-run)  DRY_RUN=1 ;;
+        --json)     JSON=1 ;;
         -*)         die "unknown option: $1" ;;
         *)          args+=("$1") ;;
     esac
@@ -440,17 +487,35 @@ done
 case "$cmd" in
     list)
         current=$(configured_renderer)
-        for r in "${RENDERERS[@]}"; do
-            mark=' '; [ "$r" = "$current" ] && mark='*'
+        rows=()
+        while read -r r; do
             case "$r" in
-                quickshell) note="our layer-shell panel; every widget, full visual freedom" ;;
-                plasma)     note="drawn by plasmashell from the same configuration; stock applets only" ;;
-                caelestia)  if caelestia_available; then note="caelestia's own bar, started as a service"
-                            else note="not available here ($CAELESTIA_UNIT is not installed)"; fi ;;
-                none)       note="stock Plasma panels, untouched" ;;
+                quickshell) label="This shell"
+                            note="Our own panel, drawn as a layer-shell surface. Every widget, and every visual effect." ;;
+                plasma)     label="Plasma"
+                            note="Drawn by plasmashell from this same configuration, using stock applets. No shaders, no blur, and any widget without a Plasma equivalent is left out." ;;
+                none)       label="Nothing"
+                            note="Your stock Plasma panels, exactly as they were. Nothing of ours is drawn." ;;
+                *)          name=$(renderer_config_name "$r")
+                            label=$name
+                            dir=$(renderer_config_dir "$name"); dir=${dir/#"$HOME"/\~}
+                            note="Another Quickshell shell, found in $dir. It draws its own bar from its own code; none of ours runs in it." ;;
             esac
-            printf '%s %-12s %s\n' "$mark" "$r" "$note"
-        done
+            rows+=("$(jq -nc --arg id "$r" --arg label "$label" --arg note "$note" \
+                        --argjson current "$([ "$r" = "$current" ] && echo true || echo false)" \
+                        '{id: $id, label: $label, note: $note, current: $current}')")
+        done < <(renderer_ids)
+        # A profile can name a configuration that has since been removed. It
+        # is still what is configured, so it is still listed -- as missing.
+        if renderer_is_foreign "$current" && [ -z "$(renderer_config_dir "$(renderer_config_name "$current")")" ]; then
+            rows+=("$(jq -nc --arg id "$current" --arg label "$(renderer_config_name "$current")" \
+                        '{id: $id, label: $label, note: "Configured, but no Quickshell configuration of that name is on this machine any more.", current: true, absent: true}')")
+        fi
+        if [ "$JSON" = 1 ]; then
+            printf '%s\n' "${rows[@]}" | jq -sc .
+        else
+            printf '%s\n' "${rows[@]}" | jq -r '"\(if .current then "*" else " " end) \(.id | . + " " * ([22 - length, 1] | max))\(.note)"'
+        fi
         ;;
 
     status)
@@ -476,14 +541,18 @@ case "$cmd" in
 
     set)
         target=${args[0]:-}
-        [ -n "$target" ] || die "usage: $ALIAS renderer set <$(IFS='|'; printf '%s' "${RENDERERS[*]}")>"
+        [ -n "$target" ] || die "usage: $ALIAS renderer set <$(renderer_ids | paste -sd'|')>"
+        target=$(renderer_normalize "$target")
+        # The one being left, read before anything writes the new one.
+        previous=$(configured_renderer)
 
         valid=0
-        for r in "${RENDERERS[@]}"; do [ "$r" = "$target" ] && valid=1; done
-        [ "$valid" = 1 ] || die "unknown renderer: $target (expected one of: ${RENDERERS[*]})"
-
-        [ "$target" = caelestia ] && ! caelestia_available \
-            && die "caelestia is not installed here ($CAELESTIA_UNIT not found)"
+        while read -r r; do [ "$r" = "$target" ] && valid=1; done < <(renderer_ids)
+        if [ "$valid" != 1 ]; then
+            renderer_is_foreign "$target" \
+                && die "no Quickshell configuration named '$(renderer_config_name "$target")' here (looked for quickshell/<name>/shell.qml in each XDG config directory)"
+            die "unknown renderer: $target (expected one of: $(renderer_ids | paste -sd' '))"
+        fi
 
         # The one switch that can leave a desktop with nothing.
         if [ "$target" = quickshell ] && [ "$FORCE" != 1 ] && ! shell_will_draw; then
@@ -632,15 +701,21 @@ case "$cmd" in
         # clipboard now rather than whenever it next notices.
         [ "$target" = quickshell ] && rehost_services
 
-        if [ "$target" = caelestia ]; then
+        # Only one thing draws. Whatever other Quickshell shell was drawing
+        # stops now, including one started outside our template.
+        leaving=""
+        renderer_is_foreign "$previous" && leaving=$(renderer_config_name "$previous")
+        if renderer_is_foreign "$target"; then
+            name=$(renderer_config_name "$target")
+            stop_foreign "$name" "$leaving"
             bound=$(jq '[.entries[] | select(.scope == "shortcuts")] | length' "$(kconfig_ledger)" 2>/dev/null || echo 0)
             if [ "${bound:-0}" -gt 0 ]; then
-                log_warn "this project holds $bound global shortcut(s) that caelestia also wants"
-                log_info "  release them first: $ALIAS shortcuts revert"
+                log_warn "this project holds $bound global shortcut(s); $name may want some of the same keys"
+                log_info "  release them if it does: $ALIAS shortcuts revert"
             fi
-            session_available && systemctl --user start "$CAELESTIA_UNIT" >/dev/null 2>&1 \
-                && log_step "started $CAELESTIA_UNIT" \
-                || log_warn "could not start $CAELESTIA_UNIT"
+            start_foreign "$name" || log_warn "the switch is made, but $name is not running: nothing draws a panel"
+        else
+            stop_foreign "" "$leaving"
         fi
 
         log_step "now drawing with: $target"
@@ -650,6 +725,9 @@ case "$cmd" in
         ;;
 
     revert)
+        leaving=""
+        renderer_is_foreign "$(configured_renderer)" && leaving=$(renderer_config_name "$(configured_renderer)")
+        stop_foreign "" "$leaving"
         kconfig_revert backend
         # plasmashell adds its own keys to our panel view's group while the
         # panel exists, and the ledger can only put back the keys we wrote. The
