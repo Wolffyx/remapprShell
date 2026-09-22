@@ -31,6 +31,7 @@ import qs.features.overlays
 import qs.domain.surfaces
 import qs.domain.surfaces.place
 import qs.domain.theme
+import qs.domain.shortcuts
 import qs.domain.sidebar
 import qs.domain.weather
 
@@ -142,6 +143,40 @@ ShellRoot {
                 Surfaces.openClipboardAt(x, y, output);
             else if (action === "sidebar")
                 Surfaces.toggleSidebar(name);
+        }
+    }
+
+    // This shell's own keys, straight off kglobalaccel -- see ShortcutWatch
+    // for what that replaces. The same verbs the IPC handlers below call, so
+    // a key and `rmpr <thing>` cannot come to mean different things.
+    Connections {
+        target: ShortcutWatch
+
+        function onPressed(action) {
+            switch (action) {
+            case "launcher": LauncherService.toggle("apps"); break;
+            case "search":   LauncherService.toggle("search"); break;
+            case "settings": settings.activeAsync = !settings.activeAsync; break;
+            case "keys":     Surfaces.toggleKeys(""); break;
+            case "switcher":         Surfaces.openWindowSwitcher("", 1); break;
+            case "switcher-reverse": Surfaces.openWindowSwitcher("", -1); break;
+            case "overview":         Surfaces.openOverview("", 1); break;
+            case "overview-reverse": Surfaces.openOverview("", -1); break;
+            }
+        }
+
+        // Only the held ones have a release worth hearing: Alt+Tab chooses
+        // when Alt comes up. It arrives on the same connection as the press
+        // now, so it cannot overtake it -- which is what it used to do.
+        function onReleased(action) {
+            switch (action) {
+            case "switcher":
+            case "switcher-reverse":
+            case "overview":
+            case "overview-reverse":
+                Surfaces.commitHeld();
+                break;
+            }
         }
     }
 

@@ -200,6 +200,29 @@ SHORTCUT_ACTIONS = {
 # A quick Alt+Tab releases the key before it is, because the press travels
 # kglobalaccel -> here -> the CLI -> the shell's IPC first, so the release
 # reached nobody and the switcher stayed on screen with nothing to close it.
+# The actions the *shell* takes off the bus itself, and which this must
+# therefore not also run.
+#
+# kglobalaccel announces every press on the session bus, and the shell now
+# listens -- shell/domain/shortcuts/ShortcutWatch.qml, which names this set in
+# turn. That deletes two spawned processes and about 200 ms per press, and with
+# them the class of bug where a press and its release raced each other as
+# separate detached commands.
+#
+# What stays here is what the shell cannot do or should not: `clipboard` and
+# `sidebar` open where the pointer is, which on Wayland only a KWin script can
+# answer; `ask` builds a redacted report before any window opens; the
+# screenshot keys are the only ones worth anything when the shell is not
+# running at all.
+#
+# Registration is unaffected. A shortcut is grabbed only while its component
+# has a running owner, and that is still this process -- see the class
+# docstring below.
+SHELL_ACTIONS = frozenset({
+    "launcher", "search", "settings", "keys",
+    "switcher", "switcher-reverse", "overview", "overview-reverse",
+})
+
 SHORTCUT_RELEASES = {
     "switcher": [CTL, "switcher", "commit"],
     "switcher-reverse": [CTL, "switcher", "commit"],
@@ -425,11 +448,19 @@ class GlobalShortcuts:
         component, action = params[0], params[1]
         if component != SHORTCUT_COMPONENT or action not in SHORTCUT_ACTIONS:
             return
+        # The shell hears this same signal and acts on it. Running the command
+        # as well would open every surface twice.
+        if action in SHELL_ACTIONS:
+            return
         self._run(action, SHORTCUT_ACTIONS[action][1])
 
     def _on_released(self, _conn, _sender, _path, _iface, _signal, params, _data):
         component, action = params[0], params[1]
         if component != SHORTCUT_COMPONENT or action not in SHORTCUT_RELEASES:
+            return
+        # As above: the shell takes every held action itself, and a second
+        # commit would close a switcher somebody had just reopened.
+        if action in SHELL_ACTIONS:
             return
         self._run(action, SHORTCUT_RELEASES[action])
 
