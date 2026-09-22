@@ -420,8 +420,8 @@ Column {
             width: parent.width
             wrapMode: Text.WordWrap
             text: Quickshell.screens.length > 1
-                ? "Each monitor draws its own panel. Position and thickness can differ per monitor; everything else is shared."
-                : "One monitor. With a second one connected, each draws its own panel and can keep its own position and thickness."
+                ? "Each monitor draws its own panel. Where it sits, how it is drawn, whether it hides and its size can differ per monitor; the widgets are shared."
+                : "One monitor. With a second one connected, each draws its own panel and can keep its own position, style, hiding and size."
             font.pixelSize: 12
             lineHeight: 1.35
             color: Theme.mut
@@ -436,8 +436,18 @@ Column {
                 required property var modelData
 
                 readonly property string name: screenBlock.modelData.name
-                readonly property bool overridden: ConfigStore.isOverriddenForScreen(screenBlock.name, "panel.position")
-                            || ConfigStore.isOverriddenForScreen(screenBlock.name, "panel.thickness")
+                // Every key the panel reads per screen (PanelModel.*For) that
+                // this block offers. Setting one back to the shared value
+                // drops the override rather than freezing a copy of it.
+                readonly property var ownKeys: ["panel.position", "panel.thickness", "panel.style",
+                                                 "panel.autoHide", "panel.iconSize"]
+                readonly property bool overridden: screenBlock.ownKeys.some(
+                    k => ConfigStore.isOverriddenForScreen(screenBlock.name, k))
+
+                function useShared() {
+                    for (const k of screenBlock.ownKeys)
+                        ConfigStore.setForScreen(screenBlock.name, k, ConfigStore.value(k, undefined));
+                }
 
                 width: parent.width
                 spacing: 8
@@ -478,6 +488,37 @@ Column {
                     stepSize: 2
                     value: ConfigStore.valueFor(screenBlock.name, "panel.thickness", 56)
                     onMoved: value => ConfigStore.setForScreen(screenBlock.name, "panel.thickness", Math.round(value))
+                }
+
+                Segmented {
+                    width: parent.width
+                    values: ["full", "floating", "islands"]
+                    labels: ["Full width", "Floating bar", "Islands"]
+                    current: ConfigStore.valueFor(screenBlock.name, "panel.style", "full")
+                    onPicked: value => ConfigStore.setForScreen(screenBlock.name, "panel.style", value)
+                }
+
+                SliderRow {
+                    label: "Tray icon size on this monitor"
+                    from: 15
+                    to: 26
+                    value: ConfigStore.valueFor(screenBlock.name, "panel.iconSize", 19)
+                    onMoved: value => ConfigStore.setForScreen(screenBlock.name, "panel.iconSize", Math.round(value))
+                }
+
+                ToggleRow {
+                    width: parent.width
+                    label: "Hide until pointed at, on this monitor"
+                    checked: ConfigStore.valueFor(screenBlock.name, "panel.autoHide", false) === true
+                    onToggled: value => ConfigStore.setForScreen(screenBlock.name, "panel.autoHide", value)
+                }
+
+                TextButton {
+                    visible: screenBlock.overridden
+                    glyph: "sync"
+                    iconName: "edit-undo"
+                    text: "Use the shared settings"
+                    onActivated: screenBlock.useShared()
                 }
             }
         }

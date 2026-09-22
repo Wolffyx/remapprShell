@@ -413,10 +413,19 @@ fixed, in `a55fd73`, `8aab52f` and `1875136`:
   dropdowns show labels (`labels` on an enum, and `Select.labels`); the Widgets
   and Tray buttons are glyphs -- as theme icons they were blank.
 
-**Still not in the window**: per-monitor overrides beyond position and
-thickness (`PanelModel.valueFor` honours style, spacing, iconSize, autoHide,
-revealOnHover and `bar.entries` per screen; the Taskbar page sets two), and
-per-instance `bar.entries[].config`. The desktop-theming switches on
+**Per monitor** the Taskbar page now sets position, thickness, style, icon
+size and hiding, with "Use the shared settings" to drop them (setting a key
+back to the shared value removes the override). **Still not in the window**:
+per-screen spacing, reveal-on-hover and `bar.entries`, which `PanelModel`
+honours, and per-instance `bar.entries[].config`.
+
+**Notification clicks** (`9f39640`): "USB Device Detected" is kded's, with no
+actions and `org.kde.kded6` as its sender, so a click started a second kded.
+`Popups.targetFor` now maps `x-kde-eventId: deviceAdded` to Disks & Devices
+(the device notifier's tray item, `activate()`), a display to kcm_kscreen, and
+never starts a service as an application; popups and history share it.
+`rmpr ipc notifications open <n>` says what it did. **Proven through the
+history route only** -- a real plug, clicking the popup, is the check. The desktop-theming switches on
 Appearance still act only on the next Apply, as designed, without saying so.
 
 #### Two mistakes this session made
