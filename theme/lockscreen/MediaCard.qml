@@ -20,6 +20,13 @@ Item {
 
     property color textColor: "#ffffff"
 
+    // The styles that put this on a bar or beside a line of type want the
+    // track and the buttons without the frosted box around them.
+    property bool chromeless: false
+
+    property color cardColor: Qt.rgba(1, 1, 1, 0.15)
+    property color cardBorder: Qt.rgba(1, 1, 1, 0.22)
+
     // Whether there is anything to draw. Read from outside as well: the lock
     // screen composes it with its own reasons for hiding the card, and a
     // `visible` set there would otherwise override this one and leave an
@@ -31,10 +38,11 @@ Item {
 
     Rectangle {
         anchors.fill: parent
+        visible: !card.chromeless
         radius: 22
-        color: Qt.rgba(1, 1, 1, 0.15)
+        color: card.cardColor
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.22)
+        border.color: card.cardBorder
     }
 
     Repeater {

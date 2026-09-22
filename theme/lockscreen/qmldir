@@ -4,3 +4,23 @@ LockUi 1.0 LockUi.qml
 LockOsd 1.0 LockOsd.qml
 MediaCard 1.0 MediaCard.qml
 singleton Options 1.0 Options.qml
+
+# The parts every style is built from.
+LockStyle 1.0 LockStyle.qml
+LockPrompt 1.0 LockPrompt.qml
+LockClock 1.0 LockClock.qml
+LockFace 1.0 LockFace.qml
+LockMessage 1.0 LockMessage.qml
+LockActions 1.0 LockActions.qml
+LockStatus 1.0 LockStatus.qml
+
+# The styles themselves. LockUi loads one by file name; they are named here
+# as well because a directory with a qmldir exposes only what the qmldir
+# lists, and a style that cannot see LockPrompt cannot take a password.
+LockGlass 1.0 LockGlass.qml
+LockEditorial 1.0 LockEditorial.qml
+LockConsole 1.0 LockConsole.qml
+LockAmbient 1.0 LockAmbient.qml
+LockBoard 1.0 LockBoard.qml
+LockPoster 1.0 LockPoster.qml
+LockSeats 1.0 LockSeats.qml

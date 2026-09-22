@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
 # Draws the lock screen offscreen, in Plasma's real greeter.
 #
-#   lock.sh <out.png> [idle|prompt] [delay-ms] [config-json]
+#   lock.sh <out.png> [idle|prompt] [delay-ms] [config-json] [WxH]
 #
 # Nothing locks and nothing reaches PAM: the greeter runs in testing mode with
 # no display, no session bus and no runtime directory, and its authenticator is
 # replaced by a stand-in that complains rather than authenticating. The config
 # JSON overrides the greeter's own settings for the picture only -- the user's
 # kscreenlockerrc is never written.
+#
+# The size matters more here than anywhere else in this directory. Qt's
+# offscreen platform invents an 800x800 screen, and every one of these designs
+# is drawn for 1920x1080 -- so a picture taken at the default was a picture of
+# the fallback scaling, not of the design. The plugin takes a screen
+# configuration file, and that is what the last argument writes.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 out=$(realpath -m "$1"); state=${2:-prompt}; delay=${3:-2500}; cfg=${4:-'{}'}
+size=${5:-1920x1080}
+sw=${size%%x*}; sh=${size##*x}
 
 source "$WT/scripts/lib/log.sh"
 source "$WT/scripts/lib/brand.sh"
@@ -109,6 +117,13 @@ PY
 
 mkdir -p "$(dirname "$out")"
 greeter=$(lockscreen_greeter) || { echo "no greeter"; exit 1; }
+
+# The screen the offscreen platform will invent.
+cat > "$work/screen.json" <<JSON
+{ "screens": [ { "name": "preview", "x": 0, "y": 0, "width": $sw, "height": $sh } ] }
+JSON
+
+LOCKSCREEN_PLATFORM="offscreen:configfile=$work/screen.json" \
 lockscreen_offscreen timeout 40 "$greeter" --testing --shell "$pkg" 2>&1 \
     | grep -iE 'preview|warn|error|lacks|refus' | head -20
 [ -f "$out" ] && echo "wrote $out" || echo "NO IMAGE"

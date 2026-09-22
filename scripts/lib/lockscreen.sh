@@ -174,9 +174,20 @@ QML
 # The greeter with no display, no session bus and no runtime directory.
 # Nothing it does can reach the desktop, and it still loads the lock screen,
 # its wallpaper and every context property -- measured.
+# `LOCKSCREEN_PLATFORM` lets a caller ask for the offscreen platform with
+# arguments -- `offscreen:configfile=...`, which is how dev/preview/lock.sh
+# gets a 1920x1080 screen instead of the 800x800 one Qt invents. It is not a
+# way to reach a real display: anything but offscreen is refused, because the
+# whole point of this function is that nothing it runs can touch one.
 lockscreen_offscreen() {
+    local platform=${LOCKSCREEN_PLATFORM:-offscreen}
+    case "$platform" in
+        offscreen|offscreen:*) ;;
+        *) log_warn "ignoring LOCKSCREEN_PLATFORM='$platform': this runs offscreen only"
+           platform=offscreen ;;
+    esac
     env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u XDG_RUNTIME_DIR \
-        QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 "$@"
+        QT_QPA_PLATFORM="$platform" QT_FORCE_STDERR_LOGGING=1 "$@"
 }
 
 # Loads a lock screen in Plasma's greeter, offscreen, and prints what went

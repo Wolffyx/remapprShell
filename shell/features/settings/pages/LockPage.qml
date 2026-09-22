@@ -190,8 +190,98 @@ Column {
             color: Theme.mut
         }
 
+        // Seven lock screens, not seven colour schemes: they differ on where
+        // the password lives, how much wallpaper survives and how loud the
+        // type is. A dropdown would hide exactly that, so each is a row with
+        // the sentence that tells them apart.
+        Column {
+            width: parent.width
+            spacing: 6
+
+            Repeater {
+                model: [
+                    { id: "glass",     name: "Glass",           about: "The one this shell shipped with: a blurred wallpaper, a frosted column, the clock rising out of the way." },
+                    { id: "editorial", name: "Editorial split",  about: "An opaque panel owns the password; the wallpaper stays sharp beside it, unblurred." },
+                    { id: "console",   name: "Console",          about: "No wallpaper and no glass. A tty prompt, all monospace, where the keys are the whole interface." },
+                    { id: "ambient",   name: "Ambient",          about: "The wallpaper unblurred under a light veil, dark type over it, one hairline field." },
+                    { id: "board",     name: "Widget board",     about: "A grid of cards to read in one glance, with the password as the bar along the foot." },
+                    { id: "poster",    name: "Poster",           about: "The picture is the design. One strip at the foot carries the time, the password and the status." },
+                    { id: "seats",     name: "Multi-user",       about: "A card for every session on the machine: unlock this one, or click another seat to switch to it." },
+                ]
+
+                Rectangle {
+                    id: styleRow
+
+                    required property var modelData
+                    readonly property bool current: root.lookValue("style", "glass") === styleRow.modelData.id
+
+                    width: parent.width
+                    height: styleText.height + 22
+                    radius: Theme.radiusOf(12)
+                    color: styleRow.current ? Theme.secondaryContainer
+                                            : (styleHover.hovered ? Theme.hover : Theme.s1)
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        spacing: 12
+
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 16
+                            height: 16
+                            radius: 8
+                            color: "transparent"
+                            border.width: styleRow.current ? 5 : 1.5
+                            border.color: styleRow.current ? Theme.acc : Theme.out
+                        }
+
+                        Column {
+                            id: styleText
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 28
+                            spacing: 2
+
+                            PanelText {
+                                text: styleRow.modelData.name
+                                font.pixelSize: 14
+                                color: styleRow.current ? Theme.secondaryContainerFg : Theme.fg
+                            }
+
+                            PanelText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: styleRow.modelData.about
+                                font.pixelSize: 12
+                                lineHeight: 1.3
+                                color: styleRow.current ? Theme.secondaryContainerFg : Theme.mut
+                            }
+                        }
+                    }
+
+                    HoverHandler { id: styleHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.run(["set", "style", styleRow.modelData.id]) }
+                    Accessible.name: styleRow.modelData.name
+                }
+            }
+        }
+
+        PanelText {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            visible: root.installed
+            text: "A style changes at the next lock. The one that was tried is the one that is installed, so a style picked here is drawn without trying it again -- the password is taken the same way in all seven."
+            font.pixelSize: 12
+            lineHeight: 1.35
+            color: Theme.mut
+        }
+
         SettingRow {
             width: parent.width
+            // Only Glass has room on both sides for the clock to move.
+            visible: root.lookValue("style", "glass") === "glass"
             label: "The clock"
 
             Segmented {
@@ -204,6 +294,9 @@ Column {
         }
 
         SliderRow {
+            // Four of the seven leave the wallpaper alone on purpose, and
+            // two of them draw over it entirely.
+            visible: ["glass", "board"].includes(root.lookValue("style", "glass"))
             label: "Wallpaper blur behind the prompt"
             from: 0
             to: 40

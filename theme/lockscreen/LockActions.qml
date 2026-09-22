@@ -1,0 +1,101 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    Sleep, hibernate and switch user -- the three the greeter can actually do.
+
+    Ending the session is not among them: the screen is locked, and nobody has
+    said who is asking. Each is drawn only when SessionManagement says the
+    machine can do it, so a laptop without a swap file big enough to hibernate
+    shows two buttons rather than a third that fails.
+
+    The designs draw these three ways -- round on glass, square on a bar, as
+    words in a row -- so the shape is the style's to choose and the actions
+    are not.
+*/
+pragma ComponentBehavior: Bound
+
+import QtQuick
+
+Row {
+    id: actions
+
+    // SessionManagement.
+    required property var session
+
+    // "round", "square", or "text".
+    property string shape: "round"
+
+    property color ink: "#ffffff"
+    property color fill: Qt.rgba(1, 1, 1, 0.14)
+    property color stroke: Qt.rgba(1, 1, 1, 0.22)
+    property color hot: Qt.rgba(1, 1, 1, 0.26)
+    property real unit: 1
+    property int size: Math.round(46 * actions.unit)
+
+    spacing: Math.round(10 * actions.unit)
+
+    component Action: Item {
+        id: action
+
+        property string glyph: ""
+        property string label: ""
+        signal activated
+
+        width: actions.shape === "text" ? word.implicitWidth : actions.size
+        height: actions.shape === "text" ? word.implicitHeight : actions.size
+
+        Rectangle {
+            anchors.fill: parent
+            visible: actions.shape !== "text"
+            radius: actions.shape === "round" ? width / 2 : Math.round(width * 0.28)
+            color: hover.hovered ? actions.hot : actions.fill
+            border.width: 1
+            border.color: actions.stroke
+
+            Text {
+                anchors.centerIn: parent
+                text: action.glyph
+                font.family: "Material Symbols Rounded"
+                font.pixelSize: Math.round(21 * actions.unit)
+                color: actions.ink
+            }
+        }
+
+        Text {
+            id: word
+
+            anchors.centerIn: parent
+            visible: actions.shape === "text"
+            text: action.label
+            textFormat: Text.PlainText
+            font.family: "Rubik"
+            font.pixelSize: Math.round(14 * actions.unit)
+            color: hover.hovered ? actions.ink : Qt.alpha(actions.ink, 0.78)
+        }
+
+        HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: action.activated() }
+        Accessible.name: action.label
+    }
+
+    Action {
+        visible: actions.session.canSuspend
+        glyph: "bedtime"
+        label: "Sleep"
+        onActivated: actions.session.suspend()
+    }
+
+    Action {
+        visible: actions.session.canHibernate
+        glyph: "downloading"
+        label: "Hibernate"
+        onActivated: actions.session.hibernate()
+    }
+
+    Action {
+        visible: actions.session.canSwitchUser
+        glyph: "group"
+        label: "Switch user"
+        onActivated: actions.session.switchUser()
+    }
+}

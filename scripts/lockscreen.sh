@@ -9,7 +9,7 @@
 #   enable            put it in this shell's packages; refused until `try`
 #                     has unlocked this exact build, in this greeter
 #   disable           take it out; Plasma's lock screen from the next lock
-#   set <key> <value> how it looks: clock, blur, media, session, idleClock
+#   set <key> <value> how it looks: style, clock, blur, media, session, idleClock
 #
 # The look settings go into kscreenlockerrc under the greeter's own group,
 # because the greeter is where they are read: it runs as its own process with
@@ -87,6 +87,7 @@ EOF
 #
 # id | key | kind | choices | default | store | inverted
 LOOK_KEYS=(
+    "style|style|enum|glass editorial console ambient board poster seats|glass|ours|"
     "clock|clockPosition|enum|left center|left|ours|"
     "blur|wallpaperBlur|int|0 40|26|ours|"
     "session|showSessionButtons|bool||true|ours|"

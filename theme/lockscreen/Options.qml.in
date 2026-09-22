@@ -34,6 +34,10 @@ QtObject {
         location: "file://@CONFIG_DIR@/lockscreen.conf"
     }
 
+    // Which lock screen is drawn. LockUi knows the names; an unknown one
+    // falls back to glass there rather than to an empty screen here.
+    readonly property string style: settings.value("style", "glass")
+
     readonly property string clockPosition: settings.value("clockPosition", "left")
     readonly property int wallpaperBlur: Math.max(0, Math.min(40, Number(settings.value("wallpaperBlur", 26))))
     readonly property bool showSessionButtons: String(settings.value("showSessionButtons", "true")) !== "false"
