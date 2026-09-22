@@ -11,6 +11,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.domain.settings.snapshots
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -148,14 +149,16 @@ CardGrid {
                             // buttons and off the card.
                             width: parent.width
                             elide: Text.ElideRight
-                            text: snap.modelData.name
+                            text: Snapshots.title(snap.modelData.name)
                             font.pixelSize: 14
                         }
 
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: `${snap.modelData.paths} path(s)   ${snap.modelData.size}`
+                            text: [Snapshots.when(snap.modelData.created, snap.modelData.name),
+                                   `${snap.modelData.paths} path(s)`, snap.modelData.size]
+                                  .filter(t => t && String(t).length > 0).join("  ·  ")
                             font.pixelSize: 12
                             color: Theme.mut
                         }
