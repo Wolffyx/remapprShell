@@ -242,6 +242,56 @@ keyboard; nothing is half-written and `make lint`/`make test` are clean.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### Seven lock screens, and the picker (2026-09-22, late)
+
+**One commit (`b857fcb`).** The design file's two turns of lock screen
+directions were built -- `Meridian Lock Options.dc.html`, read through the
+design MCP rather than guessed at. Six new ones beside the glass one this
+project shipped: **editorial split, console, ambient, widget board, poster,
+multi-user**. `rmpr lockscreen set style <name>` picks one; the Lock page
+lists all seven as rows carrying the sentence that tells them apart.
+
+**`LockUi.qml` is a frame now and draws no layout at all.** It keeps what must
+exist once and must not vary -- the wallpaper and its blur, waking, Plasma's
+on-screen keyboard and the StackView it moves, the shake, the OSD, the
+`keepShown` binding -- and loads a *style*. A style hands back the `LockPrompt`
+it built and the block the keyboard must not cover; an unknown name falls back
+to glass rather than to an empty screen. The shared parts are files of their
+own: `LockPrompt`, `LockClock`, `LockFace`, `LockMessage`, `LockActions`,
+`LockStatus`. **How a password is taken is in one of them**, so it is taken the
+same way in all seven -- a style that reimplemented it would be a second
+implementation of the only part of this project that can lock somebody out.
+
+Two things worth carrying:
+
+- **A style's `ui` must be a required property set at creation.** A `source`
+  binding on the Loader plus `item.ui = ui` in `onLoaded` is a frame too late
+  and the greeter refuses the file: *"Required property ui was not
+  initialized"*. `setSource(url, {"ui": ui})` is the way.
+- **Plasma's own controls take their colours from Kirigami, not from us.** The
+  frame asks for `Complementary` (light on dark), which is right for five of
+  the seven and invisible on the two that draw dark type on a light ground --
+  the battery and the field's reveal button were white on white in the ambient
+  render. `LockPrompt` and `LockStatus` set `Kirigami.Theme.textColor` from
+  the style's ink.
+
+**Three panels in the designs are not drawn** -- weather, the next calendar
+entry, notifications. The greeter is a separate process with no session, no
+forecast and no notification history. Where a design had one, these draw what
+the greeter does know (the screen, the account, what PAM will accept) or
+nothing at all.
+
+**`dev/preview/lock.sh` takes a size now, and defaults to 1920x1080.** Qt's
+offscreen platform invents an **800x800** screen, so every picture this
+harness had ever taken was a picture of the fallback scaling rather than of
+the design. The plugin takes a screen configuration file; `LOCKSCREEN_PLATFORM`
+carries it through `lockscreen_offscreen`, which still refuses anything but
+offscreen.
+
+**All seven load in the real greeter and all seven were rendered and looked
+at.** None has been on a real screen: `rmpr lockscreen try` is still the gate,
+and the lock screen is still off (`enabled: no`).
+
 ### The night of 2026-09-22, after the handoff was written
 
 **One commit on `dev` (`0588f48`), and one thing that was not ours at all.**
