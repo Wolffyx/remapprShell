@@ -82,6 +82,52 @@ QtObject {
             root._show(event);
     }
 
+    // The last level actually reported, and the sink it belonged to.
+    //
+    // A volume property that changes is not the same as a volume that changed.
+    // `AudioStatus.volume` reads through the default sink, and when that node
+    // goes out from under it the value falls to zero and comes back -- two
+    // changes, the second of which draws a pill showing the level nobody
+    // touched. PipeWire's graph churns exactly that way while the taskbar
+    // draws window previews: every preview is a screencast node appearing and
+    // disappearing, and hovering along a row of buttons did it a hundred times
+    // in three minutes, with "no global any more" in the journal for each one.
+    //
+    // So the level is remembered, and a repeat of it is not an event. A sink
+    // that has gone is not one either: there is no level to report until it is
+    // back, and what comes back is the same number as before.
+    property real _lastVolume: -1
+    property var _lastMuted: null
+    property var _lastSink: null
+
+    function _reportAudio(): void {
+        const sink = AudioStatus.sink;
+
+        // Nothing to report and nothing to remember: the value visible right
+        // now is a placeholder, and recording it would make the real one that
+        // follows look like a change.
+        if (!sink)
+            return;
+
+        // A different output is a different thing to have a level at all. Its
+        // first reading is where it stands, not a move to announce -- Plasma
+        // says "output changed" for this, which is a different OSD entirely.
+        if (sink !== root._lastSink) {
+            root._lastSink = sink;
+            root._lastVolume = AudioStatus.volume;
+            root._lastMuted = AudioStatus.muted;
+            return;
+        }
+
+        if (AudioStatus.volume === root._lastVolume && AudioStatus.muted === root._lastMuted)
+            return;
+
+        root._lastVolume = AudioStatus.volume;
+        root._lastMuted = AudioStatus.muted;
+        root._raise(OsdEvents.progress(StatusIcons.volumeIcon(AudioStatus.volume, AudioStatus.muted),
+                                       AudioStatus.volume * 100, ""));
+    }
+
     readonly property Connections _audio: Connections {
         target: root.enabled ? AudioStatus : null
 
@@ -89,13 +135,11 @@ QtObject {
         // it was, and a bar that vanished on mute would hide the level the
         // next keypress is about to change.
         function onVolumeChanged(): void {
-            root._raise(OsdEvents.progress(StatusIcons.volumeIcon(AudioStatus.volume, AudioStatus.muted),
-                                           AudioStatus.volume * 100, ""));
+            root._reportAudio();
         }
 
         function onMutedChanged(): void {
-            root._raise(OsdEvents.progress(StatusIcons.volumeIcon(AudioStatus.volume, AudioStatus.muted),
-                                           AudioStatus.volume * 100, ""));
+            root._reportAudio();
         }
 
         // The microphone has no bar: what a person wants to know when they hit
