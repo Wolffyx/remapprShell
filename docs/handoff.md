@@ -186,11 +186,15 @@ any disagreement, in `make lint` and in CI.
 1. ~~**Shortcuts in-process**~~ -- **done 2026-09-22**, see that session.
    What is left of it is proving the held switcher's commit with a key
    bound to `switcher`.
-2. **"Drawn by" discovers nothing**: `RENDERERS=(quickshell plasma caelestia
-   none)` is hardcoded and caelestia is detected by a hardcoded unit name.
-   Discovery is easy -- every Quickshell config is a directory in
-   `~/.config/quickshell/` -- but `renderer set` must then start and stop an
-   arbitrary discovered shell, which is the substantial half.
+2. ~~**"Drawn by" discovers nothing**~~ -- **built 2026-09-22**: every
+   `<xdg config dir>/quickshell/<name>/shell.qml` other than ours is a renderer
+   named `quickshell:<name>` (`scripts/lib/renderers.sh`), run under a new unit
+   template `<slug>-renderer@<name>.service` that `renderer set` enables and
+   switching away disables. A profile still saying `caelestia` reads as
+   `quickshell:caelestia`. The settings page takes its list from `renderer list
+   --json`; `doctor` reports a chosen one that is gone or not running. **Tested
+   in the sandbox only** -- no second Quickshell shell is installed here, so no
+   real switch to one has been made.
 3. ~~**caelestia is still running beside this shell**~~ -- **moot since
    2026-09-22**: the user uninstalled it. This shell serves notifications
    itself, and the sidebar is pulled by its own strip (`sidebar.trigger:
