@@ -9,7 +9,14 @@ set -euo pipefail
 
 # Quickshell resolves `import qs.<dir>` relative to the config root, so the
 # shell directory itself must be on the import path.
-export QML2_IMPORT_PATH="@QS_CONFIG_DIR@${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+#
+# So must the place `make plugin` installs to. The window previews and the
+# input module are compiled QML modules, not QML files: they land in the
+# user's own Qt import directory, which Qt does not search unless it is named
+# here. Built and installed but unreachable looks exactly like never built --
+# the shell said "the KWinScreencast module is not installed (build it with
+# `make plugin`)" while the module sat in that directory.
+export QML2_IMPORT_PATH="@QS_CONFIG_DIR@:$HOME/.local/lib/qt6/qml${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
 
 export QS_NO_RELOAD_POPUP=1
 export QSG_RENDER_LOOP=threaded

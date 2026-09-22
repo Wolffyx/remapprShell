@@ -112,11 +112,29 @@ section "window previews"
 # KWin's permission -- which it grants only to a client whose desktop file
 # names the protocol.
 preview_module="$HOME/.local/lib/qt6/qml/KWinScreencast/libshellscreencastplugin.so"
+preview_dir=$(dirname "$(dirname "$preview_module")")
 if [ -f "$preview_module" ]; then
     ok "the preview module is installed"
 else
     warn "no preview module: windows are drawn as their application's icon"
     fix "build it with: make plugin  (needs cmake and Qt 6 development files)"
+fi
+
+# Installed is not the same as reachable. The module is a compiled QML module
+# in the user's own Qt import directory, which Qt searches only when it is on
+# QML2_IMPORT_PATH -- and the session script is what puts it there. Built,
+# installed and unreachable reported itself as "the KWinScreencast module is
+# not installed (build it with `make plugin`)", which sent the reader to
+# rebuild a module that was already sitting in that directory.
+if [ -f "$preview_module" ]; then
+    if grep -q "$(printf '%s' "$preview_dir" | sed 's|^'"$HOME"'|\$HOME|')" "$BIN_DIR/$SESSION_BIN" 2>/dev/null \
+       || grep -qF "$preview_dir" "$BIN_DIR/$SESSION_BIN" 2>/dev/null; then
+        ok "the shell can import it ($preview_dir is on the import path)"
+    else
+        bad "the preview module is installed but the shell cannot import it"
+        fix "$preview_dir is not on QML2_IMPORT_PATH in $BIN_DIR/$SESSION_BIN"
+        fix "reinstall with: make link  (then: $ALIAS restart)"
+    fi
 fi
 
 if [ -d /usr/lib/qt6/qml/org/kde/pipewire ]; then
