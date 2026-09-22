@@ -93,8 +93,12 @@ PanelWindow {
         // and could never be stepped through with the key held. Once this
         // surface exists it has the keyboard, and Alt coming up reaches it as
         // the key release below, which is the one that means "choose".
+        //
+        // A turn later, not now: committing closes the switcher, which empties
+        // the Variants model this surface is still being created from, and Qt
+        // reports that as a binding loop on `model`.
         if (Surfaces.heldCommitFresh)
-            win.commit();
+            Qt.callLater(win.commit);
     }
 
     // The release that lands just *after* this surface opened.

@@ -213,8 +213,9 @@ PanelWindow {
 
         // The key was let go before this surface existed. See the same lines
         // in WindowSwitcher.qml.
+        // A turn later, for the reason WindowSwitcher gives.
         if (win.hold && Surfaces.heldCommitFresh)
-            win.commit();
+            Qt.callLater(win.commit);
     }
 
     // And the release that lands just *after* it opened, which the read above
