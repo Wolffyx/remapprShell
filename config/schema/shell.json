@@ -4,6 +4,7 @@
         {
             "id": "appearance",
             "label": "Appearance",
+            "group": "Look",
             "icon": "preferences-desktop-theme-global",
             "glyph": "palette",
             "page": "appearance",
@@ -140,6 +141,7 @@
         {
             "id": "taskbar",
             "label": "Taskbar",
+            "group": "Look",
             "icon": "configure",
             "glyph": "view_agenda",
             "page": "taskbar",
@@ -220,8 +222,27 @@
             }
         },
         {
+            "id": "widgets",
+            "label": "Widgets",
+            "group": "Look",
+            "icon": "preferences-desktop-plasma",
+            "glyph": "widgets",
+            "page": "widgets",
+            "description": "What appears on the panel, and in which zone."
+        },
+        {
+            "id": "tray",
+            "label": "Tray icons",
+            "group": "Look",
+            "icon": "preferences-system-tray",
+            "glyph": "expand_circle_down",
+            "page": "tray",
+            "description": "Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another."
+        },
+        {
             "id": "sidebar",
             "label": "Sidebar",
+            "group": "Look",
             "icon": "sidebar-show",
             "glyph": "view_sidebar",
             "description": "The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.",
@@ -340,8 +361,101 @@
             }
         },
         {
+            "id": "desktop",
+            "label": "Desktop",
+            "group": "Look",
+            "icon": "preferences-desktop-wallpaper",
+            "glyph": "wallpaper",
+            "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
+            "keys": {
+                "desktop.border": {
+                    "group": "Screen border",
+                    "type": "bool",
+                    "default": false,
+                    "label": "Rounded screen border",
+                    "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
+                },
+                "desktop.borderInset": {
+                    "group": "Screen border",
+                    "type": "int",
+                    "min": 0,
+                    "max": 40,
+                    "default": 0,
+                    "label": "Border width",
+                    "description": "How far in from each edge the frame is painted, in pixels."
+                },
+                "desktop.borderRadius": {
+                    "group": "Screen border",
+                    "type": "int",
+                    "min": 0,
+                    "max": 48,
+                    "default": 13,
+                    "label": "Corner radius",
+                    "description": "How round the painted corners are, in pixels."
+                },
+                "desktop.clock": {
+                    "group": "Desktop clock",
+                    "type": "bool",
+                    "default": true,
+                    "label": "Clock on the desktop",
+                    "description": "The time and date on the wallpaper, under every window."
+                },
+                "desktop.clockPosition": {
+                    "group": "Desktop clock",
+                    "type": "enum",
+                    "values": [
+                        "top-left",
+                        "top-right",
+                        "bottom-left",
+                        "bottom-right"
+                    ],
+                    "default": "bottom-right",
+                    "label": "Where it sits",
+                    "labels": [
+                        "Top left",
+                        "Top right",
+                        "Bottom left",
+                        "Bottom right"
+                    ]
+                },
+                "desktop.clockSize": {
+                    "group": "Desktop clock",
+                    "type": "int",
+                    "min": 40,
+                    "max": 200,
+                    "default": 92,
+                    "label": "How big",
+                    "description": "The height of the time, in pixels; the date follows it."
+                },
+                "desktop.clockDate": {
+                    "group": "Desktop clock",
+                    "type": "bool",
+                    "default": true,
+                    "label": "Show the date"
+                },
+                "desktop.clockInk": {
+                    "group": "Desktop clock",
+                    "type": "enum",
+                    "values": [
+                        "auto",
+                        "light",
+                        "dark"
+                    ],
+                    "default": "auto",
+                    "label": "Ink",
+                    "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed.",
+                    "labels": [
+                        "Follow the colour scheme",
+                        "Light",
+                        "Dark"
+                    ]
+                }
+            }
+        },
+        {
             "id": "weather",
             "label": "Weather",
+            "group": "Look",
             "icon": "weather-few-clouds",
             "glyph": "partly_cloudy_day",
             "description": "Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.",
@@ -392,6 +506,7 @@
         {
             "id": "windows",
             "label": "Windows",
+            "group": "Behaviour",
             "icon": "preferences-system-windows",
             "glyph": "select_window",
             "page": "windows",
@@ -400,6 +515,7 @@
         {
             "id": "launcher",
             "label": "Launcher",
+            "group": "Behaviour",
             "icon": "start-here-kde",
             "glyph": "search",
             "page": "launcher",
@@ -514,6 +630,7 @@
         {
             "id": "notifications",
             "label": "Notifications",
+            "group": "Behaviour",
             "icon": "notifications",
             "glyph": "notifications",
             "page": "notifications",
@@ -580,183 +697,50 @@
             }
         },
         {
-            "id": "lock",
-            "label": "Lock & session",
-            "icon": "system-log-out",
-            "glyph": "lock",
-            "page": "lock",
-            "description": "This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.",
+            "id": "osd",
+            "label": "On-screen display",
+            "group": "Behaviour",
+            "icon": "audio-volume-high",
+            "glyph": "display_settings",
+            "description": "The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.",
             "keys": {
-                "session.prompt": {
-                    "type": "enum",
-                    "values": [
-                        "plasma",
-                        "shell"
-                    ],
-                    "default": "plasma",
-                    "label": "Ending the session asks with",
-                    "description": "plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save."
-                }
-            }
-        },
-        {
-            "id": "desktop",
-            "label": "Desktop",
-            "icon": "preferences-desktop-wallpaper",
-            "glyph": "wallpaper",
-            "description": "What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.",
-            "keys": {
-                "desktop.border": {
-                    "group": "Screen border",
+                "osd.enabled": {
                     "type": "bool",
                     "default": false,
-                    "label": "Rounded screen border",
-                    "description": "Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that."
+                    "label": "Draw our own",
+                    "description": "Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was."
                 },
-                "desktop.borderInset": {
-                    "group": "Screen border",
+                "osd.timeout": {
                     "type": "int",
-                    "min": 0,
-                    "max": 40,
-                    "default": 0,
-                    "label": "Border width",
-                    "description": "How far in from each edge the frame is painted, in pixels."
-                },
-                "desktop.borderRadius": {
-                    "group": "Screen border",
-                    "type": "int",
-                    "min": 0,
-                    "max": 48,
-                    "default": 13,
-                    "label": "Corner radius",
-                    "description": "How round the painted corners are, in pixels."
-                },
-                "desktop.clock": {
-                    "group": "Desktop clock",
-                    "type": "bool",
-                    "default": true,
-                    "label": "Clock on the desktop",
-                    "description": "The time and date on the wallpaper, under every window."
-                },
-                "desktop.clockPosition": {
-                    "group": "Desktop clock",
-                    "type": "enum",
-                    "values": [
-                        "top-left",
-                        "top-right",
-                        "bottom-left",
-                        "bottom-right"
-                    ],
-                    "default": "bottom-right",
-                    "label": "Where it sits",
-                    "labels": [
-                        "Top left",
-                        "Top right",
-                        "Bottom left",
-                        "Bottom right"
-                    ]
-                },
-                "desktop.clockSize": {
-                    "group": "Desktop clock",
-                    "type": "int",
-                    "min": 40,
-                    "max": 200,
-                    "default": 92,
-                    "label": "How big",
-                    "description": "The height of the time, in pixels; the date follows it."
-                },
-                "desktop.clockDate": {
-                    "group": "Desktop clock",
-                    "type": "bool",
-                    "default": true,
-                    "label": "Show the date"
-                },
-                "desktop.clockInk": {
-                    "group": "Desktop clock",
-                    "type": "enum",
-                    "values": [
-                        "auto",
-                        "light",
-                        "dark"
-                    ],
-                    "default": "auto",
-                    "label": "Ink",
-                    "description": "auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed.",
-                    "labels": [
-                        "Follow the colour scheme",
-                        "Light",
-                        "Dark"
-                    ]
+                    "min": 500,
+                    "max": 5000,
+                    "step": 100,
+                    "default": 1800,
+                    "label": "Visible for",
+                    "description": "Milliseconds before it fades."
                 }
             }
         },
         {
-            "id": "services",
-            "label": "Plasma services",
-            "icon": "preferences-system",
-            "glyph": "memory",
-            "description": "Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
+            "id": "sound",
+            "label": "Sound",
+            "group": "Behaviour",
+            "icon": "audio-volume-high",
+            "glyph": "volume_up",
+            "description": "What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.",
             "keys": {
-                "services.hostPlasma": {
+                "audio.raiseMaxVolume": {
                     "type": "bool",
-                    "default": true,
-                    "label": "Keep Plasma's notifications, clipboard and device notifier running",
-                    "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
-                },
-                "clipboard.history": {
-                    "type": "enum",
-                    "values": [
-                        "own",
-                        "auto",
-                        "plasma"
-                    ],
-                    "default": "own",
-                    "label": "Clipboard history",
-                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other.",
-                    "labels": [
-                        "This shell's own",
-                        "Klipper's while it runs",
-                        "Always Klipper's"
-                    ]
+                    "default": false,
+                    "label": "Raise maximum volume",
+                    "description": "Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch."
                 }
             }
-        },
-        {
-            "id": "widgets",
-            "label": "Widgets",
-            "icon": "preferences-desktop-plasma",
-            "glyph": "widgets",
-            "page": "widgets",
-            "description": "What appears on the panel, and in which zone."
-        },
-        {
-            "id": "tray",
-            "label": "Tray icons",
-            "icon": "preferences-system-tray",
-            "glyph": "expand_circle_down",
-            "page": "tray",
-            "description": "Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another."
-        },
-        {
-            "id": "edges",
-            "label": "Screen edges",
-            "icon": "preferences-system-windows-effect-screenedge",
-            "glyph": "border_outer",
-            "page": "edges",
-            "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
-        },
-        {
-            "id": "shortcuts",
-            "label": "Shortcuts",
-            "icon": "preferences-desktop-keyboard-shortcut",
-            "glyph": "keyboard",
-            "page": "shortcuts",
-            "description": "Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.",
-            "keys": {}
         },
         {
             "id": "switching",
             "label": "Switching windows",
+            "group": "Behaviour",
             "icon": "preferences-system-tabbox",
             "glyph": "switch_access_2",
             "page": "switching",
@@ -817,47 +801,98 @@
             }
         },
         {
-            "id": "sound",
-            "label": "Sound",
-            "icon": "audio-volume-high",
-            "glyph": "volume_up",
-            "description": "What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.",
+            "id": "edges",
+            "label": "Screen edges",
+            "group": "Behaviour",
+            "icon": "preferences-system-windows-effect-screenedge",
+            "glyph": "border_outer",
+            "page": "edges",
+            "description": "What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone."
+        },
+        {
+            "id": "shortcuts",
+            "label": "Shortcuts",
+            "group": "Behaviour",
+            "icon": "preferences-desktop-keyboard-shortcut",
+            "glyph": "keyboard",
+            "page": "shortcuts",
+            "description": "Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.",
+            "keys": {}
+        },
+        {
+            "id": "lock",
+            "label": "Lock & session",
+            "group": "Behaviour",
+            "icon": "system-log-out",
+            "glyph": "lock",
+            "page": "lock",
+            "description": "This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.",
             "keys": {
-                "audio.raiseMaxVolume": {
-                    "type": "bool",
-                    "default": false,
-                    "label": "Raise maximum volume",
-                    "description": "Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch."
+                "session.prompt": {
+                    "type": "enum",
+                    "values": [
+                        "plasma",
+                        "shell"
+                    ],
+                    "default": "plasma",
+                    "label": "Ending the session asks with",
+                    "description": "plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save."
                 }
             }
         },
         {
-            "id": "osd",
-            "label": "On-screen display",
-            "icon": "audio-volume-high",
-            "glyph": "display_settings",
-            "description": "The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.",
+            "id": "services",
+            "label": "Plasma services",
+            "group": "System",
+            "icon": "preferences-system",
+            "glyph": "memory",
+            "description": "Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.",
             "keys": {
-                "osd.enabled": {
+                "services.hostPlasma": {
                     "type": "bool",
-                    "default": false,
-                    "label": "Draw our own",
-                    "description": "Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was."
+                    "default": true,
+                    "label": "Keep Plasma's notifications, clipboard and device notifier running",
+                    "description": "Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's."
                 },
-                "osd.timeout": {
-                    "type": "int",
-                    "min": 500,
-                    "max": 5000,
-                    "step": 100,
-                    "default": 1800,
-                    "label": "Visible for",
-                    "description": "Milliseconds before it fades."
+                "clipboard.history": {
+                    "type": "enum",
+                    "values": [
+                        "own",
+                        "auto",
+                        "plasma"
+                    ],
+                    "default": "own",
+                    "label": "Clipboard history",
+                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other.",
+                    "labels": [
+                        "This shell's own",
+                        "Klipper's while it runs",
+                        "Always Klipper's"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "renderer",
+            "label": "Drawn by",
+            "group": "System",
+            "icon": "preferences-desktop-plasma",
+            "glyph": "dashboard",
+            "page": "renderer",
+            "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
+            "keys": {
+                "panel.renderer": {
+                    "type": "string",
+                    "default": "quickshell",
+                    "label": "Drawn by",
+                    "description": "Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
                 }
             }
         },
         {
             "id": "presets",
             "label": "Layouts",
+            "group": "System",
             "icon": "preferences-desktop-theme",
             "glyph": "style",
             "page": "presets",
@@ -866,6 +901,7 @@
         {
             "id": "profiles",
             "label": "Profiles",
+            "group": "System",
             "icon": "preferences-desktop-display",
             "glyph": "folder_managed",
             "page": "profiles",
@@ -874,6 +910,7 @@
         {
             "id": "snapshots",
             "label": "Restore points",
+            "group": "System",
             "icon": "document-save",
             "glyph": "history",
             "page": "snapshots",
@@ -890,24 +927,9 @@
             }
         },
         {
-            "id": "renderer",
-            "label": "Drawn by",
-            "icon": "preferences-desktop-plasma",
-            "glyph": "dashboard",
-            "page": "renderer",
-            "description": "What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.",
-            "keys": {
-                "panel.renderer": {
-                    "type": "string",
-                    "default": "quickshell",
-                    "label": "Drawn by",
-                    "description": "Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
-                }
-            }
-        },
-        {
             "id": "ai",
             "label": "AI assist",
+            "group": "System",
             "icon": "help-hint",
             "glyph": "smart_toy",
             "page": "ai",
@@ -955,6 +977,7 @@
         {
             "id": "about",
             "label": "About",
+            "group": "System",
             "icon": "help-about",
             "glyph": "info",
             "page": "about",

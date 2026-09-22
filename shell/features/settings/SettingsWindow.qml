@@ -89,64 +89,113 @@ FloatingWindow {
                 }
             }
 
-            ScrollView {
+            // Grouped under the schema's own headings -- Look, Behaviour,
+            // System -- because twenty-odd pages in one list put half of them
+            // below the fold with nothing to say they were there. A heading is
+            // drawn wherever the group changes, so the schema's order is the
+            // only order, and a section without a group simply has none.
+            Flickable {
+                id: navFlick
+
                 x: 12
-                y: navTitle.y + navTitle.height + 16
+                y: navTitle.y + navTitle.height + 12
                 width: parent.width - 24
-                height: parent.height - y - version.height - 28
+                height: parent.height - y - version.height - 24
                 clip: true
+                contentHeight: navColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                // The page chosen from elsewhere -- `rmpr settings <page>`, the
+                // launcher -- may be below the fold; bring it into view.
+                function reveal(item) {
+                    if (!item)
+                        return;
+                    const top = item.y;
+                    const bottom = item.y + item.height;
+                    if (top < navFlick.contentY)
+                        navFlick.contentY = Math.max(0, top - 28);
+                    else if (bottom > navFlick.contentY + navFlick.height)
+                        navFlick.contentY = Math.min(navFlick.contentHeight - navFlick.height, bottom - navFlick.height + 8);
+                }
 
                 Column {
-                    width: nav.width - 24
-                    spacing: 2
+                    id: navColumn
+
+                    width: navFlick.width
+                    spacing: 1
 
                     Repeater {
                         model: root.sections
 
-                        Rectangle {
-                            id: navItem
+                        Column {
+                            id: navEntry
 
                             required property var modelData
                             required property int index
 
-                            readonly property bool current: navItem.index === root.currentIndex
+                            readonly property string group: navEntry.modelData.group ?? ""
+                            readonly property bool startsGroup: navEntry.group.length > 0
+                                && (navEntry.index === 0 || (root.sections[navEntry.index - 1]?.group ?? "") !== navEntry.group)
+                            readonly property bool current: navEntry.index === root.currentIndex
 
-                            width: parent.width
-                            height: 42
-                            radius: Theme.radiusOf(12)
-                            color: navItem.current ? Theme.accC
-                                 : (navHover.hovered ? Theme.hover : "transparent")
+                            width: navColumn.width
 
-                            Row {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 12
+                            onCurrentChanged: if (navEntry.current) Qt.callLater(() => navFlick.reveal(navEntry))
 
-                                Glyph {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    name: navItem.modelData.glyph ?? "tune"
-                                    fallback: navItem.modelData.icon ?? "configure"
-                                    size: 20
-                                    color: navItem.current ? Theme.accCFg : Theme.mut
-                                }
-
-                                PanelText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - 32
-                                    elide: Text.ElideRight
-                                    text: navItem.modelData.label ?? navItem.modelData.id
-                                    font.pixelSize: 14
-                                    font.weight: navItem.current ? Font.Medium : Font.Normal
-                                    color: navItem.current ? Theme.accCFg : Theme.fg
-                                }
+                            PanelText {
+                                visible: navEntry.startsGroup
+                                leftPadding: 12
+                                topPadding: navEntry.index === 0 ? 2 : 14
+                                bottomPadding: 6
+                                text: navEntry.group.toUpperCase()
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                                font.letterSpacing: 0.8
+                                color: Theme.mut
                             }
 
-                            HoverHandler { id: navHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: root.currentIndex = navItem.index }
+                            Rectangle {
+                                id: navItem
+
+                                width: parent.width
+                                height: 36
+                                radius: Theme.radiusOf(10)
+                                color: navEntry.current ? Theme.accC
+                                     : (navHover.hovered ? Theme.hover : "transparent")
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 12
+
+                                    Glyph {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        name: navEntry.modelData.glyph ?? "tune"
+                                        fallback: navEntry.modelData.icon ?? "configure"
+                                        size: 18
+                                        color: navEntry.current ? Theme.accCFg : Theme.mut
+                                    }
+
+                                    PanelText {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width - 30
+                                        elide: Text.ElideRight
+                                        text: navEntry.modelData.label ?? navEntry.modelData.id
+                                        font.pixelSize: 13
+                                        font.weight: navEntry.current ? Font.Medium : Font.Normal
+                                        color: navEntry.current ? Theme.accCFg : Theme.fg
+                                    }
+                                }
+
+                                HoverHandler { id: navHover; cursorShape: Qt.PointingHandCursor }
+                                TapHandler { onTapped: root.currentIndex = navEntry.index }
+                            }
                         }
                     }
                 }
+
+                ScrollBar.vertical: ScrollBar { policy: navFlick.contentHeight > navFlick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
             }
 
             // What is running, in the words a bug report would need.

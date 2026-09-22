@@ -73,6 +73,20 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
 | `panel.menu.entries` | a list | `[]` | Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes. |
 
+### Widgets
+
+What appears on the panel, and in which zone.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Tray icons
+
+Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
 ### Sidebar
 
 The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.
@@ -87,6 +101,21 @@ The panel that slides in from an edge: what is playing, the day and the weather,
 | `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape. |
 | `sidebar.expanded` | a list | `["media"]` | Which cards start expanded, by id: media, day, weather, machine, notifications. Every card can be folded away and opened again from the sidebar itself; this is what it remembers. |
 | `sidebar.cards` | a list | `["media","day","weather","machine","notifications"]` | Which cards the sidebar draws, in order. Leave a card out to hide it entirely. |
+
+### Desktop
+
+What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `desktop.border` | `true` or `false` | `false` | Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that. |
+| `desktop.borderInset` | a number, 0 to 40 | `0` | How far in from each edge the frame is painted, in pixels. |
+| `desktop.borderRadius` | a number, 0 to 48 | `13` | How round the painted corners are, in pixels. |
+| `desktop.clock` | `true` or `false` | `true` | The time and date on the wallpaper, under every window. |
+| `desktop.clockPosition` | `top-left`, `top-right`, `bottom-left`, `bottom-right` | `bottom-right` | Where it sits |
+| `desktop.clockSize` | a number, 40 to 200 | `92` | The height of the time, in pixels; the date follows it. |
+| `desktop.clockDate` | `true` or `false` | `true` | Show the date |
+| `desktop.clockInk` | `auto`, `light`, `dark` | `auto` | auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed. |
 
 ### Weather
 
@@ -138,65 +167,22 @@ Plasma draws every notification -- under this shell's own renderer, through the 
 | `notifications.history` | `true` or `false` | `true` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
 | `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
 
-### Lock & session
+### On-screen display
 
-This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
-
-### Desktop
-
-What this shell draws on the desktop itself: a rounded frame over the screen's corners, and a clock on the wallpaper. Both are off until asked for, and neither takes a click or reserves any space.
+The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `desktop.border` | `true` or `false` | `false` | Paints over the screen's corners so the desktop looks inset with rounded corners. Cosmetic: it reserves no space and takes no clicks, and the windows themselves are not rounded -- KWin has no effect for that. |
-| `desktop.borderInset` | a number, 0 to 40 | `0` | How far in from each edge the frame is painted, in pixels. |
-| `desktop.borderRadius` | a number, 0 to 48 | `13` | How round the painted corners are, in pixels. |
-| `desktop.clock` | `true` or `false` | `true` | The time and date on the wallpaper, under every window. |
-| `desktop.clockPosition` | `top-left`, `top-right`, `bottom-left`, `bottom-right` | `bottom-right` | Where it sits |
-| `desktop.clockSize` | a number, 40 to 200 | `92` | The height of the time, in pixels; the date follows it. |
-| `desktop.clockDate` | `true` or `false` | `true` | Show the date |
-| `desktop.clockInk` | `auto`, `light`, `dark` | `auto` | auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed. |
+| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
+| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
 
-### Plasma services
+### Sound
 
-Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
+What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
-| `clipboard.history` | `own`, `auto`, `plasma` | `own` | Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other. |
-
-### Widgets
-
-What appears on the panel, and in which zone.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
-
-### Tray icons
-
-Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
-
-### Screen edges
-
-What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
-
-### Shortcuts
-
-Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
 
 ### Switching windows
 
@@ -212,22 +198,44 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 | `switching.overviewStrip` | `true` or `false` | `true` | The row along the bottom with every desktop, what is on each, and a tile for one more. Off gives the whole surface to the selected desktop's windows, and the desktops move on the arrows alone. |
 | `switching.overviewCardWidth` | a number, 260 to 720 | `560` | In pixels. Cards share the room between them, three to a row at most, and never grow past this. |
 
-### Sound
+### Screen edges
 
-What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
+What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Shortcuts
+
+Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Lock & session
+
+This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
+| `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
 
-### On-screen display
+### Plasma services
 
-The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
+Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
-| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
+| `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
+| `clipboard.history` | `own`, `auto`, `plasma` | `own` | Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other. |
+
+### Drawn by
+
+What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `panel.renderer` | text | `quickshell` | Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
 
 ### Layouts
 
@@ -250,14 +258,6 @@ Snapshots of your KDE configuration. Nothing is removed when reverting or uninst
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `snapshots.keep` | a number, 0 to 200 | `0` | How many restore points are kept when a new one is taken. 0 keeps every one of them, which is the default: deleting somebody's restore points without being asked is not a thing to start doing quietly. Two are never removed by pruning whatever this says -- any restore point you have locked, and the oldest, which is the state the machine was in before this shell was installed. |
-
-### Drawn by
-
-What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `panel.renderer` | text | `quickshell` | Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
 
 ### AI assist
 

@@ -194,6 +194,7 @@ CardGrid {
                             anchors.verticalCenter: parent.verticalCenter
                             implicitWidth: 110
                             values: root.zones
+                            labels: root.zones.map(z => z.charAt(0).toUpperCase() + z.slice(1))
                             currentIndex: Math.max(0, root.zones.indexOf(entryRow.modelData.zone ?? "left"))
                             onPicked: value => root.updateEntry(entryRow.index, { zone: value })
                         }
@@ -217,11 +218,13 @@ CardGrid {
                             implicitWidth: 22
                             implicitHeight: 22
 
-                            PanelIcon {
+                            Glyph {
                                 anchors.centerIn: parent
-                                implicitSize: 16
-                                iconName: "transform-move"
-                                opacity: entryRow.dragging ? 1 : 0.5
+                                name: "drag_indicator"
+                                fallback: "transform-move"
+                                size: 18
+                                color: Theme.mut
+                                opacity: entryRow.dragging ? 1 : 0.7
                             }
 
                             DragHandler {
@@ -253,6 +256,7 @@ CardGrid {
                             id: up
 
                             anchors.verticalCenter: parent.verticalCenter
+                            glyph: "arrow_upward"
                             iconName: "go-up"
                             opacity: rowHover.hovered ? 1 : 0
                             enabled: rowHover.hovered
@@ -263,6 +267,7 @@ CardGrid {
                             id: down
 
                             anchors.verticalCenter: parent.verticalCenter
+                            glyph: "arrow_downward"
                             iconName: "go-down"
                             opacity: rowHover.hovered ? 1 : 0
                             enabled: rowHover.hovered
@@ -273,7 +278,9 @@ CardGrid {
                             id: configure
 
                             anchors.verticalCenter: parent.verticalCenter
+                            glyph: entryRow.expanded ? "expand_less" : "tune"
                             iconName: entryRow.expanded ? "arrow-up" : "configure"
+                            tooltip: entryRow.expanded ? "Hide its settings" : "Its settings"
                             opacity: Object.keys(entryRow.manifest?.config ?? {}).length > 0 ? 1 : 0
                             enabled: Object.keys(entryRow.manifest?.config ?? {}).length > 0
                             onActivated: entryRow.expanded = !entryRow.expanded
@@ -283,7 +290,9 @@ CardGrid {
                             id: remove
 
                             anchors.verticalCenter: parent.verticalCenter
+                            glyph: "close"
                             iconName: "list-remove"
+                            tooltip: "Take it off the panel"
                             onActivated: root.removeEntry(entryRow.index)
                         }
                     }

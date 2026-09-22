@@ -300,11 +300,13 @@ CardGrid {
                                 implicitWidth: 22
                                 implicitHeight: 22
 
-                                PanelIcon {
+                                Glyph {
                                     anchors.centerIn: parent
-                                    implicitSize: 16
-                                    iconName: "transform-move"
-                                    opacity: row.dragging ? 1 : 0.5
+                                    name: "drag_indicator"
+                                    fallback: "transform-move"
+                                    size: 18
+                                    color: Theme.mut
+                                    opacity: row.isLastOnPanel ? 0.25 : row.dragging ? 1 : 0.7
                                 }
 
                                 DragHandler {
@@ -336,6 +338,7 @@ CardGrid {
                             IconButton {
                                 id: up
                                 anchors.verticalCenter: parent.verticalCenter
+                                glyph: "arrow_upward"
                                 iconName: "go-up"
                                 visible: rowHover.hovered && !row.isLastOnPanel
                                 onActivated: root.moveRow(row.index, row.index - 1)
@@ -344,6 +347,7 @@ CardGrid {
                             IconButton {
                                 id: down
                                 anchors.verticalCenter: parent.verticalCenter
+                                glyph: "arrow_downward"
                                 iconName: "go-down"
                                 visible: rowHover.hovered && !row.isLastOnPanel
                                 onActivated: root.moveRow(row.index, row.index + 1)
