@@ -53,7 +53,19 @@ Item {
         anchors.centerIn: parent
         width: fitted * root.sourceAspect
         height: fitted
-        nodeId: stream.nodeId
+
+        // Only ever a node that exists.
+        //
+        // `WindowStream.nodeId` is -1 while there is no stream -- before the
+        // compositor answers, and again the moment it closes -- because that
+        // is how QML asks "is there one". kpipewire's own `nodeId` is
+        // *unsigned*, so binding the two together handed it 4294967295 on
+        // every teardown, and it connected to that: "created successfully
+        // 4294967295", a format that makes no sense, and `invalid image
+        // "EGL_BAD_PARAMETER"` for the frame that followed. Hovering along a
+        // row of taskbar buttons did it a hundred and fifty times, because
+        // every preview closing is one of these.
+        nodeId: stream.available ? stream.nodeId : 0
         visible: stream.available
     }
 }
