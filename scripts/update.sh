@@ -42,13 +42,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-profile="$CONFIG_DIR/profiles/default/shell.json"
-config_get() {
-    [ -f "$profile" ] || { printf '%s' "$2"; return; }
-    local v
-    v=$(jq -r "$1 // empty" "$profile" 2>/dev/null)
-    printf '%s' "${v:-$2}"
-}
+# The active profile over the defaults, as everything else reads it. This
+# used to read profiles/default alone, so an update channel set in any other
+# profile -- including from the settings window -- was ignored.
+source "$REPO_ROOT/scripts/lib/config.sh"
+profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
 
 [ -n "$CHANNEL" ]      || CHANNEL=$(config_get '.update.channel' 'main')
 [ -n "$LOCAL_SOURCE" ] || LOCAL_SOURCE=$(config_get '.update.localSource' '')

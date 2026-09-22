@@ -13,6 +13,7 @@ import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.config
+import qs.domain.settings.groups
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -40,6 +41,15 @@ CardGrid {
                 try { root.providers = JSON.parse(text); } catch (e) { root.providers = []; }
             }
         }
+    }
+
+    // Asked again once a change that decides availability has been written.
+    // ConfigStore writes a quarter of a second after the last change, and the
+    // CLI reads the file, so asking straight away gets yesterday's answer.
+    readonly property Timer _relist: Timer {
+        id: relist
+        interval: 700
+        onTriggered: { listProc.running = false; listProc.running = true; }
     }
 
     readonly property Process _forget: Process {
@@ -80,9 +90,14 @@ CardGrid {
             }
             overridden: ConfigStore.isOverridden("ai.provider")
             onResetRequested: ConfigStore.reset("ai.provider")
+            // Every provider, not only the usable ones: the two that need
+            // setting up -- an Ollama address, a command -- are set up in the
+            // card below once chosen, and could not be chosen otherwise.
             Select {
-                values: root.available
-                currentIndex: Math.max(0, root.available.indexOf(root.provider))
+                readonly property var ids: root.providers.length > 0 ? root.providers.map(p => p.id) : [root.provider]
+                values: ids
+                labels: root.providers.map(p => p.available ? p.id : `${p.id} (not set up)`)
+                currentIndex: Math.max(0, ids.indexOf(root.provider))
                 onPicked: value => ConfigStore.set("ai.provider", value)
             }
         }
@@ -118,7 +133,10 @@ CardGrid {
             TextInputRow {
                 width: parent.width
                 text: ConfigStore.value("ai.ollamaUrl", "http://127.0.0.1:11434")
-                onCommitted: value => ConfigStore.set("ai.ollamaUrl", value)
+                onCommitted: value => {
+                    ConfigStore.set("ai.ollamaUrl", value);
+                    relist.restart();
+                }
             }
         }
 
@@ -136,14 +154,23 @@ CardGrid {
             }
         }
 
-        PanelText {
+        SettingRow {
             visible: root.provider === "custom"
             width: providerCard.width - 2 * providerCard.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
-            text: `The custom command is a list, so it is set in the profile as ai.command: ["my-tool", "%report"]. %report becomes the bundle's path; without it, the bundle arrives on standard input.`
+            stacked: true
+            label: "Command"
+            description: "Run as written. %report becomes the redacted bundle's path; without it, the bundle arrives on standard input."
+            overridden: ConfigStore.isOverridden("ai.command")
+            onResetRequested: ConfigStore.reset("ai.command")
+            TextInputRow {
+                width: parent.width
+                placeholderText: "my-tool --file %report"
+                text: SettingGroups.formatList(ConfigStore.value("ai.command", []) ?? [], "words")
+                onCommitted: value => {
+                    ConfigStore.set("ai.command", SettingGroups.parseList(value, "words"));
+                    relist.restart();
+                }
+            }
         }
     }
 

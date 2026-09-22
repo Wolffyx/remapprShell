@@ -11,6 +11,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.domain.config
 import qs.domain.settings.snapshots
 import qs.domain.theme
 import qs.ui.primitives
@@ -52,6 +53,8 @@ CardGrid {
         }
     }
 
+    readonly property int keep: Number(ConfigStore.value("snapshots.keep", 0)) || 0
+
     // Pruning never takes the oldest, so the page does not offer to.
     readonly property string oldest: root.snapshots.length > 0
         ? root.snapshots.map(s => s.name).sort()[0] : ""
@@ -81,15 +84,28 @@ CardGrid {
 
         SectionLabel { text: "Restore points" }
 
+        // What it is called in the list. Empty is "manual", as from the CLI.
+        TextInputRow {
+            id: labelField
+            width: take.width - 2 * take.padding
+            placeholderText: "What it is before -- \"trying a new theme\", say"
+            onAccepted: takeButton.activated()
+        }
+
         Flow {
             width: take.width - 2 * take.padding
             spacing: 8
 
             TextButton {
+                id: takeButton
                 glyph: "history"
                 iconName: "document-save"
                 text: "Take one now"
-                onActivated: root.run(["snapshot", "create", "manual"])
+                onActivated: {
+                    const label = labelField.text.trim();
+                    root.run(["snapshot", "create", "--label", label.length > 0 ? label : "manual"]);
+                    labelField.text = "";
+                }
             }
 
             IconButton {
@@ -105,6 +121,25 @@ CardGrid {
             font.pixelSize: 12
             lineHeight: 1.35
             text: "Restore points are never removed when reverting or uninstalling. They are removed only here, or by pruning, which never takes a locked one or the oldest. Removing one is permanent."
+        }
+
+        SettingRow {
+            width: take.width - 2 * take.padding
+            stacked: true
+            label: "Keep at most"
+            description: root.keep === 0
+                ? "Every one of them. Nothing is pruned unless you set a number here."
+                : `The newest ${root.keep}, pruned each time one is taken -- never a locked one, and never the oldest.`
+            overridden: ConfigStore.isOverridden("snapshots.keep")
+            onResetRequested: ConfigStore.reset("snapshots.keep")
+
+            NumberSlider {
+                width: parent.width
+                from: 0
+                to: 100
+                value: root.keep
+                onMoved: value => ConfigStore.set("snapshots.keep", Math.round(value))
+            }
         }
     }
 

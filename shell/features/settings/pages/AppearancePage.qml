@@ -30,6 +30,8 @@ CardGrid {
 
     readonly property var styles: root.themeState?.styles ?? []
     readonly property var parts: root.themeState?.parts ?? ({})
+    readonly property var gtkThemes: root.themeState?.gtkThemes ?? []
+    readonly property bool materialYouInstalled: root.themeState?.materialYouInstalled === true
 
     // The parts a plain apply would add, named as a person would.
     readonly property var missing: {
@@ -498,6 +500,7 @@ CardGrid {
 
         Column {
             width: parent.width
+            spacing: 6
             opacity: ConfigStore.value("theme.desktop.enabled", true) === true ? 1 : 0.45
             enabled: ConfigStore.value("theme.desktop.enabled", true) === true
 
@@ -528,6 +531,56 @@ CardGrid {
                     checked: ConfigStore.value(`theme.desktop.${modelData.key}`, true) === true
                     onToggled: value => ConfigStore.set(`theme.desktop.${modelData.key}`, value)
                 }
+            }
+
+            ToggleRow {
+                label: "GTK applications"
+                description: "Chrome, Electron and GTK applications ask GTK whether to be dark, not KDE. With this on they are told too."
+                checked: ConfigStore.value("theme.desktop.gtk", true) === true
+                onToggled: value => ConfigStore.set("theme.desktop.gtk", value)
+            }
+
+            // A theme whose name is the dark half of a pair stays dark whatever
+            // GTK is asked to prefer, so the pair is named, one per variant.
+            // From what is installed, because a mistyped name is a theme GTK
+            // silently does not find.
+            Repeater {
+                model: [
+                    { key: "gtkThemeLight", label: "GTK theme by day" },
+                    { key: "gtkThemeDark",  label: "GTK theme by night" }
+                ]
+
+                delegate: SettingRow {
+                    id: gtkRow
+                    required property var modelData
+                    readonly property string path: `theme.desktop.${modelData.key}`
+                    readonly property string current: ConfigStore.value(gtkRow.path, "") ?? ""
+                    // Something set that is not installed is still shown, as itself.
+                    readonly property var names: [""].concat(root.gtkThemes.indexOf(gtkRow.current) >= 0 || gtkRow.current === ""
+                        ? root.gtkThemes : root.gtkThemes.concat([gtkRow.current]))
+
+                    visible: ConfigStore.value("theme.desktop.gtk", true) === true
+                    width: parent.width
+                    label: modelData.label
+                    description: gtkRow.current === "" ? "Left as it is." : ""
+                    overridden: ConfigStore.isOverridden(gtkRow.path)
+                    onResetRequested: ConfigStore.reset(gtkRow.path)
+
+                    Select {
+                        values: gtkRow.names
+                        labels: gtkRow.names.map(n => n === "" ? "Leave it alone" : n)
+                        currentIndex: Math.max(0, gtkRow.names.indexOf(gtkRow.current))
+                        onPicked: value => ConfigStore.set(gtkRow.path, value)
+                    }
+                }
+            }
+
+            ToggleRow {
+                visible: root.materialYouInstalled
+                label: "kde-material-you-colors"
+                description: "It has a light and dark switch of its own and applies it at every login. With this on it is told which one, so the two agree."
+                checked: ConfigStore.value("theme.desktop.materialYou", false) === true
+                onToggled: value => ConfigStore.set("theme.desktop.materialYou", value)
             }
         }
 

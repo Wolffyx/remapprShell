@@ -501,6 +501,13 @@
                     "default": "menu",
                     "label": "Kickoff style",
                     "description": "Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus."
+                },
+                "launcher.command": {
+                    "type": "list",
+                    "format": "words",
+                    "default": [],
+                    "label": "A command of your own",
+                    "description": "For the `custom` provider: a launcher and its arguments, run as written. `launcher.provider` or `launcher.searchProvider` set to `custom` runs it."
                 }
             }
         },
@@ -950,7 +957,35 @@
             "label": "About",
             "icon": "help-about",
             "glyph": "info",
-            "page": "about"
+            "page": "about",
+            "keys": {
+                "update.channel": {
+                    "type": "enum",
+                    "values": [
+                        "main",
+                        "dev"
+                    ],
+                    "labels": [
+                        "Releases",
+                        "Everything as it lands"
+                    ],
+                    "default": "main",
+                    "label": "Update channel",
+                    "description": "Which branch `rmpr update` follows: `main` moves on a release, `dev` is where work lands and moves every day."
+                },
+                "update.remote": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Update from",
+                    "description": "A git URL to update from. Empty uses the checkout's own origin, then the project's public address."
+                },
+                "update.localSource": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Local source",
+                    "description": "A checkout on this machine to update from instead of a remote -- for testing a change before it is pushed. Empty for none."
+                }
+            }
         }
     ]
 }

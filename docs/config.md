@@ -123,6 +123,7 @@ What opens when you press the start button, and what opens when you search.
 | `launcher.learn` | `true` or `false` | `true` | What has been opened before is offered first, and an empty search suggests it. Kept in the state directory and never sent anywhere; turning this off stops it being read, and Forget clears what is there. |
 | `launcher.pinned` | a list | `[]` | Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed. |
 | `launcher.kickoffMode` | `menu`, `windowed` | `menu` | Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus. |
+| `launcher.command` | a list | `[]` | For the `custom` provider: a launcher and its arguments, run as written. `launcher.provider` or `launcher.searchProvider` set to `custom` runs it. |
 
 ### Notifications
 
@@ -272,8 +273,11 @@ When something breaks, hand a redacted diagnostic report to an assistant. Off by
 
 ### About
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `update.channel` | `main`, `dev` | `main` | Which branch `rmpr update` follows: `main` moves on a release, `dev` is where work lands and moves every day. |
+| `update.remote` | text | `` | A git URL to update from. Empty uses the checkout's own origin, then the project's public address. |
+| `update.localSource` | text | `` | A checkout on this machine to update from instead of a remote -- for testing a change before it is pushed. Empty for none. |
 
 ## The panel contents
 

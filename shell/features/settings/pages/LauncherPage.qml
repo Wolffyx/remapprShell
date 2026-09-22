@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.config
+import qs.domain.settings.groups
 import qs.domain.launcher
 import qs.domain.theme
 import qs.ui.primitives
@@ -35,6 +36,14 @@ Column {
 
     spacing: 14
 
+    // The choices in both lists: automatic, then whatever is usable here,
+    // named as the providers name themselves. A custom command is only usable
+    // once there is one, which is what the field below this card is for.
+    readonly property var providerIds: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
+    readonly property var providerLabels: ["Automatic"].concat(LauncherService.availableProviders.map(p => p.label))
+    readonly property bool kickoffInUse: LauncherService.appsProvider?.providerId === "kickoff"
+                                         || LauncherService.searchProvider?.providerId === "kickoff"
+
     Card {
         width: root.width
 
@@ -46,9 +55,9 @@ Column {
             description: `Now: ${LauncherService.appsProvider?.label ?? "none"}.`
 
             Select {
-                values: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                currentIndex: Math.max(0, ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                                              .indexOf(ConfigStore.value("launcher.provider", "auto")))
+                values: root.providerIds
+                labels: root.providerLabels
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.provider", "auto")))
                 onPicked: value => ConfigStore.set("launcher.provider", value)
             }
         }
@@ -59,10 +68,39 @@ Column {
             description: `Now: ${LauncherService.searchProvider?.label ?? "none"}.`
 
             Select {
-                values: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                currentIndex: Math.max(0, ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                                              .indexOf(ConfigStore.value("launcher.searchProvider", "auto")))
+                values: root.providerIds
+                labels: root.providerLabels
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.searchProvider", "auto")))
                 onPicked: value => ConfigStore.set("launcher.searchProvider", value)
+            }
+        }
+
+        SettingRow {
+            width: parent.width
+            stacked: true
+            label: "A command of your own"
+            description: "Any launcher, run as written -- `wofi --show drun`, say. Once it is set, \"Custom command\" is in both lists above."
+
+            TextInputRow {
+                width: parent.width
+                placeholderText: "wofi --show drun"
+                text: SettingGroups.formatList(ConfigStore.value("launcher.command", []) ?? [], "words")
+                onCommitted: value => ConfigStore.set("launcher.command", SettingGroups.parseList(value, "words"))
+            }
+        }
+
+        // Only worth asking while Kickoff is the one that opens.
+        SettingRow {
+            width: parent.width
+            visible: root.kickoffInUse
+            label: "Kickoff opens as"
+            description: "A window is slower, and does not close itself when it loses focus."
+
+            Select {
+                values: ["menu", "windowed"]
+                labels: ["A menu", "A window"]
+                currentIndex: ConfigStore.value("launcher.kickoffMode", "menu") === "windowed" ? 1 : 0
+                onPicked: value => ConfigStore.set("launcher.kickoffMode", value)
             }
         }
     }

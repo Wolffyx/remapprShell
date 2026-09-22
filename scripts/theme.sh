@@ -658,6 +658,19 @@ material_you_wanted() {
     [ -f "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" ]
 }
 
+# Every GTK theme installed where GTK looks, by name: a directory with a
+# gtk-3.0 or gtk-4.0 in it. What the settings window offers for the two
+# gtkTheme keys, so a name there is one GTK will find.
+gtk_themes() {
+    local d t
+    for d in "$HOME/.themes" "${XDG_DATA_HOME:-$HOME/.local/share}/themes" /usr/local/share/themes /usr/share/themes; do
+        for t in "$d"/*/; do
+            [ -d "${t}gtk-3.0" ] || [ -d "${t}gtk-4.0" ] || continue
+            t=${t%/}; printf '%s\n' "${t##*/}"
+        done
+    done | sort -u
+}
+
 material_you_apply_variant() {   # <light|dark>
     local variant=$1 want have
 
@@ -993,11 +1006,14 @@ case "$cmd" in
                 --argjson styleCustomised "$(jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1 && echo true || echo false)" \
                 --arg variant "$(resolve_variant)" \
                 --argjson followMode "$(config_get '.theme.desktop.followMode' false)" \
+                --argjson gtkThemes "$(gtk_themes | jq -R -s -c 'split("\n") | map(select(length > 0))')" \
+                --argjson materialYou "$([ -f "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" ] && echo true || echo false)" \
                 '{package: $package, active: ($active == $lnf),
                   parts: {schemes: $schemes, switcher: $switcher, desktoptheme: $desktoptheme, splash: $splash},
                   desktop: $desktop,
                   variant: {resolved: $variant, follows: $followMode},
-                  style: $style, styles: $styles, styleCustomised: $styleCustomised}'
+                  style: $style, styles: $styles, styleCustomised: $styleCustomised,
+                  gtkThemes: $gtkThemes, materialYouInstalled: $materialYou}'
             exit 0
         fi
         printf 'packages:     %s\n' "$([ -d "$LNF_DEST" ] && echo "light installed" || echo "light MISSING"), $([ -d "$LNF_DARK_DEST" ] && echo "dark installed" || echo "dark MISSING")"
