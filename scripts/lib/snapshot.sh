@@ -128,6 +128,13 @@ _snapshot_copy() {
 # Echoes the snapshot directory on success.
 snapshot_create() {
     local label=${1:-manual}
+    # The label is part of a directory name. A slash in it made directories
+    # inside the root -- or, with `..`, outside it -- and a leading dash made
+    # a name that reads as a flag to every command given it afterwards. So
+    # both become a dash and are trimmed off the front; spaces are kept.
+    label=${label//\//-}
+    label=$(printf '%s' "$label" | tr -d '\000-\037' | sed -E 's/^[-. ]+//; s/[ ]+$//')
+    [ -n "$label" ] || label=manual
     # Two snapshots taken in the same second with the same label would share a
     # directory and merge into each other -- a restore point that is quietly
     # half of one state and half of another is worse than no restore point.

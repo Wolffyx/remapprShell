@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Restore points.
 #
-#   create [label]     take one now
+#   create [--label] <label>  take one now
 #   list [--json]      show what exists, with sizes
 #   remove <name>      delete one
 #   prune [--keep N]   delete all but the newest N
@@ -25,7 +25,20 @@ cmd=${1:-list}
 
 case "$cmd" in
     create)
-        snapshot_create "${1:-manual}" >/dev/null
+        # `--label X` too: that is how every other command here names things,
+        # and taking the flag as the label is how a restore point came to be
+        # called `--label`.
+        label=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --label)   label=${2:?usage: $ALIAS snapshot create [--label] <label>}; shift ;;
+                --label=*) label=${1#--label=} ;;
+                -*)        die "unknown option: $1 (usage: $ALIAS snapshot create [--label] <label>)" ;;
+                *)         [ -z "$label" ] || die "one label only (quote it if it has spaces)"; label=$1 ;;
+            esac
+            shift
+        done
+        snapshot_create "${label:-manual}" >/dev/null
         # Only if `snapshots.keep` says so; off until then.
         snapshot_autoprune
         ;;

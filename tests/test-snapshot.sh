@@ -132,6 +132,26 @@ check "nothing deleted after refusal" "$([ -e "$XDG_CONFIG_HOME/kdeglobals" ] &&
 rm -rf "$broken"
 
 echo
+echo "== what a label may make of a directory name =="
+# The label is part of a directory name: a slash made directories inside the
+# root, `..` one outside it, and a leading dash a name that reads as a flag.
+name_of() { basename "$(snapshot_create "$1")" | sed -E 's/^[0-9]{8}-[0-9]{6}-//'; }
+check "a slash is a dash"           "$(name_of 'a/b')" "a-b"
+check "nothing climbs out"          "$(name_of '../../escape')" "escape"
+check "no leading dash"             "$(name_of '--label')" "label"
+check "spaces are kept"             "$(name_of 'My shell setup')" "My shell setup"
+check "nothing left is manual"      "$(name_of '///')" "manual"
+check "every one inside the root"   "$(find "$(snapshot_root)" -mindepth 1 -maxdepth 1 -type d | wc -l)" \
+                                    "$(find "$(snapshot_root)" -name manifest.txt | wc -l)"
+
+echo "== the CLI takes --label =="
+cli() { "$REPO_ROOT/scripts/snapshot.sh" create "$@" >/dev/null 2>&1; }
+newest() { ls "$(snapshot_root)" | sort | tail -1 | sed -E 's/^[0-9]{8}-[0-9]{6}-//'; }
+sleep 1; cli --label flagged;   check "--label X"     "$(newest)" "flagged"
+sleep 1; cli --label=equals;    check "--label=X"     "$(newest)" "equals"
+sleep 1; cli plain;             check "a bare label"  "$(newest)" "plain"
+cli --bogus;                    check "an unknown flag is refused" "$?" "1"
+
 if [ "$fail" -gt 0 ]; then
     printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2
     exit 1
