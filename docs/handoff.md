@@ -385,6 +385,40 @@ screen edge (the ledger only records that they were unset *before* us, so what
 they had is not knowable), and the three screenshot actions. `rmpr edges
 status` lists the edges.
 
+#### The settings window, gone over (late 2026-09-22)
+
+Audited key by key -- every `ConfigStore.value`, `widgetConfig?.x` and
+`config_get` against the schema and the pages -- and three kinds of fault
+fixed, in `a55fd73`, `8aab52f` and `1875136`:
+
+- **Controls that wrote the wrong thing.** A `list` key fell through to a text
+  field and saved a *string*: `sidebar.cards` then threw on `.map`, and the
+  tray's and the task list's pins were corrupted when saved from the Widgets
+  page. A list with `values` is a set of switches keeping the person's order;
+  one without is typed (`format: "words"` for a command, commas otherwise).
+  The clock's 12-hour and seconds switches did nothing, because the shipped
+  defaults set `format: "HH:mm"`, which wins; defaults and three presets no
+  longer pin one, and the Taskbar page says when a format of your own holds
+  the switches.
+- **Keys read and not settable**: `launcher.command`, `launcher.kickoffMode`,
+  `ai.command`, `snapshots.keep`, `theme.desktop.gtk`, `gtkThemeLight/Dark`
+  (a dropdown of installed themes, from `theme status --json`),
+  `theme.desktop.materialYou`, and `update.channel/remote/localSource` (new in
+  the schema, on About, with a check -- never an apply). "Custom" launcher and
+  AI providers could only be picked once their command was set, which nothing
+  could set. `update.sh` read `profiles/default` alone; it reads the active
+  profile now.
+- **The window itself**: sections carry a `group` (Look, Behaviour, System) and
+  the nav draws headings, tighter rows, and scrolls to the current page;
+  dropdowns show labels (`labels` on an enum, and `Select.labels`); the Widgets
+  and Tray buttons are glyphs -- as theme icons they were blank.
+
+**Still not in the window**: per-monitor overrides beyond position and
+thickness (`PanelModel.valueFor` honours style, spacing, iconSize, autoHide,
+revealOnHover and `bar.entries` per screen; the Taskbar page sets two), and
+per-instance `bar.entries[].config`. The desktop-theming switches on
+Appearance still act only on the next Apply, as designed, without saying so.
+
 #### Two mistakes this session made
 
 **The shell was down for about two minutes.** A new method named
