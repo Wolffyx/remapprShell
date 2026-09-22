@@ -530,8 +530,15 @@ BarWidget {
             // clamped -- which puts the cards under a button they did not come
             // from.
             readonly property int columns: Math.min(3, Math.max(1, preview.windows.length))
-            readonly property int cellWidth: 176
-            readonly property int cellHeight: 99
+
+            // One size, whatever the window count. A picture of a window is
+            // there to be recognised, and how many other windows the
+            // application happens to have open says nothing about how big it
+            // needs to be to manage that. The single window drew 300x169 and
+            // every window after the first shrank the lot to 176x99, so
+            // opening a second window made the first one harder to read.
+            readonly property int cellWidth: 300
+            readonly property int cellHeight: 169
 
             implicitWidth: Math.max(260, body.implicitWidth + 24)
             implicitHeight: body.implicitHeight + 14
@@ -601,14 +608,15 @@ BarWidget {
                 anchors.centerIn: parent
                 spacing: 8
 
-                // One window: the picture is the card, as big as it is worth
-                // drawing, and the title sits under the application below.
+                // One window: the picture is the card, and the title sits
+                // under the application below. The same size a cell gets, so
+                // the second window does not resize the first.
                 Item {
                     id: sole
 
                     visible: preview.windows.length === 1
-                    width: 300
-                    height: 169
+                    width: preview.cellWidth
+                    height: preview.cellHeight
 
                     WindowThumbnail {
                         anchors.fill: parent
