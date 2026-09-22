@@ -152,22 +152,49 @@ QtObject {
 
     // What a click on the body should do, as { kind, value }:
     //
-    //   action  the sender's own `default` action -- always first, because it
-    //           is the one thing the sender asked for
-    //   url     a file it named, opened the way the desktop opens files
-    //   app     the application that sent it, raised or started
-    //   none    nothing to act on; the click closes the popup
+    //   action   the sender's own `default` action -- always first, because it
+    //            is the one thing the sender asked for
+    //   url      a file it named, opened the way the desktop opens files
+    //   devices  a removable device was plugged in: Disks & Devices, where it
+    //            can be mounted and opened
+    //   displays a screen was plugged in: the display settings
+    //   app      the application that sent it, raised or started
+    //   none     nothing to act on; the click closes the popup
     function openTarget(notification, hints) {
         const actions = notification?.actions ?? [];
-        const fallback = actions.find(a => String(a?.identifier ?? "") === "default");
-        if (fallback)
-            return { kind: "action", value: fallback };
-        const url = root.urlsOf(hints)[0] ?? "";
+        return root.targetFor({
+            action: actions.find(a => String(a?.identifier ?? "") === "default") ?? null,
+            url: root.urlsOf(hints)[0] ?? "",
+            eventId: hints?.["x-kde-eventId"] ?? "",
+            icon: notification?.appIcon ?? "",
+            desktopEntry: notification?.desktopEntry ?? ""
+        });
+    }
+
+    // Senders that are services rather than applications. Plasma's own
+    // notifications -- a device plugged in, a disk filling up -- come from
+    // kded, and "open the application that sent it" started a second kded,
+    // which is a click that does nothing anybody can see. That is what
+    // clicking "USB Device Detected" was.
+    readonly property var services: ["org.kde.kded6", "org.kde.kded5", "org.kde.plasmashell",
+                                     "org.kde.kwin", "org.kde.ksmserver", "org.kde.kglobalaccel"]
+
+    // KDE names what happened in `x-kde-eventId`. Plasma sends `deviceAdded`
+    // both for a USB device and for a screen, and only the icon tells them
+    // apart: the summary is translated.
+    function targetFor(o) {
+        if (o?.action)
+            return { kind: "action", value: o.action };
+        const url = String(o?.url ?? "");
         if (url)
             return { kind: "url", value: url };
-        const entry = String(notification?.desktopEntry ?? "").trim();
-        if (entry)
-            return { kind: "app", value: entry.replace(/\.desktop$/, "") };
+        if (String(o?.eventId ?? "") === "deviceAdded")
+            return /display|monitor|video/i.test(String(o?.icon ?? ""))
+                ? { kind: "displays", value: "" }
+                : { kind: "devices", value: "" };
+        const entry = String(o?.desktopEntry ?? "").trim().replace(/\.desktop$/, "");
+        if (entry && root.services.indexOf(entry) < 0)
+            return { kind: "app", value: entry };
         return { kind: "none", value: "" };
     }
 

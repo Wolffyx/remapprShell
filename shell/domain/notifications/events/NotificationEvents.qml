@@ -110,6 +110,8 @@ QtObject {
             urgency: Number.isFinite(urgency) ? urgency : 1,
             desktopEntry: String(root._hint(hints, "desktop-entry") ?? ""),
             urls: root._urls(hints),
+            // Kept for a click from the history: see Popups.targetFor.
+            eventId: String(root._hint(hints, "x-kde-eventId") ?? ""),
             when: when
         };
     }

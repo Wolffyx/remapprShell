@@ -156,4 +156,29 @@ TestCase {
         compare(Popups.openTarget({ actions: [] }, {}).kind, "none");
         compare(Popups.openTarget(null, {}).kind, "none");
     }
+
+    // "USB Device Detected": no actions, sent by kded, and a click started a
+    // second kded -- nothing anybody could see.
+    function test_a_device_plugged_in_opens_the_devices() {
+        const usb = { actions: [], desktopEntry: "org.kde.kded6", appIcon: "drive-removable-media-usb" };
+        compare(Popups.openTarget(usb, { "x-kde-eventId": "deviceAdded" }).kind, "devices");
+    }
+
+    function test_a_screen_plugged_in_opens_the_display_settings() {
+        const screen = { actions: [], desktopEntry: "org.kde.kded6", appIcon: "video-display" };
+        compare(Popups.openTarget(screen, { "x-kde-eventId": "deviceAdded" }).kind, "displays");
+    }
+
+    function test_a_service_is_never_started_as_an_application() {
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.kded6" }, {}).kind, "none");
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.plasmashell.desktop" }, {}).kind, "none");
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.kded6" },
+                                  { "x-kde-eventId": "deviceRemoved" }).kind, "none");
+    }
+
+    function test_the_history_reads_the_same_rule() {
+        compare(Popups.targetFor({ eventId: "deviceAdded", desktopEntry: "org.kde.kded6" }).kind, "devices");
+        compare(Popups.targetFor({ url: "file:///a/b.png", eventId: "deviceAdded" }).kind, "url");
+        compare(Popups.targetFor({}).kind, "none");
+    }
 }

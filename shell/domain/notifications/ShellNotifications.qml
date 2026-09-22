@@ -110,17 +110,12 @@ QtObject {
         if (!n)
             return;
         const target = Popups.openTarget(n, n.hints ?? ({}));
-        switch (target.kind) {
-        case "action":
+        if (target.kind === "action") {
             root.invoke(n, target.value);
             return;
-        case "url":
-            Quickshell.execDetached(["xdg-open", target.value]);
-            break;
-        case "app":
-            WindowsService.open(target.value);
-            break;
         }
+        Log.debug("notifications", `clicked ${n.appName}: ${target.kind} ${target.kind === "none" ? "" : target.value}`);
+        NotificationWatch.go(target);
         n.dismiss();
     }
 

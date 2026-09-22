@@ -476,8 +476,9 @@ ShellRoot {
                 return "no such notification";
             if (!NotificationWatch.openable(entry))
                 return "that notification names nothing to open";
-            NotificationWatch.open(entry);
-            return entry.urls?.[0] || entry.desktopEntry;
+            const target = NotificationWatch.targetOf(entry);
+            NotificationWatch.go(target);
+            return target.value ? `${target.kind}: ${target.value}` : target.kind;
         }
 
         // This shell's own server (notifications.server "shell").

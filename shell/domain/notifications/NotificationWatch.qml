@@ -17,9 +17,12 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.SystemTray
 import qs.core
+import qs.platform.kde
 import qs.domain.config
 import qs.domain.notifications.events
+import qs.domain.notifications.popups
 import qs.domain.windows
 
 QtObject {
@@ -49,17 +52,54 @@ QtObject {
     // Answers whether there was anything to open, so a row can be drawn as
     // clickable only when it is.
     function open(entry) {
-        const url = (entry?.urls ?? [])[0] ?? "";
-        if (url) {
-            Quickshell.execDetached(["xdg-open", url]);
+        return root.go(root.targetOf(entry));
+    }
+
+    // The rule is Popups.targetFor, shared with the live popups so a click
+    // means the same thing in both places.
+    function targetOf(entry) {
+        return Popups.targetFor({
+            url: (entry?.urls ?? [])[0] ?? "",
+            eventId: entry?.eventId ?? "",
+            icon: entry?.appIcon ?? "",
+            desktopEntry: entry?.desktopEntry ?? ""
+        });
+    }
+
+    // Does what a target says, other than invoking an action, which only a
+    // live notification can. Answers whether anything was done.
+    function go(target) {
+        switch (target?.kind) {
+        case "url":
+            Quickshell.execDetached(["xdg-open", target.value]);
             return true;
-        }
-        const app = String(entry?.desktopEntry ?? "").replace(/\.desktop$/, "");
-        if (app.length > 0) {
-            WindowsService.open(app);
+        case "devices":
+            root.openDevices();
+            return true;
+        case "displays":
+            PlasmaApplets.openSettings("kcm_kscreen");
+            return true;
+        case "app":
+            WindowsService.open(target.value);
             return true;
         }
         return false;
+    }
+
+    // Disks & Devices, as a click on its tray icon opens it: the device
+    // notifier this shell hosts under its own renderer. Where it is not
+    // hosted -- Plasma's tray has it inside, and has no icon of its own to
+    // activate -- the file manager, which lists removable devices too.
+    readonly property string deviceNotifierId: "plasmawindowed_org.kde.plasma.devicenotifier"
+
+    function openDevices() {
+        const item = (SystemTray.items?.values ?? []).find(i => i?.id === root.deviceNotifierId);
+        if (item) {
+            item.activate();
+            return;
+        }
+        Log.info("notifications", "no device notifier in the tray; opening the file manager instead");
+        WindowsService.open("org.kde.dolphin");
     }
 
     // The picture an entry is about, for the centre to draw. The rule is
@@ -70,7 +110,7 @@ QtObject {
 
     // Whether `open` would do anything.
     function openable(entry) {
-        return ((entry?.urls ?? []).length > 0) || String(entry?.desktopEntry ?? "").length > 0;
+        return root.targetOf(entry).kind !== "none";
     }
     function clear() { root.entries = []; root.unseen = 0; }
 
