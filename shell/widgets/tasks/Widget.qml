@@ -111,6 +111,7 @@ BarWidget {
     // button is cut to an equal share of it -- titles elided first, then gone
     // below a readable width, down to the icon alone.
     readonly property real iconOnly: root.iconSize + 2 * root.padding
+    givesWay: true
     readonly property real share: root.room >= 0 && root.items.length > 0
         ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
         : 1e9

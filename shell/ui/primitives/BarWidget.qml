@@ -106,6 +106,12 @@ Item {
     // cutting its titles short -- fits itself into it.
     property real room: -1
 
+    // Whether this widget fits itself into `room`. The panel counts one that
+    // does as taking nothing when it shares the bar out, since it will take
+    // whatever is left -- and so no zone's room depends on another zone's
+    // room, which is the loop the shares used to go round.
+    property bool givesWay: false
+
     // Whether there is anything to show. A battery widget on a desktop, or a
     // Bluetooth one on a machine with no adapter, sets this false and takes no
     // room on the panel -- rather than leaving a gap, or an icon for hardware

@@ -140,10 +140,8 @@ Item {
     readonly property int lead: root.pad + (root.style === "islands" ? root.islandPad : 0)
 
     // How much of the bar each zone may take before it runs into another --
-    // what a widget that can give way, the task list, has to fit in. The
-    // middle has everything between the two ends; an end has what the middle
-    // and the other end leave. Nothing here depends on a zone's own length,
-    // so a widget shrinking into its room does not change the room.
+    // what a widget that can give way, the task list, has to fit in. See
+    // `rooms` below.
     readonly property real bodyLength: root.horizontal ? root.body.width : root.body.height
     readonly property real bodyStart: root.horizontal ? root.body.x : root.body.y
     readonly property int zoneGap: Math.round(16 * Math.max(0.7, root.unit)) + (root.style === "islands" ? 2 * root.islandPad : 0)
@@ -154,12 +152,29 @@ Item {
     // past zero handed the most crowded panel of all the fewest constraints --
     // which is how a taskbar with too many windows ended up drawn over the
     // clock rather than cut short.
-    readonly property real middleRoom: Math.max(0, root.bodyLength - root.lengthOf(leftZone) - root.lengthOf(rightZone)
-        - 2 * (root.lead + root.zoneGap))
-    function endRoom(other) {
-        const middle = root.lengthOf(middleZone);
-        return Math.max(0, root.bodyLength - root.lengthOf(other) - middle - 2 * root.lead
-                           - (middle > 0 ? 2 : 1) * root.zoneGap);
+    //
+    // Each room is worked out once, from the zones' fixed lengths, rather than
+    // from their drawn ones. A drawn length depends on that zone's own room,
+    // so the middle's room read the ends, whose rooms read the middle, and Qt
+    // reported a binding loop at every panel start on a crowded bar.
+    //
+    // While everything fits, every zone is given its own length and all of
+    // what is spare: only a widget that gives way grows into it. When it does
+    // not fit, the middle gives way first, then the right end -- from its
+    // inner side, so the clock at the far end is the last thing cut -- and
+    // the left end last.
+    readonly property var rooms: {
+        const l = leftZone.fixedLength;
+        const m = middleZone.fixedLength;
+        const r = rightZone.fixedLength;
+        const avail = Math.max(0, root.bodyLength - 2 * root.lead
+                                  - (middleZone.shown > 0 ? 2 : 1) * root.zoneGap);
+        const spare = avail - l - m - r;
+        if (spare >= 0)
+            return { left: l + spare, middle: m + spare, right: r + spare };
+        const middle = Math.max(0, avail - l - r);
+        const right = Math.max(0, Math.min(r, avail - l));
+        return { left: Math.min(l, avail), middle: middle, right: right };
     }
 
     // The middle is centred on the bar itself while it fits there, so a long
@@ -176,7 +191,7 @@ Item {
     ZoneRow {
         id: leftZone
         zone: "left"
-        room: root.endRoom(rightZone)
+        room: root.rooms.left
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal
@@ -187,7 +202,7 @@ Item {
     ZoneRow {
         id: middleZone
         zone: "middle"
-        room: root.middleRoom
+        room: root.rooms.middle
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal
@@ -198,7 +213,7 @@ Item {
     ZoneRow {
         id: rightZone
         zone: "right"
-        room: root.endRoom(leftZone)
+        room: root.rooms.right
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal

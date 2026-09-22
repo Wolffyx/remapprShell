@@ -27,6 +27,12 @@ Item {
     // zone works it out; the widget decides whether it can give way.
     property real room: -1
 
+    // What this slot takes along the panel whatever room it is given: all of
+    // itself, or nothing for a widget that gives way. Read only from the
+    // widget's own content, never from `room` -- see PanelSurface.
+    readonly property real fixedLength: root.widget?.givesWay ? 0
+        : root.horizontal ? root.implicitWidth : root.implicitHeight
+
     Binding {
         target: root.widget
         property: "room"
