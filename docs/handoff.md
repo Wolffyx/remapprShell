@@ -200,9 +200,16 @@ any disagreement, in `make lint` and in CI.
    itself, and the sidebar is pulled by its own strip (`sidebar.trigger:
    drag`). What is left is the screen edges it wiped, which are the user's to
    rebind -- `rmpr edges status`.
-4. **A binding loop**, `ZoneRow.qml:27` via `PanelSurface.qml:187`: the left
-   and right zones' `implicitWidth` depend on each other through the middle.
-   A warning only; the panel lays out. Fixing it is a zone-budget redesign.
+4. ~~**A binding loop**~~ -- **fixed 2026-09-22**. It fired at panel start on a
+   crowded bar (ten times on 2026-09-16) and reproduces offscreen:
+   `dev/preview/panel.qml` at 900px wide. Each zone's room is now worked out
+   once, in `PanelSurface.rooms`, from the zones' *fixed* lengths: a widget
+   that sets `givesWay` (the task list) counts as nothing, every other widget
+   at its own size. So no room reads another room. While everything fits, the
+   spare space goes to whatever gives way; when it does not, the middle gives
+   way first, then the right end from its inner side, then the left. **One
+   visible change**: on an overfull bar the task list now shrinks before the
+   tray is cut, where before the tray was cut to make room for tasks.
 5. Snapshot names are a timestamp plus a label and the second line no longer
    repeats the timestamp, but the list is still cramped on a narrow window.
 
