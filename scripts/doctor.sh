@@ -450,6 +450,27 @@ else
     fix "put ours back: $ALIAS theme variant $([ "$variant" = dark ] && echo dark || echo light)"
 fi
 
+# Whether light and dark are settled before the session's applications start.
+#
+# The shell settles them too, but it is late: quickshell has to load, the
+# profile has to be read and Night Light has to answer, which measured eight
+# seconds into the session. Everything XDG autostart brings up -- session
+# restore included -- starts inside that window and reads the desktop's
+# colours once. An Electron application asks the portal at startup and never
+# asks again, so one started in those eight seconds is dark for the rest of
+# the day on a desktop that is light everywhere else.
+auto_lnf=$(kreadconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --default false)
+if [ "$auto_lnf" != "true" ] \
+   && [ "$(config_get '.theme.desktop.followMode' false)" != "true" ]; then
+    ok "light and dark left where you put them (nothing switches them)"
+elif systemctl --user is-enabled "$SLUG-theme.service" >/dev/null 2>&1; then
+    ok "light and dark are settled before the session's applications start"
+else
+    warn "light and dark are settled eight seconds into the session, not before it"
+    fix "applications started in that window -- Electron ones especially -- keep last night's colours all day"
+    fix "settle it at login: systemctl --user enable $SLUG-theme.service"
+fi
+
 # A scheme KDE cannot resolve to a file. kdeglobals names a scheme by the base
 # name of its .colors file -- BreezeDark, not "Breeze Dark" -- and this project
 # wrote the display name there until 2026-09-16. The colours still reached

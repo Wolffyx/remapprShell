@@ -182,6 +182,15 @@ esac
 
 if [ $autostart = 0 ]; then
     step "starting at login" systemctl --user enable --now "$SYSTEMD_UNIT"
+
+    # Separate from the shell, and enabled with it: it settles light and dark
+    # before the session's applications start, which is the one moment the
+    # shell itself is too late for. It writes nothing unless something is
+    # actually switching -- Plasma's own day/night switch, or
+    # `theme.desktop.followMode` -- so enabling it is not a decision about
+    # whether the desktop is themed, or about who switches it.
+    step "settling light and dark at login" \
+        systemctl --user enable "$SLUG-theme.service"
 else
     log_info "not enabled at login; '$ALIAS start' runs it by hand"
 fi

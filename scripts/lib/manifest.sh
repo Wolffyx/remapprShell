@@ -22,6 +22,7 @@ template|share/dbus/windows.service.in|$DBUS_SERVICES_DIR/$DBUS_NAME.service
 symlink|$CTL_BIN|$BIN_DIR/$ALIAS
 template|share/systemd/service.in|$SYSTEMD_USER_DIR/$SYSTEMD_UNIT
 template|share/systemd/report.in|$SYSTEMD_USER_DIR/$SLUG-report@.service
+template|share/systemd/theme.in|$SYSTEMD_USER_DIR/$SLUG-theme.service
 template|share/applications/launcher.desktop.in|$APPLICATIONS_DIR/$SLUG-launcher.desktop
 template|share/applications/search.desktop.in|$APPLICATIONS_DIR/$SLUG-search.desktop
 template|share/applications/settings.desktop.in|$APPLICATIONS_DIR/$SLUG-settings.desktop

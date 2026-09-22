@@ -4,7 +4,7 @@
 #   apply [--appearance|--package-only]
 #                          install the package and activate it
 #   revert                 put every key back and remove the package
-#   variant [light|dark|auto]
+#   variant [light|dark|auto] [--if-following]
 #                          which of light and dark the desktop is in
 #   osd ours|plasma        which OSD draws when our package is active
 #   style [<id>|revert]    the Qt style every application is drawn in
@@ -270,21 +270,56 @@ night_light_daylight() {
     esac
 }
 
+# Night Light answers over the bus, and on the login path it is asked seconds
+# after KWin started -- early enough to be told nothing at all. Answering
+# "no schedule" then is not neutral, so wait briefly for the real answer.
+night_light_wait() {   # [seconds]
+    local deadline=$(( SECONDS + ${1:-5} )) answer
+    while :; do
+        answer=$(night_light_daylight)
+        [ -n "$answer" ] && { printf '%s' "$answer"; return 0; }
+        [ "$SECONDS" -ge "$deadline" ] && return 0
+        sleep 0.25
+    done
+}
+
+# Whether the colour scheme on the desktop right now is a dark one, by the
+# luminance of the window background -- the same question `Scheme.resolveMode`
+# asks of `PlasmaColors.background`.
+scheme_darkness() {
+    local bg r g b
+    bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '')
+    IFS=, read -r r g b <<< "$bg"
+    [ -n "$b" ] || { printf 'dark'; return 0; }
+    if [ $(( (r * 299 + g * 587 + b * 114) / 1000 )) -lt 128 ]; then
+        printf 'dark'
+    else
+        printf 'light'
+    fi
+}
+
 # Light or dark, for the desktop. The shell answers this for itself in
 # Scheme.resolveMode; this is the same question for the applications.
 #
 # `theme.mode` is the user's, and light and dark are answers in themselves.
-# `auto` follows Night Light. With nothing to follow it stays dark, which is
-# what the defaults file said before there was a light variant of it at all.
+# `auto` follows Night Light. With nothing to follow it answers whatever the
+# desktop is already wearing -- which the caller's own "already in x" check
+# then turns into doing nothing at all.
+#
+# It used to answer dark there, which is what the defaults file said before
+# there was a light variant of it at all. That is the one guess that cannot be
+# taken back: a dark written to the desktop is read back as the desktop's own
+# darkness, and auto has latched on its own answer.
 resolve_variant() {
     local mode
     mode=$(config_get '.theme.mode' 'auto')
     case "$mode" in
         light|dark) printf '%s' "$mode"; return 0 ;;
     esac
-    case "$(night_light_daylight)" in
+    case "$(night_light_wait)" in
         true)  printf 'light' ;;
-        *)     printf 'dark' ;;
+        false) printf 'dark' ;;
+        *)     scheme_darkness ;;
     esac
 }
 
@@ -721,6 +756,7 @@ PACKAGE_ONLY=0
 WITH_JSON=0
 RUN_INSTALL=0
 VARIANT_ARG=""
+IF_FOLLOWING=0
 positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -729,6 +765,7 @@ while [ $# -gt 0 ]; do
         --json) WITH_JSON=1 ;;
         --run) RUN_INSTALL=1 ;;
         --variant) VARIANT_ARG=${2:-}; shift ;;
+        --if-following) IF_FOLLOWING=1 ;;
         -*) die "unknown option: $1" ;;
         *) positional+=("$1") ;;
     esac
@@ -873,6 +910,16 @@ case "$cmd" in
         # until the next login.
         kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
 
+        # Writing the colours is not the same as the desktop wearing them.
+        # Every application already open -- KWin's titlebars included -- holds
+        # the palette it read at startup and repaints only when told, which is
+        # what `theme variant` has always done and this never did. Without it
+        # an apply looked like it had half worked: new windows were right,
+        # every window already open kept the old colours until somebody
+        # clicked a scheme in System Settings, which sends this same signal.
+        notify_palette_changed
+        notify_style_changed
+
         log_step "applied"
         log_info "restart plasmashell to see it: systemctl --user restart plasma-plasmashell.service"
         log_info "undo with: $ALIAS theme revert"
@@ -890,6 +937,10 @@ case "$cmd" in
         colors_revert_scheme
         gtk_revert
         remove_colors
+
+        # The colours that were put back reach the open windows the same way
+        # the ones taken away did.
+        notify_palette_changed
         for spec in "${SWITCHER_LAYOUTS[@]}"; do
             IFS='|' read -r _ suffix _ <<< "$spec"
             d=$(switcher_dest "$suffix")
@@ -998,7 +1049,11 @@ case "$cmd" in
                 printf 'theme.mode:   %s\n' "$(config_get '.theme.mode' 'auto')"
                 printf 'night light:  %s\n' "$([ -n "$nl" ] && printf '%s' "$([ "$nl" = true ] && echo daylight || echo night)" || printf 'off or unavailable')"
                 printf 'resolved:     %s\n' "$(resolve_variant)"
-                printf 'follows it:   %s\n' "$(config_get '.theme.desktop.followMode' false)"
+                case "$(lnf_pair_state)" in
+                    ours)   printf 'switched by:  Plasma, between our two packages\n' ;;
+                    breeze) printf 'switched by:  Plasma, but between packages that are not ours\n' ;;
+                    *)      printf 'switched by:  %s\n' "$([ "$(config_get '.theme.desktop.followMode' false)" = "true" ] && printf 'us (theme.desktop.followMode)' || printf 'nobody')" ;;
+                esac
                 printf 'colour scheme: %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
                 printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"
                 exit 0
@@ -1007,6 +1062,46 @@ case "$cmd" in
             light|dark) variant=$1 ;;
             *) die "unknown variant: $1 (one of: light dark auto)" ;;
         esac
+
+        # Who switches light and dark, and what is left for us.
+        #
+        # Plasma has a day/night switch of its own -- "Switch to Dark Mode at
+        # Night" -- and when it is on and naming our two packages it swaps the
+        # whole look-and-feel at sunset: the colour scheme, the icons, the
+        # widget style, the decorations and Alt+Tab, every one of them read
+        # from the package's own `defaults`. Writing those again from here is
+        # a second hand on the same wheel -- the same keys, on a schedule that
+        # can disagree with Plasma's by a few seconds, waking every Qt
+        # application on the machine twice for one sunset.
+        #
+        # So when Plasma is switching, Plasma switches. This fills in only what
+        # a look-and-feel package cannot carry: GTK's theme and its dark
+        # preference, which live in gsettings and which Plasma never touches,
+        # and our own Plasma desktop theme, whose colours are generated per
+        # variant rather than shipped as two packages.
+        #
+        # The switch itself is never written here. It is the user's, set in
+        # System Settings; `theme apply` only makes sure the two packages it
+        # names are ours, so that turning it on does the right thing.
+        case "$(lnf_pair_state)" in
+            ours) plasma_owns=1 ;;
+            *)    plasma_owns=0 ;;
+        esac
+
+        # `--if-following` is what the login unit passes. There are two reasons
+        # to do anything at all: Plasma is switching and the gaps need filling,
+        # or Plasma is not and the user has asked us to switch instead.
+        if [ "$IF_FOLLOWING" = 1 ]; then
+            if [ "$(config_get '.theme.desktop.enabled' true)" != "true" ]; then
+                log_info "leaving the desktop alone (theme.desktop.enabled is off)"
+                exit 0
+            fi
+            if [ "$plasma_owns" = 0 ] \
+               && [ "$(config_get '.theme.desktop.followMode' false)" != "true" ]; then
+                log_info "nothing switches light and dark here: Plasma's own switch is off and so is theme.desktop.followMode"
+                exit 0
+            fi
+        fi
 
         # Called whenever night falls, and on every start, so doing nothing
         # when there is nothing to do matters: a write here wakes every Qt
@@ -1050,7 +1145,12 @@ case "$cmd" in
         # check fail for ever, and every start would re-apply the lot and
         # restart their unit, which wakes every Qt application on the machine.
         scheme_agrees=1
-        if material_you_wanted; then
+        if [ "$plasma_owns" = 1 ]; then
+            # Plasma writes the scheme; whether it has caught up is Plasma's
+            # business, and asking would make this re-run for ever in the
+            # seconds between its write and ours.
+            scheme_agrees=1
+        elif material_you_wanted; then
             scheme_agrees=$material_agrees
         else
             [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" \
@@ -1064,10 +1164,14 @@ case "$cmd" in
             exit 0
         fi
 
-        apply_defaults "$variant" 1 || die "could not write the $variant variant"
+        if [ "$plasma_owns" = 1 ]; then
+            log_info "Plasma switches the global theme; filling in what its packages cannot carry"
+        else
+            apply_defaults "$variant" 1 || die "could not write the $variant variant"
 
-        # The scheme's own colours, not only its name.
-        desktop_part_wanted colours && colors_apply_scheme "$variant"
+            # The scheme's own colours, not only its name.
+            desktop_part_wanted colours && colors_apply_scheme "$variant"
+        fi
 
         # And the applications that ask a portal rather than KDE.
         if desktop_part_wanted gtk; then
@@ -1087,11 +1191,16 @@ case "$cmd" in
 
         # The active package follows the variant too: it is where the OSD, the
         # splash and the logout screen come from, and System Settings shows it
-        # as the global theme in force.
-        kconfig_set theme kdeglobals KDE LookAndFeelPackage "$(lnf_id_for "$variant")"
+        # as the global theme in force. Plasma's switch writes this one itself.
+        [ "$plasma_owns" = 1 ] \
+            || kconfig_set theme kdeglobals KDE LookAndFeelPackage "$(lnf_id_for "$variant")"
 
         notify_palette_changed
-        log_step "the desktop is in $variant"
+        if [ "$plasma_owns" = 1 ]; then
+            log_step "filled in $variant behind Plasma's switch"
+        else
+            log_step "the desktop is in $variant"
+        fi
         ;;
 
     osd)
