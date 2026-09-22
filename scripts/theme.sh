@@ -43,6 +43,7 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
+source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 LNF_SRC="$REPO_ROOT/theme/lookandfeel"
 
@@ -249,26 +250,50 @@ lnf_pair_state() {
     fi
 }
 
-# Is the sun up, by KWin's reckoning? "true", "false", or empty for "nobody
-# knows" -- which is Night Light missing, unsupported or switched off.
+# Plasma's day/night switch is a kded module with a timer, and a timer can
+# miss. On the evening of 2026-09-22 it did: kded6 had been running since
+# 09:56, a Frameworks upgrade at 10:56 replaced 130 of the libraries mapped
+# into it, and sunset at 19:42 came and went with nothing written. The shell
+# had turned dark at 19:13 and every application stayed light until somebody
+# reloaded the module by hand.
 #
-# The same three properties the shell reads, asked the same way: Plasma has no
-# light/dark schedule of its own, and Night Light's is the one the user has
-# already configured, so following it means the desktop and the shell cannot
-# disagree about when night is.
-night_light_daylight() {
-    session_available || return 0
-    local out
-    out=$(busctl --user --json=short get-property org.kde.KWin /org/kde/KWin/NightLight \
-              org.kde.KWin.NightLight available enabled daylight 2>/dev/null) || return 0
-    local values
-    values=$(printf '%s\n' "$out" | jq -r '.data' 2>/dev/null | paste -sd' ' -)
-    case "$values" in
-        "true true true")  printf 'true' ;;
-        "true true false") printf 'false' ;;
-        *) ;;   # unavailable, off, or an answer in a shape we do not know
-    esac
+# Handing the schedule to Plasma is still right -- one writer, no two clocks
+# disagreeing by seconds and waking every Qt application twice for one sunset.
+# What was wrong was never looking. So this looks, waits for Plasma to do its
+# own job, and only writes when it is clear that nobody else will.
+#
+# What it writes goes through the ledger like everything else, `LookAndFeelPackage`
+# included -- which is also what stops the next start from rescuing all over
+# again, since that key is what Plasma's own switch compares against.
+plasma_rescue() {   # plasma_rescue variant
+    local variant=${1:-dark} want deadline
+
+    if [ "$(config_get '.theme.desktop.rescuePlasmaSwitch' true)" != "true" ]; then
+        log_info "Plasma's switch has not put the desktop in $variant, and rescuing it is off"
+        return 0
+    fi
+
+    want=$(lnf_id_for "$variant")
+
+    # This runs a second after the mode changed, which is the same second
+    # Plasma's own switch is working in. Writing now would be a race with a
+    # write that was already coming, so wait for it before concluding there
+    # is none.
+    deadline=$(( SECONDS + 20 ))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        [ "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')" = "$want" ] \
+            && { log_info "Plasma switched the desktop to $variant"; return 0; }
+        sleep 1
+    done
+
+    log_warn "Plasma's own day and night switch did not fire; putting the desktop in $variant ourselves"
+    apply_defaults "$variant" 1 || { log_error "could not write the $variant variant"; return 1; }
+    desktop_part_wanted colours && colors_apply_scheme "$variant"
+    kconfig_set theme kdeglobals KDE LookAndFeelPackage "$want"
 }
+
+# `night_light_daylight` and the rest of KWin's Night Light live in kwin.sh:
+# doctor asks the same question, and one copy of it is one answer.
 
 # Night Light answers over the bus, and on the login path it is asked seconds
 # after KWin started -- early enough to be told nothing at all. Answering
@@ -1160,12 +1185,23 @@ case "$cmd" in
         # after us and are meant to. Asking for our name there would make this
         # check fail for ever, and every start would re-apply the lot and
         # restart their unit, which wakes every Qt application on the machine.
+        # Whether Plasma has actually switched. This used to be assumed --
+        # "Plasma writes the scheme, whether it has caught up is Plasma's
+        # business" -- and the assumption held until the evening of 2026-09-22,
+        # when the autoswitcher did not fire at all: kded had been running
+        # since before a Frameworks upgrade replaced the libraries under it,
+        # and its timer never went off at sunset. The shell turned dark, this
+        # command said "the desktop is already in dark", and every application
+        # stayed light. Noticing costs one read; see `plasma_rescue`.
+        plasma_agrees=1
+        if [ "$plasma_owns" = 1 ]; then
+            [ "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')" \
+                = "$(lnf_id_for "$variant")" ] || plasma_agrees=0
+        fi
+
         scheme_agrees=1
         if [ "$plasma_owns" = 1 ]; then
-            # Plasma writes the scheme; whether it has caught up is Plasma's
-            # business, and asking would make this re-run for ever in the
-            # seconds between its write and ours.
-            scheme_agrees=1
+            scheme_agrees=$plasma_agrees
         elif material_you_wanted; then
             scheme_agrees=$material_agrees
         else
@@ -1182,6 +1218,7 @@ case "$cmd" in
 
         if [ "$plasma_owns" = 1 ]; then
             log_info "Plasma switches the global theme; filling in what its packages cannot carry"
+            [ "$plasma_agrees" = 0 ] && plasma_rescue "$variant"
         else
             apply_defaults "$variant" 1 || die "could not write the $variant variant"
 

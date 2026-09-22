@@ -552,6 +552,34 @@ elif [ "$theme_desktop" = "true" ]; then
     fix "put ours back: $ALIAS theme apply"
 fi
 
+# Plasma's switch is on, names ours, and is still wearing the wrong half. Found
+# on the evening of 2026-09-22: kded6 had been running since before a
+# Frameworks upgrade replaced the libraries mapped into it, its timer never
+# went off at sunset, and the desktop sat in light behind a dark shell for two
+# hours. Nothing in the configuration is wrong when this happens, which is why
+# it needs asking about rather than reading off a key.
+if [ "$theme_desktop" = "true" ] && [ "$lnf_auto" = true ] \
+   && [ "$lnf_light" = "$LNF_PACKAGE_ID" ] && [ "$lnf_dark" = "$LNF_DARK_PACKAGE_ID" ]; then
+    case "$(night_light_daylight)" in
+        true)  lnf_want=$LNF_PACKAGE_ID ;;
+        false) lnf_want=$LNF_DARK_PACKAGE_ID ;;
+        *)     lnf_want='' ;;
+    esac
+    if [ -z "$lnf_want" ]; then
+        :   # no schedule to check it against
+    elif [ "$lnf_now" = "$lnf_want" ]; then
+        ok "Plasma's switch has the desktop in the right half for the hour"
+    else
+        bad "Plasma's day and night switch has not fired: the desktop is in the wrong half"
+        fix "it is a background module on a timer, and a Frameworks upgrade under a"
+        fix "  running session is enough to stop it going off"
+        fix "put it right now:   $ALIAS theme variant auto"
+        fix "wake the module:    qdbus6 org.kde.kded6 /kded unloadModule lookandfeelautoswitcher"
+        fix "                    qdbus6 org.kde.kded6 /kded loadModule lookandfeelautoswitcher"
+        fix "or log out and back in, which starts it fresh"
+    fi
+fi
+
 # A GTK theme whose *name* is the dark half of its pair ignores every
 # preference we write and stays dark in each mode. The preference agreeing is
 # not the same as the theme agreeing.

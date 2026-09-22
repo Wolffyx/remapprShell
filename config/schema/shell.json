@@ -76,6 +76,12 @@
                     "label": "Applications follow day and night",
                     "description": "With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start."
                 },
+                "theme.desktop.rescuePlasmaSwitch": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Fix day and night when Plasma forgets",
+                    "description": "Plasma's own \"Switch to Dark Mode at Night\" is a background module with a timer, and a timer can miss -- a Frameworks upgrade under a running session is enough to stop it. When it does, the shell turns dark at sunset and every application stays light until the next login. On, the desktop is put in the right half here instead, but only after waiting twenty seconds for Plasma to do it first, so the two never write over each other. Off leaves a missed sunset missed."
+                },
                 "theme.desktop.gtk": {
                     "type": "bool",
                     "default": true,

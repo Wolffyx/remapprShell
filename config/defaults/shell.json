@@ -10,6 +10,7 @@
         "desktop": {
             "enabled": true,
             "followMode": false,
+            "rescuePlasmaSwitch": true,
             "gtkThemeLight": "",
             "gtkThemeDark": "",
             "materialYou": false,

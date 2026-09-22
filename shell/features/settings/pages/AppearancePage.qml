@@ -514,6 +514,17 @@ CardGrid {
                 onToggled: value => ConfigStore.set("theme.desktop.followMode", value)
             }
 
+            // Not about who switches, but about noticing when the one who was
+            // supposed to did not. Plasma's switch missed a sunset on
+            // 2026-09-22 and the desktop stayed light behind a dark shell all
+            // evening.
+            ToggleRow {
+                label: "Fix day and night when Plasma forgets"
+                description: "Plasma's own \"Switch to Dark Mode at Night\" runs on a timer, and a timer can miss. When it does, the desktop is put in the right half here -- after twenty seconds' grace, so the two never write over each other."
+                checked: ConfigStore.value("theme.desktop.rescuePlasmaSwitch", true) === true
+                onToggled: value => ConfigStore.set("theme.desktop.rescuePlasmaSwitch", value)
+            }
+
             Repeater {
                 model: [
                     { key: "colours",     label: "Colour scheme",        sub: "The colours every Qt application is drawn with." },
