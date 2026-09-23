@@ -239,6 +239,38 @@ mode ""
 "$REPO_ROOT/scripts/theme.sh" apply >/dev/null 2>&1
 check "back to dark by default"       "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-dark"
 
+# Plasma's own day/night switch writes the global theme's *name*. The colours
+# in kdeglobals are a second write, and on the morning of 2026-09-23 the
+# desktop had the first without the second: `LookAndFeelPackage` and
+# `ColorScheme` both said light, every `[Colors:*]` group still held the dark
+# scheme's values, and every Qt application drew dark. The name was all this
+# command asked, so it agreed with Plasma and wrote nothing at all.
+echo "== Plasma switched the name and the colours did not follow =="
+bg_of() { sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' "$COLORS_DIR/$SLUG-$1.colors" | head -1; }
+light_bg=$(bg_of light); dark_bg=$(bg_of dark)
+
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel true
+kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage "$LNF_PACKAGE_ID"
+check "the two halves are ours"      "$("$REPO_ROOT/scripts/theme.sh" variant | sed -n 's/^switched by: *//p')" "Plasma, between our two packages"
+check "and the colours are the other half" "$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal)" "$dark_bg"
+
+half=$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1)
+check "a half-done switch is not 'already light'" "$(printf '%s\n' "$half" | grep -c 'already in light')" "0"
+check "it says which half is missing"             "$(printf '%s\n' "$half" | grep -c 'still holds the other')" "1"
+check "and the light colours land"                "$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal)" "$light_bg"
+check "once they have, it does nothing"           "$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1 | grep -c 'already in light')" "1"
+
+# The part's own switch still holds: colours off means colours left alone,
+# whoever is switching.
+desktop_parts_off '{ "colours": false }'
+kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage "$LNF_DARK_PACKAGE_ID"
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+check "colours off leaves them alone"             "$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal)" "$light_bg"
+desktop_parts_off ""
+
+kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --delete
+
 # Chrome, Electron and GTK applications ask a portal rather than KDE, and the
 # GTK portal answers from dconf. A light colour scheme with that left alone is
 # what "dark mode is active globally" was.

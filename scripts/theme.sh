@@ -292,6 +292,35 @@ plasma_rescue() {   # plasma_rescue variant
     kconfig_set theme kdeglobals KDE LookAndFeelPackage "$want"
 }
 
+# The other half of the same fault: Plasma switched, and its colours did not
+# follow.
+#
+# `plasma_rescue` above is for Plasma not switching at all. This one is for
+# Plasma switching and leaving the desktop half done -- `LookAndFeelPackage`
+# and `ColorScheme` in this variant, the `[Colors:*]` groups still in the
+# other. Found on the morning of 2026-09-23, on a machine started an hour after
+# sunrise: every name in kdeglobals said light, every window was dark, and
+# `theme variant` read the names, agreed with them and wrote nothing. Three
+# separate checks -- this command's, the shell's and doctor's -- all called
+# that desktop light, because all three asked the name.
+#
+# Which is the whole reason the colours are copied into kdeglobals at all: the
+# name is a label, and `[Colors:*]` is what every Qt application reads.
+#
+# It costs one read when all is well. That is the price of never again calling
+# a dark desktop light.
+plasma_fill_colours() {   # plasma_fill_colours <light|dark>
+    local variant=$1
+    desktop_part_wanted colours || return 0
+    # With kde-material-you-colors following, the colours on the desktop are
+    # deliberately theirs and disagreeing with ours is the point.
+    if material_you_wanted; then return 0; fi
+    if colours_match "$variant"; then return 0; fi
+
+    log_warn "Plasma put the $variant global theme on, but kdeglobals still holds the other variant's colours"
+    colors_apply_scheme "$variant"
+}
+
 # `night_light_daylight` and the rest of KWin's Night Light live in kwin.sh:
 # doctor asks the same question, and one copy of it is one answer.
 
@@ -321,6 +350,26 @@ scheme_darkness() {
     else
         printf 'light'
     fi
+}
+
+# Whether the colours in kdeglobals are the ones this variant's scheme carries.
+#
+# Naming a scheme and wearing it are two separate writes -- see
+# `colors_apply_scheme` -- and on the morning of 2026-09-23 the desktop had the
+# first without the second: `LookAndFeelPackage` and `ColorScheme` both said
+# light, every `[Colors:*]` group still held the dark scheme's values, and every
+# Qt application drew dark. The window background is enough to tell the two
+# apart; it is the one colour the variants can never share.
+#
+# No scheme installed to compare against is not a disagreement, so it answers
+# yes: a missing file is `colors_apply_scheme`'s warning to give, not this.
+colours_match() {   # colours_match <light|dark>
+    local want have
+    want=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
+               "$COLORS_DIR/$SLUG-$1.colors" 2>/dev/null | head -1 | tr -d ' ')
+    [ -n "$want" ] || return 0
+    have=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '' | tr -d ' ')
+    [ "$have" = "$want" ]
 }
 
 # Light or dark, for the desktop. The shell answers this for itself in
@@ -1149,11 +1198,7 @@ case "$cmd" in
         # application on the machine.
         colours_agree=1
         if desktop_part_wanted colours; then
-            want_bg=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
-                          "$COLORS_DIR/$SLUG-$variant.colors" 2>/dev/null | head -1)
-            have_bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '')
-            [ -n "$want_bg" ] && [ "$(printf '%s' "$have_bg" | tr -d ' ')" = "$(printf '%s' "$want_bg" | tr -d ' ')" ] \
-                || colours_agree=0
+            colours_match "$variant" || colours_agree=0
         fi
 
         gtk_agrees=1
@@ -1179,12 +1224,6 @@ case "$cmd" in
                               --group CUSTOM --key light --default '' 2>/dev/null)" = "$want_my" ] \
                 || material_agrees=0
         fi
-        # Whose colour scheme is on the desktop. Normally it must be ours by
-        # name and by value; with kde-material-you-colors following, it is
-        # deliberately theirs -- they apply MaterialYouLight or MaterialYouDark
-        # after us and are meant to. Asking for our name there would make this
-        # check fail for ever, and every start would re-apply the lot and
-        # restart their unit, which wakes every Qt application on the machine.
         # Whether Plasma has actually switched. This used to be assumed --
         # "Plasma writes the scheme, whether it has caught up is Plasma's
         # business" -- and the assumption held until the evening of 2026-09-22,
@@ -1193,15 +1232,32 @@ case "$cmd" in
         # and its timer never went off at sunset. The shell turned dark, this
         # command said "the desktop is already in dark", and every application
         # stayed light. Noticing costs one read; see `plasma_rescue`.
-        plasma_agrees=1
+        #
+        # It is the package's *name*, and that is all it is. Whether the
+        # variant's colours reached kdeglobals is a second question, asked
+        # below -- on the morning of 2026-09-23 the first was yes and the
+        # second no, and asking only this one is how a dark desktop was called
+        # light three times over. See `plasma_fill_colours`.
+        plasma_named=1
         if [ "$plasma_owns" = 1 ]; then
             [ "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')" \
-                = "$(lnf_id_for "$variant")" ] || plasma_agrees=0
+                = "$(lnf_id_for "$variant")" ] || plasma_named=0
         fi
 
+        # Whose colour scheme is on the desktop, by name and by value. Normally
+        # both must be ours; with kde-material-you-colors following, they are
+        # deliberately theirs -- they apply MaterialYouLight or MaterialYouDark
+        # after us and are meant to. Asking for our name there would make this
+        # check fail for ever, and every start would re-apply the lot and
+        # restart their unit, which wakes every Qt application on the machine.
         scheme_agrees=1
         if [ "$plasma_owns" = 1 ]; then
-            scheme_agrees=$plasma_agrees
+            [ "$plasma_named" = 1 ] || scheme_agrees=0
+            if material_you_wanted; then
+                [ "$material_agrees" = 1 ] || scheme_agrees=0
+            else
+                [ "$colours_agree" = 1 ] || scheme_agrees=0
+            fi
         elif material_you_wanted; then
             scheme_agrees=$material_agrees
         else
@@ -1218,7 +1274,11 @@ case "$cmd" in
 
         if [ "$plasma_owns" = 1 ]; then
             log_info "Plasma switches the global theme; filling in what its packages cannot carry"
-            [ "$plasma_agrees" = 0 ] && plasma_rescue "$variant"
+            [ "$plasma_named" = 0 ] && plasma_rescue "$variant"
+            # Whether Plasma switched by itself, was waited for, or was stood
+            # in for above, the colours are read again here: they are the half
+            # every Qt application actually draws from.
+            plasma_fill_colours "$variant"
         else
             apply_defaults "$variant" 1 || die "could not write the $variant variant"
 

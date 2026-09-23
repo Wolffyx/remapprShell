@@ -510,6 +510,26 @@ if [ -n "$scheme_now" ]; then
     done
     if [ -n "$found" ]; then
         ok "the colour scheme resolves to a file: $found/$scheme_now.colors"
+
+        # And holds that file's colours, which is a separate write again.
+        #
+        # kdeglobals carries both: the scheme's name under [General], and a
+        # copy of its [Colors:*] groups, which is what every Qt application
+        # reads. Found disagreeing on the morning of 2026-09-23 -- the name
+        # said our light scheme, every group held our dark one, and every
+        # window on the desktop was dark while this section said nothing.
+        want_bg=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
+                      "$found/$scheme_now.colors" 2>/dev/null | head -1 | tr -d ' ')
+        have_bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '' | tr -d ' ')
+        if [ -z "$want_bg" ] || [ "$have_bg" = "$want_bg" ]; then
+            :
+        else
+            bad "kdeglobals names '$scheme_now' and holds another scheme's colours"
+            fix "the name is a label; the [Colors:*] groups copied beside it are what"
+            fix "  every Qt application draws from -- so the desktop wears the copy"
+            fix "'$scheme_now' paints windows $want_bg; kdeglobals says $have_bg"
+            fix "put the named scheme's colours back: $ALIAS theme variant auto"
+        fi
     else
         bad "kdeglobals names a colour scheme no file is called: '$scheme_now'"
         fix "KDE identifies a scheme by its file's base name, not the name it shows"
@@ -568,7 +588,7 @@ if [ "$theme_desktop" = "true" ] && [ "$lnf_auto" = true ] \
     if [ -z "$lnf_want" ]; then
         :   # no schedule to check it against
     elif [ "$lnf_now" = "$lnf_want" ]; then
-        ok "Plasma's switch has the desktop in the right half for the hour"
+        ok "Plasma's switch names the right half for the hour: $lnf_now"
     else
         bad "Plasma's day and night switch has not fired: the desktop is in the wrong half"
         fix "it is a background module on a timer, and a Frameworks upgrade under a"
