@@ -195,8 +195,38 @@ uses. Pointing that at kglobalaccel would delete the whole class.
 declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
 any disagreement, in `make lint` and in CI.
 
-**What to pick up first, 2026-09-23.** Three of these want the user at the
-keyboard; nothing is half-written and `make lint`/`make test` are clean.
+**What to pick up first, 2026-09-24.** Nothing is half-written; `make lint`,
+`make test` and `rmpr doctor` are all clean, and `dev` is pushed.
+
+1. **Meta+Space opens KRunner, not our search.** Reported by the user on
+   2026-09-23 and confirmed: `kglobalshortcutsrc` has **both**
+   `[remappr-shell] search=Meta+Space,none,Search` **and**
+   `[services][org.kde.krunner.desktop] _launch=Search\tAlt+Space\tAlt+F2\tMeta+Space`.
+   kglobalaccel gives a key to whoever registered last, and here that is
+   KRunner. The ledger already records `[services/org.kde.krunner.desktop]
+   _launch (was: Search\tAlt+Space\tAlt+F2\tMeta+Space)` -- so this project
+   *did* take Meta+Space out of KRunner once, and the value on disk is the old
+   one again. **The question to answer first is who put it back**: KRunner
+   re-registering its default at login is the obvious suspect, and if that is
+   it, taking the key once at `shortcuts set` is not enough -- it has to be
+   taken again at every start, or KRunner's default has to be changed in a way
+   it will not undo. Do not guess; watch `kglobalshortcutsrc` across a login.
+2. **Sunset, watched.** Tonight's is the first real one since the theme work:
+   Plasma's kded autoswitcher flips the package, `plasma_fill_colours` fills
+   the colours in and announces them, and every layer should follow. The two
+   failure modes are covered and `doctor` names either; nobody has seen kded
+   do it on its own yet.
+3. **Press the keys.** Bind `switcher` to a spare key (Alt+Tab is KWin's here
+   by the user's choice) and hold it: that one press proves the held
+   switcher's commit (queue item 1's leftover) *and* the quick-Alt+Tab fix
+   (item 6). `rmpr switcher show` opens it from a terminal, with no modifier
+   held, which is not the same test.
+4. **The tray shows three of ten icons** because `widgets.tray.pinned` names
+   three. Not a bug -- see the afternoon of 2026-09-23 -- but ask the user
+   whether that is what they meant to set, because they reported it as
+   "missing icons".
+
+**Older, still open. Two of these want the user at the keyboard.**
 
 1. **Press the keys.** Bind `switcher` to a spare key (Alt+Tab is KWin's here
    by the user's choice) and hold it: that one press proves the held
