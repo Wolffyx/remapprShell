@@ -42,7 +42,13 @@ Rectangle {
             ]
         },
         {
-            label: "four, one minimised",
+            label: "a tall window",
+            item: { appName: "Spectacle", iconName: "spectacle", iconFile: "", windows: [] },
+            windows: [stage.win("Unsaved* — Spectacle", { width: 900, height: 1300 })]
+        },
+        {
+            label: "four, one minimised, header on",
+            header: true,
             item: { appName: "Spectacle", iconName: "spectacle", iconFile: "", windows: [] },
             windows: [
                 stage.win("Unsaved — Spectacle", { active: true }),
@@ -53,8 +59,9 @@ Rectangle {
         }
     ]
 
-    Row {
-        anchors.centerIn: parent
+    Flow {
+        anchors.fill: parent
+        anchors.margins: 28
         spacing: 28
 
         Repeater {
@@ -84,6 +91,7 @@ Rectangle {
                         height: implicitHeight
                         item: scene.modelData.item
                         windows: scene.modelData.windows
+                        showHeader: scene.modelData.header === true
                     }
                 }
             }

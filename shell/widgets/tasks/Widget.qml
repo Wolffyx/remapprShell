@@ -54,6 +54,12 @@ BarWidget {
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
 
+    // The application's name above its preview cards, and a second square
+    // peeking out behind the icon of an application with several windows.
+    readonly property bool previewHeader: root.widgetConfig?.previewHeader ?? false
+    readonly property bool previewScreen: root.widgetConfig?.previewScreen ?? false
+    readonly property bool stackGroups: root.widgetConfig?.stackGroups ?? true
+
     // Desktop entry ids, in the order they sit on the taskbar.
     readonly property var pinned: root.widgetConfig?.pinned ?? []
 
@@ -156,7 +162,10 @@ BarWidget {
         return b ? b.x + b.width / 2 : 0;
     }
 
-    popoutPadding: root.popoutMode === "menu" ? 8 : 14
+    // The preview's cards carry their own inner margin, so the card around
+    // them adds only a little: 14 on top of theirs was the wide empty border
+    // round a single window.
+    popoutPadding: root.popoutMode === "menu" ? 8 : 6
     // The menu is a list of actions and has a width of its own; the preview
     // is a picture and takes its size from what it is showing.
     readonly property int menuWidth: 262
@@ -395,11 +404,34 @@ BarWidget {
                     anchors.centerIn: parent
                     spacing: Math.round(10 * Math.max(0.7, root.unit))
 
-                    PanelIcon {
+                    Item {
                         anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: root.drawnIcon
-                        iconName: button.modelData.iconName
-                        iconFile: button.modelData.iconFile
+                        width: root.drawnIcon
+                        height: root.drawnIcon
+
+                        // Several windows: a square behind the icon, up and to
+                        // the right, as if a second copy of the application
+                        // were stacked under the first -- the count read at a
+                        // glance on the button itself, not only in the marks
+                        // under it.
+                        Rectangle {
+                            visible: root.stackGroups && button.windowCount > 1
+                            width: Math.round(root.drawnIcon * 0.86)
+                            height: width
+                            x: Math.round(root.drawnIcon * 0.26)
+                            y: -Math.round(root.drawnIcon * 0.14)
+                            radius: Math.round(width * 0.24)
+                            color: Theme.alpha(Theme.fg, button.isActive ? 0.3 : 0.2)
+                            border.width: 1
+                            border.color: Theme.alpha(Theme.fg, 0.4)
+                        }
+
+                        PanelIcon {
+                            anchors.fill: parent
+                            implicitSize: root.drawnIcon
+                            iconName: button.modelData.iconName
+                            iconFile: button.modelData.iconFile
+                        }
                     }
 
                     PanelText {
@@ -521,6 +553,8 @@ BarWidget {
     readonly property Component preview: Component {
         TaskPreview {
             item: root.previewItem
+            showHeader: root.previewHeader
+            showScreen: root.previewScreen
             windows: item?.windows ?? []
 
             onPointerInsideChanged: {

@@ -284,6 +284,27 @@ Column {
             checked: ConfigStore.value("widgets.tasks.thisScreenOnly", false) === true
             onToggled: value => ConfigStore.set("widgets.tasks.thisScreenOnly", value)
         }
+
+        ToggleRow {
+            label: "Stack the icon of an application with several windows"
+            description: "A second square behind the icon, so the count shows on the button itself."
+            checked: ConfigStore.value("widgets.tasks.stackGroups", true) === true
+            onToggled: value => ConfigStore.set("widgets.tasks.stackGroups", value)
+        }
+
+        ToggleRow {
+            label: "Name the application above its previews"
+            description: "Off, each window's card carries the icon and title itself, as Windows draws them."
+            checked: ConfigStore.value("widgets.tasks.previewHeader", false) === true
+            onToggled: value => ConfigStore.set("widgets.tasks.previewHeader", value)
+        }
+
+        ToggleRow {
+            label: "Name the monitor on each preview"
+            description: "With more than one monitor, the one a window is on -- \"DP-2\" -- after its title."
+            checked: ConfigStore.value("widgets.tasks.previewScreen", false) === true
+            onToggled: value => ConfigStore.set("widgets.tasks.previewScreen", value)
+        }
     }
 
     Card {
