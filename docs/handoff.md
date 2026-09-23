@@ -280,6 +280,60 @@ any disagreement, in `make lint` and in CI.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### Twelve lock screens, and what every one of them draws (2026-09-23, late afternoon)
+
+**Uncommitted at the time of writing.** The design file's turns 3 and 4
+(`Meridian Lock Options.dc.html`, read through the design MCP again) were
+built: five more styles -- **minimal, dayahead, secure, accessible, kiosk** --
+and turn 4's "polish on every screen", which is not a style at all but four
+things the frame now draws over whichever style is up:
+
+- **the lockout countdown** (`LockLockout`, `LockRing`). pam_faillock says
+  "(10 minutes left to unlock)" once; `Unlock.say()` turns that into
+  `lockedUntil`/`lockedSpan`, which only ever draw -- PAM still refuses.
+- **the battery running out** (`LockPower`) -- the design's 4d, as a state
+  rather than a style: a pill at powerdevil's low level, a banner at its
+  critical level, and at `hibernateAt` (default 3, 0 = never) a minute's
+  countdown to `session.hibernate()`. The levels are read from powerdevilrc
+  with `QtCore.Settings`, so the lock screen and PowerDevil agree.
+- **the idle dim** (`LockDim`) after `dimSeconds` (default 20, 0 = never),
+  woken by `Unlock.activity()`, a new signal `poke()` emits.
+- **the shutter** on the way out. `Unlock.finished` now calls
+  `LockUi.leave()` and the greeter quits on `LockUi.gone()` -- after 750 ms of
+  the style sliding up over the un-blurring wallpaper, or at once with
+  `unlockAnimation false`. **A timer guarantees `gone` within 1.5 s whatever
+  happens**; that is the line to keep if any of this is touched.
+
+Also: the clock digits roll (`LockClock`, every style), Caps Lock and a
+non-first layout are warned about (`LockMessage` in words, `LockStatus` in
+amber), `accent` is a setting (four names), the console's F-keys are bound to
+what the greeter can do (F1 sleep, F2 hibernate, F3 switch user, F4 play,
+Ctrl+U clear) instead of printed, and `LockActions` buttons take Tab.
+
+**Not built, and why.** 4c "update pending" -- nothing in this project knows
+about pending system updates, and a restart scheduled from the lock screen
+would need the session to act on it. The design's agendas, weather, device
+posture, reservations, notification cards and sign-in history are demo data;
+each style's header says what it drew instead. A shell-to-greeter bridge (the
+shell writing a file the greeter reads with `QtCore.Settings`) would make some
+of them possible; it is a decision about what a locked screen may show, not
+a technicality, so it was left for the user.
+
+**Two traps found on the way.** (1) The user pressed `try` on two styles
+while their files were still being written and got nothing: a *known* style
+name with a broken file drew an empty Loader. `LockUi` now falls back to
+glass on `Loader.Error` too, proven with a deliberately broken copy. (2)
+`try` refuses anything `check` complains about, and `check` only loaded the
+*selected* style -- so a style with a binding loop (`letterSpacing: 0.12 *
+font.pixelSize` inside the same `font`) passed until picked. **`rmpr
+lockscreen check --all`** loads all twelve (about 30 s); run it after touching
+any style. `lockscreen_check` takes a style as its third argument, and
+`dev/preview/lock.sh` takes `{"options": {...}, "simulate": {...}}` so no
+picture ever writes the user's `lockscreen.conf`.
+
+Still true: the lock screen is off, and every change here is a new build that
+`try` must unlock before `enable` accepts it.
+
 ### Icons missing from the panel until a restart (2026-09-23, afternoon)
 
 The user's own words named it: *"the taskbar/panel does not have all the icons
