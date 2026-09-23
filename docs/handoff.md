@@ -1,7 +1,10 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on the **morning of 2026-09-23**,
+sessions, and added to since -- most recently on the **evening of 2026-09-23**
+(twelve lock screens, a reworked taskbar preview, and the global shortcuts
+moved into the shell's configuration: read "The evening of 2026-09-23" and
+"Twelve lock screens" first). Before that, the **morning of 2026-09-23**,
 which was one bug in two halves: the desktop came up dark two hours after
 sunrise while every name in `kdeglobals` said light and all three of this
 project's checks agreed with the names -- and then, the colours mended, the
@@ -279,6 +282,49 @@ any disagreement, in `make lint` and in CI.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The evening of 2026-09-23: previews, and the keys moved into the configuration
+
+**Two commits (`cac1f45`, `1339c9d`), on top of the lock screens below.**
+
+**Taskbar previews** (`shell/widgets/tasks/TaskPreview.qml`). The user asked
+for Windows' arrangement and then, seeing it copied too closely, for the
+shell's own look back -- so: Windows' *layout* (a card per window, a title
+line with the small icon, the title and a close button; the picture under
+it), the shell's *surfaces* (resting tile, `accC` for the focused window,
+round close button in `Theme.error`). The big header is off by default
+(`widgets.tasks.previewHeader`), the monitor name after a title is off
+(`previewScreen` -- the user saw "DP-2" and asked for it gone), pictures take
+the window's shape at one height, middle-click on a card closes that window,
+and an application with several windows gets a square behind its taskbar
+icon (`stackGroups`). **Never seen live on a screen by a session** -- offscreen
+thumbnails are icons; the user was looking at it.
+
+**Shortcuts are configuration now.** `shortcuts.<action>` in the profile (14
+keys in the schema): Meta and Meta+Space by default, `""` = leave to KDE,
+`none` = unbound. `rmpr shortcuts sync` applies it, **and the daemon runs sync
+at every start** (`GlobalShortcuts.sync_configured` in `bin/windowsd.py.in`),
+so a key taken back while the shell was not looking is reclaimed. Proven on
+this machine: Meta+Space given back to KRunner by hand, `rmpr windows
+restart`, reclaimed. This reverses the old "nothing is bound by default"
+decision, at the user's request. The user's profile is
+**`recovered-appearance`** (not `default`) and holds their six keys.
+
+**The morning's KRunner mystery is answered.** `accel_keycode` did not know
+the key name `Search`, KRunner's first key, so every `shortcuts set search
+Meta+Space` failed its live push to KRunner and fell back to "next login".
+KRunner kept the key live, and kglobalaccel later wrote that live state back
+into the file -- which is the "who put it back" this file asked. The table now
+has every named key in the user's kglobalshortcutsrc (codes from PyQt6's
+`QKeySequence`, not from memory). **Worth knowing:** a daemon change needs
+`make link` (or `make install`) -- `~/.local/bin/<slug>-windowsd` is a rendered
+copy, and `rmpr windows restart` only restarts what is on disk. A KRunner
+group missing from kglobalshortcutsrc is normal: kglobalaccel omits entries
+equal to their defaults (Alt+Space, Alt+F2, Search).
+
+Also this session, uncommitted-then-committed: the search key briefly moved to
+Meta+S and the sidebar to Meta+N on a misunderstanding, and was put back.
+Search is Meta+Space, the sidebar Meta+S.
 
 ### Twelve lock screens, and what every one of them draws (2026-09-23, late afternoon)
 
