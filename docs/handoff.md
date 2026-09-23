@@ -2,11 +2,14 @@
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
 sessions, and added to since -- most recently on the **morning of 2026-09-23**,
-which was one bug: the desktop came up dark two hours after sunrise while every
-name in `kdeglobals` said light, and all three of this project's checks agreed
-with the names. Read "The morning of 2026-09-23" first; it is short, and the
-lesson in it -- *a name in `kdeglobals` is a claim about the desktop, not the
-desktop* -- outlives the bug. Before it, **2026-09-22, a long day in
+which was one bug in two halves: the desktop came up dark two hours after
+sunrise while every name in `kdeglobals` said light and all three of this
+project's checks agreed with the names -- and then, the colours mended, the
+titlebars stayed dark anyway, because writing `kdeglobals` by hand is silent
+and nothing in the session was ever told. Read "The morning of 2026-09-23"
+first, both parts; the two lessons in it -- *a name in `kdeglobals` is a claim
+about the desktop, not the desktop*, and *a write nobody is told about is a
+write nobody acts on* -- outlive the bug. Before it, **2026-09-22, a long day in
 two halves**. The morning was two shapes of fault: *something was written and
 nobody was told*, and *something was installed and nothing could reach it*. It
 also ended the queue's first item (shortcuts are in-process now) and found that
@@ -120,7 +123,7 @@ and the rest still say what 2026-09-16 found.
 | Tray | 8 items, nothing pinned, so every one is on the panel and there is no chevron. Curate it with `rmpr settings tray` |
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
-| Theme | *(2026-09-23)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on and Plasma is keeping up, only GTK's theme and dark preference and our Plasma desktop theme. When Plasma's switch misses a sunset (it did, on 2026-09-22; see that night's entry) `theme.desktop.rescuePlasmaSwitch` writes the variant after twenty seconds' grace. When the switch fires and its *colours* do not follow (2026-09-23: every name light, every `[Colors:*]` group dark), `plasma_fill_colours` copies them in -- the name is checked and so is the value, because only the value is what applications draw. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
+| Theme | *(2026-09-23)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on and Plasma is keeping up, only GTK's theme and dark preference and our Plasma desktop theme. When Plasma's switch misses a sunset (it did, on 2026-09-22; see that night's entry) `theme.desktop.rescuePlasmaSwitch` writes the variant after twenty seconds' grace. When the switch fires and its *colours* do not follow (2026-09-23: every name light, every `[Colors:*]` group dark), `plasma_fill_colours` copies them in -- the name is checked and so is the value, because only the value is what applications draw. Every write to kdeglobals is **announced** on the bus (`org.kde.kconfig.notify.ConfigChanged`, `busctl` not `gdbus`, see that day's part two): without it KWin's decorations and the desktop portal keep the old colours, and Chrome, Electron and Claude Code with them. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
 | Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- put back twice now, on 2026-09-15 after a restore and on **2026-09-22** after the caelestia uninstall unset the kwinrc key again. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it. *(2026-09-22)* **The hover previews draw real windows for the first time**: the compiled `KWinScreencast` module had been installed and unreachable since the day it was built, because `~/.local/lib/qt6/qml` was not on the session's `QML2_IMPORT_PATH` |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
@@ -314,6 +317,93 @@ as one.
 **The lesson generalises past this bug, and is the reason the fix is shaped
 the way it is:** any writer can leave `kdeglobals` half-applied, and a name in
 it is a claim about the desktop, not the desktop. Check the value.
+
+#### The same morning, part two: written and nobody told
+
+The user came back with the part the first fix did not reach: *"the topbar of
+Dolphin was still dark... claude code still seems to detect some dark theme
+somewhere. Please check all the places."* So all the places were checked, on
+the running desktop, with a probe window and `dbus-monitor`.
+
+**The colours were right and nothing had been told.** KDE's own tools write
+`kdeglobals` through KConfig with its `Notify` flag, which puts a
+`ConfigChanged` signal on the bus; every `KConfigWatcher` in the session is
+listening. This project writes the file by hand -- `kdeglobals-colors.py`, for
+the good reason that a scheme is a hundred keys and the per-key ledger would
+mean a hundred rewrites twice a day -- and a write by hand is **silent**.
+
+Measured, not guessed. A `kdialog` window was opened and the dark scheme's
+colours were written the way this project writes them:
+
+| | before | after a silent write |
+| --- | --- | --- |
+| window background | light | **dark** |
+| titlebar | light | **light** |
+
+The contents followed and the decoration did not, because the older
+`org.kde.KGlobalSettings notifyChange` this project already sent reaches an
+application's palette and **KWin's decoration palette is a `KConfigWatcher`**,
+which heard nothing. The same silence is why `xdg-desktop-portal-kde` -- which
+is what answers Chrome, every Electron application and Claude Code -- kept
+saying `color-scheme: 1` after a switch to light.
+
+The signal was read off the bus from a real `kwriteconfig6 --notify` rather
+than remembered:
+
+    path      /kdeglobals
+    interface org.kde.kconfig.notify
+    member    ConfigChanged
+    signature a{saay}     -- {group: [key, ...]}, the keys as byte arrays
+
+`notify` in the helper sends it, and `colors_apply_scheme` calls it. **It is
+sent with `busctl`, not `gdbus`**: `gdbus emit` writes a GVariant bytestring,
+which is nul-terminated, so `ColorScheme\0` would match nothing on the other
+side. `busctl` takes the bytes as numbers.
+
+**Two more places the colours were not reaching.**
+
+- **`[ColorEffects:Disabled]` and `[ColorEffects:Inactive]`** are as much a
+  part of a colour scheme as `[Colors:*]`, and the helper had never copied
+  them: a light desktop greyed its disabled text with whatever grey the last
+  scheme left. They are governed now.
+- **`plasma_fill_colours`, written four hours earlier, wrote the colours and
+  not the name** -- the same fault upside down, and `doctor` caught it on this
+  machine within the hour. It writes both.
+
+**Widening what a scheme governs broke the one promise this project makes
+about other people's configuration**, and the fix for that is worth reading
+before touching the set again. A backup written under the old set has no
+record of `[ColorEffects:*]`, so a `revert` would take those groups away and
+put nothing back. The first attempt -- "save anything governed now that the
+backup does not mention" -- is wrong, and the test caught it: by the second
+apply the groups in `kdeglobals` are **ours**, and the backup would have
+handed a revert the very scheme it exists to undo. So the backup records
+`governs`, what "governed" meant when it was written, and only groups outside
+*that* set are added. The live backup on this machine was stamped by hand
+after the fix; its Colors and WM blocks are still the user's own, in hex, from
+2026-09-15.
+
+**What the audit found in order, and where each is written:**
+
+| where the variant has to reach | how | state |
+| --- | --- | --- |
+| `kdeglobals [Colors:*]`, `[WM]` | copied by `colors_apply_scheme` | was already right |
+| `kdeglobals [ColorEffects:*]` | same copy | **added 2026-09-23** |
+| `kdeglobals [General] ColorScheme` | `apply_defaults`, or `plasma_fill_colours` | **fixed 2026-09-23** |
+| `kdeglobals [KDE] LookAndFeelPackage` | Plasma's switch, or `plasma_rescue` | fixed that morning |
+| `kdeglobals [Icons] Theme` | the package Plasma applies | checked by `doctor` now |
+| KWin's window decorations | `[WM]` + **the ConfigChanged signal** | **fixed 2026-09-23** |
+| xdg-desktop-portal-kde -> Chrome, Electron, Claude Code | kdeglobals + the signal | **fixed 2026-09-23** |
+| xdg-desktop-portal-gtk -> the same applications | gsettings `color-scheme` | was already right |
+| GTK 3 and GTK 4 `settings.ini`, `gtk-theme` | `gtk_apply_variant` | was already right |
+| Plasma's own widgets | `install_desktoptheme` | right from the next plasmashell start, as before |
+| this shell | reads kdeglobals itself | was already right |
+
+Proven on the running desktop afterwards: the same window's titlebar followed
+`rmpr theme variant dark`, and the portal's `color-scheme` moved with it. One
+thing that does **not** follow and is not ours: a `kdialog --textbox`'s text
+view keeps its palette until the window is reopened, which is a Qt widget
+holding an explicit palette, not a message that failed to arrive.
 
 ### Seven lock screens, and the picker (2026-09-22, late)
 

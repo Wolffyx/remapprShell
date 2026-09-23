@@ -600,6 +600,25 @@ if [ "$theme_desktop" = "true" ] && [ "$lnf_auto" = true ] \
     fi
 fi
 
+# The icon theme is in the package too, and a package is applied whole -- so
+# when Plasma is the one switching, the icons are Plasma's to write and not
+# ours. Checked rather than assumed, for the same reason the colours are: the
+# morning of 2026-09-23 showed that "Plasma applied the package" and "every
+# part of the package reached kdeglobals" are two different statements.
+if [ "$theme_desktop" = "true" ] && [ "$(config_get '.theme.desktop.icons' true)" = "true" ] \
+   && [ -f "$PLASMA_LNF_DIR/$lnf_now/contents/defaults" ]; then
+    want_icons=$(sed -n '/^\[kdeglobals\]\[Icons\]/,/^\[/ s/^Theme=//p' \
+                     "$PLASMA_LNF_DIR/$lnf_now/contents/defaults" | head -1)
+    have_icons=$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '')
+    if [ -z "$want_icons" ] || [ "$have_icons" = "$want_icons" ]; then
+        ok "the icon theme is the one the active package names: ${have_icons:-<unset>}"
+    else
+        warn "the icon theme is '$have_icons'; the global theme in force asks for '$want_icons'"
+        fix "the package was applied and this part of it did not land"
+        fix "put it right: $ALIAS theme variant auto"
+    fi
+fi
+
 # A GTK theme whose *name* is the dark half of its pair ignores every
 # preference we write and stays dark in each mode. The preference agreeing is
 # not the same as the theme agreeing.

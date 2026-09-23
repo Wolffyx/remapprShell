@@ -318,7 +318,14 @@ plasma_fill_colours() {   # plasma_fill_colours <light|dark>
     if colours_match "$variant"; then return 0; fi
 
     log_warn "Plasma put the $variant global theme on, but kdeglobals still holds the other variant's colours"
-    colors_apply_scheme "$variant"
+    colors_apply_scheme "$variant" || return 1
+
+    # The name beside them, when it is the other variant's. Copying a scheme's
+    # colours in under another scheme's name is the same fault upside down --
+    # and it is one this function caused on 2026-09-23 before it did this.
+    [ "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')" \
+        = "$SLUG-$variant" ] \
+        || kconfig_set theme kdeglobals General ColorScheme "$SLUG-$variant"
 }
 
 # `night_light_daylight` and the rest of KWin's Night Light live in kwin.sh:
@@ -535,12 +542,35 @@ colors_apply_scheme() {   # <light|dark>
 
     mkdir -p "$(dirname "$backup")" "$(dirname "$kdeglobals")"
     touch "$kdeglobals"
-    [ -f "$backup" ] || python3 "$COLORS_HELPER" save "$kdeglobals" "$backup" \
-        || { log_error "could not save the colours that were there"; return 1; }
+    if [ -f "$backup" ]; then
+        # A backup written before a group joined the governed set knows nothing
+        # of it, and a revert would take it away without putting anything back.
+        python3 "$COLORS_HELPER" save-widened "$kdeglobals" "$backup" \
+            || log_warn "could not widen the saved colours; a revert may leave a group out"
+    else
+        python3 "$COLORS_HELPER" save "$kdeglobals" "$backup" \
+            || { log_error "could not save the colours that were there"; return 1; }
+    fi
 
     python3 "$COLORS_HELPER" apply "$scheme" "$kdeglobals" \
         || { log_error "could not copy the $variant colours into kdeglobals"; return 1; }
     log_step "copied the $variant colours into kdeglobals"
+
+    # And say so. Writing the file by hand is silent, and a silent write is one
+    # nobody acts on: on 2026-09-23 a window's contents followed the new
+    # colours and its titlebar stayed the old ones, because KWin's decoration
+    # palette is a KConfigWatcher and no ConfigChanged ever reached it. The
+    # portal that answers Chrome and every Electron application is another.
+    notify_colours_changed "$scheme"
+}
+
+# The signal KConfig sends when it writes kdeglobals itself. `notify_palette_changed`
+# below is the other, older one, which reaches an application's contents but
+# not its decoration; both are sent, because KDE's own apply sends both.
+notify_colours_changed() {   # notify_colours_changed <scheme.colors>
+    session_available || return 0
+    python3 "$COLORS_HELPER" notify "$1" >/dev/null 2>&1 \
+        || log_warn "could not announce the colours; applications will catch up when next started"
 }
 
 colors_revert_scheme() {

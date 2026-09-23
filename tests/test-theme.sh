@@ -259,6 +259,9 @@ half=$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1)
 check "a half-done switch is not 'already light'" "$(printf '%s\n' "$half" | grep -c 'already in light')" "0"
 check "it says which half is missing"             "$(printf '%s\n' "$half" | grep -c 'still holds the other')" "1"
 check "and the light colours land"                "$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal)" "$light_bg"
+# Copying a scheme's colours under another scheme's name is the same fault
+# upside down, and this function caused it before it wrote the name as well.
+check "and the name goes with them"               "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)" "$SLUG-light"
 check "once they have, it does nothing"           "$("$REPO_ROOT/scripts/theme.sh" variant light 2>&1 | grep -c 'already in light')" "1"
 
 # The part's own switch still holds: colours off means colours left alone,
@@ -270,6 +273,61 @@ check "colours off leaves them alone"             "$(kreadconfig6 --file kdeglob
 desktop_parts_off ""
 
 kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --delete
+
+# `[ColorEffects:*]` is as much a part of a colour scheme as `[Colors:*]`: it
+# is how disabled and inactive things are drawn. It was left behind until
+# 2026-09-23, so a light desktop greyed its disabled text with the dark
+# scheme's grey.
+echo "== a scheme is more than its [Colors:*] groups =="
+effect_of() { sed -n '/^\[ColorEffects:Inactive\]/,/^\[/ s/^Color=//p' "$COLORS_DIR/$SLUG-$1.colors" | head -1; }
+"$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "the light effects are copied too" "$(kreadconfig6 --file kdeglobals --group "ColorEffects:Inactive" --key Color)" "$(effect_of light)"
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+check "and the dark ones"                "$(kreadconfig6 --file kdeglobals --group "ColorEffects:Inactive" --key Color)" "$(effect_of dark)"
+
+# A backup written before `[ColorEffects:*]` joined the governed set knows
+# nothing about those groups, so a revert would take them away and put nothing
+# back. Widening it is right; widening it by "everything governed now that the
+# backup does not mention" is not -- by the second apply that is *our own
+# colours*, and the backup would hand a revert the scheme it exists to undo.
+echo "== a backup written before the group set grew =="
+widen="$SANDBOX/widen"
+mkdir -p "$widen"
+printf '[Colors:Window]\nBackgroundNormal=1,2,3\n\n[ColorEffects:Inactive]\nColor=4,5,6\n' > "$widen/kdeglobals"
+sections() { python3 -c "import json,sys; print(' '.join(b['section'] for b in json.load(open(sys.argv[1]))['blocks']))" "$1"; }
+
+# As the old code wrote it: the groups it governed, and no note of which those were.
+printf '{"blocks": [{"index": 1, "section": "Colors:Window", "text": "[Colors:Window]\\nBackgroundNormal=1,2,3\\n\\n"}]}\n' > "$widen/backup.json"
+python3 "$REPO_ROOT/scripts/lib/kdeglobals-colors.py" save-widened "$widen/kdeglobals" "$widen/backup.json"
+check "the new group is recorded"       "$(sections "$widen/backup.json")" "Colors:Window ColorEffects:Inactive"
+python3 "$REPO_ROOT/scripts/lib/kdeglobals-colors.py" save-widened "$widen/kdeglobals" "$widen/backup.json"
+check "and widening again does nothing" "$(sections "$widen/backup.json")" "Colors:Window ColorEffects:Inactive"
+
+# Nothing was there when we started, and a widen must not change that answer.
+printf '{"blocks": []}\n' > "$widen/empty.json"
+python3 "$REPO_ROOT/scripts/lib/kdeglobals-colors.py" save-widened "$widen/kdeglobals" "$widen/empty.json"
+check "our own colours are not theirs"  "$(sections "$widen/empty.json")" "ColorEffects:Inactive"
+
+# Writing kdeglobals by hand is silent, and a silent write is one nobody acts
+# on: KDE's own tools write through KConfig, which puts a ConfigChanged on the
+# bus, and every KConfigWatcher in the session -- KWin's decoration palette and
+# the desktop portal among them -- is listening for it. Measured on 2026-09-23:
+# without it a window's contents followed the new colours and its titlebar did
+# not.
+echo "== and it is announced, not written in silence =="
+: > "$CALLS"
+"$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "no session, nothing emitted"      "$(wc -l < "$CALLS")" "0"
+
+"$REPO_ROOT/scripts/theme.sh" variant dark >/dev/null 2>&1
+: > "$CALLS"
+env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/theme.sh" variant light >/dev/null 2>&1
+check "the config change is announced"   "$(grep -c 'emit /kdeglobals org.kde.kconfig.notify ConfigChanged' "$CALLS")" "1"
+check "and the older signal as well"     "$(grep -c 'emit /KGlobalSettings' "$CALLS")" "1"
+# The key names go as byte arrays, and busctl takes the bytes as numbers --
+# `gdbus` would nul-terminate them and a listener would match none.
+check "it names the key listeners watch" "$(grep -c 'General 1 11 67 111 108 111 114 83 99 104 101 109 101' "$CALLS")" "1"
+: > "$CALLS"
 
 # Chrome, Electron and GTK applications ask a portal rather than KDE, and the
 # GTK portal answers from dconf. A light colour scheme with that left alone is
