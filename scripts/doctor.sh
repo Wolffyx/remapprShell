@@ -728,6 +728,26 @@ if [ "$(config_get '.theme.desktop.gtk' true)" = "true" ] && command -v gsetting
     fi
 fi
 
+# The daemon on the bus, against the file it was installed from.
+#
+# It is started by the bus rather than by the shell's unit, so it outlives
+# every way of restarting the shell -- which is right, because the KWin script
+# must be able to reach it before the shell exists, and a trap after an update:
+# the fix is on disk and the process is the one that started with the session.
+# On 2026-09-23 that made an icon fix appear to do nothing three times over.
+daemon_bin="$BIN_DIR/$WINDOWSD_BIN"
+daemon_pid=$(pgrep -f "$daemon_bin" 2>/dev/null | head -1)
+if [ -n "$daemon_pid" ] && [ -f "$daemon_bin" ]; then
+    if [ "$daemon_bin" -nt "/proc/$daemon_pid" ]; then
+        warn "the window daemon running is older than the one installed"
+        fix "it is started by the bus, not by the shell's unit, so restarting the"
+        fix "  shell leaves it exactly where it was"
+        fix "start the one on disk: $ALIAS windows restart"
+    else
+        ok "the window daemon running is the one installed"
+    fi
+fi
+
 # ---------------------------------------------------------------- lock screen
 
 section "lock screen"

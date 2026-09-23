@@ -250,6 +250,84 @@ keyboard; nothing is half-written and `make lint`/`make test` are clean.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### Icons missing from the panel until a restart (2026-09-23, afternoon)
+
+The user's own words named it: *"the taskbar/panel does not have all the icons
+... it has some caching or something. If I reset the shell I think the icons
+will be displayed, but I do not want to do that every time."* The restart was
+doing nothing but forgetting, and forgetting was the fix.
+
+**`WindowIcons.path_for` cached a miss for the life of the daemon.** For an
+application whose icon is not in the theme, the daemon reads `_NET_WM_ICON`
+off the X11 window and caches the PNG it writes. The cache was careful about a
+stale *path* -- a restored snapshot takes the file out from under it, which is
+a fault this file already records -- and careless about a stale *answer*:
+
+    if app_id in self._cache:
+        cached = self._cache[app_id]
+        if cached is None or os.path.exists(cached):
+            return cached        # `None` returned for ever
+
+`_NET_WM_ICON` is set by the toolkit a little *after* the window is mapped,
+and Electron, Proton and the JVM are all late. A window asked the instant it
+appears has no icon yet, the `None` was kept, and that application had no icon
+until the daemon was restarted.
+
+A miss is now kept for **three seconds and six attempts** and then looked at
+again -- bounded, because one lookup is an `xprop` sweep of every window on
+the display and there is an update per window change, which is the cost the
+cache exists to avoid. A window with no icon after twenty seconds has none.
+Seven checks in `tests/test-windows.sh` cover it, including that a real miss
+gives up and that a path whose file went away is still re-read.
+
+**The window daemon is started by the bus, not by the shell's unit**, and that
+cost most of the afternoon. `systemctl --user restart remappr-shell.service`
+leaves it exactly where it was -- on this machine it had been up since
+09:03:46 through three shell restarts -- so a fix to `windowsd.py` lands on
+disk and never runs, and the symptom is a fix that "does nothing". It is
+`share/dbus/windows.service.in` that starts it, and that is right: the KWin
+script has to be able to reach the daemon before the shell exists. So:
+
+* `rmpr windows restart` kills it and calls it back. There is no unit to stop.
+  The `List` it makes afterwards is what starts it again -- without that, the
+  daemon returns only at the next window change and the task list is empty
+  until then.
+* `doctor` compares the running process against the file it was installed
+  from and says so when they differ, because nothing else will.
+
+**A Steam game's icon comes from Steam now.** `steam_app_1407200` (World of
+Tanks) drew a grey rectangle because that is genuinely what its window
+publishes as `_NET_WM_ICON` -- under Proton, a window with no icon gets the
+Windows default and the cache stored it faithfully. Steam has had the real one
+all along, in `appcache/librarycache/<appid>/`, where the artwork is named for
+what it is (`library_hero.jpg`, `logo.png`, `header.jpg`) and **the icon is
+the one file named for its hash** -- forty hex characters, 32x32. That is the
+only rule that tells the icon from the cover art, and it is what
+`WindowIcons._steam_icon` matches. Flatpak Steam and `~/.steam/root` are
+looked at too. It is asked on every call rather than under the retry budget:
+it is two filesystem calls, and an icon Steam writes after a game first runs
+is then picked up without waiting.
+
+**Two things found in the same sweep that are not bugs**, worth knowing before
+either is "fixed" again:
+
+- **Seven of ten tray icons sit behind the chevron** because
+  `widgets.tray.pinned` names exactly three (`Claude_status_icon_1`,
+  `discord_status_icon_1`, `ZapZap`), written through the settings window on
+  2026-09-22 at 18:18. An empty `pinned` means everything; a non-empty one
+  means *only* those. `TrayLayout.split` says so in its own comments, the
+  settings page reads the same function, and `tray list` over IPC shows all
+  ten items present. Settings -> Tray icons is where it changes.
+- **The WoT window's icon really is a grey rectangle.** `steam_app_1407200`
+  publishes a generic window pixmap as its `_NET_WM_ICON`, and the cache
+  stored what it was given, faithfully. Nothing to fix in this shell; giving
+  Steam applications their library icon would be new work, not a repair.
+
+Useful while chasing this: `quickshell -c remappr-shell ipc call panel layout
+<screen>` gives every widget's box, and `... ipc call tray list` gives the tray
+the shell actually holds, which is how "the items are there and the icons are
+not" was told apart from "the items are gone" without a screenshot.
+
 ### The morning of 2026-09-23: a light desktop wearing dark colours
 
 **The user reported it the way it looked: "I started the pc a few minutes ago

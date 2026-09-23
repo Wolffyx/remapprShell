@@ -4,6 +4,7 @@
 #   enable    install and load the KWin script
 #   disable   unload and remove it
 #   status    what is installed, loaded and reporting
+#   restart   start the daemon again, so it is the copy on disk
 #   show      the windows as the daemon currently has them
 #   close ID  close one window, by the uuid the list reports -- what the task
 #             list's "Close window" runs
@@ -115,6 +116,25 @@ case "$cmd" in
         printf 'loaded:    %s\n' "$(kwin_script isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo 'unknown')"
         printf 'daemon:    %s\n' "$(busctl --user --json=short list 2>/dev/null | grep -c "$DBUS_NAME" >/dev/null && echo 'on the bus' || echo 'not running (it starts when something calls it)')"
         printf 'windows:   %s\n' "$("$0" show 2>/dev/null | wc -l)"
+        ;;
+
+    # The daemon is started by the bus, not by the shell's unit, so it outlives
+    # `systemctl --user restart` and every other way of restarting the shell.
+    # That is right -- the KWin script must be able to reach it before the
+    # shell exists -- and it is a trap after an update: the file on disk is new
+    # and the process is the one that started with the session. Found on
+    # 2026-09-23, when an icon fix appeared to do nothing three times over.
+    #
+    # Killed rather than stopped: there is no unit to stop. The next call on
+    # the bus starts it again, which is what the List below is for -- without
+    # it the daemon comes back only at the next window change, and the task
+    # list is empty until then.
+    restart)
+        pkill -f "$BIN_DIR/$WINDOWSD_BIN" 2>/dev/null || true
+        sleep 1
+        busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List >/dev/null 2>&1 || true
+        log_step "the window daemon is the one on disk now"
+        log_info "its window list fills in at the next window change; open and close something to hurry it"
         ;;
 
     show)

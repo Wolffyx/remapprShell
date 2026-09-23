@@ -45,6 +45,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 
 import gi
 
@@ -575,8 +576,28 @@ class WindowIcons:
     it did before.
     """
 
+    # How often a lookup that found nothing is tried again, and how many times.
+    #
+    # A miss is not a fact about the application, it is a fact about the
+    # moment. `_NET_WM_ICON` is set by the toolkit a little *after* the window
+    # is mapped -- Electron, Proton and the JVM are all late -- so a window
+    # asked about the instant it appears often has no icon yet. Keeping that
+    # answer for the life of the daemon is the whole of "some icons are
+    # missing until I restart the shell": the restart was doing nothing but
+    # forgetting.
+    #
+    # Tried again, but not on every KWin event. One lookup is an `xprop` sweep
+    # of every window on the display and there is an update per window change,
+    # so an unbounded retry would be a poor way to draw a panel -- which is
+    # what the cache was there to avoid in the first place. Six attempts at
+    # three seconds apart covers a slow start and then stops: a window that
+    # still has no icon after twenty seconds does not have one.
+    MISS_RETRY_SECONDS = 3.0
+    MISS_ATTEMPTS = 6
+
     def __init__(self):
         self._cache = {}          # appId -> path or None
+        self._misses = {}         # appId -> (attempts, monotonic of the last)
         self._available = self._check()
 
     @staticmethod
@@ -591,13 +612,49 @@ class WindowIcons:
             return False
         return bool(os.environ.get("DISPLAY"))
 
-    def path_for(self, app_id, pid):
-        """A cached PNG for this application, or None."""
-        if not self._available or not app_id or not pid:
+    # Where Steam keeps the icon it shows in its own library, and what the file
+    # is called. Every app has a directory named for its id; the artwork in it
+    # is named for what it is (`library_hero.jpg`, `logo.png`, `header.jpg`)
+    # and the **icon** is named for its hash -- forty hex characters, 32x32.
+    # That is the only rule that tells the icon from the cover art.
+    STEAM_DIRS = (
+        "~/.local/share/Steam",
+        "~/.steam/root",
+        "~/.var/app/com.valvesoftware.Steam/data/Steam",
+    )
+    STEAM_APP = re.compile(r"steam_app_(\d+)\Z")
+    STEAM_ICON = re.compile(r"[0-9a-f]{40}\.(?:jpg|jpeg|png)\Z", re.IGNORECASE)
+
+    @classmethod
+    def _steam_icon(cls, app_id):
+        """Steam's own icon for a `steam_app_<id>` window, or None.
+
+        A game's window carries whatever icon its engine set, and under Proton
+        that is usually the generic rectangle Windows gives a window with none
+        -- which is what the panel drew for World of Tanks. Steam has the real
+        one on disk all along.
+        """
+        match = cls.STEAM_APP.match(app_id)
+        if not match:
             return None
-        # Once per application, not once per update: xprop over every window on
-        # every KWin event would be a poor way to draw a panel.
-        #
+        for root in cls.STEAM_DIRS:
+            directory = os.path.join(os.path.expanduser(root),
+                                     "appcache", "librarycache", match.group(1))
+            try:
+                names = sorted(os.listdir(directory))
+            except OSError:
+                continue
+            for name in names:
+                path = os.path.join(directory, name)
+                if cls.STEAM_ICON.match(name) and os.path.isfile(path):
+                    return path
+        return None
+
+    def path_for(self, app_id, pid):
+        """A cached icon for this application, or None."""
+        if not app_id:
+            return None
+
         # What is cached is a path, not a picture, and a path can stop being
         # true: restoring a snapshot, or clearing the state directory, takes
         # the file out from under it. The shell was then handed a path to a
@@ -605,19 +662,50 @@ class WindowIcons:
         # which is what "some icons stopped working" was, after a restore
         # removed the cache directory. So a cached hit is trusted only while
         # the file behind it is still there; otherwise it is read again.
-        if app_id in self._cache:
-            cached = self._cache[app_id]
-            if cached is None or os.path.exists(cached):
-                return cached
+        cached = self._cache.get(app_id)
+        if cached is not None and os.path.exists(cached):
+            return cached
 
+        # Steam is asked every time, ahead of the budget below: it is two
+        # filesystem calls, and it means an icon Steam writes after the game
+        # first runs is picked up without waiting for anything.
+        found = self._steam_icon(app_id)
+        if found:
+            self._cache[app_id] = found
+            self._misses.pop(app_id, None)
+            return found
+
+        # A miss is kept too, or every update would sweep the display for the
+        # handful of applications that genuinely have no icon. It is kept for a
+        # while and a few tries, not for ever: see the constants above.
+        if app_id in self._cache and self._cache[app_id] is None \
+           and not self._worth_another_look(app_id):
+            return None
+
+        # Once per application, not once per update: xprop over every window on
+        # every KWin event would be a poor way to draw a panel.
         self._cache[app_id] = None
-        try:
-            window = self._x11_window_for(pid)
-            if window:
-                self._cache[app_id] = self._extract(window, app_id)
-        except Exception as exc:                      # never take the daemon down
-            print(f"could not read an icon for {app_id}: {exc}", file=sys.stderr)
+        if self._available and pid:
+            try:
+                window = self._x11_window_for(pid)
+                if window:
+                    self._cache[app_id] = self._extract(window, app_id)
+            except Exception as exc:                  # never take the daemon down
+                print(f"could not read an icon for {app_id}: {exc}", file=sys.stderr)
+
+        if self._cache[app_id] is None:
+            attempts, _ = self._misses.get(app_id, (0, 0.0))
+            self._misses[app_id] = (attempts + 1, time.monotonic())
+        else:
+            self._misses.pop(app_id, None)
         return self._cache[app_id]
+
+    def _worth_another_look(self, app_id):
+        """Whether a lookup that found nothing should be made again yet."""
+        attempts, last = self._misses.get(app_id, (0, 0.0))
+        if attempts >= self.MISS_ATTEMPTS:
+            return False
+        return time.monotonic() - last >= self.MISS_RETRY_SECONDS
 
     @staticmethod
     def _x11_window_for(pid):

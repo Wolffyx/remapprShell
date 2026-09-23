@@ -20,7 +20,7 @@ usage: @ALIAS@ <command> [options]
   report create|list|show|remove    write a local diagnostic report
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
-  windows enable|disable|status     the open-window list (needs a KWin script)
+  windows enable|disable|status|restart  the open-window list (needs a KWin script)
   edges status|set|shell|snap|disable-all  the screen's corners and edges
   switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)

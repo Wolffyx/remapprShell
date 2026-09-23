@@ -201,6 +201,130 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
 
+# A game's window carries whatever icon its engine set, and under Proton that
+# is the generic rectangle Windows gives a window with none -- which is what
+# the panel drew for World of Tanks. Steam has the real one on disk, in a
+# directory of artwork where the *icon* is the one file named for its hash.
+echo "== a Steam game's icon comes from Steam =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+
+steam = os.path.join(sandbox, "steam")
+lib = os.path.join(steam, "appcache", "librarycache", "1407200")
+os.makedirs(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db"), exist_ok=True)
+icon = os.path.join(lib, "3ba3158e913a637a1fbe033db4f88fccc52f1ff4.jpg")
+for name in ("library_hero.jpg", "logo.png", "header.jpg", "library_600x900.jpg"):
+    open(os.path.join(lib, name), "w").close()
+open(icon, "w").close()
+# The artwork also sits in hash-named *directories*, which are not the icon.
+open(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db", "library_header.jpg"), "w").close()
+
+class Steamy(mod["WindowIcons"]):
+    STEAM_DIRS = (steam,)
+    def __init__(self):
+        self._cache, self._misses, self._available = {}, {}, False
+        self.looks = 0
+    def _x11_window_for(self, pid):
+        self.looks += 1
+        return None
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+check("the hash-named file is the icon", Steamy._steam_icon("steam_app_1407200"), icon)
+check("the artwork beside it is not",    os.path.basename(Steamy._steam_icon("steam_app_1407200")), os.path.basename(icon))
+check("a game Steam has nothing for",    Steamy._steam_icon("steam_app_4"), None)
+check("an ordinary application",         Steamy._steam_icon("org.kde.dolphin"), None)
+check("steam itself is not an app id",   Steamy._steam_icon("steam"), None)
+
+# It is found without a display, and without touching the window at all.
+probe = Steamy()
+check("found with no X11 lookup",        (probe.path_for("steam_app_1407200", 1), probe.looks), (icon, 0))
+# An icon Steam writes later is still picked up: the cheap check is not budgeted.
+probe = Steamy()
+probe.path_for("steam_app_4", 1)
+late = os.path.join(steam, "appcache", "librarycache", "4")
+os.makedirs(late, exist_ok=True)
+late_icon = os.path.join(late, "a" * 40 + ".png")
+open(late_icon, "w").close()
+check("an icon written later is found",  probe.path_for("steam_app_4", 1), late_icon)
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+
+# A lookup that found nothing is a fact about the moment, not about the
+# application: `_NET_WM_ICON` is set a little after the window is mapped, so a
+# window asked the instant it appears often has no icon yet. Keeping that
+# answer for the life of the daemon is what "some icons are missing until I
+# restart the shell" was -- the restart forgot, and that was the whole fix.
+echo "== a missing icon is looked at again, a few times =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+
+class Probe(mod["WindowIcons"]):
+    """The real path_for, with the display replaced by a script of answers."""
+    MISS_RETRY_SECONDS = 0.0        # the waiting is not what is under test
+
+    def __init__(self, script):
+        self._cache, self._misses, self._available = {}, {}, True
+        self.script, self.looks = list(script), 0
+
+    def _x11_window_for(self, pid):
+        return "0x1"
+
+    def _extract(self, window, app_id):
+        self.looks += 1
+        return self.script.pop(0) if self.script else None
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+icon = os.path.join(sandbox, "late.png")
+open(icon, "w").close()
+
+# Late, as Electron and Proton are: nothing twice, then an icon.
+p = Probe([None, None, icon])
+check("nothing on the first look",  p.path_for("late", 1), None)
+check("nothing on the second",      p.path_for("late", 1), None)
+check("and the icon on the third",  p.path_for("late", 1), icon)
+check("three looks, not one",       p.looks, 3)
+check("then it stops looking",      (p.path_for("late", 1), p.looks), (icon, 3))
+
+# A window that really has no icon must not cost a display sweep for ever.
+p = Probe([])
+for _ in range(20):
+    p.path_for("never", 1)
+check("a real miss gives up",       p.looks, Probe.MISS_ATTEMPTS)
+
+# The path is cached, not the picture, and a path can stop being true.
+p = Probe([icon])
+p.path_for("gone", 1)
+os.unlink(icon)
+check("a path that went away is read again", (p.path_for("gone", 1), p.looks), (None, 2))
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+
 # The shortcuts the daemon owns. Two things can be checked without a session:
 # that a key string becomes the integer kglobalaccel wants -- the same numbers
 # scripts/lib/accel.sh is checked against, from the same measurements off a
