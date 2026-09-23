@@ -285,6 +285,23 @@ check "Plasma's key goes to Plasma"      "$(plasmakey showMediaControls)" "false
 check "an inverted key is stored inverted" "$(plasmakey hideClockWhenIdle)" "true"
 check "and read back as it was set"        "$(lookval idleClock)" "false"
 check "defaults where nothing is set"      "$(lookval session)" "true"
+
+# The turn-3 and turn-4 styles, and what came with them.
+"$LS" set style kiosk >/dev/null
+check "a new style is a style"             "$(ourkey style)" "kiosk"
+check "the accent takes a name"            "$("$LS" set accent '#ff0000' >/dev/null 2>&1; echo $?)" "1"
+"$LS" set accent green >/dev/null
+check "and is written by name"             "$(ourkey accent)" "green"
+check "dimming takes seconds in range"     "$("$LS" set dim 9000 >/dev/null 2>&1; echo $?)" "1"
+"$LS" set dim 0 >/dev/null
+check "zero dims never, and is kept"       "$(lookval dim)" "0"
+check "hibernating stops at ten percent"   "$("$LS" set hibernateAt 50 >/dev/null 2>&1; echo $?)" "1"
+"$LS" set kioskName "Riverside Library · 2nd floor" >/dev/null
+check "text is kept as written"            "$(lookval kioskName)" "Riverside Library · 2nd floor"
+check "text takes one line"                "$("$LS" set kioskNote $'one\ntwo' >/dev/null 2>&1; echo $?)" "1"
+check "and a sensible length"              "$("$LS" set kioskNote "$(printf 'x%.0s' {1..121})" >/dev/null 2>&1; echo $?)" "1"
+"$LS" set kioskName "" >/dev/null
+check "and can be emptied"                 "$(lookval kioskName)" ""
 check "only Plasma's keys are ledgered"    "$(jq '[.entries[] | select(.scope == "lockscreen")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
 
 echo "== nothing reached the session =="

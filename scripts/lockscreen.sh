@@ -2,14 +2,15 @@
 # The lock screen: ours, drawn by Plasma's own greeter, and off by default.
 #
 #   status [--json]   what is installed, what was tried, what will be drawn
-#   check             load it in Plasma's greeter, offscreen and off the bus,
-#                     and say what the greeter said
+#   check [--all]     load it in Plasma's greeter, offscreen and off the bus,
+#                     and say what the greeter said; --all loads every style
 #   try               show it for real, in the greeter's testing mode, and
 #                     unlock it with your password -- that is the test
 #   enable            put it in this shell's packages; refused until `try`
 #                     has unlocked this exact build, in this greeter
 #   disable           take it out; Plasma's lock screen from the next lock
-#   set <key> <value> how it looks: style, clock, blur, media, session, idleClock
+#   set <key> <value> how it looks: style, clock, blur, media, session, idleClock,
+#                     accent, dim, unlockAnimation, hibernateAt, kioskName, kioskNote
 #
 # The look settings go into kscreenlockerrc under the greeter's own group,
 # because the greeter is where they are read: it runs as its own process with
@@ -87,10 +88,16 @@ EOF
 #
 # id | key | kind | choices | default | store | inverted
 LOOK_KEYS=(
-    "style|style|enum|glass editorial console ambient board poster seats|glass|ours|"
+    "style|style|enum|glass editorial console ambient board poster seats minimal dayahead secure accessible kiosk|glass|ours|"
     "clock|clockPosition|enum|left center|left|ours|"
     "blur|wallpaperBlur|int|0 40|26|ours|"
     "session|showSessionButtons|bool||true|ours|"
+    "accent|accent|enum|indigo terracotta green violet|indigo|ours|"
+    "dim|dimSeconds|int|0 600|20|ours|"
+    "unlockAnimation|unlockAnimation|bool||true|ours|"
+    "hibernateAt|hibernateAt|int|0 10|3|ours|"
+    "kioskName|kioskName|text|||ours|"
+    "kioskNote|kioskNote|text|||ours|"
     "media|showMediaControls|bool||true|plasma|"
     "idleClock|hideClockWhenIdle|bool||true|plasma|invert"
 )
@@ -217,6 +224,25 @@ case "$cmd" in
         ;;
 
     check)
+        # --all loads every style in turn, not only the one picked: a style
+        # nobody has chosen yet is still one somebody can choose.
+        if [ "${1:-}" = "--all" ]; then
+            src=${2:-$LOCKSCREEN_SRC}
+            spec=$(look_spec style)
+            IFS='|' read -r _ _ _ styles _ <<< "$spec"
+            failed=0
+            for st in $styles; do
+                if out=$(lockscreen_check "$src" 15 "$st"); then
+                    log_step "$st: loads"
+                else
+                    log_warn "$st: does not load cleanly"
+                    printf '%s\n' "$out" | sed 's/^/    /' >&2
+                    failed=1
+                fi
+            done
+            [ "$failed" = 0 ] || die "not every style loads cleanly"
+            exit 0
+        fi
         src=${1:-$LOCKSCREEN_SRC}
         if out=$(lockscreen_check "$src"); then
             log_step "it loads in Plasma's greeter and found everything it needs"
@@ -328,6 +354,10 @@ EOF
                   lo=${choices%% *}; hi=${choices##* }
                   [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
             enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
+            # One line, drawn as it is written: a newline would be a second
+            # key to KConfig, and a lock screen is no place for an essay.
+            text) [[ "$value" != *$'\n'* ]] || die "$id takes one line"
+                  [ "${#value}" -le 120 ] || die "$id takes at most 120 characters" ;;
         esac
 
         if [ "$(look_read "$spec")" = "$value" ]; then

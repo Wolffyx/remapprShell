@@ -11,14 +11,18 @@
     read neither -- it has no session and this file has no way to open /proc --
     so the banner says what is actually known: the account, the screen, and
     what the authenticator has said so far. The F-keys are labelled with the
-    three things SessionManagement can really do on this machine, and they are
-    bound: a style that printed "F12 poweroff" without binding it would be a
-    picture of a console rather than one.
+    things the greeter can really do on this machine, and they are bound: a
+    style that printed "F12 poweroff" without binding it would be a picture of
+    a console rather than one. So the design's F2 reboot and F12 poweroff are
+    not here -- the greeter cannot do either -- and neither is F3, which
+    showed notifications the greeter never receives. What is: F1 sleep, F2
+    hibernate, F3 switch user, F4 play or pause, Ctrl+U to clear the line.
 */
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.mpris as Mpris
 
 LockStyle {
     id: console_
@@ -27,7 +31,7 @@ LockStyle {
 
     readonly property color ink: "#cdc6be"
     readonly property color mut: "#8a8378"
-    readonly property color accent: "#4f60c8"
+    readonly property color accent: console_.ui.accent
     readonly property color warn: "#e0c98a"
 
     blursWallpaper: false
@@ -35,6 +39,61 @@ LockStyle {
 
     promptField: password
     promptBlock: block
+
+    // "12 min ago", from when the greeter started, redrawn each minute.
+    property date now: new Date()
+    readonly property string lockedFor: {
+        const minutes = Math.floor((console_.now - console_.ui.lockedAt) / 60000);
+        return minutes < 1 ? "just now" : minutes < 60 ? minutes + " min ago"
+            : Math.floor(minutes / 60) + " h " + (minutes % 60) + " min ago";
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: true
+        onTriggered: console_.now = new Date()
+    }
+
+    // The one player Plasma's lock screen would control, or null.
+    Mpris.MultiplexerModel {
+        id: players
+    }
+
+    component Player: QtObject {
+        required property var model
+    }
+
+    Instantiator {
+        id: playerRow
+        model: players
+        delegate: Player {}
+    }
+
+    readonly property var player: console_.ui.setting("showMediaControls", true) && playerRow.count > 0
+        ? (playerRow.objectAt(0) as Player)?.model ?? null : null
+
+    readonly property var keys: [
+        { key: "F1", label: "sleep", can: console_.ui.session.canSuspend && Options.showSessionButtons,
+          run: () => console_.ui.session.suspend() },
+        { key: "F2", label: "hibernate", can: console_.ui.session.canHibernate && Options.showSessionButtons,
+          run: () => console_.ui.session.hibernate() },
+        { key: "F3", label: "switch user", can: console_.ui.session.canSwitchUser && Options.showSessionButtons,
+          run: () => console_.ui.session.switchUser() },
+        { key: "F4", label: console_.player?.playbackStatus === Mpris.PlaybackStatus.Playing ? "pause" : "play",
+          can: console_.player !== null && console_.player.canControl,
+          run: () => console_.player.container.PlayPause() },
+        { key: "ctrl+u", label: "clear", can: true,
+          run: () => password.clear() },
+    ]
+
+    // Bound whether or not the prompt is showing: a key that only worked
+    // after a first key had woken the screen would be two keys.
+    Shortcut { sequence: "F1"; enabled: console_.keys[0].can; onActivated: console_.keys[0].run() }
+    Shortcut { sequence: "F2"; enabled: console_.keys[1].can; onActivated: console_.keys[1].run() }
+    Shortcut { sequence: "F3"; enabled: console_.keys[2].can; onActivated: console_.keys[2].run() }
+    Shortcut { sequence: "F4"; enabled: console_.keys[3].can; onActivated: console_.keys[3].run() }
+    Shortcut { sequence: "Ctrl+U"; onActivated: console_.keys[4].run() }
 
     Rectangle {
         anchors.fill: parent
@@ -44,7 +103,7 @@ LockStyle {
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0.31, 0.38, 0.78, 0.16) }
+            GradientStop { position: 0.0; color: Qt.alpha(console_.accent, 0.16) }
             GradientStop { position: 0.6; color: "transparent" }
         }
     }
@@ -211,19 +270,79 @@ LockStyle {
                 color: console_.mut
             }
 
-            // The three the greeter can do, as a tty would print them.
-            LockActions {
-                topPadding: Math.round(56 * console_.unit)
-                visible: Options.showSessionButtons
+            // What the greeter knows about itself, as a tty's login banner
+            // says it: how long ago it locked, and what is playing.
+            Column {
+                topPadding: Math.round(48 * console_.unit)
+                spacing: Math.round(12 * console_.unit)
+
+                Text {
+                    text: "Screen locked " + console_.lockedFor
+                    textFormat: Text.PlainText
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: Math.round(17 * console_.unit)
+                    color: console_.mut
+                }
+
+                Repeater {
+                    model: console_.player ? [console_.player] : []
+
+                    Text {
+                        required property var modelData
+                        text: "♪ " + [modelData.track, modelData.artist].filter(t => t).join(" — ")
+                            + " · F4 to " + (modelData.playbackStatus === Mpris.PlaybackStatus.Playing ? "pause" : "play")
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        width: body.width
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: Math.round(17 * console_.unit)
+                        color: console_.mut
+                    }
+                }
+            }
+
+            // The keys, as a tty would print them, and each one bound.
+            Flow {
+                topPadding: Math.round(48 * console_.unit)
+                width: parent.width
+                spacing: Math.round(10 * console_.unit)
                 enabled: console_.ui.unlock.shown
-                session: console_.ui.session
-                shape: "square"
-                unit: console_.unit
-                size: Math.round(42 * console_.unit)
-                ink: console_.ink
-                fill: "transparent"
-                stroke: "#2f2b27"
-                hot: Qt.rgba(1, 1, 1, 0.06)
+
+                Repeater {
+                    model: console_.keys.filter(k => k.can)
+
+                    Rectangle {
+                        id: chip
+
+                        required property var modelData
+
+                        width: chipText.implicitWidth + Math.round(30 * console_.unit)
+                        height: chipText.implicitHeight + Math.round(18 * console_.unit)
+                        color: "transparent"
+                        border.width: 1
+                        border.color: chipHover.hovered ? "#5a534b" : "#2f2b27"
+
+                        Text {
+                            id: chipText
+                            anchors.centerIn: parent
+                            text: `<span style="color:${console_.ink}">${chip.modelData.key}</span>&nbsp; ${chip.modelData.label}`
+                            textFormat: Text.StyledText
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: Math.round(15 * console_.unit)
+                            color: console_.mut
+                        }
+
+                        HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            onTapped: {
+                                chip.modelData.run();
+                                console_.ui.focusPassword();
+                            }
+                        }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: chip.modelData.label
+                    }
+                }
             }
         }
     }

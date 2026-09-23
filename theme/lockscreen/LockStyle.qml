@@ -53,5 +53,13 @@ Item {
     // A style that draws its own background does not want a second one.
     property bool scrimsWallpaper: true
 
+    // No slides, no rolling digits, no shutter. The accessible style sets it
+    // from its own reduced-motion switch; the frame reads it for the shutter.
+    property bool reduceMotion: false
+
+    // Where the frame puts the lockout countdown, from the top, for a style
+    // whose own bar is where the default would land. Negative is the default.
+    property real toastY: -1
+
     anchors.fill: parent
 }

@@ -198,8 +198,8 @@ lockscreen_offscreen() {
 # a type that is not installed, and the greeter refused it and drew its
 # built-in locker. The greeter's testing mode never locks anything, and the
 # lock screen gets a stand-in authenticator, so PAM is never reached.
-lockscreen_check() {   # <lockscreen dir> [seconds]
-    local src=$1 limit=${2:-15} greeter work pkg log pid i rc settled=0 problems=0 ours lacks
+lockscreen_check() {   # <lockscreen dir> [seconds] [style]
+    local src=$1 limit=${2:-15} style=${3:-} greeter work pkg log pid i rc settled=0 problems=0 ours lacks
     greeter=$(lockscreen_greeter) || { echo "Plasma's greeter (kscreenlocker_greet) was not found"; return 1; }
     [ -f "$src/LockScreen.qml" ] || { echo "no LockScreen.qml in $src"; return 1; }
 
@@ -207,6 +207,14 @@ lockscreen_check() {   # <lockscreen dir> [seconds]
     pkg="$work/package"
     log="$work/greeter.log"
     lockscreen_probe_package "$pkg" "$src" || { rm -rf "$work"; echo "could not build a package to load"; return 1; }
+    # A style named here is drawn instead of the one the person picked: the
+    # copy's Options.qml is pointed at a settings file saying so, and theirs
+    # is never read or written.
+    if [ -n "$style" ]; then
+        printf '[Lock]\nstyle=%s\n' "$style" > "$work/lockscreen.conf"
+        sed -i "s|location: \"file://[^\"]*\"|location: \"file://$work/lockscreen.conf\"|" \
+            "$pkg/contents/lockscreen/Options.qml"
+    fi
 
     lockscreen_offscreen timeout "$limit" "$greeter" --testing --shell "$pkg" > "$log" 2>&1 &
     pid=$!

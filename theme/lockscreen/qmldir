@@ -13,6 +13,12 @@ LockFace 1.0 LockFace.qml
 LockMessage 1.0 LockMessage.qml
 LockActions 1.0 LockActions.qml
 LockStatus 1.0 LockStatus.qml
+LockRing 1.0 LockRing.qml
+
+# Drawn by the frame over every style.
+LockLockout 1.0 LockLockout.qml
+LockPower 1.0 LockPower.qml
+LockDim 1.0 LockDim.qml
 
 # The styles themselves. LockUi loads one by file name; they are named here
 # as well because a directory with a qmldir exposes only what the qmldir
@@ -24,3 +30,8 @@ LockAmbient 1.0 LockAmbient.qml
 LockBoard 1.0 LockBoard.qml
 LockPoster 1.0 LockPoster.qml
 LockSeats 1.0 LockSeats.qml
+LockMinimal 1.0 LockMinimal.qml
+LockDayAhead 1.0 LockDayAhead.qml
+LockSecure 1.0 LockSecure.qml
+LockAccessible 1.0 LockAccessible.qml
+LockKiosk 1.0 LockKiosk.qml

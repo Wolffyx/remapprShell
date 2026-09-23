@@ -57,6 +57,15 @@ Item {
     // PAM let the session go without a prompt: the field becomes a button.
     property bool unlockedWithoutPassword: false
 
+    // When the account stops being locked out, in milliseconds since the
+    // epoch, and how long the lockout was when it was said -- or 0 and 0.
+    // pam_faillock says it in words, "(10 minutes left to unlock)", once, and
+    // a sentence that stays on screen goes stale; this is what lets the lock
+    // screen count it down instead. Only ever drawn: nothing here waits for
+    // it, because PAM is what refuses, and PAM keeps its own clock.
+    property double lockedUntil: 0
+    property double lockedSpan: 0
+
     // The readers that can unlock without typing, as kscreenlocker's flags.
     readonly property int fingerprint: 1
     readonly property int smartcard: 2
@@ -66,6 +75,9 @@ Item {
     signal rejected()
     signal messageRepeated()
     signal secretRequested()
+    // A key, the pointer, a touch: anything poke() was told about. The frame
+    // dims the screen after a while without one.
+    signal activity()
     // The session is unlocked; the lock screen quits the greeter on this.
     signal finished()
 
@@ -73,6 +85,7 @@ Item {
     function poke() {
         unlock.shown = true;
         idleTimer.restart();
+        unlock.activity();
     }
 
     function hide() {
@@ -107,9 +120,20 @@ Item {
             unlock.finished();
     }
 
+    // pam_faillock's own sentence, in minutes. Anything else is not a lockout.
+    function lockoutIn(text) {
+        const m = /\((\d+) minutes? left to unlock\)/.exec(text || "");
+        return m ? Number(m[1]) * 60000 : 0;
+    }
+
     function say(text) {
         if (!text)
             return;
+        const span = unlock.lockoutIn(text);
+        if (span > 0) {
+            unlock.lockedSpan = span;
+            unlock.lockedUntil = Date.now() + span;
+        }
         if (!unlock.message)
             unlock.message = text;
         else if (unlock.message.split("\n").includes(text))
@@ -144,6 +168,8 @@ Item {
         }
 
         function onSucceeded() {
+            unlock.lockedUntil = 0;
+            unlock.lockedSpan = 0;
             if (unlock.authenticator.hadPrompt) {
                 unlock.finished();
             } else {

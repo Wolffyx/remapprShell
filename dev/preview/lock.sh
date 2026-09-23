@@ -7,7 +7,10 @@
 # no display, no session bus and no runtime directory, and its authenticator is
 # replaced by a stand-in that complains rather than authenticating. The config
 # JSON overrides the greeter's own settings for the picture only -- the user's
-# kscreenlockerrc is never written.
+# kscreenlockerrc is never written -- and its "options" object does the same
+# for this shell's own, e.g. '{"options": {"style": "minimal"}}'. A "simulate"
+# object puts the frame in a state nobody can wait for offscreen:
+#   {"simulate": {"battery": {"percent": 4}, "lockout": 540, "dim": true, "leave": 0.4}}
 #
 # The size matters more here than anywhere else in this directory. Qt's
 # offscreen platform invents an 800x800 screen, and every one of these designs
@@ -30,8 +33,18 @@ work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 pkg="$work/package"
 dir="$pkg/contents/lockscreen"
-lockscreen_package "$pkg" "$WT/theme/lockscreen" || { echo "could not build the package"; exit 1; }
+lockscreen_package "$pkg" "${LOCK_SRC:-$WT/theme/lockscreen}" || { echo "could not build the package"; exit 1; }
 mv "$dir/LockScreen.qml" "$dir/LockScreenUnderTest.qml"
+
+# This shell's own settings -- the style above all -- are read from a file,
+# not from `config`. A config JSON carrying "options" draws with those instead
+# of the person's own, from a copy the package is pointed at, so a picture of
+# every style never means writing their lockscreen.conf seven times.
+if jq -e '.options' <<< "$cfg" >/dev/null 2>&1; then
+    { echo "[Lock]"; jq -r '.options | to_entries[] | "\(.key)=\(.value)"' <<< "$cfg"; } > "$work/lockscreen.conf"
+    sed -i "s|location: \"file://[^\"]*\"|location: \"file://$work/lockscreen.conf\"|" "$dir/Options.qml"
+    cfg=$(jq -c 'del(.options)' <<< "$cfg")
+fi
 printf 'LockScreenUnderTest 1.0 LockScreenUnderTest.qml\n' >> "$dir/qmldir"
 
 cat > "$dir/LockScreen.qml" <<'QML'
@@ -84,7 +97,13 @@ Item {
     Timer {
         running: true
         interval: 400
-        onTriggered: if (previewState === "prompt") under.wake()
+        onTriggered: {
+            if (previewState === "prompt")
+                under.wake();
+            const sim = JSON.parse(previewConfig).simulate;
+            if (sim)
+                under.simulate(sim);
+        }
     }
 
     Timer {

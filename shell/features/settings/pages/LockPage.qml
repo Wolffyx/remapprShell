@@ -190,7 +190,7 @@ Column {
             color: Theme.mut
         }
 
-        // Seven lock screens, not seven colour schemes: they differ on where
+        // Twelve lock screens, not twelve colour schemes: they differ on where
         // the password lives, how much wallpaper survives and how loud the
         // type is. A dropdown would hide exactly that, so each is a row with
         // the sentence that tells them apart.
@@ -207,6 +207,11 @@ Column {
                     { id: "board",     name: "Widget board",     about: "A grid of cards to read in one glance, with the password as the bar along the foot." },
                     { id: "poster",    name: "Poster",           about: "The picture is the design. One strip at the foot carries the time, the password and the status." },
                     { id: "seats",     name: "Multi-user",       about: "A card for every session on the machine: unlock this one, or click another seat to switch to it." },
+                    { id: "minimal",   name: "Minimal",          about: "The clock and nothing else. The field fades in when you type and out when you stop; light or dark follows the desktop." },
+                    { id: "dayahead",  name: "Day ahead",        about: "A palette that follows the time of day, from dawn to night, with the day laid out as a ruler under the clock." },
+                    { id: "secure",    name: "Secure workstation", about: "Monospace and auditable: the ways PAM will let you in, and a live log of everything that happened at this lock." },
+                    { id: "accessible", name: "Accessible",      about: "Large type, high contrast, the on-screen keyboard and captions of what the screen says, all on the screen rather than in a menu." },
+                    { id: "kiosk",     name: "Kiosk",            about: "For a shared computer: one big button to a guest session, a notice of your own, and the owner's sign-in in a corner." },
                 ]
 
                 Rectangle {
@@ -293,9 +298,50 @@ Column {
             }
         }
 
+        SettingRow {
+            width: parent.width
+            // Only the kiosk says anything about whose computer it is.
+            visible: root.lookValue("style", "glass") === "kiosk"
+            label: "The kiosk's name"
+            description: "Drawn at the top, where a guest looks first. Empty says \"Shared computer\"."
+
+            TextInputRow {
+                width: parent.width
+                text: root.lookValue("kioskName", "")
+                onCommitted: value => root.run(["set", "kioskName", value])
+            }
+        }
+
+        SettingRow {
+            width: parent.width
+            visible: root.lookValue("style", "glass") === "kiosk"
+            label: "A notice for guests"
+            description: "One line, shown where a guest will read it. Empty shows nothing."
+
+            TextInputRow {
+                width: parent.width
+                text: root.lookValue("kioskNote", "")
+                onCommitted: value => root.run(["set", "kioskNote", value])
+            }
+        }
+
+        SettingRow {
+            width: parent.width
+            label: "Accent"
+            description: "The focus ring, the caret and the primary button, on every style."
+
+            Segmented {
+                width: parent.width
+                values: ["indigo", "terracotta", "green", "violet"]
+                labels: ["Indigo", "Terracotta", "Green", "Violet"]
+                current: root.lookValue("accent", "indigo")
+                onPicked: value => root.run(["set", "accent", value])
+            }
+        }
+
         SliderRow {
-            // Four of the seven leave the wallpaper alone on purpose, and
-            // two of them draw over it entirely.
+            // Half of the twelve leave the wallpaper alone on purpose, and
+            // most of those draw over it entirely.
             visible: ["glass", "board"].includes(root.lookValue("style", "glass"))
             label: "Wallpaper blur behind the prompt"
             from: 0
@@ -310,6 +356,41 @@ Column {
             description: "Off, the screen is dark until a key or the pointer wakes the prompt."
             checked: root.lookBool("idleClock")
             onToggled: value => root.run(["set", "idleClock", value])
+        }
+
+        SettingRow {
+            width: parent.width
+            label: "Dim to the clock after"
+            description: "With nobody at it, the screen goes dark but for the clock. Plasma still turns the screen off on its own schedule."
+
+            Segmented {
+                width: parent.width
+                values: ["0", "10", "20", "60", "300"]
+                labels: ["Never", "10 s", "20 s", "1 min", "5 min"]
+                current: String(root.lookValue("dim", "20"))
+                onPicked: value => root.run(["set", "dim", value])
+            }
+        }
+
+        ToggleRow {
+            label: "Lift the shutter when unlocking"
+            description: "The lock screen slides away over the unblurring wallpaper. Off, it goes at once, as Plasma's does."
+            checked: root.lookBool("unlockAnimation")
+            onToggled: value => root.run(["set", "unlockAnimation", value])
+        }
+
+        SettingRow {
+            width: parent.width
+            label: "On a battery about to run out"
+            description: "At Plasma's low and critical levels the lock screen says so; at this one it counts down a minute and hibernates, unless you plug in. Never leaves it to Plasma's own critical-battery action."
+
+            Segmented {
+                width: parent.width
+                values: ["0", "2", "3", "5"]
+                labels: ["Never", "At 2%", "At 3%", "At 5%"]
+                current: String(root.lookValue("hibernateAt", "3"))
+                onPicked: value => root.run(["set", "hibernateAt", value])
+            }
         }
 
         ToggleRow {

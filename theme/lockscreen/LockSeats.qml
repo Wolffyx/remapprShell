@@ -31,7 +31,7 @@ LockStyle {
 
     readonly property color ink: "#f4efe8"
     readonly property color mut: "#8a8378"
-    readonly property color accent: "#4f60c8"
+    readonly property color accent: seats.ui.accent
 
     blursWallpaper: false
     scrimsWallpaper: false
@@ -52,7 +52,7 @@ LockStyle {
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0.31, 0.38, 0.78, 0.22) }
+            GradientStop { position: 0.0; color: Qt.alpha(seats.accent, 0.22) }
             GradientStop { position: 0.62; color: "transparent" }
         }
     }

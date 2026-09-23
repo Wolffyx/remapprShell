@@ -291,6 +291,19 @@ the case that matters: from a text console (Ctrl+Alt+F3),
 `loginctl unlock-session <id>`, then `rmpr lockscreen disable`, which needs no
 desktop to run.
 
+It comes in twelve styles, picked on the settings window's Lock page or with
+`rmpr lockscreen set style <name>`: glass (the default), editorial, console,
+ambient, board, poster, seats, minimal, dayahead, secure, accessible and kiosk.
+Every one draws the same few things over itself: a countdown while PAM has the
+account locked out, a battery running out (a pill, then a banner, then a
+minute's countdown to hibernating -- `set hibernateAt 0` leaves that to
+Plasma), the screen dimming to a clock after `set dim <seconds>`, and the
+shutter lifting on the way out (`set unlockAnimation false` for none). `set
+accent` picks the one colour they all share. Nothing a lock screen cannot know
+is drawn -- no weather, calendar or notifications: the greeter is a separate,
+sandboxed program with none of the session's memory. `rmpr lockscreen check
+--all` loads every style in the real greeter.
+
 Plasma 6 reads the lock screen from the shell package plasmashell is on, so
 ours lives in this project's own shell packages, and no KDE setting is
 written. `rmpr lockscreen check` loads it in Plasma's real greeter, offscreen

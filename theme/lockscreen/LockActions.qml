@@ -44,6 +44,23 @@ Row {
         width: actions.shape === "text" ? word.implicitWidth : actions.size
         height: actions.shape === "text" ? word.implicitHeight : actions.size
 
+        // Reachable with Tab, and pressed with Space or Enter, like any
+        // button -- the accessible style's rule, and nobody else's loss.
+        activeFocusOnTab: true
+        Keys.onSpacePressed: action.activated()
+        Keys.onReturnPressed: action.activated()
+        Keys.onEnterPressed: action.activated()
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -Math.round(4 * actions.unit)
+            visible: action.activeFocus
+            radius: actions.shape === "round" ? width / 2 : Math.round(8 * actions.unit)
+            color: "transparent"
+            border.width: Math.max(2, Math.round(2 * actions.unit))
+            border.color: Options.accent
+        }
+
         Rectangle {
             anchors.fill: parent
             visible: actions.shape !== "text"
@@ -75,7 +92,9 @@ Row {
 
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: action.activated() }
+        Accessible.role: Accessible.Button
         Accessible.name: action.label
+        Accessible.onPressAction: action.activated()
     }
 
     Action {

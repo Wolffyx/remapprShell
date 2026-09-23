@@ -254,4 +254,42 @@ TestCase {
         verify(unlock.alternatives & unlock.fingerprint);
         verify(unlock.alternatives & unlock.smartcard);
     }
+
+    // ---- what is only drawn ----------------------------------------------
+
+    function test_a_lockout_is_counted_from_what_pam_said() {
+        const { auth, unlock } = make();
+        compare(unlock.lockedUntil, 0);
+        const before = Date.now();
+        auth.errorMessage = "The account is locked due to 3 failed logins.";
+        compare(unlock.lockedUntil, 0, "the reason alone is not a duration");
+        auth.infoMessage = "(10 minutes left to unlock)";
+        compare(unlock.lockedSpan, 600000);
+        verify(unlock.lockedUntil >= before + 600000);
+        verify(unlock.message.includes("10 minutes left"), "and it is still said");
+    }
+
+    function test_one_minute_is_a_lockout_too() {
+        const { auth, unlock } = make();
+        auth.infoMessage = "(1 minute left to unlock)";
+        compare(unlock.lockedSpan, 60000);
+    }
+
+    function test_letting_in_forgets_the_lockout() {
+        const { auth, unlock } = make();
+        auth.infoMessage = "(3 minutes left to unlock)";
+        verify(unlock.lockedUntil > 0);
+        unlock.poke();
+        auth.succeeded();
+        compare(unlock.lockedUntil, 0);
+        compare(unlock.lockedSpan, 0);
+    }
+
+    function test_any_sign_of_a_person_is_activity() {
+        const { unlock } = make();
+        const s = spy(unlock, "activity");
+        unlock.poke();
+        unlock.poke();
+        compare(s.count, 2);
+    }
 }

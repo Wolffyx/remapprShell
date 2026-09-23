@@ -10,10 +10,16 @@
     something is half-typed. It draws no layout at all.
 
     The arrangement is a *style*: one file under `Options.style`, loaded here
-    and handed this item to read. Seven of them, six from the design file's
-    turns 1 and 2 and the seventh the glass one this project shipped first.
-    A style that cannot be found falls back to glass rather than to an empty
-    screen.
+    and handed this item to read. Twelve of them: eleven from the design
+    file's four turns and the twelfth the glass one this project shipped
+    first. A style that cannot be found falls back to glass rather than to an
+    empty screen.
+
+    Four things are drawn over whichever style it is, because the design's
+    turn 4 draws them on every screen and none of them is a matter of look:
+    the lockout countdown, the battery running out, the screen dimming to a
+    clock when nobody is there, and the shutter lifting once the password is
+    right.
 
     Whether to unlock is decided in Unlock.qml, never here and never in a
     style. The controls that decide anything are Plasma's own -- its password
@@ -74,6 +80,75 @@ Item {
     // The glass style's colours, which the others override for themselves.
     readonly property color fg: "#ffffff"
     readonly property color fgDim: Qt.rgba(1, 1, 1, 0.82)
+    // Every style's focus ring, caret and primary button.
+    readonly property color accent: Options.accent
+
+    // When the lock screen started, which is as near as the greeter can know
+    // to when the session was locked. "Locked 12 min ago" is read from this.
+    readonly property date lockedAt: new Date()
+
+    // No slides, no rolls, no shutter: a style asks for this (the accessible
+    // one, when reduced motion is on) and the frame honours it too.
+    readonly property bool reduceMotion: ui.style?.reduceMotion ?? false
+
+    // --- leaving ----------------------------------------------------------
+
+    // Set once the password was right. The greeter quits on `gone`, after the
+    // shutter has lifted -- or at once, with the animation off. Either way a
+    // timer makes sure it does: a lock screen that stayed up after saying yes
+    // would be the one thing worse than one that said no.
+    property bool leaving: false
+    property real revealed: 0
+    signal gone()
+
+    function leave(): void {
+        if (ui.leaving)
+            return;
+        ui.leaving = true;
+        if (!Options.unlockAnimation || ui.reduceMotion)
+            ui.gone();
+        else
+            shutter.start();
+    }
+
+    Timer {
+        interval: 1500
+        running: ui.leaving
+        onTriggered: ui.gone()
+    }
+
+    ParallelAnimation {
+        id: shutter
+
+        NumberAnimation {
+            target: lift
+            property: "y"
+            to: -ui.height
+            duration: 750
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.6, 0, 0.2, 1, 1, 1]
+        }
+        NumberAnimation {
+            target: ui
+            property: "revealed"
+            to: 1
+            duration: 750
+            easing.type: Easing.OutCubic
+        }
+
+        onFinished: ui.gone()
+    }
+
+    // --- dimming ----------------------------------------------------------
+
+    property bool dimmed: false
+
+    Timer {
+        id: dimTimer
+        interval: Math.max(1, Options.dimSeconds) * 1000
+        running: Options.dimSeconds > 0 && !ui.dimmed && !ui.leaving && !power.dying
+        onTriggered: ui.dimmed = true
+    }
 
     // The styles, by the name `lockscreen set style` writes. Kept here rather
     // than built from the file name so that an unknown name is a fallback to
@@ -87,6 +162,11 @@ Item {
         "board": "LockBoard.qml",
         "poster": "LockPoster.qml",
         "seats": "LockSeats.qml",
+        "minimal": "LockMinimal.qml",
+        "dayahead": "LockDayAhead.qml",
+        "secure": "LockSecure.qml",
+        "accessible": "LockAccessible.qml",
+        "kiosk": "LockKiosk.qml",
     })
 
     readonly property string styleName: ui.styles[Options.style] !== undefined ? Options.style : "glass"
@@ -115,6 +195,10 @@ Item {
 
     Connections {
         target: ui.unlock
+        function onActivity() {
+            ui.dimmed = false;
+            dimTimer.restart();
+        }
         function onClearPassword() {
             if (ui.prompt)
                 ui.prompt.clear();
@@ -125,8 +209,9 @@ Item {
                 ui.focusPassword();
             }
         }
-        function onRejected() { shake.start(); }
-        function onMessageRepeated() { shake.start(); }
+        // The shake is motion, and reduced motion means none.
+        function onRejected() { if (!ui.reduceMotion) shake.start(); }
+        function onMessageRepeated() { if (!ui.reduceMotion) shake.start(); }
         function onShownChanged() {
             if (ui.unlock.shown)
                 ui.focusPassword();
@@ -157,12 +242,12 @@ Item {
         source: ui.wallpaper
         visible: ui.wallpaper !== null && opacity > 0 && ui.blurAmount > 0
             && (ui.style?.blursWallpaper ?? true)
-        opacity: ui.unlock.shown ? 1 : 0
+        opacity: ui.unlock.shown || ui.leaving ? 1 - ui.revealed : 0
         autoPaddingEnabled: false
         blurEnabled: true
         blurMax: 64
-        blur: ui.blurAmount / 40
-        brightness: -0.12
+        blur: ui.blurAmount / 40 * (1 - ui.revealed)
+        brightness: -0.12 * (1 - ui.revealed)
         Behavior on opacity {
             NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad }
         }
@@ -174,6 +259,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         visible: ui.style?.scrimsWallpaper ?? true
+        opacity: 1 - ui.revealed
         gradient: Gradient {
             GradientStop { position: 0.0; color: Qt.rgba(0.04, 0.03, 0.03, ui.unlock.shown ? 0.34 : 0.26) }
             GradientStop { position: 0.5; color: Qt.rgba(0.04, 0.03, 0.03, ui.unlock.shown ? 0.42 : 0.24) }
@@ -193,6 +279,9 @@ Item {
         height: ui.height
         focus: true
         initialItem: stylePage
+        // The shutter. A transform rather than `y`, which the on-screen
+        // keyboard moves for its own reasons.
+        transform: Translate { id: lift }
     }
 
     Item {
@@ -223,6 +312,19 @@ Item {
             }
 
             onLoaded: ui.focusPassword()
+
+            // A style whose file will not load -- a mistake in it, a file
+            // half-written -- is glass instead. The name alone falling back
+            // is not enough: a known name with a broken file would otherwise
+            // be a lock screen with nothing on it but the wallpaper.
+            onStatusChanged: {
+                if (styleLoader.status !== Loader.Error)
+                    return;
+                if (styleLoader.source.toString().endsWith(ui.styles.glass))
+                    return;
+                console.warn("lock screen: the", ui.styleName, "style did not load -- drawing glass");
+                styleLoader.setSource(ui.styles.glass, { "ui": ui });
+            }
         }
     }
 
@@ -250,6 +352,51 @@ Item {
         target: ui.unlock
         property: "keepShown"
         value: (ui.prompt?.text.length ?? 0) > 0 || inputPanel.keyboardActive || ui.unlock.unlockedWithoutPassword
+    }
+
+    // --- over every style -------------------------------------------------
+
+    LockPower {
+        id: power
+        z: 3
+        anchors.fill: parent
+        ui: ui
+        visible: !ui.leaving
+    }
+
+    LockLockout {
+        z: 4
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: (ui.style?.toastY ?? -1) >= 0 ? ui.style.toastY
+                                          : Math.round((power.critical ? 96 : 66) * ui.unit)
+        unlock: ui.unlock
+        unit: ui.unit
+        visible: counting && !ui.leaving
+    }
+
+    LockDim {
+        z: 5
+        anchors.fill: parent
+        ui: ui
+        dimmed: ui.dimmed && !ui.leaving
+    }
+
+    // For dev/preview/lock.sh: the states a picture cannot wait for.
+    function simulate(what: var): void {
+        if (what.battery)
+            power.override = what.battery;
+        if (what.lockout) {
+            ui.unlock.lockedSpan = what.lockout * 1000;
+            ui.unlock.lockedUntil = Date.now() + what.lockout * 1000;
+        }
+        if (what.dim)
+            ui.dimmed = true;
+        // Part of the way up, held there -- without `leaving`, whose timer
+        // would quit the greeter before the picture was taken.
+        if (what.leave) {
+            lift.y = -ui.height * what.leave;
+            ui.revealed = what.leave;
+        }
     }
 
     LockOsd {

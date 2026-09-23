@@ -20,6 +20,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.workspace.components as PW
 import org.kde.breeze.components as Breeze
+import org.kde.plasma.private.keyboardindicator as KeyboardIndicator
 
 Row {
     id: status
@@ -31,6 +32,10 @@ Row {
     property var keyboard: null
 
     property color ink: "#ffffff"
+    // Caps Lock, and a layout that is not the person's first: the two things
+    // that make a right password wrong. Said here in this colour, and in
+    // words under the field by LockMessage.
+    property color warn: "#e0c98a"
     property int textSize: 12
 
     // Asked for before the keyboard is shown, so the first key typed on it
@@ -46,6 +51,21 @@ Row {
     Kirigami.Theme.textColor: status.ink
 
     spacing: 14
+
+    KeyboardIndicator.KeyState {
+        id: capsLock
+        key: Qt.Key_CapsLock
+    }
+
+    Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: capsLock.locked
+        text: "keyboard_capslock"
+        font.family: "Material Symbols Rounded"
+        font.pixelSize: Math.round(status.textSize * 1.5)
+        color: status.warn
+        Accessible.name: "Caps Lock is on"
+    }
 
     PlasmaComponents3.ToolButton {
         anchors.verticalCenter: parent.verticalCenter
@@ -72,7 +92,7 @@ Row {
             textFormat: Text.PlainText
             font.family: "monospace"
             font.pixelSize: status.textSize
-            color: status.ink
+            color: layouts.keyboardLayout.layout > 0 ? status.warn : status.ink
         }
 
         PW.KeyboardLayoutSwitcher {

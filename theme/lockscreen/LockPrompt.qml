@@ -29,7 +29,7 @@ Item {
     // The colours, which every style sets. The defaults are the glass ones.
     property color ink: "#ffffff"
     property color dim: Qt.rgba(1, 1, 1, 0.6)
-    property color accent: "#4f60c8"
+    property color accent: Options.accent
 
     // The chrome. `pill` is the rounded field of the glass and poster styles;
     // `underline` is a hairline under the text, as the ambient and editorial
