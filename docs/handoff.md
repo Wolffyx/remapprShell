@@ -398,6 +398,94 @@ after the fix; its Colors and WM blocks are still the user's own, in hex, from
 | GTK 3 and GTK 4 `settings.ini`, `gtk-theme` | `gtk_apply_variant` | was already right |
 | Plasma's own widgets | `install_desktoptheme` | right from the next plasmashell start, as before |
 | this shell | reads kdeglobals itself | was already right |
+| GTK 3 and GTK 4 `gtk.css` | **nobody's -- and it beats all of the above** | named by `doctor` 2026-09-23 |
+
+#### Who else can change the colours, swept
+
+The user's next question was the right one -- *"find all the places the theme
+might be changed, and maybe delete them so the app is forced to use the
+default"* -- and the sweep that answered it is worth keeping, because
+"delete them" is right for one of the three kinds it found and wrong for the
+other two.
+
+**Generated, and follows.** Deleting these gains nothing: they are rewritten
+at the next switch, and until then the desktop is missing a bridge.
+`gtk-{3,4}.0/settings.ini` (ours), `gtk-{3,4}.0/colors.css` and the three GTK 2
+`gtkrc` files (kde-gtk-config), `Trolltech.conf` (Plasma), `kdeglobals` (ours),
+`kdedefaults/*` (Plasma).
+
+**Static, and pins a colour.** The dangerous kind, and the reason the sweep
+exists. Exactly one existed -- `gtk.css` -- and it cost a morning.
+
+**Dead leftovers**, with no unit, no autostart and the software uninstalled:
+`~/.config/caelestia` (36K), `~/.local/state/caelestia` (60K),
+`~/.local/share/caelestia` (16K), `~/.config/kde-material-you-colors`,
+`~/.cache/wal`, and `gtk-{3,4}.0/thunar.css` (Thunar is not installed; its
+rules are all scoped `.thunar ...`, so it paints nothing here). None of these
+was doing anything once `gtk.css` was clean. Removing them is tidiness, not a
+fix -- and `~/.config/caelestia/stolen-shortcuts.json` and
+`stolen-screen-edges.json` are caelestia's record of the KDE shortcuts and
+screen edges it took, which is worth keeping until the user is sure they do
+not want them back.
+
+So: **not deletion -- detection.** `doctor` sweeps for the dangerous kind now,
+and each check was proven by planting the fault and watching it fire:
+
+| planted | what doctor said |
+| --- | --- |
+| `@define-color card_bg_color` in `gtk.css` | `gtk-4.0/gtk.css paints every GTK window itself: card_bg_color #101014` |
+| the same, in a file `gtk.css` imports | `gtk-3.0/probe-palette.css sets the palette itself: view_bg_color #0a0a0a` |
+| `GTK_THEME=Adwaita:dark` in the session | `GTK_THEME=Adwaita:dark is set for the whole session` |
+| `--force-dark-mode` in a `*-flags.conf` | `probe-flags.conf forces dark mode on the command line` |
+| `kdedefaults` naming another scheme | `kdedefaults/kdeglobals still falls back to ...` |
+
+The palette names it looks for are in `GTK_PALETTE_NAMES` in `doctor.sh`:
+`window_bg_color`, `view_bg_color`, `headerbar_bg_color` and the rest that
+libadwaita and Adwaita actually paint with. The `*_breeze` names
+kde-gtk-config generates are deliberately not among them, which is why
+`colors.css` is safe and `gtk.css` was not.
+
+**And the sweep turned up something about `kdeglobals` itself.** There are two
+of them. `~/.config/kdeglobals` is the user's; `~/.config/kdedefaults/kdeglobals`
+is written by Plasma when a global theme is applied and read *beneath* it. On
+this machine the user's file has **no `ColorScheme` key at all** -- Plasma took
+it out when it applied our package, and the name the whole desktop uses comes
+from `kdedefaults`. `kreadconfig6 --file kdeglobals` cascades, so every read in
+this project already gets the effective answer; that is why nothing broke. It
+also means `plasma_fill_colours` writes the name only when the *effective* name
+is wrong, so it cannot pin a name above Plasma's own layer -- which it would
+otherwise do, twice a day, for ever.
+
+**Two applications stayed dark through all of it, and neither was ours.** The
+user found them and both are worth writing down, because both look exactly
+like this shell failing.
+
+- **Mission Center**, set to "system", dark on a light desktop. Not the
+  system: `libadwaita` on this machine answers `dark = False`, the portal
+  answers `color-scheme: 2`, `gsettings` answers `prefer-light`. The cause is
+  `~/.config/gtk-3.0/gtk.css` and `~/.config/gtk-4.0/gtk.css`, which carry
+  `@define-color window_bg_color #131317` and a dozen more like it. **GTK loads
+  that file last and an `@define-color` in it beats the theme, the preference,
+  the portal and us.** A GTK 4 window here resolves `window_bg_color` to
+  `#131317` while libadwaita's dark flag reads `false` -- the application is
+  not in dark mode, it is *painted* dark, which is why nothing that asks about
+  dark mode can see it. Neither file is this project's: we write
+  `settings.ini` and nothing else. They are a caelestia leftover (they end
+  `@import "thunar.css"; @import 'colors.css';` and carry a Material You
+  accent, `#c2c1ff`). `doctor` names them now, with the one-line fix:
+  `sed -i '/^@define-color /d' ~/.config/gtk-4.0/gtk.css`, which keeps the
+  `@import` lines kde-gtk-config manages.
+
+  Worth noticing in passing: `colors.css` beside it was **regenerated at the
+  moment of a variant switch for the first time**, by kde-gtk-config, which is
+  a `KConfigWatcher` and had never been told. The notification fixed that too.
+
+- **Claude Desktop**, also set to "system", dark under a system in light *and*
+  a system in dark -- captured both ways, the window identical. Electron 44,
+  `--ozone-platform=wayland`, no dark flag on the command line, nothing in
+  `Preferences`, `userThemeMode: system` in its own config. Chromium computes
+  its dark preference partly from the GTK colours it resolves, so the same
+  `gtk.css` is the likeliest cause here as well; it was not retested after.
 
 Proven on the running desktop afterwards: the same window's titlebar followed
 `rmpr theme variant dark`, and the portal's `color-scheme` moved with it. One

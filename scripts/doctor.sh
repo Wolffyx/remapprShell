@@ -619,6 +619,95 @@ if [ "$theme_desktop" = "true" ] && [ "$(config_get '.theme.desktop.icons' true)
     fi
 fi
 
+# The names libadwaita and the Adwaita GTK themes actually paint with. A
+# stylesheet that sets one of these decides the colour of every window; the
+# `*_breeze` names kde-gtk-config generates are not among them, which is why
+# `colors.css` is safe and `gtk.css` was not.
+GTK_PALETTE_NAMES='window_bg_color|view_bg_color|theme_bg_color|theme_base_color|headerbar_bg_color|card_bg_color|popover_bg_color|sidebar_bg_color|accent_bg_color|dialog_bg_color'
+
+# A `gtk.css` that names the colours outright, which beats everyone.
+#
+# GTK loads `~/.config/gtk-N.0/gtk.css` last and an `@define-color` in it wins
+# over the theme, over the preference, over the portal and over us. Found on
+# 2026-09-23 with `window_bg_color #131317` in both files: every GTK 4 and
+# libadwaita application drew near-black on a light desktop, with libadwaita's
+# own dark flag reading `false` -- the application was not in dark mode, it was
+# merely painted that way, which is why nothing that asks about dark mode could
+# see it. Neither file is this project's to write; we write `settings.ini`.
+if [ "$(config_get '.theme.desktop.gtk' true)" = "true" ]; then
+    for gtk_v in 3.0 4.0; do
+        gtk_css="$XDG_CONFIG_HOME/gtk-$gtk_v/gtk.css"
+        [ -f "$gtk_css" ] || continue
+        pinned=$(grep -oE "^@define-color ($GTK_PALETTE_NAMES) +#[0-9a-fA-F]{6}" "$gtk_css" | head -1)
+        [ -n "$pinned" ] || continue
+        bad "gtk-$gtk_v/gtk.css paints every GTK window itself: ${pinned#@define-color }"
+        fix "an \`@define-color\` there is loaded last and beats the theme, the"
+        fix "  preference, the portal and this project -- the application is not in"
+        fix "  dark mode, it is painted dark, so nothing that asks can tell"
+        fix "this file is not ours; we write gtk-$gtk_v/settings.ini and nothing else"
+        fix "take the colours out and keep the @import lines:"
+        fix "  sed -i '/^@define-color /d' $gtk_css"
+    done
+fi
+
+# The same fault one file further out: a stylesheet gtk.css pulls in.
+#
+# `colors.css`, which kde-gtk-config writes, is safe because every name in it
+# ends `_breeze` -- names only the Breeze GTK theme reads. A file that defines
+# the palette names themselves is the `gtk.css` fault wearing an @import.
+for gtk_v in 3.0 4.0; do
+    gtk_css="$XDG_CONFIG_HOME/gtk-$gtk_v/gtk.css"
+    [ -f "$gtk_css" ] || continue
+    [ "$(config_get '.theme.desktop.gtk' true)" = "true" ] || continue
+    while read -r imported; do
+        [ -n "$imported" ] || continue
+        case $imported in /*) f=$imported ;; *) f="$XDG_CONFIG_HOME/gtk-$gtk_v/$imported" ;; esac
+        [ -f "$f" ] || continue
+        pinned=$(grep -oE "^@define-color ($GTK_PALETTE_NAMES) +#[0-9a-fA-F]{6}" "$f" | head -1)
+        [ -n "$pinned" ] || continue
+        bad "gtk-$gtk_v/$imported sets the palette itself: ${pinned#@define-color }"
+        fix "gtk.css imports it, so it lands in every GTK window the same way"
+        fix "  an @define-color in gtk.css itself would -- see above"
+        fix "stop importing it, or take that line out of $f"
+    done <<< "$(sed -n "s/^@import *['\"]\\([^'\"]*\\)['\"].*/\\1/p" "$gtk_css")"
+done
+
+# Something in the session environment deciding it instead.
+#
+# These beat every file. `GTK_THEME` in particular is absolute: GTK takes it
+# over the theme name, the preference and the portal, and `GTK_THEME=x:dark`
+# is how a whole session ends up dark with nothing on disk to show for it.
+for var in GTK_THEME QT_STYLE_OVERRIDE; do
+    val=$(systemctl --user show-environment 2>/dev/null | sed -n "s/^$var=//p")
+    [ -n "$val" ] || continue
+    bad "$var=$val is set for the whole session"
+    fix "it beats every file this project writes, and every mode switch"
+    fix "take it out of wherever it is set and log out and in:"
+    fix "  grep -rn $var ~/.config/environment.d ~/.config/plasma-workspace/env /etc/environment"
+done
+
+# A browser or Electron application told to be dark on the command line.
+for flags in "$XDG_CONFIG_HOME"/*-flags.conf; do
+    [ -f "$flags" ] || continue
+    grep -q 'force-dark' "$flags" || continue
+    warn "$(basename "$flags") forces dark mode on the command line"
+    fix "that application will stay dark whatever the desktop does"
+    fix "take the force-dark flag out of $flags"
+done
+
+# KDE keeps a second kdeglobals under `kdedefaults/`, written when a global
+# theme is applied and read *beneath* the real one. It is Plasma's, not ours,
+# and it is only reached for a key the real file does not have -- but when
+# those two disagree the desktop has two answers on disk, and the second one
+# is the one nobody thinks to look at.
+kd_scheme=$(kreadconfig6 --file "$XDG_CONFIG_HOME/kdedefaults/kdeglobals" --group General --key ColorScheme --default '')
+if [ -n "$kd_scheme" ] && [ -n "$scheme_now" ] && [ "$kd_scheme" != "$scheme_now" ]; then
+    warn "kdedefaults/kdeglobals still falls back to '$kd_scheme'; the desktop is on '$scheme_now'"
+    fix "Plasma writes that file when a global theme is applied; it is read beneath"
+    fix "  the real kdeglobals, so it only shows when a key goes missing"
+    fix "applying the theme again lines them up: $ALIAS theme apply"
+fi
+
 # A GTK theme whose *name* is the dark half of its pair ignores every
 # preference we write and stays dark in each mode. The preference agreeing is
 # not the same as the theme agreeing.
