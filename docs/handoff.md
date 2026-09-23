@@ -485,7 +485,18 @@ like this shell failing.
   `--ozone-platform=wayland`, no dark flag on the command line, nothing in
   `Preferences`, `userThemeMode: system` in its own config. Chromium computes
   its dark preference partly from the GTK colours it resolves, so the same
-  `gtk.css` is the likeliest cause here as well; it was not retested after.
+  `gtk.css` was the cause here too, **confirmed**. The user's own description
+  is what identified it: switching the desktop made the window *flash light and
+  snap back to dark*. That is not a message that failed to arrive -- it is
+  Electron's boot placeholder drawing from the fresh system value, and then the
+  renderer painting from Chromium's `prefers-color-scheme`, which on Linux is
+  derived from the GTK colours the process resolved **at start**. That process
+  had started at 10:34:50; `gtk.css` was mended at 10:47:22, and GTK does not
+  re-read it for a process already running. The bus was watched across a whole
+  dark-to-light switch to rule out a second writer, and there is none: one
+  `ConfigChanged`, one `SettingChanged`, and the session settles. After a
+  restart the same window followed `rmpr theme variant dark` and back, live,
+  with no restart in between.
 
 Proven on the running desktop afterwards: the same window's titlebar followed
 `rmpr theme variant dark`, and the portal's `color-scheme` moved with it. One
