@@ -7,10 +7,12 @@ pragma ComponentBehavior: Bound
 // alone changed. They are read and written through the same `shortcuts`
 // command the CLI has -- one path that writes, one ledger that can undo it.
 //
-// Nothing is bound by default, deliberately: a shortcut is the one setting a
-// user is guaranteed to notice being taken, and the obvious keys here are the
-// ones another shell is most likely to be holding. Binding one here takes it
-// from whoever holds it, and `shortcuts revert` gives every one of them back.
+// The keys are this shell's configuration (`shortcuts.<action>`): Meta for
+// the menu and Meta+Space for search by default, and the session daemon
+// applies them at every login, taking a key back from anything that grabbed
+// it meanwhile. Binding one here takes it from whoever holds it and writes it
+// to the profile; `shortcuts revert` gives every one of them back and stops
+// enforcing them.
 
 import QtQuick
 import Quickshell.Io
@@ -113,7 +115,7 @@ Column {
             width: parent.width
             wrapMode: Text.WordWrap
             text: root.grabbed
-                ? "Click a shortcut and press the keys you want. Esc leaves it as it was; Backspace unbinds it. A key already held by something else is taken from it, and “Revert every shortcut” gives them all back."
+                ? "Click a shortcut and press the keys you want. Esc leaves it as it was; Backspace unbinds it. A key already held by something else is taken from it — and taken back at every login, if something grabs it again. “Revert every shortcut” gives them all back."
                 : "These are recorded but not grabbed: nothing owns them, so none of them fire. The session daemon is the owner — if it is not running, a key here will do nothing however it is bound."
             font.pixelSize: 12
             lineHeight: 1.35

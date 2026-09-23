@@ -102,6 +102,13 @@ check "a function key"        "$(accel_keycode 'F5')"                 "16777268"
 check "the last function key" "$(accel_keycode 'F12')"                "16777275"
 check "Alt+Tab"               "$(accel_keycode 'Alt+Tab')"            "150994945"
 check "every modifier at once" "$(accel_keycode 'Meta+Alt+Ctrl+Shift+Delete')" "520093703"
+# Named keys, as Plasma's own defaults spell them. KRunner's first key is
+# "Search", and not knowing it once left Meta+Space with KRunner until login.
+check "the Search key"        "$(accel_keycode 'Search')"             "16777362"
+check "a named key with a space" "$(accel_keycode 'Shift+Volume Up')" "50331762"
+check "a named key with a slash" "$(accel_keycode 'Keyboard Light On/Off')" "16777396"
+check "the plus key"          "$(accel_keycode 'Meta++')"             "268435499"
+check "the tilde"             "$(accel_keycode 'Alt+~')"              "134217854"
 
 # Refusing is the point: a key this table gets wrong would be bound to the
 # wrong thing silently, where a refusal falls back to applying at next login.
@@ -139,6 +146,34 @@ check "an unknown mode is refused" \
       "$("$REPO_ROOT/scripts/screenshot.sh" nonsense >/dev/null 2>&1 && echo ran || echo refused)" "refused"
 sc clear screenshot >/dev/null
 
+echo "== the configuration is where the keys live =="
+PROFILE="$XDG_CONFIG_HOME/$SLUG/profiles/default/shell.json"
+configured() { jq -r --arg a "$1" '.shortcuts[$a] // "<unset>"' "$PROFILE" 2>/dev/null || echo '<no profile>'; }
+# Its own starting point: the revert above gave every key back.
+sc set search "Meta+J" >/dev/null
+sc set settings "Meta+Shift+R" >/dev/null
+sc clear launcher >/dev/null
+check "set writes the key to the profile"   "$(configured search)" "Meta+J"
+check "clear writes none"                   "$(configured launcher)" "none"
+
+# KRunner holding Meta+Space, as it does again after every login.
+kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.krunner.desktop \
+    --key _launch "$(printf 'Search\tAlt+Space\tAlt+F2\tMeta+Space')"
+jq '.shortcuts.search = "Meta+Space"' "$PROFILE" > "$PROFILE.tmp" && mv "$PROFILE.tmp" "$PROFILE"
+sc sync >/dev/null
+check "sync binds what is configured"       "$(binding search)" "Meta+Space,none,Search"
+check "and takes it from KRunner"           "$(kreadconfig6 --file kglobalshortcutsrc --group services --group org.kde.krunner.desktop --key _launch)" \
+                                            "$(printf 'Search\tAlt+Space\tAlt+F2')"
+check "an unbound action stays unbound"     "$(binding launcher)" "none,none,Application menu"
+check "a second sync has nothing to do"     "$(sc sync; echo)" ""
+out=$("$REPO_ROOT/scripts/shortcuts.sh" sync 2>&1)
+check "and says so"                         "$(printf '%s' "$out" | grep -c 'already bound')" "1"
+
+# An empty value is not managed: a key bound in KDE by hand stays.
+jq '.shortcuts.settings = ""' "$PROFILE" > "$PROFILE.tmp" && mv "$PROFILE.tmp" "$PROFILE"
+sc sync >/dev/null
+check "an empty value leaves KDE's key"     "$(binding settings)" "Meta+Shift+R,none,Settings"
+
 echo "== the live session =="
 check "nothing reached the session"  "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&1
@@ -146,6 +181,7 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&
 # is what makes a revert apply now rather than at the next login.
 check "the session daemon is told"   "$(grep -c 'busctl .*Shortcuts Reload' "$CALLS")" "1"
 check "and kglobalaccel restarted"   "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
+check "revert stops enforcing them"  "$(configured search)" ""
 
 echo
 if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi

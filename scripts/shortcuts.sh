@@ -7,15 +7,21 @@
 #                                     overview, overview-reverse, screenshot,
 #                                     screenshot-screen, screenshot-window)
 #   clear <action>      unbind one
+#   sync [--quiet]      make KDE's shortcuts match the shell's configuration
 #   migrate             move keys off the old desktop-file entries
 #   revert              undo everything this project bound
 #
-# Nothing is bound by default. A shortcut is the one setting a user is
-# guaranteed to notice being taken, and the obvious keys here -- Meta for the
-# menu, Meta+Space for search -- are exactly the ones another shell is most
-# likely to be holding. So this reports the situation and binds only what is
-# asked for. When it is asked for a key someone else holds, it takes it from
-# them, and says so; revert gives it back.
+# The keys are the shell's configuration: `shortcuts.<action>` in the profile,
+# with Meta for the menu and Meta+Space for search shipped as the defaults. A
+# key there is enforced -- `sync` takes it from whoever holds it, and the
+# session daemon runs `sync` whenever it starts, so a key another program
+# took back while the shell was not looking (KRunner and Meta+Space) is ours
+# again at the next login. An empty value is not managed at all: whatever KDE
+# has bound stays bound. "none" keeps an action unbound.
+#
+# `set` and `clear` write both places, so the configuration and KDE never
+# disagree after either. When a key someone else holds is taken, they are
+# named, and revert gives it back.
 #
 # Each action belongs to this project's own kglobalaccel component, [<slug>],
 # the same place any other shell keeps its keys. That is not cosmetic: a
@@ -32,6 +38,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 
 ACTIONS=(launcher search settings ask clipboard sidebar keys switcher switcher-reverse
          overview overview-reverse screenshot screenshot-screen screenshot-window)
@@ -73,6 +80,32 @@ legacy_key() {
         --key _launch --default '' | cut -d, -f1 | tr '\t' ' ' | sed 's/^ *//; s/ *$//'
 }
 
+# What the shell's configuration wants for an action: a key, "none", or ""
+# when it leaves the action to whatever KDE has. Read from the merged JSON a
+# caller already has, since `sync` asks for all fourteen at login.
+configured_key() {   # <action> [merged json]
+    local merged=${2:-$(config_merged)}
+    jq -r --arg a "$1" '.shortcuts[$a] // ""' <<< "$merged" 2>/dev/null
+}
+
+# Writes an action's key into the active profile, so the configuration says
+# what KDE was just told.
+configure_key() {   # <action> <key|none>
+    local profile tmp
+    profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
+    mkdir -p "$(dirname "$profile")"
+    if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
+        log_warn "$profile does not parse; the shortcut is bound but not saved in the configuration"
+        return 1
+    fi
+    tmp=$(mktemp)
+    if [ -f "$profile" ]; then
+        jq --arg a "$1" --arg k "$2" '.shortcuts = ((.shortcuts // {}) + {($a): $k})' "$profile" > "$tmp"
+    else
+        jq -n --arg a "$1" --arg k "$2" '{shortcuts: {($a): $k}}' > "$tmp"
+    fi && mv "$tmp" "$profile" || { rm -f "$tmp"; return 1; }
+}
+
 # Everything currently bound to a key, as "group: name", so a conflict can be
 # named rather than discovered when the shortcut silently does nothing.
 holders_of() {
@@ -88,12 +121,14 @@ case "$cmd" in
         # one answer to "what is bound", so the window and the terminal cannot
         # disagree about it.
         if [ "${1:-}" = "--json" ]; then
+            merged=$(config_merged)
             actions=$(for a in "${ACTIONS[@]}"; do
                 cur=$(action_key "$a"); [ "$cur" = none ] && cur=""
                 old=$(legacy_key "$a"); [ "$old" = none ] && old=""
                 jq -cn --arg id "$a" --arg label "$(action_label "$a")" \
                        --arg shortcut "$cur" --arg legacy "$old" \
-                       '{id: $id, label: $label, shortcut: $shortcut, legacy: $legacy}'
+                       --arg configured "$(configured_key "$a" "$merged")" \
+                       '{id: $id, label: $label, shortcut: $shortcut, legacy: $legacy, configured: $configured}'
             done | jq -sc '.')
             jq -n --arg component "$COMPONENT" \
                   --argjson active "$(accel_component_active "$COMPONENT" | grep -qx true && echo true || echo false)" \
@@ -157,6 +192,7 @@ case "$cmd" in
         ACCEL_FRIENDLY_HINT=$(action_label "$action")
         accel_take shortcuts "$key" "$COMPONENT" "$action" replace
         accel_reload
+        configure_key "$action" "$key"
         log_step "$action ($(action_label "$action")) -> $key"
         ;;
 
@@ -166,7 +202,45 @@ case "$cmd" in
         ACCEL_FRIENDLY_HINT=$(action_label "$action")
         accel_clear shortcuts "$COMPONENT" "$action"
         accel_reload
+        configure_key "$action" none
         log_step "$action unbound"
+        ;;
+
+    # KDE made to match the configuration. Only what differs is touched, and
+    # a key is "ours" only when nothing else holds it too: kglobalaccel gives
+    # a key held twice to whichever registered last, and KRunner registers at
+    # every login.
+    sync)
+        quiet=0; [ "${1:-}" = "--quiet" ] && quiet=1
+        merged=$(config_merged)
+        changed=0
+        for a in "${ACTIONS[@]}"; do
+            want=$(configured_key "$a" "$merged")
+            [ -n "$want" ] || continue
+            cur=$(action_key "$a")
+            ACCEL_FRIENDLY_HINT=$(action_label "$a")
+            if [ "$want" = none ]; then
+                [ -z "$cur" ] || [ "$cur" = none ] && continue
+                accel_clear shortcuts "$COMPONENT" "$a"
+                [ "$quiet" = 1 ] || log_step "$a unbound, as configured"
+                changed=$((changed + 1))
+                continue
+            fi
+            if ! accel_keycode "$want" >/dev/null; then
+                log_warn "$a: '$want' in the configuration is not a key this can bind"
+                continue
+            fi
+            others=$(accel_holders "$want" | awk -F'\t' -v c="$COMPONENT" -v a="$a" '!($1 == c && $2 == a)')
+            [ "$cur" = "$want" ] && [ -z "$others" ] && continue
+            accel_take shortcuts "$want" "$COMPONENT" "$a" replace
+            [ "$quiet" = 1 ] || log_step "$a -> $want, as configured"
+            changed=$((changed + 1))
+        done
+        if [ "$changed" -gt 0 ]; then
+            accel_reload
+        elif [ "$quiet" = 0 ]; then
+            log_info "every configured shortcut is already bound"
+        fi
         ;;
 
     # One-way, and safe to run twice: an action already bound in the new form
@@ -238,9 +312,13 @@ case "$cmd" in
         [ "$moved" = 0 ] && log_info "nothing to move" || log_step "$moved shortcut(s) moved"
         ;;
 
+    # Gives every key back -- and leaves every action unmanaged in the
+    # profile, or the defaults (Meta, Meta+Space) would take them straight
+    # back at the next login.
     revert)
         kconfig_revert shortcuts
         accel_reload
+        for a in "${ACTIONS[@]}"; do configure_key "$a" "" || break; done
         ;;
 
     *) die "unknown command: $cmd" ;;

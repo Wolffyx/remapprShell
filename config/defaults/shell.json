@@ -227,5 +227,21 @@
         "channel": "main",
         "remote": "",
         "localSource": ""
+    },
+    "shortcuts": {
+        "launcher": "Meta",
+        "search": "Meta+Space",
+        "settings": "",
+        "ask": "",
+        "clipboard": "",
+        "sidebar": "",
+        "keys": "",
+        "switcher": "",
+        "switcher-reverse": "",
+        "overview": "",
+        "overview-reverse": "",
+        "screenshot": "",
+        "screenshot-screen": "",
+        "screenshot-window": ""
     }
 }

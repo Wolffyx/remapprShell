@@ -208,10 +208,24 @@ list of values.
 
 ### Shortcuts
 
-Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.
+Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu and Meta+Space the search by default.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `shortcuts.launcher` | text | `Meta` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.search` | text | `Meta+Space` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.settings` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.ask` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.clipboard` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.sidebar` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.keys` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.switcher` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.switcher-reverse` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.overview` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.overview-reverse` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot-screen` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot-window` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 
 ### Lock & session
 
@@ -492,6 +506,9 @@ without `tray` it stands on the panel alone.
 | `pinned` | a list | `[]` | Desktop entry ids ("org.kde.dolphin"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose "Pin to taskbar" rather than typing them. |
 | `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
 | `thisDesktopOnly` | `true` or `false` | `true` | The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed. |
+| `previewHeader` | `true` or `false` | `false` | The application's icon and name over the window cards, with how many windows it has. Off, each card's own icon and title say it. |
+| `previewScreen` | `true` or `false` | `false` | With more than one monitor, the one a window is on ("DP-2") after its title. The desktop it is on is said whenever there is more than one. |
+| `stackGroups` | `true` or `false` | `true` | A second square behind the icon when an application has more than one window open, so the count shows on the button itself. |
 | `showTitles` | `true` or `false` | `true` | The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `230` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |

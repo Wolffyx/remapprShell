@@ -477,6 +477,19 @@ class GlobalShortcuts:
         except OSError as exc:
             print(f"could not run {action}: {exc}", file=sys.stderr)
 
+    def sync_configured(self):
+        """Make KDE's bindings match the shell's configuration, once, at start.
+
+        The keys are the shell's configuration (`shortcuts.<action>`), and a
+        key there is enforced: another program that grabbed it while the shell
+        was not looking -- KRunner re-registering Meta+Space at login -- gives
+        it back here. The CLI does the work, since it keeps the ledger that
+        `shortcuts revert` undoes. Detached, not waited for: it ends by
+        calling Reload on this very process, which could not answer while it
+        was waiting.
+        """
+        self._run("sync", [CTL, "shortcuts", "sync", "--quiet"])
+
     def handle_call(self, _connection, _sender, _path, _interface, method, _params, invocation):
         if method == "Reload":
             self.reload()
@@ -862,6 +875,7 @@ def main():
         # nothing, which is the whole point -- see SHORTCUT_OWNER above.
         if shortcuts_wanted():
             shortcuts.start(connection)
+            shortcuts.sync_configured()
         else:
             print("not the shell's own bus name; leaving the global shortcuts alone",
                   file=sys.stderr)

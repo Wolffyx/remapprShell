@@ -249,6 +249,39 @@ _accel_base_code() {
         "'")          printf '39' ;;
         '`')          printf '96' ;;
         '*')          printf '42' ;;
+        '~')          printf '126' ;;
+        # The named keys Plasma's own defaults use, as Qt spells and encodes
+        # them (QKeySequence, PortableText). KRunner's first key is "Search";
+        # when this table did not know it, taking Meta+Space from KRunner
+        # could not be pushed to the running session, KRunner kept the key
+        # until the next login, and our search got nothing -- with only a
+        # line of warning to say so.
+        Search)                     printf '16777362' ;;
+        'Volume Down')              printf '16777328' ;;
+        'Volume Mute')              printf '16777329' ;;
+        'Volume Up')                printf '16777330' ;;
+        'Media Play')               printf '16777344' ;;
+        'Media Stop')               printf '16777345' ;;
+        'Media Previous')           printf '16777346' ;;
+        'Media Next')               printf '16777347' ;;
+        'Media Pause')              printf '16777349' ;;
+        'Media Rewind')             printf '16777413' ;;
+        'Media Fast Forward')       printf '16777474' ;;
+        'Launch (C)')               printf '16777390' ;;
+        'Monitor Brightness Up')    printf '16777394' ;;
+        'Monitor Brightness Down')  printf '16777395' ;;
+        'Keyboard Light On/Off')    printf '16777396' ;;
+        'Keyboard Brightness Up')   printf '16777397' ;;
+        'Keyboard Brightness Down') printf '16777398' ;;
+        'Power Off')                printf '16777399' ;;
+        Screensaver)                printf '16777402' ;;
+        Battery)                    printf '16777470' ;;
+        Hibernate)                  printf '16777480' ;;
+        'Power Down')               printf '16777483' ;;
+        'Microphone Mute')          printf '16777491' ;;
+        'Microphone Volume Up')     printf '16777501' ;;
+        'Microphone Volume Down')   printf '16777502' ;;
+        Sleep)                      printf '16908292' ;;
         *) return 1 ;;
     esac
 }
@@ -257,6 +290,11 @@ _accel_base_code() {
 # Fails on anything it does not know rather than guessing a wrong key.
 accel_keycode() {
     local spec=$1 part total=0 base="" bases=0 mod
+    # The plus key itself: "Meta++" split on "+" is a modifier and nothing.
+    case "$spec" in
+        +)   spec=Plus ;;
+        *++) spec=${spec%+}Plus ;;
+    esac
     local IFS='+'
     for part in $spec; do
         [ -n "$part" ] || continue
