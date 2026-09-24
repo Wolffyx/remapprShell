@@ -36,6 +36,20 @@ for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$r
         /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: Region|screen: |color: "transparent")/d;
         s/^    required property var modelData/    property var modelData/' "$f"
 done
+# The profile and the state directory are the user's, and a preview is not.
+# Branding names them as absolute paths, so no variable moves them: they are
+# pointed into this run's root instead -- the profile copied, so a preview
+# still looks like this machine, and the state empty. Before this every render
+# wrote the running shell's widget-health.json ("booting", from a shell that
+# never lived past three seconds), and a target that saved a setting saved it
+# into the real profile (2026-09-24).
+branding="$root/core/Branding.qml"
+real_config=$(sed -nE 's/^ *readonly property string configDir: "(.*)"$/\1/p' "$branding")
+mkdir -p "$root/profile" "$root/state"
+[ -n "$real_config" ] && [ -d "$real_config" ] && cp -a "$real_config/." "$root/profile/"
+sed -i -E "s|^( *readonly property string configDir: )\".*\"$|\1\"$root/profile\"|; s|^( *readonly property string stateDir: )\".*\"$|\1\"$root/state\"|" "$branding"
+grep -qF "configDir: \"$root/profile\"" "$branding" && grep -qF "stateDir: \"$root/state\"" "$branding" \
+    || { echo "preview: could not point the profile and state at a copy; not rendering" >&2; exit 1; }
 # Pages that shell out use Branding.ctlBin, which is the *installed* CLI from
 # the main tree. Point it at this worktree's scripts instead, so a preview
 # shows what this branch's commands say.

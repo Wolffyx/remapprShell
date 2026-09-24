@@ -150,6 +150,9 @@ blur, a mask, a layer or a shadow is right.
 
 `PREVIEW_RUNTIME='{"theme.rounding":28}'` overrides configuration for the run.
 
+A preview reads a copy of the profile and keeps its state in its own
+temporary root: it never writes the running shell's files.
+
 ### On the real screen
 
 `grim` writes nothing here -- KWin does not implement `wlr-screencopy`.
