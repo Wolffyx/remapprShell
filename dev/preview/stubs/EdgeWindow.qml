@@ -23,6 +23,10 @@ FloatingWindow {
     property int shadowMargin: 0
     property int edgeMargin: 12
     property string align: "centre"
+    property bool tail: false
+
+    readonly property int reach: Placement.reach(win.gap, win.shadowMargin)
+    readonly property int padNear: win.tail ? win.reach : win.shadowMargin
 
     readonly property string edge: win.bar?.position ?? "bottom"
     readonly property bool horizontal: win.edge === "top" || win.edge === "bottom"
@@ -58,16 +62,16 @@ FloatingWindow {
         win.screenLength, win.shadowMargin, win.edgeMargin)
 
     readonly property real away: Placement.away(
-        win.bar?.extent ?? win.bar?.thickness ?? 0, win.gap, win.shadowMargin)
+        win.bar?.extent ?? win.bar?.thickness ?? 0, win.gap, win.shadowMargin, win.padNear)
 
     readonly property int padLead: win.shadowMargin + win.alongShift
     readonly property int padTrail: win.shadowMargin - win.alongShift
-    readonly property int padH: 2 * win.shadowMargin
-    readonly property int padV: 2 * win.shadowMargin
-    readonly property int padTop: win.horizontal ? win.shadowMargin : win.padLead
-    readonly property int padBottom: win.horizontal ? win.shadowMargin : win.padTrail
-    readonly property int padLeft: win.horizontal ? win.padLead : win.shadowMargin
-    readonly property int padRight: win.horizontal ? win.padTrail : win.shadowMargin
+    readonly property int padH: win.horizontal ? 2 * win.shadowMargin : win.shadowMargin + win.padNear
+    readonly property int padV: win.horizontal ? win.shadowMargin + win.padNear : 2 * win.shadowMargin
+    readonly property int padTop: win.horizontal ? (win.edge === "top" ? win.padNear : win.shadowMargin) : win.padLead
+    readonly property int padBottom: win.horizontal ? (win.edge === "bottom" ? win.padNear : win.shadowMargin) : win.padTrail
+    readonly property int padLeft: win.horizontal ? win.padLead : (win.edge === "left" ? win.padNear : win.shadowMargin)
+    readonly property int padRight: win.horizontal ? win.padTrail : (win.edge === "right" ? win.padNear : win.shadowMargin)
 
     onVisibleChanged: if (win.visible) win.place()
 

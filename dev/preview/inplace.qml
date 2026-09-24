@@ -11,6 +11,10 @@
 //                      or right zone is hard against the end of the screen
 //   PREVIEW_BUTTON     the taskbar: which button the pointer rests on; -1 is
 //                      the last (0)
+//   PREVIEW_TAIL       1: hang the popout from its widget by a neck, as the
+//                      taskbar's preview does, whatever the widget -- the
+//                      taskbar runs along a top or bottom panel only, and
+//                      this is how the neck is seen on a side one
 //   PREVIEW_RUNTIME    configuration overrides, as JSON
 //   PREVIEW_POPOUT     also save the popout's window alone, to this path --
 //                      what a before/after comparison of one popout wants
@@ -128,6 +132,12 @@ Stage {
                 return;
             }
             stage.hoverButton(w, stage.button);
+        } else if (Quickshell.env("PREVIEW_TAIL") === "1") {
+            // Pointing at its middle, as a widget that hangs its popout from
+            // one point names that point.
+            w.popoutTail = true;
+            PanelModel.clickRequested(stage.wid, mock.screenName);
+            w.requestPopout(stage.wid, (stage.horizontal ? slot.width : slot.height) / 2);
         } else if (typeof w.showOverflow === "function") {
             // The tray: a click lands on an icon, and the flyout is the
             // chevron's.

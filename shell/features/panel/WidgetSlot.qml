@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 // One position in a zone: the widget, plus the interaction it asked for.
 //
 // The panel reads capabilities and calls the matching function. It never asks
@@ -10,6 +12,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.core
 import qs.ui.primitives
+import qs.domain.panel
 import qs.domain.theme
 import qs.features.panel.model
 
@@ -58,6 +61,15 @@ Item {
         function onRequestPopout(name: string, centre: real): void {
             root.popoutCentre = centre;
         }
+    }
+
+    // Whether the pointer is on the popout, for a widget whose popout closes
+    // by itself when the pointer leaves it. See `popout.hovered`.
+    Binding {
+        target: root.widget
+        property: "popoutHovered"
+        value: popout.hovered
+        when: root.widget !== null
     }
 
     // A widget that takes hover from the panel gets it through the MouseArea
@@ -256,6 +268,7 @@ Item {
         centre: root.popoutCentre
         align: root.widget?.popoutAlign ?? "centre"
         shadowMargin: Math.ceil(popout.shadowBlur + popout.shadowDrop)
+        tail: root.widget?.popoutTail ?? false
 
         visible: popout.wanted
 
@@ -304,12 +317,72 @@ Item {
         // start menu's own window and a second click on it went nowhere --
         // the menu could be opened and not closed. EdgeWindow caps the room
         // on the panel side at the gap for exactly this.
-        mask: (root.widget?.popoutGrabsFocus ?? false) ? null : cardOnly
+        //
+        // A popout with a tail takes it on its neck as well, so the pointer
+        // crossing from the button to the card never leaves the popout: the
+        // neck is the way there.
+        mask: (root.widget?.popoutGrabsFocus ?? false) ? null : popout.tail ? popout.cardAndNeck : popout.cardOnly
         readonly property Region cardOnly: Region { item: card }
+        readonly property Region cardAndNeck: Region {
+            item: card
+            regions: [popout._neckInput]
+        }
+        readonly property Region _neckInput: NeckRegion { box: popout.neckBox; hollows: popout.neckHollows }
 
-        // Frosted behind, where the compositor offers it.
-        BackgroundEffect.blurRegion: Theme.translucent ? popout._blur : null
+        // Frosted behind, where the compositor offers it -- the neck too, with
+        // the corners beside it as round as the neck has left them.
+        BackgroundEffect.blurRegion: Theme.translucent ? (popout.tail ? popout._tailBlur : popout._blur) : null
         readonly property Region _blur: Region { item: card; radius: card.radius }
+        readonly property Region _tailBlur: Region {
+            id: tailBlur
+            readonly property var corners: Tail.corners(popout.neck, popout.edge)
+            item: card
+            radius: card.radius
+            topLeftRadius: Math.round(tailBlur.corners.topLeft)
+            topRightRadius: Math.round(tailBlur.corners.topRight)
+            bottomLeftRadius: Math.round(tailBlur.corners.bottomLeft)
+            bottomRightRadius: Math.round(tailBlur.corners.bottomRight)
+            regions: [popout._neckBlur]
+        }
+        readonly property Region _neckBlur: NeckRegion { box: popout.neckBox; hollows: popout.neckHollows }
+
+        // ---- the tail -------------------------------------------------------
+        //
+        // A popout that asked for one hangs from its widget by a neck across
+        // the gap, landing on the point the widget named (Tail). The window
+        // already reaches the panel's edge for it (EdgeWindow.tail).
+        //
+        // Where it lands is followed rather than jumped to once the popout is
+        // up, so the neck slides from one taskbar button to the next with the
+        // pointer. It is followed on the screen, not on the card: a card
+        // centred on each button in turn moves under it, and the neck swings
+        // across from the button it was on; a card held at the end of the
+        // screen stays, and the neck runs along it. While the popout is still
+        // arriving it goes straight there, so it never opens pointing at the
+        // button the last one was about.
+        readonly property real tailTarget: popout.slotStart + popout.centre
+        property real tailPoint: popout.tailTarget
+        Behavior on tailPoint {
+            enabled: popout.tail && popout.visible && !enter.running
+            NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic }
+        }
+
+        readonly property real tailWidth: (root.widget?.popoutTailWidth ?? -1) > 0
+            ? root.widget.popoutTailWidth : (root.widget?.tileSize ?? 40)
+
+        // The neck on this card, measured along it from its leading edge.
+        readonly property var neck: Tail.neck(popout.horizontal ? card.width : card.height, card.radius,
+                                              popout.tailPoint - popout.placedAlong - popout.padLead,
+                                              popout.tailWidth, popout.reach)
+        readonly property var neckBox: Tail.box(popout.neck, card.width, card.height, popout.edge, card.x, card.y)
+        readonly property var neckHollows: Tail.hollows(popout.neck, card.width, card.height, popout.edge, card.x, card.y)
+
+        // The pointer on the card or its neck. Told to the widget (see the
+        // Binding at the top): the task list keeps its preview open on it,
+        // where it used to watch its own contents -- which stop short of the
+        // card's padding, and of the neck, so crossing either started the
+        // countdown to closing.
+        readonly property bool hovered: popout.visible && (cardHover.hovered || neckHover.hovered)
 
         // One popout open at a time, closed by a click anywhere else: see
         // PanelModel. A preview that follows the pointer closes by itself and
@@ -379,8 +452,10 @@ Item {
             height: parent.height - popout.padV
             radius: Math.min((root.widget?.popoutRadius ?? -1) >= 0 ? root.widget.popoutRadius : Theme.radius,
                              width / 2, height / 2)
-            color: Theme.glass
-            border.width: 1
+            // With a tail, the outline below draws the background and the
+            // border, card and neck in one.
+            color: popout.tail ? "transparent" : Theme.glass
+            border.width: popout.tail ? 0 : 1
             border.color: Theme.out
             opacity: popout.shown
 
@@ -394,6 +469,30 @@ Item {
             // the panel itself holds the keyboard because it was clicked.
             focus: true
             Keys.forwardTo: popout.popoutContent ? [popout.popoutContent] : []
+
+            HoverHandler { id: cardHover }
+
+            Loader {
+                anchors.fill: parent
+                active: popout.tail
+                sourceComponent: PopoutOutline {
+                    neck: popout.neck
+                    edge: popout.edge
+                    fill: Theme.glass
+                    border: Theme.out
+                }
+            }
+
+            // The neck takes the pointer as the card does.
+            Item {
+                readonly property var box: Tail.box(popout.neck, card.width, card.height, popout.edge, 0, 0)
+                visible: popout.tail
+                x: box.x
+                y: box.y
+                width: box.width
+                height: box.height
+                HoverHandler { id: neckHover }
+            }
 
             Loader {
                 id: content

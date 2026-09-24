@@ -112,6 +112,24 @@ Item {
     property int popoutPadding: 20
     property real popoutRadius: -1
 
+    // Whether the popout hangs from the widget by a neck across the gap to
+    // the panel, rather than standing clear of it: the card's edge facing the
+    // panel flows into a neck `popoutTailWidth` wide (-1 is `tileSize`) that
+    // meets the panel's edge on the point the widget named in requestPopout,
+    // and follows it from one to the next. For a popout that is about one
+    // thing on the panel and moves along it with the pointer -- the taskbar's
+    // preview. A card that stands for the whole widget has no one point to
+    // hang from, and keeps its gap.
+    property bool popoutTail: false
+    property real popoutTailWidth: -1
+
+    // Whether the pointer is on the popout: anywhere on its card, the border
+    // and padding round the contents included, and on its neck. Set by the
+    // panel. A popout that closes by itself when the pointer leaves it reads
+    // this rather than hovering its own contents, which stop short of all
+    // three.
+    property bool popoutHovered: false
+
     // How long the widget may be along the panel before it runs into its
     // neighbours; -1 for no limit. Set by the panel. Most widgets have a size
     // of their own and ignore it; one that can give way -- the task list,
