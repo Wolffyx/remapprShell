@@ -84,6 +84,17 @@ TestCase {
         verify(out.theme === undefined);
     }
 
+    // The merge is made on a copy: neither what was read nor our own copy is
+    // changed by it, whichever of the two holds the key.
+    function test_the_merge_changes_neither_side() {
+        const onDisk = { schemaVersion: 1, panel: { renderer: "plasma", thickness: 38 } };
+        const ours = { panel: { thickness: 44 } };
+        const out = ConfigMerge.flushData(onDisk, {}, ours, []);
+        compare(out.panel, { renderer: "plasma", thickness: 44 });
+        compare(onDisk.panel, { renderer: "plasma", thickness: 38 });
+        compare(ours, { panel: { thickness: 44 } });
+    }
+
     function test_no_removals_is_not_an_error() {
         const out = ConfigMerge.flushData({ schemaVersion: 1, theme: { mode: "light" } }, {}, {}, undefined);
         compare(out.theme.mode, "light");
