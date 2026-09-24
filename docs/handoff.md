@@ -300,6 +300,26 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### The sunset of 2026-09-24, watched
+
+**Plasma's day and night switch worked on its own**: at sunset it moved the
+desktop to `remappr-shell-dark.lookandfeel` and the colours followed
+(`ColorScheme=remappr-shell-dark`). Two things it showed:
+
+- **Plasma's OSD came back with the dark package.** Installing the packages
+  copies Plasma's own `Osd.qml` into both, and nothing put our silenced one
+  back afterwards; the light package had been silenced again since the last
+  install, the dark one never had. `osd_keep_configured` now reapplies
+  `osd.enabled` to both at every install, `theme status` says "ours" only
+  when both are silenced, and doctor checks both packages and accepts either
+  as ours (it used to call the dark one "not our package"). A plasmashell
+  that loaded the unsilenced one keeps it until it restarts.
+- **The switch does not rewrite `~/.config/kdedefaults`**: after it,
+  `kdedefaults/kdeglobals` still names the light scheme and doctor warns.
+  Harmless while the real kdeglobals has the key (it does); `theme apply`
+  lines them up. Not changed -- it is Plasma's switch, and whether to write
+  kdedefaults behind it is a choice for the user.
+
 ### The evening of 2026-09-24: no source file over 500 lines
 
 At the user's request every source file of 500 lines or more was split by

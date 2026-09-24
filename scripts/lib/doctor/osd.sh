@@ -10,9 +10,15 @@ doctor_osd() {
 
     osd_enabled=$(config_get '.osd.enabled' false)
     lnf_active=$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '')
-    osd_file="$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml"
-    osd_silenced=no
-    grep -q 'drawn as nothing' "$osd_file" 2>/dev/null && osd_silenced=yes
+    # Either of our two packages is ours: Plasma's day and night switch moves
+    # between them, and the dark one is the active one every evening. Both
+    # must be silenced, or Plasma's OSD comes back with the next switch.
+    osd_silenced=yes
+    for osd_file in "$PLASMA_LNF_DIR/$LNF_PACKAGE_ID/contents/osd/Osd.qml" \
+                    "$PLASMA_LNF_DIR/$LNF_DARK_PACKAGE_ID/contents/osd/Osd.qml"; do
+        [ -f "$osd_file" ] || continue
+        grep -q 'drawn as nothing' "$osd_file" 2>/dev/null || osd_silenced=no
+    done
 
     if [ "$osd_enabled" != "true" ]; then
         ok "Plasma draws the OSD"
@@ -21,7 +27,7 @@ doctor_osd() {
             fix "nothing will draw an OSD at all"
             fix "put it back: $ALIAS theme osd plasma"
         fi
-    elif [ "$lnf_active" != "$LNF_PACKAGE_ID" ]; then
+    elif [ "$lnf_active" != "$LNF_PACKAGE_ID" ] && [ "$lnf_active" != "$LNF_DARK_PACKAGE_ID" ]; then
         warn "our OSD is on, but our look-and-feel package is not active"
         fix "Plasma is drawing its own as well, so you will see two"
         fix "either apply the package ($ALIAS theme apply) or turn ours off"

@@ -43,7 +43,8 @@ osd_mode() {
             log_step "Plasma draws the OSD again"
             ;;
         status)
-            if grep -q 'drawn as nothing' "$dest" 2>/dev/null; then
+            if grep -q 'drawn as nothing' "$dest" 2>/dev/null \
+               && { [ ! -d "$LNF_DARK_DEST" ] || grep -q 'drawn as nothing' "$LNF_DARK_DEST/contents/osd/Osd.qml" 2>/dev/null; }; then
                 printf 'osd: ours (Plasma'"'"'s is silenced)\n'
             else
                 printf 'osd: Plasma'"'"'s\n'
@@ -54,6 +55,21 @@ osd_mode() {
     esac
 
     log_info "restart plasmashell to see it: systemctl --user restart plasma-plasmashell.service"
+}
+
+# What a fresh copy of the packages must carry: installing one copies Plasma's
+# own OSD back in, and on 2026-09-24 that left the dark package drawing
+# Plasma's popup beside ours from the first sunset after an install -- the
+# light one had been silenced again since, the dark one never was. So an
+# install puts back whatever `osd.enabled` says, in both.
+osd_keep_configured() {
+    local pkg
+    [ "$(config_get '.osd.enabled' false)" = "true" ] || return 0
+    for pkg in "$LNF_DEST" "$LNF_DARK_DEST"; do
+        [ -d "$pkg/contents/osd" ] || continue
+        cp -a "$LNF_SRC/contents/osd/SilentOsd.qml" "$pkg/contents/osd/Osd.qml" || return 1
+        chmod 644 "$pkg/contents/osd/Osd.qml"
+    done
 }
 
 # The shell watches its configuration, so this is what makes our OSD appear or

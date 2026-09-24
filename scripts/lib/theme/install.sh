@@ -100,6 +100,7 @@ install_package() {   # install_package [variant]
     # activated gives a desktop with no OSD at all.
     install_package_variant light || return 1
     install_package_variant dark || return 1
+    osd_keep_configured || return 1
 
     install_colors || return 1
     install_switcher || return 1
