@@ -64,3 +64,27 @@ render_template() {
     mv "$tmp" "$dest"
     chmod 755 "$dest"
 }
+
+# render_package <src dir> <dest dir>: a directory of modules, rendered as one.
+#
+# Each *.in in it is rendered as render_template renders a file, the suffix
+# dropped; everything else is copied as it is. The session daemon is the one
+# user: a package of which only the module holding the install's names is a
+# template, so a placeholder is written once rather than in every module.
+# Modules rather than programs, so every file is left 644; whatever Python
+# cached beside the sources is not a source, and is not copied.
+render_package() {
+    local src=$1 dest=$2 file rel out
+    [ -d "$src" ] || { log_error "not a directory to render: $src"; return 1; }
+    mkdir -p "$dest" || return 1
+    while IFS= read -r -d '' file; do
+        rel=${file#"$src"/}
+        out=$dest/${rel%.in}
+        mkdir -p "$(dirname "$out")" || return 1
+        case "$rel" in
+            *.in) render_template "$file" "$out" || return 1 ;;
+            *)    cp "$file" "$out" || return 1 ;;
+        esac
+        chmod 644 "$out"
+    done < <(find "$src" -type f -not -path '*/__pycache__/*' -not -name '*.pyc' -print0 | sort -z)
+}

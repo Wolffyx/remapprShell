@@ -8,6 +8,9 @@
 # Each entry is: KIND|SRC (repo-relative)|DEST (absolute)
 #   dir       a directory: symlinked whole in link mode, copied in copy mode
 #   template  a *.in file rendered by lib/render.sh, always copied, made executable
+#   package   a directory of modules rendered by lib/render.sh file by file --
+#             the *.in among them rendered, the rest as they are -- always
+#             copied, never linked: see install_package in install.sh
 #   symlink   a link to SRC, which is a path relative to DEST's directory
 #
 # Requires brand.sh to have been sourced.
