@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The session daemon, for the suites that test it.
+# The session daemon, for the suites that test it: tests/test-windowsd*.sh.
 #
 # Sourced after harness.sh, never executed:
 #
