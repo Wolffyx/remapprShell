@@ -667,28 +667,10 @@ Item {
                                 width: parent.width
                                 spacing: 12
 
-                                Rectangle {
+                                AlbumArt {
                                     width: 56
                                     height: 56
-                                    radius: Theme.radiusOf(12)
-                                    color: Theme.accC
-                                    clip: true
-
-                                    Image {
-                                        anchors.fill: parent
-                                        source: MediaStatus.current?.trackArtUrl ?? ""
-                                        fillMode: Image.PreserveAspectCrop
-                                        asynchronous: true
-                                        visible: status === Image.Ready
-                                    }
-
-                                    Glyph {
-                                        anchors.centerIn: parent
-                                        visible: !(MediaStatus.current?.trackArtUrl)
-                                        name: "music_note"
-                                        size: 26
-                                        color: Theme.accCFg
-                                    }
+                                    source: MediaStatus.current?.trackArtUrl ?? ""
                                 }
 
                                 Column {

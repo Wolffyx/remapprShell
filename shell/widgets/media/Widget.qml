@@ -9,7 +9,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.status
-import qs.domain.status.icons
 import qs.domain.theme
 import qs.platform.kde
 import qs.ui.controls
@@ -78,29 +77,15 @@ BarWidget {
                 width: parent.width
                 spacing: 10
 
-                Rectangle {
+                AlbumArt {
                     width: 64
                     height: 64
                     radius: Theme.radiusOf(6)
                     color: Theme.alpha(Theme.foreground, 0.08)
-                    clip: true
-
-                    Image {
-                        id: art
-                        anchors.fill: parent
-                        source: root.player?.trackArtUrl ?? ""
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        visible: art.status === Image.Ready
-                    }
-
-                    PanelIcon {
-                        anchors.centerIn: parent
-                        visible: !art.visible
-                        implicitSize: 32
-                        iconName: root.player?.desktopEntry ?? ""
-                        fallbackName: "media-album-cover"
-                    }
+                    source: root.player?.trackArtUrl ?? ""
+                    // The player's own icon stands in for a missing cover.
+                    glyph: ""
+                    iconName: root.player?.desktopEntry ?? ""
                 }
 
                 Column {
@@ -136,52 +121,13 @@ BarWidget {
 
             // Where in the track, and a click on the bar to go elsewhere
             // in it, when the player allows that.
-            Column {
+            SeekBar {
                 visible: (root.player?.lengthSupported ?? false) && (root.player?.length ?? 0) > 0
                 width: parent.width
-                spacing: 3
-
-                Rectangle {
-                    id: track
-                    width: parent.width
-                    height: 4
-                    radius: Theme.radiusOf(2)
-                    color: Theme.alpha(Theme.foreground, 0.2)
-
-                    Rectangle {
-                        width: parent.width * Math.min(1, (root.player?.position ?? 0) / Math.max(1, root.player?.length ?? 1))
-                        height: parent.height
-                        radius: parent.radius
-                        color: Theme.accent
-                    }
-
-                    TapHandler {
-                        enabled: root.player?.canSeek ?? false
-                        // A 4px bar is a small target; the handler's
-                        // margin makes the band around it count too.
-                        margin: 6
-                        onTapped: point => MediaStatus.seek(point.position.x / track.width * (root.player?.length ?? 0))
-                    }
-                }
-
-                Item {
-                    width: parent.width
-                    height: elapsed.implicitHeight
-
-                    PanelText {
-                        id: elapsed
-                        text: StatusIcons.trackTime(root.player?.position ?? 0)
-                        color: Theme.foregroundInactive
-                        font.pixelSize: 10
-                    }
-
-                    PanelText {
-                        anchors.right: parent.right
-                        text: StatusIcons.trackTime(root.player?.length ?? 0)
-                        color: Theme.foregroundInactive
-                        font.pixelSize: 10
-                    }
-                }
+                position: root.player?.position ?? 0
+                length: root.player?.length ?? 0
+                canSeek: root.player?.canSeek ?? false
+                onSeek: seconds => MediaStatus.seek(seconds)
             }
 
             Row {
