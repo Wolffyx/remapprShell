@@ -89,6 +89,12 @@ QtObject {
     // notifier this shell hosts under its own renderer. Where it is not
     // hosted -- Plasma's tray has it inside, and has no icon of its own to
     // activate -- the file manager, which lists removable devices too.
+    //
+    // Whichever file manager this desktop opens a folder with, not one named
+    // here: it was Dolphin by name until 2026-09-24, which opened nothing on
+    // a desktop without it. At the home folder, because Plasma's
+    // `deviceAdded` names no device and no mount point -- it is sent before
+    // anything is mounted -- so home is the one place known to be there.
     readonly property string deviceNotifierId: "plasmawindowed_org.kde.plasma.devicenotifier"
 
     function openDevices() {
@@ -98,7 +104,7 @@ QtObject {
             return;
         }
         Log.info("notifications", "no device notifier in the tray; opening the file manager instead");
-        WindowsService.open("org.kde.dolphin");
+        Launch.open(Paths.fileUrl(Env.string("HOME")));
     }
 
     // The picture an entry is about, for the centre to draw. The rule is
