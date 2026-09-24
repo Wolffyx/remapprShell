@@ -49,7 +49,7 @@ chmod +x "$FAKEBIN"/*
 # a missing program is refused is only a test if the program can be missing.
 path_only bash sh jq cat wc cmp diff sed awk grep ls sort tail head date mktemp stat \
           chmod mkdir rm mv cp basename dirname tr printf setsid sleep seq id uname \
-          env journalctl systemctl coredumpctl kreadconfig6 curl
+          env journalctl systemctl coredumpctl kreadconfig6 curl systemd-escape
 export TERMINAL=fake-term
 unset DISPLAY WAYLAND_DISPLAY
 
@@ -123,6 +123,78 @@ check "forget removes it"            "$([ -f "$STATE_DIR/ai-consent.json" ] && e
 "$ASK" --provider claude-code >/dev/null 2>&1
 check "hands off to the shell"       "$?" "2"
 check "on the very same report"      "$(awk '{print $NF}' "$SANDBOX/ipc-open.txt")" "$(ls -1 "$STATE_DIR/diagnostics")"
+
+# --- the terminal: the one this desktop is set to use --------------------------
+# Every terminal here is a stand-in that writes down what it was handed, then
+# runs the command after its own options, as a real one would.
+fake_terminal() {   # <name> <file its arguments go to>
+    cat > "$FAKEBIN/$1" <<F
+#!/usr/bin/env bash
+printf '%s\n' "\$@" > "$2"
+while [ \$# -gt 0 ] && [ "\$1" != -e ]; do shift; done
+[ "\${1-}" = -e ] && shift
+"\$@"
+F
+    chmod +x "$FAKEBIN/$1"
+}
+
+# KDE's choice first, before $TERMINAL, with the options it was given.
+fake_terminal fake-kterm "$SANDBOX/kterm-args.txt"
+printf '[General]\nTerminalApplication=fake-kterm --hold\n' > "$XDG_CONFIG_HOME/kdeglobals"
+rm -f "$SANDBOX/claude-prompt.txt"
+"$ASK" --provider claude-code --yes >/dev/null 2>&1
+wait_for "$SANDBOX/claude-prompt.txt"
+check "KDE's terminal, over \$TERMINAL"  "$(awk 'NR <= 3 {printf "%s%s", (NR > 1 ? " " : ""), $0}' "$SANDBOX/kterm-args.txt")" "--hold -e claude"
+check "and the command ran in it"       "$([ -f "$SANDBOX/claude-prompt.txt" ] && echo sent || echo no)" "sent"
+
+# One KDE names but this machine lacks is passed over, and said so.
+printf '[General]\nTerminalApplication=not-installed-term\n' > "$XDG_CONFIG_HOME/kdeglobals"
+rm -f "$SANDBOX/claude-prompt.txt" "$SANDBOX/term-args.txt"
+"$ASK" --provider claude-code --yes >/dev/null 2>"$SANDBOX/err.txt"
+wait_for "$SANDBOX/claude-prompt.txt"
+present "a missing one is said"         "$SANDBOX/err.txt" "not-installed-term"
+check "and \$TERMINAL is next"           "$(head -1 "$SANDBOX/term-args.txt")" "-e"
+rm -f "$XDG_CONFIG_HOME/kdeglobals"
+
+# xdg-terminal-exec next, before $TERMINAL, given the command as it is.
+fake_terminal xdg-terminal-exec "$SANDBOX/xte-args.txt"
+rm -f "$SANDBOX/claude-prompt.txt"
+"$ASK" --provider claude-code --yes >/dev/null 2>&1
+wait_for "$SANDBOX/claude-prompt.txt"
+check "then xdg-terminal-exec"          "$(head -1 "$SANDBOX/xte-args.txt")" "claude"
+rm -f "$FAKEBIN/xdg-terminal-exec"
+
+# None of the three: no guessing, and a message that says what to set.
+rm -f "$SANDBOX/claude-prompt.txt"
+TERMINAL= "$ASK" --provider claude-code --yes >/dev/null 2>"$SANDBOX/err.txt"
+check "no terminal is a failure"        "$?" "1"
+present "that says where to choose one" "$SANDBOX/err.txt" "Default Applications"
+check "and nothing ran"                 "$([ -f "$SANDBOX/claude-prompt.txt" ] && echo sent || echo no)" "no"
+
+# In a scope of its own where one can be made: run by the shell, this is a
+# process of the shell's service, and a terminal left there closes with the
+# next restart of the shell. systemd-run is a stand-in too, writing down its
+# own options and the program, then running it; `true` is the check whether
+# a scope can be made at all.
+cat > "$FAKEBIN/systemd-run" <<F
+#!/usr/bin/env bash
+opts=()
+while [ \$# -gt 0 ] && [ "\$1" != -- ]; do opts+=("\$1"); shift; done
+shift
+printf '%s -- %s\n' "\${opts[*]}" "\$1" >> "$SANDBOX/scopes.txt"
+"\$@"
+F
+chmod +x "$FAKEBIN/systemd-run"
+rm -f "$SANDBOX/claude-prompt.txt"
+"$ASK" --provider claude-code --yes >/dev/null 2>&1
+wait_for "$SANDBOX/claude-prompt.txt"
+check "a scope is tried, then made"     "$(awk '{printf "%s%s", (NR > 1 ? " " : ""), $NF}' "$SANDBOX/scopes.txt")" "true fake-term"
+scope=$(tail -1 "$SANDBOX/scopes.txt")
+contains "in app.slice, gone once done" "$scope" "--user --scope --slice=app.slice --collect --quiet --unit="
+unit=${scope#*--unit=}; unit=${unit%% *}
+check "named app-<slug>-<app>-<random>" "$([[ $unit =~ ^app-$(systemd-escape -- "$SLUG" | sed 's/\\/\\\\/g')-fake\\x2dterm-[0-9a-f]{16}\.scope$ ]] && echo yes || echo "$unit")" "yes"
+check "and the command ran in it"       "$([ -f "$SANDBOX/claude-prompt.txt" ] && echo sent || echo no)" "sent"
+rm -f "$FAKEBIN/systemd-run"
 
 # --- custom: %report is the bundle path ----------------------------------------
 "$ASK" --provider custom --yes >/dev/null 2>&1

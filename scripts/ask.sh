@@ -34,6 +34,7 @@ source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
 source "$REPO_ROOT/scripts/lib/reports.sh"
+source "$REPO_ROOT/scripts/lib/launch.sh"
 
 # Read once: the provider checks ask for the same few settings over and over.
 config_load
@@ -278,26 +279,50 @@ open_in_shell() {
 
 # --- sending -----------------------------------------------------------------
 
+# The terminal this desktop is set to use, as the words that run a command in
+# it, in TERMINAL_ARGV. No terminal is named here: a list of them was a guess,
+# and a guess opens a terminal somebody does not use. In order --
+#
+#   KDE's own choice, kdeglobals [General] TerminalApplication: a command line
+#     ("konsole", "alacritty"), read as the shell's DefaultApps reads it, and
+#     given a command with `-e` after it, as KDE gives it one
+#   xdg-terminal-exec, the freedesktop way to ask for "the terminal", which
+#     takes the command as it is
+#   $TERMINAL, the older convention, with `-e`
 find_terminal() {
-    local t
-    for t in "${TERMINAL:-}" konsole kitty alacritty foot xterm; do
-        [ -n "$t" ] && command -v "$t" >/dev/null 2>&1 && { printf '%s' "$t"; return 0; }
-    done
+    local words=()
+    read -ra words <<< "$(kreadconfig6 --file kdeglobals --group General --key TerminalApplication 2>/dev/null)"
+    if [ "${#words[@]}" -gt 0 ]; then
+        if command -v "${words[0]}" >/dev/null 2>&1; then
+            TERMINAL_ARGV=("${words[@]}" -e)
+            return 0
+        fi
+        log_warn "kdeglobals names '${words[0]}' as the terminal, and it is not installed"
+    fi
+    if command -v xdg-terminal-exec >/dev/null 2>&1; then
+        TERMINAL_ARGV=(xdg-terminal-exec)
+        return 0
+    fi
+    read -ra words <<< "${TERMINAL:-}"
+    if [ "${#words[@]}" -gt 0 ] && command -v "${words[0]}" >/dev/null 2>&1; then
+        TERMINAL_ARGV=("${words[@]}" -e)
+        return 0
+    fi
     return 1
 }
 
 # run_in_terminal <cmd...>  -- interactive programs need a terminal; from a
-# shortcut or the settings window there is none, so one is opened.
+# shortcut or the settings window there is none, so one is opened. In a scope
+# of its own (lib/launch.sh): run from the shell, this is a process of the
+# shell's service, and a terminal left in it would close with the next
+# restart of the shell -- the conversation in it too.
 run_in_terminal() {
     if [ -t 0 ] && [ -t 1 ]; then
         exec "$@"
     fi
-    local term; term=$(find_terminal) || die "no terminal emulator found (set \$TERMINAL)"
-    case "$(basename "$term")" in
-        kitty|foot) setsid -f "$term" "$@" >/dev/null 2>&1 ;;
-        *)          setsid -f "$term" -e "$@" >/dev/null 2>&1 ;;
-    esac
-    log_step "opened $(basename "$term") running $(basename "$1")"
+    find_terminal || die "no terminal to run $(basename "$1") in: choose one in System Settings (Default Applications), or install xdg-terminal-exec, or set \$TERMINAL"
+    app_scope "$(basename "${TERMINAL_ARGV[0]}")" "${TERMINAL_ARGV[@]}" "$@"
+    log_step "opened $(basename "${TERMINAL_ARGV[0]}") running $(basename "$1")"
 }
 
 send_clipboard() {
