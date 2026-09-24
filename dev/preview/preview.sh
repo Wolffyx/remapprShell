@@ -53,6 +53,22 @@ sed -i "s|\${Branding.dataDir}/config/schema|$WT/config/schema|" "$root/domain/c
 sed -i "s|\${Branding.dataDir}/config/defaults|$WT/config/defaults|" "$root/core/Paths.qml"
 sed -i -E 's/^FloatingWindow \{/Item {/; /^    title: /d; /^    color: Theme\.s1$/d' "$root/features/settings/SettingsWindow.qml"
 
+# The configuration is read from a copy of the real one, so that whatever the
+# shell writes back -- a migration it applies on reading, a setting a target
+# changes -- lands in the copy and goes with it. The real one is the running
+# shell's. On 2026-09-24 a preview of a branch whose schema was a version
+# ahead migrated the live profile on reading it, and the running shell, a
+# version behind, refused to save anything to it from then on. PREVIEW_DEMO
+# puts an empty directory in the same place instead, below.
+if [ "${PREVIEW_DEMO:-}" != "1" ]; then
+    real_config=$(sed -n 's/.*readonly property string configDir: "\(.*\)"$/\1/p' "$root/core/Branding.qml")
+    mkdir -p "$root/config"
+    [ -n "$real_config" ] && [ -d "$real_config" ] && cp -r "$real_config/." "$root/config/"
+    sed -i "s|readonly property string configDir: Branding.configDir|readonly property string configDir: \"$root/config\"|" "$root/core/Paths.qml"
+    grep -qF "configDir: \"$root/config\"" "$root/core/Paths.qml" \
+        || { echo "preview: could not point the configuration at a copy; not running on the real one" >&2; exit 1; }
+fi
+
 # PREVIEW_DEMO=1: a picture fit to publish.
 #
 # A shot of the real shell carries whoever took it -- the account name, the
