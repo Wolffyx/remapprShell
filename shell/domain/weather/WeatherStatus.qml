@@ -246,6 +246,8 @@ QtObject {
         atomicWrites: true
         printErrors: false
 
+        onSaveFailed: Fs.forget(Paths.stateDir)
+
         onLoaded: {
             try {
                 const data = JSON.parse(text());

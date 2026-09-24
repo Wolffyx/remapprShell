@@ -229,6 +229,8 @@ QtObject {
     readonly property FileView _monitorWriter: FileView {
         atomicWrites: true
         printErrors: false
+
+        onSaveFailed: Fs.forget(`${Paths.profileDir(root.profile)}/monitors`)
     }
 
     function _scheduleWrite() {
@@ -435,6 +437,7 @@ QtObject {
         onSaveFailed: err => {
             root.lastError = `cannot write ${path} (error ${err})`;
             Log.error("config", root.lastError);
+            Fs.forget(Paths.profileDir(root.profile));
         }
 
         onFileChanged: reload()

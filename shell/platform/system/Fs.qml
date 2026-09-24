@@ -17,10 +17,27 @@ QtObject {
     // Creates a directory and its parents. Fire-and-forget: callers write
     // through FileView immediately afterwards, and a failure surfaces there as
     // a save error with a real path in it.
+    //
+    // Once per directory per session. Every save asks first, and some save
+    // often: the quarantine ledger once per third-party widget as the panel
+    // is built, the launcher's history once per launch. Each ask was a mkdir
+    // process for a directory made the first time.
     function ensureDir(path) {
-        if (!path)
+        if (!path || root._made[path])
             return;
+        root._made[path] = true;
         Quickshell.execDetached(["mkdir", "-p", path]);
         Log.debug("fs", `ensureDir ${path}`);
     }
+
+    // For a save that failed: the directory it went to may be gone -- a
+    // restore point replaces the whole state directory -- so the next
+    // ensureDir makes it again instead of trusting the first.
+    function forget(path) {
+        delete root._made[path];
+    }
+
+    // path -> true for every directory made this session. Nothing binds to
+    // it, so it is changed in place.
+    property var _made: ({})
 }
