@@ -16,7 +16,7 @@ pragma Singleton
 //
 // The daemon is still what *owns* the component: a shortcut is only grabbed
 // while its component has a running owner, which is the whole reason
-// bin/windowsd.py.in registers them. It no longer runs anything for the
+// bin/windowsd/shortcuts.py registers them. It no longer runs anything for the
 // actions listed here -- see SHELL_ACTIONS there, which names this file.
 
 import QtQuick

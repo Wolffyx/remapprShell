@@ -3,10 +3,12 @@
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
 sessions, and added to since -- most recently on **2026-09-24**, a cleanup
 of the whole tree for duplicated and wasteful code that found a dozen bugs in
-the copies, and that afternoon three things that came out of using it:
+the copies; that afternoon three things that came out of using it; and that
+evening every source file over 500 lines split by what it does ("The evening
+of 2026-09-24"). The afternoon's three:
 applications in scopes of their own, no other application named in the code,
-and a taskbar preview that hangs from its button (read "The afternoon of
-2026-09-24" first, then "The cleanup of 2026-09-24"). Before that, the
+and an invisible bridge from a taskbar button to its preview (read "The
+afternoon of 2026-09-24" first, then "The cleanup of 2026-09-24"). Before that, the
 **evening of 2026-09-23**
 (twelve lock screens, a reworked taskbar preview, and the global shortcuts
 moved into the shell's configuration: read "The evening of 2026-09-23" and
@@ -298,6 +300,49 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### The evening of 2026-09-24: no source file over 500 lines
+
+At the user's request every source file of 500 lines or more was split by
+what it does -- 24 of them, directly on `dev` in the live checkout, by the
+user's choice. Behaviour was kept: every split was checked against renders
+of the file before it (pixel-identical, or differing only in live data) or,
+for the scripts, against their own output in a sandbox (byte-identical but
+for the file and line bash names in a missing-argument error). Where things
+are now:
+
+- **The window daemon** is `bin/windowsd.py.in` (a 60-line entry) and a
+  package, `bin/windowsd/` -- one module per job, and `brand.py.in` the only
+  template. The installer has a new manifest kind, `package`, rendered and
+  copied in every mode (never linked), so **a daemon change still needs
+  `make link` and `rmpr windows restart`**. Its test is six suites,
+  `tests/test-windows*.sh`.
+- **Scripts:** `theme.sh`, `doctor.sh`, `renderer.sh` and `edges.sh` are thin
+  commands over `scripts/lib/{theme,doctor,renderer,edges}/`. The window
+  switcher is `main.qml.in` with `SwitcherHeader`/`SwitcherFooter` beside it,
+  and `install_switcher` renders every template in its `ui/`.
+- **The shell:** `shell.qml` hosts `ShellScreens`, `ShellWindows` and
+  `ShellIpc` (every IPC target and function kept); `WidgetSlot` hosts
+  `SlotPopout` and `SlotTooltip`; Overview, Sidebar, Quick settings, the
+  start menu, the taskbar and the notification centre are each a file per
+  part beside them; the wizard is a file per step; the appearance and
+  taskbar settings pages have cards of their own.
+- **`StatusIcons` is a facade now**, forwarding all 54 of its names to one
+  singleton per subject (`NetworkIcons`, `AudioIcons`, `PowerIcons`,
+  `BrightnessIcons`, ...), so no caller changed; each has its own test.
+- **The lock screen:** day ahead, secure, accessible and kiosk are each a
+  root plus parts named for their style, all in `qmldir`, none a singleton
+  (a singleton there loads with every file -- see the afternoon's LockKeys
+  trap). Their colours moved onto one typed palette object per style. The
+  package's hash changed: **`rmpr lockscreen try` before `enable`**.
+
+Two traps it hit, both fixed: `scripts/gen-qmldir.sh` rewrote every qmldir
+in place, and the live shell reloaded one half-written ("Panel is not a
+type") -- it now writes each beside itself, renames it over, and leaves an
+unchanged one alone; and an install run into a sandbox HOME regenerated the
+*checkout's* `shell/core/Branding.qml` with sandbox paths for a few minutes,
+which the next `make` put back. `theme status` no longer stops after five
+lines on a machine without the package (a `die` inside `|| true`).
+
 ### The afternoon of 2026-09-24: applications of their own, no other names, a preview that hangs
 
 **Why the first one.** Reloading the shell after the cleanup merged --
@@ -360,7 +405,10 @@ on 2026-09-23 and kept ever since. An unmatched window is named by its title.
 KWin 6.7 gives scripts no X11 window id, which is why the window is found by
 process, class and title rather than by id.
 
-**The taskbar preview hangs from its button.** An opt-in on `BarWidget`
+**The taskbar preview hangs from its button.** *(Later the same day: the
+drawn neck was not wanted. It is an invisible bridge now, exactly the
+hovered button's width, that only takes the pointer -- `PopoutOutline` and
+`NeckRegion` are gone, and `Tail` is the rectangle.)* An opt-in on `BarWidget`
 (`popoutTail`, `popoutTailWidth`, `popoutHovered`), taken only by the task
 preview: the card's edge curves down into a neck on the hovered button,
 drawn with the card's own border by `PopoutOutline`, from pure geometry in
@@ -540,7 +588,7 @@ thumbnails are icons; the user was looking at it.
 **Shortcuts are configuration now.** `shortcuts.<action>` in the profile (14
 keys in the schema): Meta and Meta+Space by default, `""` = leave to KDE,
 `none` = unbound. `rmpr shortcuts sync` applies it, **and the daemon runs sync
-at every start** (`GlobalShortcuts.sync_configured` in `bin/windowsd.py.in`),
+at every start** (`GlobalShortcuts.sync_configured` in `bin/windowsd/shortcuts.py`),
 so a key taken back while the shell was not looking is reclaimed. Proven on
 this machine: Meta+Space given back to KRunner by hand, `rmpr windows
 restart`, reclaimed. This reverses the old "nothing is bound by default"
@@ -888,7 +936,7 @@ and each check was proven by planting the fault and watching it fire:
 | `--force-dark-mode` in a `*-flags.conf` | `probe-flags.conf forces dark mode on the command line` |
 | `kdedefaults` naming another scheme | `kdedefaults/kdeglobals still falls back to ...` |
 
-The palette names it looks for are in `GTK_PALETTE_NAMES` in `doctor.sh`:
+The palette names it looks for are in `GTK_PALETTE_NAMES` in `scripts/lib/doctor/light-dark.sh`:
 `window_bg_color`, `view_bg_color`, `headerbar_bg_color` and the rest that
 libadwaita and Adwaita actually paint with. The `*_breeze` names
 kde-gtk-config generates are deliberately not among them, which is why
@@ -1072,7 +1120,7 @@ its release now arrive on one connection in order, so neither can overtake the
 other -- which was the whole switcher race. The daemon still registers the keys
 and still owns the component, because a key is only grabbed while its component
 has a running owner; it no longer *runs* anything for what the shell takes
-(`SHELL_ACTIONS` in `bin/windowsd.py.in` names the QML, which names it back).
+(`SHELL_ACTIONS` in `bin/windowsd/shortcuts.py` names the QML, which names it back).
 Left on the old route deliberately: `clipboard` and `sidebar`, which open where
 the pointer is and so need a KWin script for the answer; `ask`, which builds a
 redacted report before any window opens; the screenshot keys, the only ones
@@ -2032,7 +2080,7 @@ show the bug. Do not repeat that: see "Looking at the real screen".
     Darkly and Kvantum installed and Union not. Not seen: an application
     restyling on the notification. **Union**, once installed (`sudo pacman
     -S --needed union`): check its plugin's file name against the
-    `*union*.so` glob and its key against "Union" in `scripts/theme.sh`
+    `*union*.so` glob and its key against "Union" in `scripts/lib/theme/styles.sh`
     before trusting the button. "Install the missing parts" is a real
     `theme apply` on this machine -- see the state table.
 21. **Notifications drawn by the shell.** Settings -> Notifications, "Drawn
@@ -3978,7 +4026,7 @@ flags=4 active=False
 
 **The shortcuts have an owner.** Every action is now a component action under
 `[remappr-shell]` in kglobalshortcutsrc -- the same place and shape as any
-other shell's -- registered by `GlobalShortcuts` in `bin/windowsd.py.in` with
+other shell's -- registered by `GlobalShortcuts` in `bin/windowsd/shortcuts.py` with
 `doRegister` and `setShortcutKeys` at flags 6, and run from the
 `globalShortcutPressed` signal. The daemon was the right place because the
 KWin script D-Bus-activates it at login, before the shell is up, so the keys
@@ -4028,7 +4076,7 @@ perfect either way.
 #### The test suite unbound the user's keys, twice
 
 Worth writing down because it took the second report to find. `make test`
-runs `tests/test-windows.sh`, which renders the real `bin/windowsd.py.in` and
+runs `tests/test-windows.sh`, which renders the real daemon (`bin/windowsd.py.in` and its package `bin/windowsd/`) and
 **runs it against the real session bus** -- there is no other one -- under a
 bus name of its own. The moment the daemon grew a `GlobalShortcuts`, that copy
 registered the shell's kglobalaccel component with the *sandbox's* empty

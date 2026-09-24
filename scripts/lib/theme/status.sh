@@ -52,7 +52,10 @@ theme_status() {   # --json in $WITH_JSON
     esac)"
     printf 'colour:       %s\n' "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '<unset>')"
     printf 'our schemes:  %s installed\n' "$(ls -1 "$COLORS_DIR" 2>/dev/null | grep -c "^$SLUG-")"
-    osd_mode status 2>/dev/null || true
+    # In a subshell: without the package, osd_mode dies, and `|| true` does
+    # not catch an exit -- status stopped after five lines instead of
+    # carrying on without the OSD line.
+    ( osd_mode status ) 2>/dev/null || true
     printf 'switcher:     %s\n' "$([ -d "$SWITCHER_DEST" ] && echo "installed" || echo "not installed")"
     printf 'active Alt+Tab: %s\n' "$(kreadconfig6 --file kwinrc --group TabBox --key LayoutName --default '<unset>')"
     printf 'icons:        %s\n' "$(kreadconfig6 --file kdeglobals --group Icons --key Theme --default '<unset>')"

@@ -11,7 +11,7 @@ guessing.
 | | |
 | --- | --- |
 | [`shell/ui/primitives/BarWidget.qml`](../shell/ui/primitives/BarWidget.qml) | the contract. A widget says *what* its popout is and how it should behave; it never draws the window. |
-| [`shell/features/panel/WidgetSlot.qml`](../shell/features/panel/WidgetSlot.qml) | the card. Builds the window, draws the background, the border and the shadow, and loads the widget's contents into it. |
+| [`shell/features/panel/SlotPopout.qml`](../shell/features/panel/SlotPopout.qml) | the card, built for its slot by `WidgetSlot.qml`. Builds the window, draws the background, the border and the shadow, and loads the widget's contents into it. |
 | [`shell/features/panel/EdgeWindow.qml`](../shell/features/panel/EdgeWindow.qml) | the window. A layer surface beside the panel, on any of the four edges. Shared with tooltips. |
 | [`shell/domain/panel/Placement.qml`](../shell/domain/panel/Placement.qml) | the arithmetic. Where the window goes and where the card sits inside it. Pure functions, tested in [`tests/tst_Placement.qml`](../tests/tst_Placement.qml). |
 
@@ -200,7 +200,7 @@ PREVIEW_WIDGET=launcher dev/preview/preview.sh dev/preview/popout.qml out.png 11
 
 Good for layout, spacing, colour and text. **It cannot show anything the
 compositor does.** `preview.sh` deletes `BackgroundEffect.blurRegion` and the
-input mask from `WidgetSlot.qml` before rendering, and turns every full-screen
+input mask from `SlotPopout.qml` before rendering, and turns every full-screen
 layer surface into a plain `Item`. Do not conclude from a preview that a
 blur, a mask, a layer or a shadow is right.
 

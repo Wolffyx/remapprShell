@@ -3,7 +3,7 @@
 #
 # One list for everything that needs it. shortcuts.sh reads it for what it
 # accepts and what it shows, edges.sh for what an edge may name, doctor for
-# what to look for; bin/windowsd.py.in has it rendered in, to register each
+# what to look for; bin/windowsd/brand.py.in has it rendered in, to register each
 # one with kglobalaccel and to run it. Before this there were three copies and
 # a fourth that held eight of the fourteen.
 #

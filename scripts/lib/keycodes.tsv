@@ -2,7 +2,7 @@
 # digit or a function key -- those are computed, being ASCII and a run.
 #
 # One table for both sides of a binding. scripts/lib/accel.sh reads it to check
-# and push a key; bin/windowsd.py.in has it rendered in, to register the same
+# and push a key; bin/windowsd/brand.py.in has it rendered in, to register the same
 # key with kglobalaccel. The two used to keep a copy each, and the copies
 # disagreed: `shortcuts set search "Volume Up"` was accepted, written, and then
 # refused by the daemon that owns the component, so the key grabbed nothing.

@@ -6,7 +6,7 @@ pragma Singleton
 // client's own surface, so a shell cannot ask the question at all. KWin can:
 // `rmpr clipboard` loads a one-shot KWin script that reads
 // `workspace.cursorPos`, hands it to the daemon, and the daemon emits the
-// signal this listens for. The whole route is in bin/windowsd.py.in's Pointer.
+// signal this listens for. The whole route is in bin/windowsd/pointer.py.
 //
 // A match rule rather than a whole-bus monitor, for the reason the window list
 // gives: this wants one signal, not every message on the session bus.

@@ -333,7 +333,7 @@ PanelWindow {
                                     sourceAspect: WindowEvents.aspectOf(tile.modelData)
                                     iconScale: 0.45
                                     // The selected card alone: see the same
-                                    // note in Overview.qml.
+                                    // note in OverviewWindows.qml.
                                     live: tile.selected && !tile.modelData?.minimized
                                     iconName: WindowsService.iconFor(tile.modelData)
                                     iconFile: WindowsService.iconFileFor(tile.modelData)
