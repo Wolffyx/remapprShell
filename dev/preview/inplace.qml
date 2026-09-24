@@ -11,6 +11,10 @@
 //                      or right zone is hard against the end of the screen
 //   PREVIEW_BUTTON     the taskbar: which button the pointer rests on; -1 is
 //                      the last (0)
+//   PREVIEW_MOVE       the taskbar: a second button to move the pointer on to
+//                      once the card has settled, and PREVIEW_MOVE_MS how long
+//                      after that to take the picture (60) -- the neck caught
+//                      on its way from one button to the next
 //   PREVIEW_TAIL       1: hang the popout from its widget by a neck, as the
 //                      taskbar's preview does, whatever the widget -- the
 //                      taskbar runs along a top or bottom panel only, and
@@ -42,6 +46,8 @@ Stage {
     readonly property string zone: Quickshell.env("PREVIEW_ZONE") || "middle"
     readonly property int button: parseInt(Quickshell.env("PREVIEW_BUTTON") || "0")
     readonly property string alone: Quickshell.env("PREVIEW_POPOUT") || ""
+    readonly property int moveTo: parseInt(Quickshell.env("PREVIEW_MOVE") || "-1000")
+    readonly property bool moves: stage.moveTo > -1000
     readonly property bool horizontal: stage.edge === "top" || stage.edge === "bottom"
 
     orientation: stage.horizontal ? Gradient.Horizontal : Gradient.Vertical
@@ -132,6 +138,8 @@ Stage {
                 return;
             }
             stage.hoverButton(w, stage.button);
+            if (stage.moves)
+                moveTimer.start();
         } else if (Quickshell.env("PREVIEW_TAIL") === "1") {
             // Pointing at its middle, as a widget that hangs its popout from
             // one point names that point.
@@ -155,9 +163,20 @@ Stage {
     }
 
     Timer {
+        id: moveTimer
+        interval: 900
+        onTriggered: {
+            stage.hoverButton(stage.slotOf(stage.wid).widget, stage.moveTo);
+            grabTimer.interval = parseInt(Quickshell.env("PREVIEW_MOVE_MS") || "60");
+            grabTimer.restart();
+        }
+    }
+
+    Timer {
+        id: grabTimer
         // Long enough for the popout's contents to build and its entrance to
         // finish; the harness takes its own picture after this.
-        running: true
+        running: !stage.moves
         interval: Math.max(900, parseInt(Quickshell.env("PREVIEW_DELAY") || "2500") - 700)
         onTriggered: {
             const win = stage.popoutWindow();

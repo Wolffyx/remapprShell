@@ -219,10 +219,11 @@ PREVIEW_DEMO=1 PREVIEW_WIDGET=tasks PREVIEW_EDGE=bottom PREVIEW_BAR=floating \
 ```
 
 It takes `PREVIEW_ZONE`, `PREVIEW_ALONE`, `PREVIEW_BUTTON` (which taskbar
-button the pointer rests on), `PREVIEW_TAIL=1` (a neck on any widget, for a
-side panel, which the taskbar does not run along) and `PREVIEW_POPOUT` (also
-save the popout's window alone -- the thing to compare before and after a
-change). The popout is its own window offscreen too, so it is photographed
+button the pointer rests on), `PREVIEW_MOVE` and `PREVIEW_MOVE_MS` (a second
+button to move on to, and when to take the picture after -- the neck on its
+way), `PREVIEW_TAIL=1` (a neck on any widget, for a side panel, which the
+taskbar does not run along) and `PREVIEW_POPOUT` (also save the popout's
+window alone -- the thing to compare before and after a change). The popout is its own window offscreen too, so it is photographed
 and laid over the panel. Shadows are shader effects and do not render in the
 offscreen harness at all.
 
