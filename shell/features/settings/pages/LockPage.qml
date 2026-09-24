@@ -10,9 +10,8 @@ pragma ComponentBehavior: Bound
 // CLI does and refuses nothing on its own -- the gates are in the script.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.session
 import qs.domain.surfaces
@@ -23,10 +22,12 @@ import qs.ui.controls
 Column {
     id: root
 
-    // `lockscreen status --json`, parsed.
-    property var info: null
-    property string status: ""
-    property bool busy: false
+    // `lockscreen status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["lockscreen"]
+        readFailed: "Could not read the lock screen's state."
+    }
+    readonly property var info: root.ctl.state
 
     readonly property bool installed: root.info?.enabled === true
     // What `enable` itself requires: this exact build, unlocked in this
@@ -44,57 +45,13 @@ Column {
 
     spacing: 14
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "lockscreen"].concat(args);
-        runProc.running = true;
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "lockscreen", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.info = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the lock screen's state.";
-                    Log.warn("settings", `lockscreen status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     PanelText {
-        visible: root.status.length > 0
+        visible: root.ctl.status.length > 0
         width: root.width
         wrapMode: Text.WordWrap
-        text: root.status
+        text: root.ctl.status
         font.pixelSize: 12
         color: Theme.error
     }
@@ -140,8 +97,8 @@ Column {
                 glyph: "play_circle"
                 iconName: "media-playback-start"
                 text: "Try it…"
-                enabled: !root.busy
-                onActivated: root.run(["try"])
+                enabled: !root.ctl.busy
+                onActivated: root.ctl.run(["try"])
             }
 
             TextButton {
@@ -150,8 +107,8 @@ Column {
                 glyph: "lock"
                 iconName: "lock"
                 text: "Turn it on"
-                enabled: !root.busy && root.ready
-                onActivated: root.run(["enable"])
+                enabled: !root.ctl.busy && root.ready
+                onActivated: root.ctl.run(["enable"])
             }
 
             TextButton {
@@ -159,8 +116,8 @@ Column {
                 glyph: "lock_open"
                 iconName: "unlock"
                 text: "Turn it off"
-                enabled: !root.busy
-                onActivated: root.run(["disable"])
+                enabled: !root.ctl.busy
+                onActivated: root.ctl.run(["disable"])
             }
         }
 
@@ -267,7 +224,7 @@ Column {
                     }
 
                     HoverHandler { id: styleHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.run(["set", "style", styleRow.modelData.id]) }
+                    TapHandler { onTapped: root.ctl.run(["set", "style", styleRow.modelData.id]) }
                     Accessible.name: styleRow.modelData.name
                 }
             }
@@ -294,7 +251,7 @@ Column {
                 values: ["left", "center"]
                 labels: ["Left", "Centred"]
                 current: root.lookValue("clock", "left")
-                onPicked: value => root.run(["set", "clock", value])
+                onPicked: value => root.ctl.run(["set", "clock", value])
             }
         }
 
@@ -308,7 +265,7 @@ Column {
             TextInputRow {
                 width: parent.width
                 text: root.lookValue("kioskName", "")
-                onCommitted: value => root.run(["set", "kioskName", value])
+                onCommitted: value => root.ctl.run(["set", "kioskName", value])
             }
         }
 
@@ -321,7 +278,7 @@ Column {
             TextInputRow {
                 width: parent.width
                 text: root.lookValue("kioskNote", "")
-                onCommitted: value => root.run(["set", "kioskNote", value])
+                onCommitted: value => root.ctl.run(["set", "kioskNote", value])
             }
         }
 
@@ -335,7 +292,7 @@ Column {
                 values: ["indigo", "terracotta", "green", "violet"]
                 labels: ["Indigo", "Terracotta", "Green", "Violet"]
                 current: root.lookValue("accent", "indigo")
-                onPicked: value => root.run(["set", "accent", value])
+                onPicked: value => root.ctl.run(["set", "accent", value])
             }
         }
 
@@ -348,14 +305,14 @@ Column {
             to: 40
             stepSize: 2
             value: Number(root.lookValue("blur", 26))
-            onMoved: value => root.run(["set", "blur", Math.round(value)])
+            onMoved: value => root.ctl.run(["set", "blur", Math.round(value)])
         }
 
         ToggleRow {
             label: "Show the clock while nothing is happening"
             description: "Off, the screen is dark until a key or the pointer wakes the prompt."
             checked: root.lookBool("idleClock")
-            onToggled: value => root.run(["set", "idleClock", value])
+            onToggled: value => root.ctl.run(["set", "idleClock", value])
         }
 
         SettingRow {
@@ -368,7 +325,7 @@ Column {
                 values: ["0", "10", "20", "60", "300"]
                 labels: ["Never", "10 s", "20 s", "1 min", "5 min"]
                 current: String(root.lookValue("dim", "20"))
-                onPicked: value => root.run(["set", "dim", value])
+                onPicked: value => root.ctl.run(["set", "dim", value])
             }
         }
 
@@ -376,7 +333,7 @@ Column {
             label: "Lift the shutter when unlocking"
             description: "The lock screen slides away over the unblurring wallpaper. Off, it goes at once, as Plasma's does."
             checked: root.lookBool("unlockAnimation")
-            onToggled: value => root.run(["set", "unlockAnimation", value])
+            onToggled: value => root.ctl.run(["set", "unlockAnimation", value])
         }
 
         SettingRow {
@@ -389,7 +346,7 @@ Column {
                 values: ["0", "2", "3", "5"]
                 labels: ["Never", "At 2%", "At 3%", "At 5%"]
                 current: String(root.lookValue("hibernateAt", "3"))
-                onPicked: value => root.run(["set", "hibernateAt", value])
+                onPicked: value => root.ctl.run(["set", "hibernateAt", value])
             }
         }
 
@@ -397,14 +354,14 @@ Column {
             label: "What is playing"
             description: "The media card, from the same players Plasma's lock screen controls. This is Plasma's own setting."
             checked: root.lookBool("media")
-            onToggled: value => root.run(["set", "media", value])
+            onToggled: value => root.ctl.run(["set", "media", value])
         }
 
         ToggleRow {
             label: "Sleep, hibernate and switch user"
             description: "The round buttons under the password."
             checked: root.lookBool("session")
-            onToggled: value => root.run(["set", "session", value])
+            onToggled: value => root.ctl.run(["set", "session", value])
         }
 
         PanelText {

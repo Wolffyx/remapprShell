@@ -12,9 +12,7 @@ pragma ComponentBehavior: Bound
 // "BottomLeft" is not a word anyone uses about their own monitor.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
-import qs.platform.kde
+import qs.platform.system
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -22,11 +20,15 @@ import qs.ui.controls
 CardGrid {
     id: root
 
-    // `edges status --json`, parsed. Null until the first read returns.
-    property var edgeState: null
+    // `edges status --json`, and the command that changes it. A refusal -- a
+    // corner set while the triggers are off, say -- is explained on the
+    // command's error line, and shown as it is.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["edges"]
+        readFailed: "Could not read the screen edges from KWin's configuration."
+    }
+    readonly property var edgeState: root.ctl.state
     property string selected: "TopLeft"
-    property string status: ""
-    property bool busy: false
 
     readonly property bool triggersOn: root.edgeState?.triggers ?? true
     readonly property var actions: root.edgeState?.actions ?? []
@@ -58,53 +60,7 @@ CardGrid {
 
     count: 3
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "edges"].concat(args);
-        runProc.running = true;
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "edges", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.edgeState = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the screen edges from KWin's configuration.";
-                    Log.warn("settings", `edges status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        // A refusal -- a corner set while the triggers are off, say -- is
-        // explained on the command's error line, and shown as it is.
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     // The picture is 460px of screen with a chip in each corner, so this card
     // takes the whole row rather than half of it.
@@ -118,7 +74,7 @@ CardGrid {
 
         SettingRow {
             width: screenCard.width - 2 * screenCard.padding
-            enabled: !root.busy
+            enabled: !root.ctl.busy
             label: "Mouse triggers at the screen edges"
             description: root.triggersOn
                 ? "Turn off to stop every corner, edge and snap below at once."
@@ -126,7 +82,7 @@ CardGrid {
 
             Toggle {
                 checked: root.triggersOn
-                onToggled: value => root.run([value ? "enable-all" : "disable-all"])
+                onToggled: value => root.ctl.run([value ? "enable-all" : "disable-all"])
             }
         }
 
@@ -135,7 +91,7 @@ CardGrid {
 
             width: screenCard.width - 2 * screenCard.padding
             height: screenFrame.height + 8
-            enabled: root.triggersOn && !root.busy
+            enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
 
             Rectangle {
@@ -190,7 +146,7 @@ CardGrid {
 
         SettingRow {
             width: screenCard.width - 2 * screenCard.padding
-            enabled: root.triggersOn && !root.busy
+            enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
             label: root.nameOf(root.selected)
             description: root.selectedKnown
@@ -203,7 +159,7 @@ CardGrid {
                 onPicked: value => {
                     const a = root.actions.find(x => x.label === value);
                     if (a && a.id !== root.selectedAction)
-                        root.run(["set", root.selected, a.id]);
+                        root.ctl.run(["set", root.selected, a.id]);
                 }
             }
         }
@@ -218,7 +174,7 @@ CardGrid {
 
         SettingRow {
             width: snapCard.width - 2 * snapCard.padding
-            enabled: root.triggersOn && !root.busy
+            enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
             label: "Snap windows to the screen edges"
             description: "Drag a window to the top to maximise it, or to a side to fill that half."
@@ -228,7 +184,7 @@ CardGrid {
 
             Toggle {
                 checked: root.snapOn
-                onToggled: value => root.run(["snap", value ? "on" : "off"])
+                onToggled: value => root.ctl.run(["snap", value ? "on" : "off"])
             }
         }
     }
@@ -241,38 +197,14 @@ CardGrid {
 
         SectionLabel { text: "Undo, and the rest" }
 
-        Flow {
-            width: elsewhere.width - 2 * elsewhere.padding
-            spacing: 8
-            enabled: !root.busy
-
-            TextButton {
-                visible: root.edgeState?.customised ?? false
-                iconName: "edit-undo"
-                text: "Undo everything set here"
-                onActivated: root.run(["revert"])
-            }
-
-            // Plasma's own page has what this one leaves out: the delay before
-            // a trigger fires, touch-screen edges, the corner size.
-            TextButton {
-                iconName: "configure"
-                text: "Plasma's screen edge settings"
-                onActivated: PlasmaApplets.openSettings("kcm_kwinscreenedges")
-            }
-
-            IconButton {
-                iconName: "view-refresh"
-                onActivated: root.refresh()
-            }
-        }
-
-        PanelText {
-            visible: root.status.length > 0
-            width: elsewhere.width - 2 * elsewhere.padding
-            wrapMode: Text.WordWrap
-            text: root.status
-            font.pixelSize: 12
+        // Plasma's own page has what this one leaves out: the delay before a
+        // trigger fires, touch-screen edges, the corner size.
+        UndoFooter {
+            spacing: elsewhere.spacing
+            session: root.ctl
+            customised: root.edgeState?.customised ?? false
+            settingsModule: "kcm_kwinscreenedges"
+            settingsText: "Plasma's screen edge settings"
         }
     }
 }

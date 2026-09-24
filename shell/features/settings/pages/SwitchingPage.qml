@@ -11,10 +11,9 @@ pragma ComponentBehavior: Bound
 // its holder included -- is undone by one button.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.config
-import qs.platform.kde
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -22,10 +21,12 @@ import qs.ui.controls
 CardGrid {
     id: root
 
-    // `switcher status --json`, parsed. Null until the first read returns.
-    property var switcherState: null
-    property string status: ""
-    property bool busy: false
+    // `switcher status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["switcher"]
+        readFailed: "Could not read the window switcher's settings."
+    }
+    readonly property var switcherState: root.ctl.state
 
     readonly property var layouts: root.switcherState?.layouts ?? []
 
@@ -37,20 +38,7 @@ CardGrid {
 
     count: 4
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "switcher"].concat(args);
-        runProc.running = true;
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     // Who holds a key, said in a sentence rather than as a component id.
     function describe(k) {
@@ -66,37 +54,6 @@ CardGrid {
         return `Held by ${who}. Giving it to ${kwins} takes it from them; undo gives it back.`;
     }
 
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "switcher", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.switcherState = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the window switcher's settings.";
-                    Log.warn("settings", `switcher status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
-
     // Who draws each of the two, which is a different question from who holds
     // the key: the setting says which is drawn, and the command moves the key
     // to match, because an overview nobody can open is not a choice.
@@ -110,7 +67,7 @@ CardGrid {
 
         SettingRow {
             width: drawnBy.width - 2 * drawnBy.padding
-            enabled: !root.busy
+            enabled: !root.ctl.busy
             label: "Alt+Tab"
             description: root.drawnByWindows === "shell"
                 ? `${Branding.displayName}'s own card row, drawn here. It shows each application's icon: a picture of a window is KWin's to give and it gives one only to its own switcher.`
@@ -122,7 +79,7 @@ CardGrid {
                 values: ["plasma", "shell"]
                 labels: ["KWin", "This shell"]
                 current: root.drawnByWindows
-                onPicked: value => root.run(["use", value])
+                onPicked: value => root.ctl.run(["use", value])
             }
         }
 
@@ -147,7 +104,7 @@ CardGrid {
 
         SettingRow {
             width: drawnBy.width - 2 * drawnBy.padding
-            enabled: !root.busy
+            enabled: !root.ctl.busy
             label: "Meta+Tab"
             description: root.drawnByDesktops === "shell"
                 ? `${Branding.displayName}'s own overview: every desktop, what is open on each, and one more at the end.`
@@ -159,7 +116,7 @@ CardGrid {
                 values: ["plasma", "shell"]
                 labels: ["KWin", "This shell"]
                 current: root.drawnByDesktops
-                onPicked: value => root.run(["desktops", value])
+                onPicked: value => root.ctl.run(["desktops", value])
             }
         }
     }
@@ -174,7 +131,7 @@ CardGrid {
         Flow {
             width: look.width - 2 * look.padding
             spacing: 6
-            enabled: !root.busy
+            enabled: !root.ctl.busy
 
             Repeater {
                 model: root.layouts
@@ -184,7 +141,7 @@ CardGrid {
 
                     text: modelData.name
                     checked: modelData.id === (root.switcherState?.layout ?? "")
-                    onActivated: if (!checked) root.run(["layout", modelData.id])
+                    onActivated: if (!checked) root.ctl.run(["layout", modelData.id])
                 }
             }
         }
@@ -273,50 +230,26 @@ CardGrid {
                 required property var modelData
 
                 width: keyCard.width - 2 * keyCard.padding
-                enabled: !root.busy
+                enabled: !root.ctl.busy
                 label: `${keyRow.modelData.key}: ${keyRow.modelData.label.toLowerCase()}`
                 description: root.describe(keyRow.modelData)
 
                 TextButton {
                     visible: !keyRow.modelData.kwin || keyRow.modelData.holders.length > 1
                     text: "Give it to KWin"
-                    onActivated: root.run(["give", keyRow.modelData.id])
+                    onActivated: root.ctl.run(["give", keyRow.modelData.id])
                 }
             }
         }
 
-        Flow {
-            width: keyCard.width - 2 * keyCard.padding
-            spacing: 8
-            enabled: !root.busy
-
-            TextButton {
-                visible: root.switcherState?.customised ?? false
-                iconName: "edit-undo"
-                text: "Undo everything set here"
-                onActivated: root.run(["revert"])
-            }
-
-            // Plasma's own page has the rest: the switcher's second shortcut
-            // set, which windows it lists, the order they come in.
-            TextButton {
-                iconName: "configure"
-                text: "Plasma's task switcher settings"
-                onActivated: PlasmaApplets.openSettings("kcm_kwintabbox")
-            }
-
-            IconButton {
-                iconName: "view-refresh"
-                onActivated: root.refresh()
-            }
-        }
-
-        PanelText {
-            visible: root.status.length > 0
-            width: keyCard.width - 2 * keyCard.padding
-            wrapMode: Text.WordWrap
-            text: root.status
-            font.pixelSize: 12
+        // Plasma's own page has the rest: the switcher's second shortcut
+        // set, which windows it lists, the order they come in.
+        UndoFooter {
+            spacing: keyCard.spacing
+            session: root.ctl
+            customised: root.switcherState?.customised ?? false
+            settingsModule: "kcm_kwintabbox"
+            settingsText: "Plasma's task switcher settings"
         }
     }
 }

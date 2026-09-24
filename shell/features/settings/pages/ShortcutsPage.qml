@@ -15,8 +15,7 @@ pragma ComponentBehavior: Bound
 // enforcing them.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
+import qs.platform.system
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -24,10 +23,15 @@ import qs.ui.controls
 Column {
     id: root
 
-    // `shortcuts status --json`, parsed. Null until the first read returns.
-    property var shortcutState: null
-    property string status: ""
-    property bool busy: false
+    // `shortcuts status --json`, and the command that changes it. Its error
+    // line is cut down only after "error:", colon and all: a line that
+    // merely mentions an error is shown whole.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["shortcuts"]
+        readFailed: "Could not read the shortcuts."
+        errorPrefix: /^.*error:\s*/i
+    }
+    readonly property var shortcutState: root.ctl.state
 
     // Which row is listening for a key, by action id, or "".
     property string capturing: ""
@@ -40,20 +44,7 @@ Column {
 
     spacing: 14
 
-    Component.onCompleted: root.refresh()
-
-    function refresh(): void {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args): void {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "shortcuts"].concat(args);
-        runProc.running = true;
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     // Qt's key to the name KDE writes in kglobalshortcutsrc. Anything not
     // named here is refused rather than guessed: a shortcut written wrong is
@@ -103,7 +94,7 @@ Column {
 
     function bind(id, key): void {
         root.capturing = "";
-        root.run(["set", id, key]);
+        root.ctl.run(["set", id, key]);
     }
 
     Card {
@@ -201,14 +192,14 @@ Column {
                             }
                             if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
                                 root.capturing = "";
-                                root.run(["clear", String(row.modelData.id)]);
+                                root.ctl.run(["clear", String(row.modelData.id)]);
                                 return;
                             }
                             if (root.isModifier(event.key))
                                 return;
                             const name = root.keyName(event.key);
                             if (name.length === 0) {
-                                root.status = "That key cannot be written as a shortcut.";
+                                root.ctl.status = "That key cannot be written as a shortcut.";
                                 return;
                             }
                             root.bind(String(row.modelData.id), root.modifiersOf(event.modifiers).concat([name]).join("+"));
@@ -234,7 +225,7 @@ Column {
                     glyph: "close"
                     iconName: "edit-clear"
                     tooltip: "Unbind this"
-                    onActivated: root.run(["clear", String(row.modelData.id)])
+                    onActivated: root.ctl.run(["clear", String(row.modelData.id)])
                 }
             }
         }
@@ -258,48 +249,17 @@ Column {
             text: "Revert every shortcut"
             glyph: "undo"
             iconName: "edit-undo"
-            enabled: !root.busy
-            onActivated: root.run(["revert"])
+            enabled: !root.ctl.busy
+            onActivated: root.ctl.run(["revert"])
         }
 
         PanelText {
             width: parent.width
-            visible: root.status.length > 0
+            visible: root.ctl.status.length > 0
             wrapMode: Text.WordWrap
-            text: root.status
+            text: root.ctl.status
             font.pixelSize: 12
             color: Theme.error
-        }
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "shortcuts", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.shortcutState = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the shortcuts.";
-                    Log.warn("settings", `shortcuts status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors[errors.length - 1].replace(/^.*error:\s*/i, "");
-            }
         }
     }
 }

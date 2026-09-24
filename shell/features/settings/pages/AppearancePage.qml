@@ -11,9 +11,9 @@ pragma ComponentBehavior: Bound
 // installs it, for a person to run: nothing here installs a package.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.theme
 import qs.domain.theme.palette
@@ -23,10 +23,12 @@ import qs.ui.controls
 CardGrid {
     id: root
 
-    // `theme status --json`, parsed. Null until the first read returns.
-    property var themeState: null
-    property string status: ""
-    property bool busy: false
+    // `theme status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["theme"]
+        readFailed: "Could not read the theme's state."
+    }
+    readonly property var themeState: root.ctl.state
 
     readonly property var styles: root.themeState?.styles ?? []
     readonly property var parts: root.themeState?.parts ?? ({})
@@ -53,51 +55,7 @@ CardGrid {
 
     count: 7
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "theme"].concat(args);
-        runProc.running = true;
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "theme", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.themeState = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the theme's state.";
-                    Log.warn("settings", `theme status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     Card {
         id: scheme
@@ -384,7 +342,7 @@ CardGrid {
         Flow {
             width: parent.width
             spacing: 6
-            enabled: !root.busy
+            enabled: !root.ctl.busy
 
             Repeater {
                 model: root.styles
@@ -396,7 +354,7 @@ CardGrid {
                     checked: modelData.id === (root.themeState?.style ?? "")
                     enabled: modelData.installed
                     opacity: modelData.installed ? 1 : 0.45
-                    onActivated: if (!checked) root.run(["style", modelData.id])
+                    onActivated: if (!checked) root.ctl.run(["style", modelData.id])
                 }
             }
         }
@@ -461,12 +419,12 @@ CardGrid {
         }
 
         TextButton {
-            enabled: !root.busy
+            enabled: !root.ctl.busy
             iconName: "run-install"
             text: root.missing.length > 0
                   ? (root.themeState?.package ? "Install the missing parts and apply" : "Install the theme")
                   : "Apply the theme"
-            onActivated: root.run(["apply"])
+            onActivated: root.ctl.run(["apply"])
         }
 
         PanelText {
@@ -605,36 +563,14 @@ CardGrid {
 
         SectionLabel { text: "Undo, and the rest" }
 
-        Flow {
-            width: parent.width
-            spacing: 8
-            enabled: !root.busy
-
-            TextButton {
-                visible: root.themeState?.styleCustomised ?? false
-                iconName: "edit-undo"
-                text: "Undo the style"
-                onActivated: root.run(["style", "revert"])
-            }
-
-            TextButton {
-                iconName: "configure"
-                text: "Plasma's application style settings"
-                onActivated: PlasmaApplets.openSettings("kcm_style")
-            }
-
-            IconButton {
-                iconName: "view-refresh"
-                onActivated: root.refresh()
-            }
-        }
-
-        PanelText {
-            visible: root.status.length > 0
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.status
-            font.pixelSize: 12
+        UndoFooter {
+            spacing: rest.spacing
+            session: root.ctl
+            customised: root.themeState?.styleCustomised ?? false
+            undoText: "Undo the style"
+            undoArgs: ["style", "revert"]
+            settingsModule: "kcm_style"
+            settingsText: "Plasma's application style settings"
         }
     }
 

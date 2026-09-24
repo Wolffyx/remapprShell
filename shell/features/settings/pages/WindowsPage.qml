@@ -13,9 +13,8 @@ pragma ComponentBehavior: Bound
 // more use than a control that writes a key nothing reads.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.theme
 import qs.domain.windows
 import qs.ui.primitives
@@ -24,13 +23,15 @@ import qs.ui.controls
 Column {
     id: root
 
-    // `windows behaviour status --json`, parsed. Null until the first read.
-    property var info: null
-    property string status: ""
-    property bool busy: false
+    // `windows behaviour status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["windows", "behaviour"]
+        readFailed: "Could not read KWin's window settings."
+        logLabel: "windows behaviour"
+    }
 
-    readonly property var settings: root.info?.settings ?? []
-    readonly property var tilingScripts: root.info?.tilingScripts ?? []
+    readonly property var settings: root.ctl.state?.settings ?? []
+    readonly property var tilingScripts: root.ctl.state?.tilingScripts ?? []
 
     function valueOf(id, fallback) {
         return (root.settings.find(s => s.id === id)?.value) ?? fallback;
@@ -41,57 +42,17 @@ Column {
 
     spacing: 14
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     function set(id, value) {
-        if (root.busy)
-            return;
-        root.status = "";
-        setProc.command = [Branding.ctlBin, "windows", "behaviour", "set", id, String(value)];
-        setProc.running = true;
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "windows", "behaviour", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.info = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read KWin's window settings.";
-                    Log.warn("settings", `windows behaviour: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _set: Process {
-        id: setProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
+        root.ctl.run(["set", id, value]);
     }
 
     PanelText {
-        visible: root.status.length > 0
+        visible: root.ctl.status.length > 0
         width: root.width
         wrapMode: Text.WordWrap
-        text: root.status
+        text: root.ctl.status
         font.pixelSize: 12
         color: Theme.error
     }
