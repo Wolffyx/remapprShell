@@ -297,13 +297,18 @@ CardGrid {
                         }
                     }
 
-                    // The widget's own settings, from its manifest.
-                    SchemaRenderer {
+                    // The widget's own settings, from its manifest -- built
+                    // when the row is opened, not for every row on the page
+                    // and then hidden.
+                    Loader {
                         width: parent.width
                         visible: entryRow.expanded
-                        title: "Settings"
-                        keys: entryRow.manifest?.config ?? ({})
-                        prefix: `widgets.${entryRow.modelData.id}.`
+                        active: entryRow.expanded
+                        sourceComponent: SchemaRenderer {
+                            title: "Settings"
+                            keys: entryRow.manifest?.config ?? ({})
+                            prefix: `widgets.${entryRow.modelData.id}.`
+                        }
                     }
 
                     Rectangle {
