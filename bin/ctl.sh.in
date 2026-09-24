@@ -217,13 +217,12 @@ case "$cmd" in
         # checkout, whose command line names the source tree instead. Saying
         # "no" to a shell that is plainly on screen is how an afternoon goes
         # missing.
-        if pgrep -a -x quickshell 2>/dev/null | grep -qF "@QS_CONFIG_DIR@"; then
-            echo "yes"
-        elif pgrep -a -x quickshell 2>/dev/null | grep -qF "@REPO_ROOT@/shell/shell.qml"; then
-            echo "yes (from the working tree at @REPO_ROOT@)"
-        else
-            echo "no"
-        fi
+        procs=$(pgrep -a -x quickshell 2>/dev/null) || true
+        case "$procs" in
+            *"@QS_CONFIG_DIR@"*)             echo "yes" ;;
+            *"@REPO_ROOT@/shell/shell.qml"*) echo "yes (from the working tree at @REPO_ROOT@)" ;;
+            *)                               echo "no" ;;
+        esac
         printf 'service:    '
         systemctl --user is-active "@SYSTEMD_UNIT@" 2>/dev/null || true
         printf 'config:     %s\n' "@CONFIG_DIR@"

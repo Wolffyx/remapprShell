@@ -199,25 +199,24 @@ case "$cmd" in
             echo
             exit 0
         fi
-        s=$(status_json)
-        printf 'drawn at the next lock: %s\n' \
-            "$(jq -r 'if .drawn == "ours" then "ours" else "Plasma'"'"'s" end' <<< "$s")"
-        printf 'enabled:                %s\n' "$(jq -r 'if .enabled then "yes" else "no" end' <<< "$s")"
-        printf 'plasmashell is on:      %s%s\n' "$(jq -r .live <<< "$s")" \
-            "$(jq -r 'if .liveIsOurs then " (ours)" else " (not ours: its own lock screen is drawn)" end' <<< "$s")"
-        jq -r '.packages[] | "  \(.id): " + (if .installed then "installed (\(.hash))"
-                                              elif .foreign then "a lock screen that is not ours"
-                                              elif .present then "not installed" else "package not installed" end)' <<< "$s"
-        if jq -e '.tried' <<< "$s" >/dev/null; then
-            printf 'tried:                  %s, build %s%s\n' "$(jq -r .tried.at <<< "$s")" "$(jq -r .tried.hash <<< "$s")" \
-                "$(jq -r 'if .tried.release != "" then " (kscreenlocker \(.tried.release))" else "" end' <<< "$s")"
-            jq -e '.triedWithThisGreeter' <<< "$s" >/dev/null \
-                || echo "                        with a different greeter from this one: try it again before enabling"
-            jq -e '.triedIsSource' <<< "$s" >/dev/null \
-                || echo "                        the source has changed since: try it again to use the change"
-        else
-            echo "tried:                  never ($ALIAS lockscreen try)"
-        fi
+        # The same JSON the settings page reads, said in words -- by one jq
+        # rather than one for every line.
+        status_json | jq -r --arg alias "$ALIAS" '
+            "drawn at the next lock: " + (if .drawn == "ours" then "ours" else "Plasma'"'"'s" end),
+            "enabled:                " + (if .enabled then "yes" else "no" end),
+            "plasmashell is on:      \(.live)"
+                + (if .liveIsOurs then " (ours)" else " (not ours: its own lock screen is drawn)" end),
+            (.packages[] | "  \(.id): " + (if .installed then "installed (\(.hash))"
+                                         elif .foreign then "a lock screen that is not ours"
+                                         elif .present then "not installed" else "package not installed" end)),
+            (if .tried then
+                "tried:                  \(.tried.at), build \(.tried.hash)"
+                    + (if .tried.release != "" then " (kscreenlocker \(.tried.release))" else "" end),
+                (if .triedWithThisGreeter then empty
+                 else "                        with a different greeter from this one: try it again before enabling" end),
+                (if .triedIsSource then empty
+                 else "                        the source has changed since: try it again to use the change" end)
+             else "tried:                  never (\($alias) lockscreen try)" end)'
         ;;
 
     check)
