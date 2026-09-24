@@ -889,7 +889,7 @@
                 "shortcuts.screenshot": {
                     "type": "string",
                     "default": "",
-                    "label": "Screenshot of a region",
+                    "label": "Screenshot, choosing an area",
                     "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
                 },
                 "shortcuts.screenshot-screen": {
@@ -901,7 +901,7 @@
                 "shortcuts.screenshot-window": {
                     "type": "string",
                     "default": "",
-                    "label": "Screenshot of the active window",
+                    "label": "Screenshot, choosing a window",
                     "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
                 }
             }
