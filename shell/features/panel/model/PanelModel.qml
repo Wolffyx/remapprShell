@@ -114,7 +114,7 @@ QtObject {
     // monitor override reaches the panel it describes; the globals remain for
     // anything not drawn per screen.
     function positionFor(name) { return ConfigStore.valueFor(name, "panel.position", "bottom"); }
-    function thicknessFor(name) { return ConfigStore.valueFor(name, "panel.thickness", 40); }
+    function thicknessFor(name) { return ConfigStore.valueFor(name, "panel.thickness", 52); }
 
     // Hiding is per output as much as position is: a panel worth hiding on a
     // laptop screen is often worth keeping on a second monitor.
@@ -127,8 +127,8 @@ QtObject {
         const s = ConfigStore.valueFor(name, "panel.style", "full");
         return s === "floating" || s === "islands" ? s : "full";
     }
-    function spacingFor(name) { return ConfigStore.valueFor(name, "panel.spacing", 6); }
-    function iconSizeFor(name) { return ConfigStore.valueFor(name, "panel.iconSize", 19); }
+    function spacingFor(name) { return ConfigStore.valueFor(name, "panel.spacing", 5); }
+    function iconSizeFor(name) { return ConfigStore.valueFor(name, "panel.iconSize", 18); }
     function horizontalFor(name) {
         const p = root.positionFor(name);
         return p === "top" || p === "bottom";

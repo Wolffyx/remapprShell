@@ -44,9 +44,9 @@ FloatingWindow {
     // deciding: a wizard that applied each answer as it was given would leave a
     // half-configured shell behind if it were closed halfway through.
     property string position: ConfigStore.value("panel.position", "bottom")
-    property int thickness: ConfigStore.value("panel.thickness", 40)
+    property int thickness: ConfigStore.value("panel.thickness", 52)
     property string preset: ""
-    property string launcher: ConfigStore.value("launcher.provider", "auto")
+    property string launcher: ConfigStore.value("launcher.provider", "builtin")
     property string renderer: "quickshell"
 
     // What this shell's theme is allowed to change outside itself. The whole
