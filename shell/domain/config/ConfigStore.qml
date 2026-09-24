@@ -196,20 +196,24 @@ QtObject {
 
     // ---- persistence --------------------------------------------------
 
-    // Counts writes we initiated. The file watcher compares against it to tell
-    // our own save from an external edit.
-    property int _writeEpoch: 0
+    // The text of our own last save, until anything else is read. The file is
+    // read back after every save -- by the reload in onSaved, and again when
+    // the watcher sees the file replaced -- and _onProfileText compares
+    // against this to tell our own save from an external edit. Cleared the
+    // moment anything else is applied, so an edit that later puts the same
+    // text back is still read.
     property string _lastWritten: ""
+
+    // A different profile is a different file; nothing written to the last
+    // one says anything about this one.
+    onProfileChanged: root._lastWritten = ""
 
     // ensureDir runs as a detached process, so the write has to wait for the
     // directory to exist. A short delay is enough and keeps this off the
     // startup path.
     readonly property Timer _seedTimer: Timer {
         interval: 150
-        onTriggered: {
-            root._writeEpoch++;
-            root._profileView.setText(JSON.stringify({ schemaVersion: Migrations.currentVersion }, null, 4) + "\n");
-        }
+        onTriggered: root._profileView.setText(JSON.stringify({ schemaVersion: Migrations.currentVersion }, null, 4) + "\n")
     }
 
     readonly property Timer _writeTimer: Timer {
@@ -259,16 +263,30 @@ QtObject {
         if (onDisk.ok) {
             if (ConfigMerge.changedOnDisk(onDisk.data, root._lastParsed))
                 Log.info("config", "profile changed on disk; merging our delta onto it");
-            root.profileData = ConfigMerge.flushData(onDisk.data, root._lastParsed,
-                                                     root.profileData, root._removed);
+            // Assigned only when it differs: flushData hands back our own copy
+            // when nobody else wrote, and assigning even the same object
+            // rebuilt the whole merged configuration for nothing.
+            const next = ConfigMerge.flushData(onDisk.data, root._lastParsed,
+                                               root.profileData, root._removed);
+            if (!Obj.deepEqual(next, root.profileData))
+                root.profileData = next;
         }
         root._removed = [];
 
         const out = Object.assign({ schemaVersion: Migrations.currentVersion }, root.profileData);
         const text = JSON.stringify(out, null, 4) + "\n";
 
+        // What reading this file back would leave, set now: _onProfileText
+        // skips our own save when it comes back, so this is the only place
+        // it is set. Taken from the text rather than from profileData, which
+        // can hold what JSON cannot -- an undefined, say -- and the file is
+        // what the next flush compares against.
+        const written = ConfigMerge.withoutVersion(JSON.parse(text));
+        root._lastParsed = written;
+        if (!Obj.deepEqual(written, root.profileData))
+            root.profileData = Obj.clone(written);
+
         root._lastWritten = text;
-        root._writeEpoch++;
         root._profileView.setText(text);
     }
 
@@ -290,6 +308,19 @@ QtObject {
     }
 
     function _onProfileText(text) {
+        // Our own save, read back. _flush has already left everything as
+        // applying it would, so it is not applied again: doing that rebuilt
+        // the whole merged configuration twice more per change -- once for
+        // the reload after the save, once for the watcher -- and it undid any
+        // change made while the write was on its way, which the next flush
+        // then found nothing to write for.
+        if (root._lastWritten.length > 0 && text === root._lastWritten && root.writable) {
+            root.lastError = "";
+            root.profileLoaded = true;
+            return;
+        }
+        root._lastWritten = "";
+
         const res = root._parseProfile(text);
 
         if (!res.ok) {
@@ -405,6 +436,7 @@ QtObject {
         onLoaded: root._onProfileText(text())
 
         onLoadFailed: err => {
+            root._lastWritten = "";
             if (err === FileViewError.FileNotFound) {
                 // Normal on a fresh install: no overrides yet.
                 //
