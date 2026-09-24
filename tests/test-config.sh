@@ -8,25 +8,10 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/config.sh"
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-
-profile="$CONFIG_DIR/profiles/default/shell.json"
 mkdir -p "$(dirname "$profile")"
 write_profile() { printf '%s\n' "$1" > "$profile"; }
 
@@ -55,5 +40,4 @@ echo "== a profile that does not parse is ignored, as the shell ignores it =="
 write_profile '{ this is not json'
 check "the defaults are used"      "$(config_get '.panel.renderer' 'none')"       "quickshell"
 
-if [ "$fail" -gt 0 ]; then echo "FAILED: $pass passed, $fail failed" >&2; exit 1; fi
-echo "OK: $pass passed"
+harness_done

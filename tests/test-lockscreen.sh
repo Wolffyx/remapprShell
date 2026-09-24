@@ -11,14 +11,9 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 export XDG_CONFIG_DIRS="$SANDBOX/etc"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
 REPO="$SANDBOX/repo"
 mkdir -p "$REPO/theme"
@@ -26,15 +21,8 @@ cp -a "$REPO_ROOT/scripts" "$REPO_ROOT/branding.json" "$REPO/"
 cp -a "$REPO_ROOT/VERSION" "$REPO/" 2>/dev/null || true
 cp -a "$REPO_ROOT/theme/lockscreen" "$REPO/theme/"
 
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in qdbus6 busctl systemctl kquitapp6; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 # The way back names the session and its terminal; read-only, but not this
 # machine's to answer.
 cat > "$FAKEBIN/loginctl" <<'EOF'
@@ -45,8 +33,6 @@ case "$*" in
 esac
 EOF
 chmod +x "$FAKEBIN/loginctl"
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
 export "${ENV_PREFIX}_LOCKSCREEN_SETTLE=0"
 unset XDG_SESSION_ID
 
@@ -109,11 +95,6 @@ EOF
 chmod +x "$GREETER"
 export "${ENV_PREFIX}_GREETER=$GREETER"
 setmode() { printf '%s\n' "$1" > "$MODE"; }
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-contains() { case "$2" in *"$3"*) check "$1" yes yes ;; *) check "$1" "$2" "(containing) $3" ;; esac; }
 
 LS="$REPO/scripts/lockscreen.sh"
 ls_() { "$LS" "$@" 2>&1; }
@@ -261,8 +242,8 @@ echo "== how it looks =="
 # got -- and through the ledger. This shell's own go to a file of its own,
 # because the greeter's config object is built from the desktop package's
 # config.xml and a key of ours added there never arrives.
-plasmakey() { kreadconfig6 --file kscreenlockerrc --group Greeter --group LnF --group General --key "$1" --default '<unset>'; }
-ourkey() { kreadconfig6 --file "$XDG_CONFIG_HOME/$SLUG/lockscreen.conf" --group Lock --key "$1" --default '<unset>'; }
+plasmakey() { kread kscreenlockerrc Greeter LnF General "$1"; }
+ourkey() { kread "$XDG_CONFIG_HOME/$SLUG/lockscreen.conf" Lock "$1"; }
 lookval() { "$LS" status --json | jq -r --arg id "$1" '.look[] | select(.id == $id) | .value'; }
 
 check "an unknown setting is refused"    "$("$LS" set nosuch left >/dev/null 2>&1; echo $?)" "1"
@@ -302,11 +283,9 @@ check "text takes one line"                "$("$LS" set kioskNote $'one\ntwo' >/
 check "and a sensible length"              "$("$LS" set kioskNote "$(printf 'x%.0s' {1..121})" >/dev/null 2>&1; echo $?)" "1"
 "$LS" set kioskName "" >/dev/null
 check "and can be emptied"                 "$(lookval kioskName)" ""
-check "only Plasma's keys are ledgered"    "$(jq '[.entries[] | select(.scope == "lockscreen")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+check "only Plasma's keys are ledgered"    "$(ledger_count lockscreen)" "2"
 
 echo "== nothing reached the session =="
 check "no DBus call, restart or quit" "$(cat "$CALLS")" ""
 
-echo
-printf '%d passed, %d failed\n' "$pass" "$fail"
-[ "$fail" -eq 0 ]
+harness_done

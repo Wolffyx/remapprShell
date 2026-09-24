@@ -8,26 +8,10 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-# Everything below runs against these, never the caller's real directories.
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
-
-pass=0; fail=0
-ok()   { printf '  PASS  %s\n' "$1"; pass=$((pass + 1)); }
-bad()  { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
-check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (expected '$3', got '$2')"; fi; }
 
 # --- a plausible KDE home -------------------------------------------------
 
@@ -152,8 +136,4 @@ sleep 1; cli --label=equals;    check "--label=X"     "$(newest)" "equals"
 sleep 1; cli plain;             check "a bare label"  "$(newest)" "plain"
 cli --bogus;                    check "an unknown flag is refused" "$?" "1"
 
-if [ "$fail" -gt 0 ]; then
-    printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2
-    exit 1
-fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

@@ -11,28 +11,11 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-DAEMON_PID=""
-cleanup() {
-    [ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null
-    rm -rf "$SANDBOX"
-}
-trap cleanup EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/render.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+DAEMON_PID=""
+harness_on_exit '[ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null'
 
 # KWin's own window behaviour: kwinrc keys, written through the ledger. What
 # matters is that a bad value never reaches kwinrc, that a write is recorded
@@ -41,7 +24,7 @@ check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
 echo "== KWin's window behaviour =="
 BEHAVE=("$REPO_ROOT/scripts/windows.sh" behaviour)
 behave() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${BEHAVE[@]}" "$@" 2>&1; }
-kwinrc_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default '<unset>'; }
+kwinrc_key() { kread kwinrc Windows "$1"; }
 
 FAKES="$SANDBOX/fakes"
 mkdir -p "$FAKES"
@@ -62,12 +45,12 @@ behave set borderlessMaximized true >/dev/null
 check "borderless maximised written"     "$(kwinrc_key BorderlessMaximizedWindows)" "true"
 check "status reads them back"           "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .value')" "FocusFollowsMouse"
 check "and says what the default was"    "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .default')" "ClickToFocus"
-check "the ledger has both"              "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+check "the ledger has both"              "$(ledger_count windows-behaviour)" "2"
 
 behave revert >/dev/null
 check "revert deletes a key that was unset" "$(kwinrc_key FocusPolicy)" "<unset>"
 check "and the other one too"               "$(kwinrc_key BorderlessMaximizedWindows)" "<unset>"
-check "the ledger is empty again"           "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "0"
+check "the ledger is empty again"           "$(ledger_count windows-behaviour)" "0"
 check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
 
 command -v busctl >/dev/null 2>&1 || { echo "  SKIP  busctl not available"; exit 0; }
@@ -81,8 +64,8 @@ python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo " 
 # It runs against the *real* session bus -- there is no other -- so a daemon
 # that claimed the shell's kglobalaccel component here would unbind the keys on
 # the machine running the tests, which is exactly what happened once. Belt and
-# braces: the no-session variable as well, which the daemon honours too.
-export "$NO_SESSION_VAR=1"
+# braces: the no-session variable as well, set by the harness for every suite
+# and honoured by the daemon too.
 TEST_NAME="com.remappr.ShellTest$$"
 DAEMON="$SANDBOX/windowsd"
 render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
@@ -405,6 +388,4 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

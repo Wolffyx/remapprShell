@@ -6,20 +6,8 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 
 UI_VAR="${ENV_PREFIX}_UI"
 setup() { "$REPO_ROOT/scripts/setup.sh" "$@" 2>&1; }
@@ -27,9 +15,7 @@ setup() { "$REPO_ROOT/scripts/setup.sh" "$@" 2>&1; }
 # Stand-ins for the graphical front end, so detection can be tested on a
 # machine that has no kdialog -- and so a case that reaches one by mistake
 # cannot put a dialog on the screen of whoever is running the suite.
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
 printf '#!/bin/sh\nexit 0\n' > "$FAKEBIN/kdialog"; chmod +x "$FAKEBIN/kdialog"
-export PATH="$FAKEBIN:$PATH"
 
 # The library under test, in a subshell per case: ui_backend remembers its
 # answer, which is the point of it and would make the cases depend on order.
@@ -118,5 +104,4 @@ check "and it says so"          "$(printf '%s' "$plan" | grep -c 'nothing was ch
 echo "== unknown arguments are refused =="
 check "refuses an unknown flag" "$(setup --wat >/dev/null 2>&1 && echo ran || echo refused)" "refused"
 
-printf '\n%d passed, %d failed\n' "$pass" "$fail"
-[ "$fail" -eq 0 ]
+harness_done

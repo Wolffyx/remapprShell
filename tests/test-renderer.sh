@@ -17,41 +17,15 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 # Discovery reads every XDG config directory, and /etc/xdg is the real one.
 export XDG_CONFIG_DIRS="$SANDBOX/etc/xdg"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-export "$NO_SESSION_VAR=1"
-
-# The process list is the last piece of the live session that reached in here.
-# The sandbox gives every script its own HOME, but `pgrep` still answered for
-# the real machine, so "is the shell running?" depended on whether whoever ran
-# the suite had `make run` going -- which is precisely when these tests are
-# run. The suite says what is running, in this process and in the scripts it
-# calls, and `FAKE_PROC` is the one place it says it.
+# The process list is the last piece of the live session that reached in
+# here; see fake_pgrep for how it did.
 export FAKE_PROC=""
-mkdir -p "$SANDBOX/bin"
-cat > "$SANDBOX/bin/pgrep" <<'STUB'
-#!/usr/bin/env bash
-[ -n "${FAKE_PROC:-}" ] && printf '%s\n' "$FAKE_PROC"
-exit 0
-STUB
-chmod +x "$SANDBOX/bin/pgrep"
-export PATH="$SANDBOX/bin:$PATH"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+fake_pgrep
 
 rmpr_renderer() { "$REPO_ROOT/scripts/renderer.sh" "$@"; }
 
@@ -95,8 +69,7 @@ STOCK
 stock_sum=$(sha256sum "$stock")
 
 kde_files=(plasmashellrc kdeglobals plasma-org.kde.plasma.desktop-appletsrc)
-kde_sums() { (cd "$XDG_CONFIG_HOME" && sha256sum "${kde_files[@]}" 2>/dev/null); }
-before_sums=$(kde_sums)
+before_sums=$(kde_sums "${kde_files[@]}")
 
 # --- a widget index with one widget the Plasma renderer cannot draw --------
 
@@ -112,7 +85,6 @@ jq '.widgets += [{
 
 # --- the user's configuration ---------------------------------------------
 
-profile="$CONFIG_DIR/profiles/default/shell.json"
 mkdir -p "$(dirname "$profile")"
 cat > "$profile" <<'PROFILE'
 {
@@ -335,15 +307,7 @@ echo "== revert =="
 rmpr_renderer revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
 check "package back to stock"     "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage)" "org.kde.plasma.desktop"
 
-after_sums=$(kde_sums)
-if [ "$before_sums" = "$after_sums" ]; then
-    printf "  PASS  KDE's own config files byte-identical after revert\n"; pass=$((pass+1))
-else
-    printf "  FAIL  KDE's config files differ after revert:\n" >&2
-    diff <(printf '%s\n' "$before_sums") <(printf '%s\n' "$after_sums") | sed 's/^/        /' >&2
-    fail=$((fail+1))
-fi
+check_unchanged "KDE's own config files byte-identical after revert" \
+    "$before_sums" "$(kde_sums "${kde_files[@]}")"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

@@ -7,42 +7,19 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-export "$NO_SESSION_VAR=1"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-absent() { if grep -qF -- "$3" "$2" 2>/dev/null; then
-               printf '  FAIL  %s (found %q in %s)\n' "$1" "$3" "$2" >&2; fail=$((fail+1));
-           else printf '  PASS  %s\n' "$1"; pass=$((pass+1)); fi; }
-# A detached terminal finishes after the command that opened it returns.
-wait_for() { local i; for i in $(seq 1 40); do [ -f "$1" ] && return 0; sleep 0.05; done; return 1; }
-present() { if grep -qF -- "$3" "$2" 2>/dev/null; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-            else printf '  FAIL  %s (%q not in %s)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 
 # --- fakes on PATH, each recording what it was handed ------------------------
-FAKES="$SANDBOX/bin"; mkdir -p "$FAKES"
-cat > "$FAKES/wl-copy" <<F
+cat > "$FAKEBIN/wl-copy" <<F
 #!/usr/bin/env bash
 cat > "$SANDBOX/clipboard.txt"
 F
-cat > "$FAKES/claude" <<F
+cat > "$FAKEBIN/claude" <<F
 #!/usr/bin/env bash
 printf '%s' "\$1" > "$SANDBOX/claude-prompt.txt"
 F
-cat > "$FAKES/fake-term" <<F
+cat > "$FAKEBIN/fake-term" <<F
 #!/usr/bin/env bash
 # a terminal emulator: records the command, then runs it so the fake claude
 # gets its argument, the way a real one would
@@ -50,11 +27,11 @@ printf '%s\n' "\$@" > "$SANDBOX/term-args.txt"
 shift   # -e
 "\$@"
 F
-cat > "$FAKES/fake-custom" <<F
+cat > "$FAKEBIN/fake-custom" <<F
 #!/usr/bin/env bash
 cp "\$1" "$SANDBOX/custom-got.txt"
 F
-cat > "$FAKES/quickshell" <<F
+cat > "$FAKEBIN/quickshell" <<F
 #!/usr/bin/env bash
 # the shell, answering only what ask.sh asks of it
 case "\$*" in
@@ -66,23 +43,18 @@ case "\$*" in
     *) exit 1 ;;
 esac
 F
-chmod +x "$FAKES"/*
+chmod +x "$FAKEBIN"/*
 # Only the fakes and a whitelist of system tools: a real `claude` anywhere on
 # this machine's PATH must not stand in for the missing one, and the test that
 # a missing program is refused is only a test if the program can be missing.
-SYS="$SANDBOX/sys"; mkdir -p "$SYS"
-for t in bash sh jq cat wc cmp diff sed awk grep ls sort tail head date mktemp stat \
-         chmod mkdir rm mv cp basename dirname tr printf setsid sleep seq id uname \
-         env journalctl systemctl coredumpctl kreadconfig6 curl; do
-    path=$(command -v "$t" 2>/dev/null) && ln -sf "$path" "$SYS/$t"
-done
-export PATH="$FAKES:$SYS"
+path_only bash sh jq cat wc cmp diff sed awk grep ls sort tail head date mktemp stat \
+          chmod mkdir rm mv cp basename dirname tr printf setsid sleep seq id uname \
+          env journalctl systemctl coredumpctl kreadconfig6 curl
 export TERMINAL=fake-term
 unset DISPLAY WAYLAND_DISPLAY
 
 ASK="$REPO_ROOT/scripts/ask.sh"
 
-profile="$CONFIG_DIR/profiles/default/shell.json"
 mkdir -p "$(dirname "$profile")"
 cat > "$profile" <<PROFILE
 {
@@ -180,11 +152,9 @@ present "the unit question is kept"  "$SANDBOX/resend.txt" "The systemd user uni
 # --- an unknown provider, and one that cannot run ------------------------------
 "$ASK" --provider nothing >/dev/null 2>&1
 check "unknown provider refused"     "$?" "1"
-rm -f "$FAKES/claude"
+rm -f "$FAKEBIN/claude"
 "$ASK" --provider claude-code --yes >/dev/null 2>"$SANDBOX/err.txt"
 check "missing program refused"      "$?" "1"
 present "and says why"               "$SANDBOX/err.txt" "not installed"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

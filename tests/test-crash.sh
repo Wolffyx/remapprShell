@@ -9,29 +9,8 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-export XDG_CACHE_HOME="$HOME/.cache"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-export "$NO_SESSION_VAR=1"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-absent() { if grep -qF -- "$3" "$2" 2>/dev/null; then
-               printf '  FAIL  %s (found %q in %s)\n' "$1" "$3" "$2" >&2; fail=$((fail+1));
-           else printf '  PASS  %s\n' "$1"; pass=$((pass+1)); fi; }
-present() { if grep -qF -- "$3" "$2" 2>/dev/null; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-            else printf '  FAIL  %s (%q not in %s)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init --cache
 
 CRASHES="$XDG_CACHE_HOME/quickshell/crashes"
 
@@ -116,16 +95,11 @@ check "a missing dump is not fatal"   "$([ -d "$dir2" ] && echo yes)" "yes"
 present "and is said out loud"        "$dir2/error.txt" "no crash dump found"
 
 # --- ask --crash --------------------------------------------------------------
-FAKES="$SANDBOX/bin"; mkdir -p "$FAKES"
-printf '#!/usr/bin/env bash\ncat > %s/clipboard.txt\n' "$SANDBOX" > "$FAKES/wl-copy"
-chmod +x "$FAKES/wl-copy"
-SYS="$SANDBOX/sys"; mkdir -p "$SYS"
-for t in bash sh jq cat wc cut grep sed awk ls sort tail head date mktemp stat chmod mkdir rm mv cp \
-         basename dirname tr printf find touch id uname env seq sleep setsid diff cmp \
-         journalctl systemctl coredumpctl kreadconfig6 quickshell; do
-    path=$(command -v "$t" 2>/dev/null) && ln -sf "$path" "$SYS/$t"
-done
-export PATH="$FAKES:$SYS"
+printf '#!/usr/bin/env bash\ncat > %s/clipboard.txt\n' "$SANDBOX" > "$FAKEBIN/wl-copy"
+chmod +x "$FAKEBIN/wl-copy"
+path_only bash sh jq cat wc cut grep sed awk ls sort tail head date mktemp stat chmod mkdir rm mv cp \
+          basename dirname tr printf find touch id uname env seq sleep setsid diff cmp \
+          journalctl systemctl coredumpctl kreadconfig6 quickshell
 
 "$REPO_ROOT/scripts/ask.sh" --crash --show > "$SANDBOX/ask.txt" 2>/dev/null
 check "ask --crash exits 0"           "$?" "0"
@@ -225,6 +199,4 @@ check "and theirs left alone"         "$([ -d "$CRASHES/theirs" ] && echo yes)" 
 
 check "no dumps reads cleanly"        "$("$CRASH" list 2>&1 | grep -c 'no crash dumps')" "1"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

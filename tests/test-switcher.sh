@@ -6,36 +6,19 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 export XDG_DATA_DIRS="$SANDBOX/sys"
 # kreadconfig6 falls back to the system's kwinrc for an unset key, and the one
 # here names a different Alt+Tab layout from KWin's own default.
 export XDG_CONFIG_DIRS="$SANDBOX/etc"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in qdbus6 busctl systemctl kquitapp6; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 sw() { "$REPO_ROOT/scripts/switcher.sh" "$@" >/dev/null 2>&1; }
 js() { "$REPO_ROOT/scripts/switcher.sh" status --json 2>/dev/null | jq -r "$1"; }
-sc() { kreadconfig6 --file kglobalshortcutsrc --group "$1" --key "$2" --default '<unset>'; }
+sc() { kread kglobalshortcutsrc "$1" "$2"; }
 T=$'\t'
 
 layout() {   # <dir> <id> <name>
@@ -99,12 +82,12 @@ check "not customised"           "$(js .customised)" "false"
 # a choice a person made.
 echo "== who draws Meta+Tab =="
 sw desktops shell
-check "the setting says ours"     "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "shell"
+check "the setting says ours"     "$(jq -r '.switching.desktops' "$profile")" "shell"
 check "and it holds Meta+Tab"     "$(sc "$SLUG" overview)" "Meta+Tab,none,Desktops"
 check "taken from caelestia"      "$(sc caelestia-shell caelestia-shortcut-overview)" "none,none,Toggle overview"
 
 sw desktops plasma
-check "back to KWin's Overview"   "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "plasma"
+check "back to KWin's Overview"   "$(jq -r '.switching.desktops' "$profile")" "plasma"
 # The fixture below gives KWin's Overview its own default and name, and taking
 # a key keeps both -- which is what makes giving it back possible.
 check "KWin holds the key"        "$(sc kwin Overview)" "Meta+Tab,Meta+W,Toggle Overview"
@@ -144,6 +127,4 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/switcher.sh" revert >/dev/null 2>&1
 check "with one, kglobalaccel restarts" "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
 check "and KWin reloads"                "$(grep -c reconfigure "$CALLS")" "1"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done
