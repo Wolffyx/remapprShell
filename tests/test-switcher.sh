@@ -121,7 +121,8 @@ echo "== the daemon runs a release =="
 check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "the overview has a key"    "$(grep -c '"overview":  ("Desktops"' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+# The actions themselves are one list, which the daemon is rendered from.
+check "the overview has a key"    "$(grep -c "^overview$(printf '\t')Desktops$(printf '\t')" "$REPO_ROOT/scripts/lib/shortcut-actions.tsv")" "1"
 check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
 
 echo "== the live session =="
