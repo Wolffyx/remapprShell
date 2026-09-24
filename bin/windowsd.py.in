@@ -39,6 +39,7 @@ whether the shell is running or not -- each one runs the same `@CTL_BIN@`
 command its desktop file used to run, and that starts the shell if it has to.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -593,12 +594,12 @@ def icon_dir():
 class WindowIcons:
     """Icons taken from the windows themselves.
 
-    Most windows are matched to an installed application by the shell, and the
-    application's desktop entry names the icon. Some windows match nothing: a
-    program started by another program often reports a window class that no
-    desktop entry mentions. Those windows usually still *have* an icon -- an
-    X11 window can carry its own, `_NET_WM_ICON`, which is what Plasma's own
-    task manager draws -- and it is the only place that icon exists.
+    Plasma's task manager draws a window with its application's icon, and where
+    the application has no icon it can use -- or no application matched at all
+    -- with the icon the window carries, as KWin reports it. On X11 that is
+    `_NET_WM_ICON`, a property of the window itself, and the window is the only
+    place that icon exists. The shell decides which of the two to draw; this
+    makes the window's own one something it can draw.
 
     Why it has to become a file. The shell draws every icon from a URL: a name
     the icon theme turns into a file, or a file itself. `_NET_WM_ICON` is
@@ -610,35 +611,53 @@ class WindowIcons:
     65,536 of them, written out as numbers, into every window list the shell
     is sent.
 
+    One window, and that window's icon. KWin gives a script no way to name an
+    X11 window -- nothing in KWin 6's scripting API carries its id -- so the
+    window is found among the display's managed windows by what KWin does
+    say: the process, the class and the title. The process alone is not
+    enough. One process can own several windows, and taking the first of them
+    took whichever the display happened to list first -- and the copy was then
+    kept for every window of the application, for as long as the daemon ran.
+    So a window of the same process is taken only with the same class, the
+    title decides between several, and what is written is kept per window and
+    dropped when the window goes.
+
+    It is read again when KWin says the window's icon changed -- `iconSerial`,
+    which the KWin script counts. A program often sets its own icon a moment
+    after its window appears, over the one its toolkit put there first, and a
+    copy taken in between was otherwise kept for the life of the window. That
+    is the signal Plasma's own task list redraws on.
+
     Reading needs `xprop` and writing needs Pillow; where either is missing
-    this does nothing at all and the shell guesses from the window class. A
-    Wayland-native window has no `_NET_WM_ICON` to read, and is guessed for in
-    the same way.
+    this does nothing at all and the shell falls back to the icon theme. A
+    Wayland-native window has no `_NET_WM_ICON` and no X11 window to find, and
+    falls back the same way.
     """
 
     # How often a lookup that found nothing is tried again, and how many times.
     #
-    # A miss is not a fact about the application, it is a fact about the
-    # moment. `_NET_WM_ICON` is set by the toolkit a little *after* the window
-    # is mapped -- Electron, Proton and the JVM are all late -- so a window
-    # asked about the instant it appears often has no icon yet. Keeping that
-    # answer for the life of the daemon is the whole of "some icons are
-    # missing until I restart the shell": the restart was doing nothing but
-    # forgetting.
+    # A miss is a fact about the moment, not about the window: KWin can report
+    # a window a moment before the display lists it, and a toolkit sets
+    # `_NET_WM_ICON` a little after the window is mapped. Keeping that answer
+    # for the life of the daemon is the whole of "some icons are missing until
+    # I restart the shell": the restart was doing nothing but forgetting.
     #
-    # Tried again, but not on every KWin event. One lookup is an `xprop` sweep
-    # of every window on the display and there is an update per window change,
-    # so an unbounded retry would be a poor way to draw a panel -- which is
-    # what the cache was there to avoid in the first place. Six attempts at
-    # three seconds apart covers a slow start and then stops: a window that
-    # still has no icon after twenty seconds does not have one.
+    # Tried again, but not on every KWin event. Finding the window is an
+    # `xprop` sweep of every window on the display and there is an update per
+    # window change, so an unbounded retry would be a poor way to draw a
+    # panel. Six attempts at three seconds apart covers a slow start and then
+    # stops -- which is also all a Wayland-native window costs, there being no
+    # X11 window to find for it. An icon change KWin announces starts the
+    # count again.
     MISS_RETRY_SECONDS = 3.0
     MISS_ATTEMPTS = 6
 
     def __init__(self):
-        self._cache = {}          # appId -> path or None
-        self._misses = {}         # appId -> (attempts, monotonic of the last)
-        self._windows_by_pid = None   # pid -> X11 window, for one update
+        self._x11 = {}            # uuid -> the X11 window it is, once found
+        self._icons = {}          # uuid -> (iconSerial, path or None)
+        self._misses = {}         # uuid -> (attempts, monotonic of the last)
+        self._written = set()     # files this process wrote: the only ones it removes
+        self._clients = None      # the display's managed windows, for one update
         self._available = self._check()
 
     @staticmethod
@@ -653,89 +672,171 @@ class WindowIcons:
             return False
         return bool(os.environ.get("DISPLAY"))
 
-    def path_for(self, app_id, pid):
-        """A cached icon for this application, or None."""
-        if not app_id:
+    def path_for(self, window):
+        """The icon this window carries, written out as a PNG, or None."""
+        uuid = str(window.get("uuid") or "")
+        pid = window.get("pid")
+        if not self._available or not uuid or not isinstance(pid, int) or pid <= 0:
             return None
 
-        # What is cached is a path, not a picture, and a path can stop being
-        # true: whatever empties the directory takes the file out from under
-        # it. The shell was then handed a path to a file that is gone, drew
-        # nothing, and said so only in the journal -- which is what "some
-        # icons stopped working" was, after a restored snapshot removed the
-        # directory these were kept in then. So a cached hit is trusted only
-        # while the file behind it is still there; otherwise it is read again.
-        cached = self._cache.get(app_id)
-        if cached is not None and os.path.exists(cached):
-            return cached
-
-        # A miss is kept too, or every update would sweep the display for the
-        # handful of applications that genuinely have no icon. It is kept for a
-        # while and a few tries, not for ever: see the constants above.
-        if app_id in self._cache and self._cache[app_id] is None \
-           and not self._worth_another_look(app_id):
-            return None
-
-        # Once per application, not once per update: xprop over every window on
-        # every KWin event would be a poor way to draw a panel.
-        self._cache[app_id] = None
-        if self._available and pid:
-            try:
-                window = self._x11_window_for(pid)
-                if window:
-                    self._cache[app_id] = self._extract(window, app_id)
-            except Exception as exc:                  # never take the daemon down
-                print(f"could not read an icon for {app_id}: {exc}", file=sys.stderr)
-
-        if self._cache[app_id] is None:
-            attempts, _ = self._misses.get(app_id, (0, 0.0))
-            self._misses[app_id] = (attempts + 1, time.monotonic())
+        serial = window.get("iconSerial", 0)
+        known = self._icons.get(uuid)
+        if known is not None and known[0] == serial:
+            # What is cached is a path, not a picture, and a path can stop
+            # being true: whatever empties the directory takes the file out
+            # from under it. The shell was then handed a path to a file that
+            # is gone, drew nothing, and said so only in the journal. So a hit
+            # is trusted only while the file behind it is still there.
+            if known[1] is not None and os.path.exists(known[1]):
+                return known[1]
+            # A miss is kept too, or every update would sweep the display for
+            # the windows that genuinely have no icon -- for a while and a few
+            # tries, not for ever: see the constants above.
+            if known[1] is None and not self._worth_another_look(uuid):
+                return None
         else:
-            self._misses.pop(app_id, None)
-        return self._cache[app_id]
+            # The first look, or KWin says the icon changed: whatever was
+            # missed before is worth looking at now.
+            self._misses.pop(uuid, None)
 
-    def _worth_another_look(self, app_id):
+        path = None
+        try:
+            x11 = self._x11_window_for(uuid, window)
+            if x11:
+                path = self._extract(x11)
+        except Exception as exc:                  # never take the daemon down
+            print(f"could not read an icon for window {uuid}: {exc}", file=sys.stderr)
+
+        if known is not None and known[1] and known[1] != path:
+            self._remove(known[1])
+        self._icons[uuid] = (serial, path)
+        if path is None:
+            attempts, _ = self._misses.get(uuid, (0, 0.0))
+            self._misses[uuid] = (attempts + 1, time.monotonic())
+        else:
+            self._misses.pop(uuid, None)
+        return path
+
+    def _worth_another_look(self, uuid):
         """Whether a lookup that found nothing should be made again yet."""
-        attempts, last = self._misses.get(app_id, (0, 0.0))
+        attempts, last = self._misses.get(uuid, (0, 0.0))
         if attempts >= self.MISS_ATTEMPTS:
             return False
         return time.monotonic() - last >= self.MISS_RETRY_SECONDS
 
     def new_update(self):
-        """Forget which window belongs to which process.
+        """Forget what windows the display has.
 
         That was true of the last update. Finding it out is an `xprop` for
         every window on the display, and this runs on the thread that answers
         D-Bus -- so it is done at most once an update, however many windows
-        in it have no icon yet, rather than once for each of them.
+        in it are still to be found, rather than once for each of them.
         """
-        self._windows_by_pid = None
+        self._clients = None
 
-    def _x11_window_for(self, pid):
-        if self._windows_by_pid is None:
+    def forget_all_but(self, uuids):
+        """Drop what is kept for the windows that have gone, their files too.
+
+        A copy of a window's icon is worth keeping only while the window is
+        there to have it; the next window of the same program is another
+        window, and is asked for its own.
+        """
+        for uuid in [u for u in self._icons if u not in uuids]:
+            _, path = self._icons.pop(uuid)
+            if path:
+                self._remove(path)
+        for table in (self._x11, self._misses):
+            for uuid in [u for u in table if u not in uuids]:
+                del table[uuid]
+
+    def _remove(self, path):
+        # Only a file this process wrote. The directory is shared with any
+        # other copy of the daemon on this login -- the test suite runs one --
+        # and a file that copy wrote is not this one's to take away.
+        if path not in self._written:
+            return
+        self._written.discard(path)
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    def _x11_window_for(self, uuid, window):
+        found = self._x11.get(uuid)
+        if found:
+            return found
+        if self._clients is None:
             # Set before the sweep, so one that fails is not tried again for
             # every other window in the same update.
-            self._windows_by_pid = {}
-            self._windows_by_pid = self._x11_windows_by_pid()
-        return self._windows_by_pid.get(int(pid))
-
-    @staticmethod
-    def _x11_windows_by_pid():
-        """pid -> the first of its windows in the display's client list."""
-        out = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"],
-                             capture_output=True, text=True, timeout=5).stdout
-        found = {}
-        for window in re.findall(r"0x[0-9a-fA-F]+", out):
-            prop = subprocess.run(["xprop", "-id", window, "_NET_WM_PID"],
-                                  capture_output=True, text=True, timeout=5).stdout
-            match = re.search(r"=\s*(\d+)", prop)
-            if match:
-                found.setdefault(int(match.group(1)), window)
+            self._clients = []
+            self._clients = self._x11_clients()
+        found = self.pick_client(window, self._clients, set(self._x11.values()))
+        if found:
+            self._x11[uuid] = found
         return found
 
-    def _extract(self, window, app_id):
+    @staticmethod
+    def pick_client(window, clients, taken):
+        """Which of the display's windows this one is, or None.
+
+        The same process and the same class -- both halves of it, where KWin
+        sent both -- and not a window another one has already been found to
+        be. Among several, the one with this window's title: KWin adds " <2>"
+        to a title two windows share, so a title that begins with the
+        window's own name will do. Nothing rather than a guess: a window of
+        the same process with another class is another window, and its icon
+        is not this one's.
+        """
+        pid = window.get("pid")
+        klass = str(window.get("appId") or "").lower()
+        instance = str(window.get("resourceName") or "").lower()
+        title = str(window.get("title") or "")
+        mine = [c for c in clients
+                if c["pid"] == pid and c["id"] not in taken
+                and c["class"].lower() == klass
+                and (not instance or c["instance"].lower() == instance)]
+        for client in mine:
+            if client["name"] and (client["name"] == title or title.startswith(client["name"])):
+                return client["id"]
+        return mine[0]["id"] if mine else None
+
+    @staticmethod
+    def _x11_clients():
+        """The display's managed windows: the id, process, class and title of each."""
+        out = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"],
+                             capture_output=True, encoding="utf-8", errors="replace",
+                             timeout=5).stdout
+        found = []
+        for window in re.findall(r"0x[0-9a-fA-F]+", out):
+            props = subprocess.run(["xprop", "-id", window, "_NET_WM_PID", "WM_CLASS", "_NET_WM_NAME"],
+                                   capture_output=True, encoding="utf-8", errors="replace",
+                                   timeout=5).stdout
+            found.append(WindowIcons.client(window, props))
+        return found
+
+    @staticmethod
+    def client(window, props):
+        """One window's `xprop` answer, as the fields `pick_client` compares."""
+        quoted = r'"((?:[^"\\]|\\.)*)"'
+        pid = re.search(r"^_NET_WM_PID\([^)]*\) = (\d+)", props, re.M)
+        klass = re.search(r"^WM_CLASS\([^)]*\) = " + quoted + ", " + quoted, props, re.M)
+        name = re.search(r"^_NET_WM_NAME\([^)]*\) = " + quoted, props, re.M)
+
+        def text(match, group):
+            return re.sub(r"\\(.)", r"\1", match.group(group)) if match else ""
+
+        return {
+            "id": window,
+            "pid": int(pid.group(1)) if pid else 0,
+            "instance": text(klass, 1),
+            "class": text(klass, 2),
+            "name": text(name, 1),
+        }
+
+    def _extract(self, window):
         out = subprocess.run(["xprop", "-id", window, "-notype", "32c", "_NET_WM_ICON"],
-                             capture_output=True, text=True, timeout=10).stdout
+                             capture_output=True, encoding="utf-8", errors="replace",
+                             timeout=10).stdout
         values = [int(v) for v in re.findall(r"-?\d+", out.split("=", 1)[-1])]
         image = self._largest(values)
         if image is None:
@@ -753,11 +854,16 @@ class WindowIcons:
         data = array(_U32, (value & 0xFFFFFFFF for value in pixels)).tobytes()
         rawmode = "BGRA" if sys.byteorder == "little" else "ARGB"
 
-        # The application id is a window class and can contain anything; it is
-        # about to become a filename.
-        safe = re.sub(r"[^A-Za-z0-9._-]", "_", app_id)[:96]
-        path = os.path.join(icon_dir(), f"{safe}.png")
-        Image.frombytes("RGBA", (width, height), data, "raw", rawmode).save(path)
+        # Named for the window and for the picture. The shell keeps an image
+        # it has loaded for as long as its URL stays the same, so a new icon
+        # on the same window has to be a new file for it to be drawn at all;
+        # the same icon read again is the same file, and is not written twice.
+        digest = hashlib.sha1(f"{width}x{height}:".encode() + data).hexdigest()[:12]
+        safe = re.sub(r"[^A-Za-z0-9]", "_", window)[:32]
+        path = os.path.join(icon_dir(), f"{safe}-{digest}.png")
+        if not os.path.exists(path):
+            Image.frombytes("RGBA", (width, height), data, "raw", rawmode).save(path)
+        self._written.add(path)
         return path
 
     @staticmethod
@@ -809,12 +915,17 @@ class WindowList:
         # A window with no application to match keeps the icon it carries
         # itself, which is the only copy of it that exists.
         self._icons.new_update()
+        present = set()
         for window in windows:
-            if not isinstance(window, dict) or window.get("desktopFile"):
+            if not isinstance(window, dict):
                 continue
-            path = self._icons.path_for(window.get("appId"), window.get("pid"))
+            present.add(str(window.get("uuid") or ""))
+            if window.get("desktopFile"):
+                continue
+            path = self._icons.path_for(window)
             if path:
                 window["iconPath"] = path
+        self._icons.forget_all_but(present)
 
         # Re-serialised from the parsed value, so whatever reaches the shell is
         # known to be valid JSON of the shape it expects.

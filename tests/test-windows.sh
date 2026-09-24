@@ -276,11 +276,13 @@ PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
 
 # A lookup that found nothing is a fact about the moment, not about the
-# application: `_NET_WM_ICON` is set a little after the window is mapped, so a
+# window: `_NET_WM_ICON` is set a little after the window is mapped, so a
 # window asked the instant it appears often has no icon yet. Keeping that
 # answer for the life of the daemon is what "some icons are missing until I
 # restart the shell" was -- the restart forgot, and that was the whole fix.
-echo "== a missing icon is looked at again, a few times =="
+# A hit is kept only until KWin says the icon changed: a program that set its
+# own icon over its toolkit's first one was otherwise drawn with the first.
+echo "== a window's icon is looked at again when it may have changed =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
@@ -297,13 +299,14 @@ class Probe(mod["WindowIcons"]):
     MISS_RETRY_SECONDS = 0.0        # the waiting is not what is under test
 
     def __init__(self, script):
-        self._cache, self._misses, self._available = {}, {}, True
+        self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
+        self._clients, self._available = None, True
         self.script, self.looks = list(script), 0
 
-    def _x11_window_for(self, pid):
+    def _x11_window_for(self, uuid, window):
         return "0x1"
 
-    def _extract(self, window, app_id):
+    def _extract(self, window):
         self.looks += 1
         return self.script.pop(0) if self.script else None
 
@@ -314,31 +317,131 @@ def check(name, got, want):
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
     fails += 0 if ok else 1
 
-icon = os.path.join(sandbox, "late.png")
-open(icon, "w").close()
+def icon(name):
+    path = os.path.join(sandbox, name)
+    open(path, "w").close()
+    return path
 
-# Late, as Electron and Proton are: nothing twice, then an icon.
-p = Probe([None, None, icon])
-check("nothing on the first look",  p.path_for("late", 1), None)
-check("nothing on the second",      p.path_for("late", 1), None)
-check("and the icon on the third",  p.path_for("late", 1), icon)
+def window(uuid="w", serial=0):
+    return {"uuid": uuid, "pid": 1, "iconSerial": serial}
+
+# Late, as a toolkit often is: nothing twice, then an icon.
+late = icon("late.png")
+p = Probe([None, None, late])
+check("nothing on the first look",  p.path_for(window()), None)
+check("nothing on the second",      p.path_for(window()), None)
+check("and the icon on the third",  p.path_for(window()), late)
 check("three looks, not one",       p.looks, 3)
-check("then it stops looking",      (p.path_for("late", 1), p.looks), (icon, 3))
+check("then it stops looking",      (p.path_for(window()), p.looks), (late, 3))
 
-# A window that really has no icon must not cost a display sweep for ever.
+# The program set its own icon over the first: KWin says so, and it is read
+# again however good the copy already kept looked.
+first, own = icon("first.png"), icon("own.png")
+p = Probe([first, own])
+p.path_for(window(serial=0))
+check("an icon KWin says changed is read again", (p.path_for(window(serial=1)), p.looks), (own, 2))
+check("and kept until it changes again",         (p.path_for(window(serial=1)), p.looks), (own, 2))
+
+# A window that really has no icon must not cost a display sweep for ever --
+# until KWin says it has one after all.
 p = Probe([])
 for _ in range(20):
-    p.path_for("never", 1)
-check("a real miss gives up",       p.looks, Probe.MISS_ATTEMPTS)
+    p.path_for(window("never"))
+check("a real miss gives up",           p.looks, Probe.MISS_ATTEMPTS)
+p.path_for(window("never", serial=1))
+check("until KWin announces a change",  p.looks, Probe.MISS_ATTEMPTS + 1)
 
 # The path is cached, not the picture, and a path can stop being true.
-p = Probe([icon])
-p.path_for("gone", 1)
-os.unlink(icon)
-check("a path that went away is read again", (p.path_for("gone", 1), p.looks), (None, 2))
+gone = icon("gone.png")
+p = Probe([gone])
+p.path_for(window("gone"))
+os.unlink(gone)
+check("a path that went away is read again", (p.path_for(window("gone")), p.looks), (None, 2))
+
+# Per window, not per application: the second window of a program is asked
+# for its own icon rather than handed the first one's.
+one, two = icon("one.png"), icon("two.png")
+p = Probe([one, two])
+check("each window has its own",   [p.path_for(window("a")), p.path_for(window("b"))], [one, two])
+check("a window with no process is not looked for",
+      (p.path_for({"uuid": "x"}), p.path_for({"uuid": "y", "pid": 0}), p.looks), (None, None, 2))
+
+# Kept while the window is there, and not after: a window that went takes its
+# file with it -- but only a file this copy of the daemon wrote.
+mine, foreign = icon("mine.png"), icon("foreign.png")
+p = Probe([])
+p._written.add(mine)
+p._icons.update({"went": (0, mine), "stays": (0, one), "stranger": (0, foreign)})
+p._x11.update({"went": "0x5", "stays": "0x6"})
+p.forget_all_but({"stays"})
+check("a window that went takes its icon with it",   os.path.exists(mine), False)
+check("and what was found out about it",             ("went" in p._x11, "went" in p._icons), (False, False))
+check("a window still there keeps its own",          (p._icons.get("stays"), p._x11.get("stays")), ((0, one), "0x6"))
+check("a file this copy did not write is left alone", os.path.exists(foreign), True)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+16)); else fail=$((fail+1)); fi
+
+# Which X11 window a window is. KWin names no X11 window to a script, so the
+# daemon finds it among the display's managed windows -- and "the first window
+# of this process" was the wrong answer for a process with several: a helper
+# window's stock icon stood for the application's own. The class must agree,
+# and the title decides between windows that share it.
+echo "== a window's icon comes from that window =="
+python3 - "$REPO_ROOT" <<'PYTEST'
+import sys, os
+repo = sys.argv[1]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+pick, parse = mod["WindowIcons"].pick_client, mod["WindowIcons"].client
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+# One process with a helper window listed first and two windows of its own,
+# and another process.
+clients = [
+    {"id": "0xa1", "pid": 7, "instance": "helper",  "class": "Example.Viewer", "name": "Default"},
+    {"id": "0xa2", "pid": 7, "instance": "viewer",  "class": "Example.Viewer", "name": "Main"},
+    {"id": "0xa3", "pid": 7, "instance": "viewer",  "class": "Example.Viewer", "name": "Second"},
+    {"id": "0xa4", "pid": 7, "instance": "tool",    "class": "Example.Tool",   "name": "Tool"},
+    {"id": "0xb1", "pid": 8, "instance": "other",   "class": "Other",          "name": "Other"},
+]
+def window(**over):
+    w = {"pid": 7, "appId": "example.viewer", "resourceName": "viewer", "title": "Somewhere"}
+    w.update(over)
+    return w
+
+check("not the process's first window",           pick(window(), clients, set()), "0xa2")
+check("the one with this title",                  pick(window(title="Second"), clients, set()), "0xa3")
+check("a title KWin numbered finds its window",   pick(window(title="Second <2>"), clients, set()), "0xa3")
+check("not one another window already is",        pick(window(title="Second"), clients, {"0xa3"}), "0xa2")
+check("the class decides, not the process",       pick(window(appId="example.tool", resourceName="tool"), clients, set()), "0xa4")
+check("no window of that class, no icon",         pick(window(appId="example.missing"), clients, set()), None)
+check("another process's window is not this one", pick(window(pid=9, appId="other", resourceName="other"), clients, set()), None)
+check("without an instance name the class will do",
+      pick({"pid": 8, "appId": "other", "title": ""}, clients, set()), "0xb1")
+
+# What xprop says about a window, read back.
+props = ('_NET_WM_PID(CARDINAL) = 4242\n'
+         'WM_CLASS(STRING) = "inst", "Klass"\n'
+         '_NET_WM_NAME(UTF8_STRING) = "A \\"quoted\\" title"\n')
+check("xprop's answer read",   parse("0x1", props),
+      {"id": "0x1", "pid": 4242, "instance": "inst", "class": "Klass", "name": 'A "quoted" title'})
+check("a window with none of it", parse("0x2", "_NET_WM_PID:  not found.\n"),
+      {"id": "0x2", "pid": 0, "instance": "", "class": "", "name": ""})
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 # The shortcuts the daemon owns. Two things can be checked without a session:
 # that a key string becomes the integer kglobalaccel wants -- the same numbers
@@ -423,9 +526,9 @@ PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
 # Both run on the thread that answers D-Bus, so both are about time. Finding
-# which window a process owns is an xprop per window on the display, and it
-# was done again for every window in an update that had no icon yet; and the
-# icon's pixels were reordered one at a time in Python.
+# the display's windows is an xprop per window on it, and it was done again
+# for every window in an update that had no icon yet; and the icon's pixels
+# were reordered one at a time in Python.
 echo "== the daemon's icon work, once an update and not pixel by pixel =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
@@ -447,24 +550,29 @@ def check(name, got, want):
 
 class Counting(mod["WindowIcons"]):
     def __init__(self):
-        self._cache, self._misses, self._available = {}, {}, True
-        self._windows_by_pid, self.sweeps, self.asked = None, 0, []
-    def _x11_windows_by_pid(self):
+        self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
+        self._clients, self._available = None, True
+        self.sweeps, self.asked = 0, []
+    def _x11_clients(self):
         self.sweeps += 1
-        return {1: "0x1", 2: "0x2"}
-    def _extract(self, window, app_id):
+        return [{"id": "0x1", "pid": 1, "instance": "", "class": "a", "name": ""},
+                {"id": "0x2", "pid": 2, "instance": "", "class": "b", "name": ""}]
+    def _extract(self, window):
         self.asked.append(window)
         return None
 
 icons = Counting()
 icons.new_update()
-for app, pid in (("a", 1), ("b", 2), ("c", 3)):
-    icons.path_for(app, pid)
+for uuid, app, pid in (("u1", "a", 1), ("u2", "b", 2), ("u3", "c", 3)):
+    icons.path_for({"uuid": uuid, "appId": app, "pid": pid})
 check("one sweep for a whole update", icons.sweeps, 1)
 check("and every window found in it", icons.asked, ["0x1", "0x2"])
 icons.new_update()
-icons.path_for("d", 1)
+icons.path_for({"uuid": "u4", "appId": "c", "pid": 3})
 check("the next update sweeps again", icons.sweeps, 2)
+icons.new_update()
+icons.path_for({"uuid": "u1", "appId": "a", "pid": 1, "iconSerial": 1})
+check("a window found once is not looked for again", (icons.sweeps, icons.asked[-1]), (2, "0x1"))
 
 try:
     from PIL import Image
@@ -483,14 +591,21 @@ mod["subprocess"] = FakeSubprocess
 run = os.path.join(sandbox, "run-pixels")
 os.makedirs(run, mode=0o700)
 os.environ["XDG_RUNTIME_DIR"] = run
-path = mod["WindowIcons"]._extract(icons, "0x1", "some.app")
+extract = mod["WindowIcons"]._extract
+path = extract(icons, "0x1")
 image = Image.open(path)
-check("written to the runtime directory", path, os.path.join(run, "t", "window-icons", "some.app.png"))
+check("written to the runtime directory", os.path.dirname(path), os.path.join(run, "t", "window-icons"))
+check("named for the window",     os.path.basename(path).startswith("0x1-"), True)
 check("the icon is its size",     image.size, (2, 1))
 check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0))],
                                   [(0, 0, 255, 255), (0, 0, 0, 0x81)])
+# The shell keeps a picture for as long as its URL is the same: a new icon on
+# the same window must be a new file, and the same one read again need not be.
+check("the same icon is the same file", extract(icons, "0x1"), path)
+Run.stdout = "_NET_WM_ICON(CARDINAL) = 1, 1, 4278190335"
+check("a new icon is a new file",       extract(icons, "0x1") != path, True)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+6)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 harness_done
