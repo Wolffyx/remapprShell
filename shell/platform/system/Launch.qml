@@ -3,9 +3,9 @@ pragma Singleton
 // Every application the shell starts is started here, in a systemd scope of
 // its own -- never as the shell's child.
 //
-// On 2026-09-24 a restart of the shell took the user's game with it -- World
-// of Tanks under Proton, its winedevice.exe killed outright -- and Steam
-// beside it. Whatever was started from the start menu, the taskbar or a
+// On 2026-09-24 a restart of the shell took the user's game with it -- run
+// under Wine, its winedevice.exe killed outright -- and the game store's
+// client beside it. Whatever was started from the start menu, the taskbar or a
 // notification was a child of the shell, and so a process of the shell's
 // systemd service, which ends every process in it when the shell stops,
 // crashes or restarts. Plasma starts each application in a unit of its own in

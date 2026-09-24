@@ -8,8 +8,8 @@ pragma Singleton
 // Why a scope at all. An application started from the shell used to be the
 // shell's child, and so a process of the shell's systemd service -- and a
 // service that stops, crashes or restarts takes every process in its cgroup
-// with it. On 2026-09-24 a restart of the shell took the user's game (World
-// of Tanks, under Proton) and Steam with it. In a scope of its own, in
+// with it. On 2026-09-24 a restart of the shell took the user's game (under
+// Wine) and its store's client with it. In a scope of its own, in
 // app.slice where Plasma puts the applications it starts, an application is
 // a unit of its own, and the shell and what it started no longer share a
 // fate.
@@ -75,7 +75,7 @@ QtObject {
     }
 
     // The application id of a command that comes with none: the file name
-    // of the program it runs -- "fuzzel" for ["/usr/bin/fuzzel", "--prompt"].
+    // of the program it runs -- "launcher" for ["/usr/bin/launcher", "--prompt"].
     function idOf(argv) {
         const first = String((argv ?? [])[0] ?? "");
         return first.split("/").pop();

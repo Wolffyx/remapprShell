@@ -1,7 +1,7 @@
 // Tests for the scope every application is started in (AppScope, which
 // Launch runs everything through).
 //
-// On 2026-09-24 a restart of the shell took the user's game and Steam with
+// On 2026-09-24 a restart of the shell took the user's game and its store with
 // it, because both had been started as the shell's children. The name is
 // what has to be right for the cure to work at all: a unit name systemd
 // refuses is an application that never starts, and says so only on a stderr
@@ -16,8 +16,8 @@ TestCase {
     name: "Launch"
 
     function test_escape_like_systemd_escape() {
-        compare(AppScope.escaped("org.kde.dolphin"), "org.kde.dolphin");
-        compare(AppScope.escaped("steam"), "steam");
+        compare(AppScope.escaped("org.example.Viewer"), "org.example.Viewer");
+        compare(AppScope.escaped("viewer"), "viewer");
         compare(AppScope.escaped("a:b_c.d"), "a:b_c.d");
         compare(AppScope.escaped("UPPER09"), "UPPER09");
         compare(AppScope.escaped(""), "");
@@ -50,8 +50,8 @@ TestCase {
     }
 
     function test_unit_name() {
-        compare(AppScope.unitName("my-shell", "org.kde.dolphin", "0123abcd"),
-                "app-my\\x2dshell-org.kde.dolphin-0123abcd.scope");
+        compare(AppScope.unitName("my-shell", "org.example.Viewer", "0123abcd"),
+                "app-my\\x2dshell-org.example.Viewer-0123abcd.scope");
         compare(AppScope.unitName("my-shell", "org.kde.plasma-systemmonitor", "ff"),
                 "app-my\\x2dshell-org.kde.plasma\\x2dsystemmonitor-ff.scope");
     }
@@ -72,7 +72,7 @@ TestCase {
     }
 
     function test_id_of_a_command() {
-        compare(AppScope.idOf(["/usr/bin/fuzzel", "--prompt", "run: "]), "fuzzel");
+        compare(AppScope.idOf(["/usr/bin/launcher", "--prompt", "run: "]), "launcher");
         compare(AppScope.idOf(["walker"]), "walker");
         compare(AppScope.idOf([]), "");
         compare(AppScope.idOf(undefined), "");

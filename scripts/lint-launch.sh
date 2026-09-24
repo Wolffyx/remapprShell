@@ -4,7 +4,7 @@
 # An application the shell starts itself is the shell's child, in the shell's
 # systemd service, and the service ends every process in it when the shell
 # stops, crashes or restarts. On 2026-09-24 a restart of the shell took the
-# user's game (World of Tanks, under Proton) and Steam with it that way.
+# user's game (running under Wine) and its store's client with it that way.
 # shell/platform/system/Launch.qml starts every application in a scope of its
 # own instead, and this keeps the known ways round it closed:
 #

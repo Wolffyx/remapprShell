@@ -9,7 +9,7 @@
 # service, and so is anything it starts. `setsid -f` leaves the session, not
 # the service's cgroup, and a service that stops, crashes or restarts ends
 # every process in that. On 2026-09-24 a restart of the shell took the user's
-# game and Steam with it; a terminal opened from here would have gone the same
+# game and its store's client with it; a terminal opened from here would have gone the same
 # way. So an application started here goes where the shell's own Launch puts
 # one (shell/platform/system/Launch.qml): a scope in app.slice, named as
 # systemd asks desktops to name them,
