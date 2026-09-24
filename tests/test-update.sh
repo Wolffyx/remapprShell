@@ -24,8 +24,11 @@ INSTALLED="$SANDBOX/installed"
 NEWER="$SANDBOX/newer"
 # The working tree, not `git ls-files`: an uncommitted change is exactly what
 # is usually being tested, and copying only tracked files silently omits it.
+# Less what is built or rendered in it rather than written: `make plugin`'s
+# build directory was most of every copy, and the copy is made three times.
 mkdir -p "$INSTALLED"
-tar -C "$SOURCE_REPO" --exclude=.git -cf - . | tar -C "$INSTALLED" -xf -
+tar -C "$SOURCE_REPO" --exclude=.git --exclude=./build --exclude='./dev/preview/root.*' -cf - . \
+    | tar -C "$INSTALLED" -xf -
 cp -a "$INSTALLED" "$NEWER"
 
 echo "0.9.9" > "$NEWER/VERSION"
