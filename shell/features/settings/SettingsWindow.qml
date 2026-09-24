@@ -16,6 +16,7 @@ import Quickshell
 import qs.core
 import qs.domain.theme
 import qs.ui.primitives
+import qs.ui.controls
 import qs.features.settings.pages
 
 FloatingWindow {
@@ -257,26 +258,14 @@ FloatingWindow {
                     font.weight: Font.Medium
                 }
 
-                Rectangle {
-                    id: closeButton
-
+                IconButton {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 34
-                    height: 34
-                    radius: width / 2
-                    color: closeHover.hovered ? Theme.s2 : "transparent"
-
-                    Glyph {
-                        anchors.centerIn: parent
-                        name: "close"
-                        fallback: "window-close"
-                        size: 20
-                        color: Theme.mut
-                    }
-
-                    HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.visible = false }
+                    glyph: "close"
+                    iconName: "window-close"
+                    tooltip: "Close"
+                    color: Theme.mut
+                    onActivated: root.visible = false
                 }
             }
 
