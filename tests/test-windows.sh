@@ -69,7 +69,10 @@ python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo " 
 TEST_NAME="com.remappr.ShellTest$$"
 DAEMON="$SANDBOX/windowsd"
 render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
-sed -i "s|\"$DBUS_NAME\"|\"$TEST_NAME\"|g; s|f\"{INTERFACE}\"|f\"{INTERFACE}\"|" "$DAEMON"
+# BUS_NAME and INTERFACE by name, and nothing else. SHORTCUT_OWNER keeps the
+# shell's own name, because BUS_NAME differing from it is the guard: a sed
+# over every quoted "$DBUS_NAME" renamed both, and left this copy believing
+# it owned the keys, with only the no-session variable standing in the way.
 python3 - "$DAEMON" "$TEST_NAME" <<'PY'
 import re, sys
 path, name = sys.argv[1], sys.argv[2]
