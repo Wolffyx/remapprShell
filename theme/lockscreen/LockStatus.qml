@@ -36,11 +36,12 @@ Row {
     property color warn: "#e0c98a"
     property int textSize: 12
 
-    // The frame asks Kirigami for light-on-dark, which is right for five of
-    // the seven styles and invisible on the two that draw dark type on a
-    // light ground. Plasma's battery and the field's reveal button are
-    // Kirigami's to colour, so the style's ink is handed over here rather
-    // than fought with afterwards.
+    // The frame asks Kirigami for light-on-dark, which is right for the
+    // styles drawn light on dark and invisible on the ones that draw dark
+    // type on a light ground -- ambient, kiosk, and minimal in its light
+    // scheme. Plasma's battery and the field's reveal button are Kirigami's
+    // to colour, so the style's ink is handed over here rather than fought
+    // with afterwards.
     Kirigami.Theme.inherit: false
     Kirigami.Theme.textColor: status.ink
 

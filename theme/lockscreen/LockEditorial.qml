@@ -29,7 +29,6 @@ LockStyle {
     readonly property color dim: "#a89f94"
     readonly property color mut: "#8a8378"
     readonly property color accent: editorial.ui.accent
-    readonly property color paper: "#2a2521"
 
     blursWallpaper: false
     scrimsWallpaper: false

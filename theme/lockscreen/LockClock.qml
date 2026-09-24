@@ -45,10 +45,6 @@ Column {
     // Empty is the locale's own short time.
     property string format: ""
 
-    // A second line beside the date, where a style has something true to put
-    // there. Empty draws nothing rather than a separator with nothing after it.
-    property string aside: ""
-
     spacing: 0
 
     // Only while it can be seen. The dim screen's clock is made with the
@@ -158,9 +154,7 @@ Column {
         anchors.horizontalCenter: clock.centred ? parent.horizontalCenter : undefined
         topPadding: Math.round(clock.dateSize * 0.64)
         visible: clock.showDate
-        text: clock.aside === ""
-            ? clock.now.toLocaleDateString(Qt.locale(), Locale.LongFormat)
-            : clock.now.toLocaleDateString(Qt.locale(), Locale.LongFormat) + " · " + clock.aside
+        text: clock.now.toLocaleDateString(Qt.locale(), Locale.LongFormat)
         textFormat: Text.PlainText
         color: clock.dateInk
         style: clock.raised ? Text.Raised : Text.Normal

@@ -77,9 +77,8 @@ Item {
     readonly property real unit: Math.max(0.62, Math.min(1, ui.height / 1080))
     readonly property int edge: Math.round(96 * ui.unit)
 
-    // The glass style's colours, which the others override for themselves.
+    // The glass style's colour, which the others override for themselves.
     readonly property color fg: "#ffffff"
-    readonly property color fgDim: Qt.rgba(1, 1, 1, 0.82)
     // Every style's focus ring, primary button and the border of a field
     // with the keyboard. Not the caret, which Plasma's field draws in the
     // text's own colour.
