@@ -161,29 +161,18 @@ QtObject {
         // format and one code path, whether the shell died or merely gave up
         // on a widget -- and it is written here, at the point a widget is
         // actually disabled, rather than on every failed attempt.
-        root._report.running = false;
-        root._report.command = [Branding.ctlBin, "report", "create",
-                                "--reason", `widget '${id}' quarantined: ${reason}`];
-        root._report.running = true;
+        root._report.run(["report", "create", "--reason", `widget '${id}' quarantined: ${reason}`]);
     }
 
     // Nothing is sent anywhere: the report is a directory of text files under
     // the state directory, and every consumer of one is separately opt-in.
-    // The reporter's own progress lines come back on stderr. They are logged
-    // rather than dropped: a report that failed to be written is worth knowing
-    // about precisely when something has already gone wrong. Read through a
-    // collector rather than the `exited` signal, whose exit-status parameter
-    // the linter cannot resolve -- and note that a comment line starting with
-    // the linter's own name is parsed as a directive, so it cannot be named
-    // at the start of one.
-    readonly property Process _report: Process {
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const last = text.trim().split("\n").pop();
-                if (last.length > 0)
-                    Log.debug("quarantine", `report: ${last}`);
-            }
-        }
+    // The reporter's own progress lines come back on stderr, and its last
+    // line is logged rather than dropped -- at debug, with a failure too: the
+    // quarantine above has already said what matters at warn.
+    readonly property CtlRun _report: CtlRun {
+        tag: "quarantine"
+        label: "report"
+        level: "debug"
     }
 
     function _persist() {

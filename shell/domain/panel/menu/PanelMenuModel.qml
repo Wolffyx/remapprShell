@@ -11,8 +11,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
-import qs.core
+import qs.platform.system
 import qs.domain.config
 import qs.domain.windows
 
@@ -118,25 +117,15 @@ QtObject {
     // that went through it did nothing at all, silently, while the one row
     // that launched a desktop entry worked. Nothing on screen said why.
     function runCtl(args): void {
-        ctl.running = false;
-        ctl.command = [Branding.ctlBin].concat(args);
-        ctl.running = true;
+        ctl.run(args);
     }
 
-    readonly property Process _ctl: Process {
+    // A row that does nothing and says nothing is what sent a whole session
+    // looking for a missing click. An action that fails says so in the log,
+    // with the line it failed on.
+    readonly property CtlRun _ctl: CtlRun {
         id: ctl
-
-        // A row that does nothing and says nothing is what sent a whole
-        // session looking for a missing click. An action that fails now says
-        // so in the log, whether it failed loudly or merely came back wrong.
-        onExited: (code, status) => {
-            if (code !== 0)
-                Log.warn("panel", `panel menu: ${ctl.command.join(" ")} exited ${code}`);
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim().length > 0)
-                Log.warn("panel", `panel menu: ${text.trim().split("\n").pop()}`)
-        }
+        tag: "panel"
+        label: `panel menu: ${ctl.args.join(" ")}`
     }
 }
