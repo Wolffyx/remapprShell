@@ -1074,9 +1074,7 @@ LockStyle {
             radius: day.px(26)
             color: day.cardFill
             border.width: Math.max(1, day.px(1.5))
-            border.color: day.ui.unlock.message.length > 0 ? day.bad
-                : password.field.activeFocus ? day.ui.accent
-                : Qt.rgba(0.5, 0.5, 0.5, 0.32)
+            border.color: password.stateBorder
             opacity: board.shownOpacity
 
             Behavior on opacity {
@@ -1160,6 +1158,8 @@ LockStyle {
                 ink: day.ink
                 dim: day.sub
                 accent: day.ui.accent
+                errorColor: day.bad
+                alarm: day.ui.unlock.message.length > 0
             }
 
             Rectangle {

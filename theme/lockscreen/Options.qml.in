@@ -42,10 +42,10 @@ QtObject {
     readonly property int wallpaperBlur: Math.max(0, Math.min(40, Number(settings.value("wallpaperBlur", 26))))
     readonly property bool showSessionButtons: String(settings.value("showSessionButtons", "true")) !== "false"
 
-    // The one colour every style draws its focus, its caret and its primary
-    // button in. Four, by name, as the design offers them -- a name rather
-    // than a hex string so that a typo is the default rather than an
-    // invisible caret.
+    // The one colour every style draws its focus and its primary button in.
+    // Four, by name, as the design offers them -- a name rather than a hex
+    // string so that a typo is the default rather than an invisible focus
+    // ring.
     readonly property var accents: ({
         "indigo": "#4f60c8",
         "terracotta": "#c8674f",

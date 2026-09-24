@@ -80,7 +80,9 @@ Item {
     // The glass style's colours, which the others override for themselves.
     readonly property color fg: "#ffffff"
     readonly property color fgDim: Qt.rgba(1, 1, 1, 0.82)
-    // Every style's focus ring, caret and primary button.
+    // Every style's focus ring, primary button and the border of a field
+    // with the keyboard. Not the caret, which Plasma's field draws in the
+    // text's own colour.
     readonly property color accent: Options.accent
 
     // When the lock screen started, which is as near as the greeter can know

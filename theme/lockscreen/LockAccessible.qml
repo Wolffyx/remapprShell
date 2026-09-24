@@ -647,8 +647,7 @@ LockStyle {
             radius: Math.round(18 * access.s)
             color: access.card
             border.width: access.thick
-            border.color: access.ui.unlock.resting ? access.err
-                : password.field.activeFocus ? access.acc : access.bd
+            border.color: password.stateBorder
 
             LockPrompt {
                 id: password
@@ -668,6 +667,8 @@ LockStyle {
                 ink: access.fg
                 dim: access.sub
                 accent: access.acc
+                errorColor: access.err
+                restBorder: access.bd
             }
         }
 

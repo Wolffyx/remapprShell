@@ -441,10 +441,12 @@ LockStyle {
                         ink: secure.ink
                         dim: secure.sub
                         accent: secure.ui.accent
+                        errorColor: secure.bad
                         fieldColor: secure.ground
-                        fieldBorder: secure.ui.unlock.resting ? secure.bad
-                            : password.field.activeFocus && !secure.keyMode ? secure.ui.accent
-                            : Qt.rgba(0.5, 0.5, 0.5, 0.32)
+                        // In key mode this panel is hidden, so the colour
+                        // the border has there -- the accent, since the
+                        // field keeps the keyboard -- is never seen.
+                        fieldBorder: password.stateBorder
 
                         onTextChanged: {
                             if (password.text.length > 0)
