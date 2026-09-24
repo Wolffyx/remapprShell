@@ -240,17 +240,12 @@ QtObject {
     //
     // A desktop file id is the reliable one; the resource class is the
     // fallback, and lower-casing it is what turns "Google-chrome" into an icon
-    // that exists.
+    // that exists. The same rule for every window, whoever started it: a class
+    // that names no icon in the theme gets the theme's generic application
+    // icon where it is drawn, not another program's.
     function iconName(window) {
         if (!window)
             return "";
-
-        // A game launched through Steam has no desktop entry of its own -- its
-        // class is the numeric app id -- so nothing above can have matched and
-        // the only honest answer is Steam's icon rather than a blank square.
-        if (/^steam_app_\d+$/.test(window.appId))
-            return "steam";
-
         if (window.desktopFile.length > 0)
             return window.desktopFile;
         return window.appId.toLowerCase();

@@ -167,9 +167,10 @@ QtObject {
         return WindowEvents.iconName(window);
     }
 
-    // Some windows match no installed application at all -- a Steam game's
-    // class is a numeric app id -- and the only copy of their icon is the one
-    // the window carries. The daemon writes that out; this is the file.
+    // Some windows match no installed application at all -- a program started
+    // by another program often reports a class no desktop entry names -- and
+    // the only copy of their icon is the one the window carries. The daemon
+    // writes that out; this is the file.
     function iconFileFor(window) {
         const path = String(window?.iconPath ?? "");
         return path.length > 0 ? Paths.fileUrl(path) : "";

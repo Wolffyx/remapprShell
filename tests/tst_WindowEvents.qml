@@ -130,12 +130,14 @@ TestCase {
         compare(WindowEvents.label(null), "");
     }
 
-    // Steam games have no desktop entry: the class is the numeric app id, so
-    // nothing can match and the fallback is all there is.
-    function test_steam_games_get_steams_icon() {
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam");
-        // But an application that merely mentions steam is not one.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steamworks-tool" })), "steamworks-tool");
+    // A window whose class no desktop entry names -- a game started by its
+    // store's client, whose class is the client's own made-up id -- gets the
+    // rule every other window gets, and no other program's icon. The class
+    // names no icon in the theme, so where it is drawn it is the theme's
+    // generic one.
+    function test_a_class_with_no_entry_gets_the_ordinary_rule() {
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam_app_1407200");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Some_Game_42" })), "some_game_42");
     }
 
     // Grouping is the one part of what KDE's task manager does that needs no
