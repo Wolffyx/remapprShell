@@ -951,19 +951,29 @@ LockStyle {
 
             // Where the design has VPN and Wi-Fi: the two things about this
             // machine the greeter can read.
+            //
+            // Shown from what the tiles would say rather than from the tiles'
+            // own `visible`, which reads false for as long as this row is
+            // hidden -- so a row that asked its tiles stayed hidden for good
+            // once it had been, and the layouts arrive after the lock screen
+            // is up. On a machine with no battery the layout was never drawn.
             Row {
+                id: machine
+
+                readonly property bool hasLayout: LockKeys.layoutName !== ""
+                readonly property bool hasBattery: secure.battery.present
+                readonly property int tiles: (machine.hasLayout ? 1 : 0) + (machine.hasBattery ? 1 : 0)
+                readonly property real tileWidth: (width - (tiles - 1) * spacing) / Math.max(1, tiles)
+
                 width: parent.width
                 spacing: secure.px(12)
-                visible: layoutTile.visible || batteryTile.visible
-
-                readonly property int tiles: (layoutTile.visible ? 1 : 0) + (batteryTile.visible ? 1 : 0)
-                readonly property real tileWidth: (width - (tiles - 1) * spacing) / Math.max(1, tiles)
+                visible: machine.tiles > 0
 
                 Tile {
                     id: layoutTile
 
-                    visible: LockKeys.layoutName !== ""
-                    width: parent.tileWidth
+                    visible: machine.hasLayout
+                    width: machine.tileWidth
                     glyph: "keyboard"
                     label: LockKeys.layouts.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
                     detail: LockKeys.layoutName
@@ -987,8 +997,8 @@ LockStyle {
                 Tile {
                     id: batteryTile
 
-                    visible: secure.battery.present
-                    width: parent.tileWidth
+                    visible: machine.hasBattery
+                    width: machine.tileWidth
                     glyph: secure.battery.glyph
                     label: `Battery · ${secure.battery.percent}%`
                     tint: secure.battery.plugged ? secure.good : secure.ink
