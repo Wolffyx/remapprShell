@@ -219,6 +219,21 @@ TestCase {
         compare(StatusIcons.linkSpeed(2500), "2.5 Gbit/s");
     }
 
+    // What the network widget and the status cluster both say on hover.
+    function test_network_tooltip() {
+        const wired = { kind: "wired", name: "Wired connection 1", speed: 1000 };
+        const wifi = { kind: "wifi", name: "Home", strength: 0.72 };
+        compare(StatusIcons.networkTooltip([wired, wifi], "Full"),
+                "Wired connection 1 · 1 Gbit/s\nHome · 72%");
+        // A speed nobody reported is left out, not shown as nothing.
+        compare(StatusIcons.networkTooltip([{ kind: "wired", name: "eth0", speed: 0 }], "Full"), "eth0");
+        compare(StatusIcons.networkTooltip([wifi], "Portal"), "Home · 72%\nA sign-in page is in the way");
+        compare(StatusIcons.networkTooltip([wifi], "Limited"), "Home · 72%\nNo internet");
+        // Nothing connected says so, whatever the check thinks.
+        compare(StatusIcons.networkTooltip([], "None"), "Not connected");
+        compare(StatusIcons.networkTooltip(undefined, "Unknown"), "Not connected");
+    }
+
     function test_bluetooth() {
         compare(StatusIcons.bluetoothIcon(false, 2), "network-bluetooth-inactive-symbolic");
         compare(StatusIcons.bluetoothIcon(true, 0), "network-bluetooth");
@@ -455,6 +470,16 @@ TestCase {
         compare(StatusIcons.brightnessFloor(15), 1);
     }
 
+    // A slider's percent as a raw value: 1% at the bottom, never below.
+    function test_a_percent_is_a_raw_value_above_the_floor() {
+        compare(StatusIcons.brightnessFromPercent(50, 10000), 5000);
+        compare(StatusIcons.brightnessFromPercent(100, 15), 15);
+        compare(StatusIcons.brightnessFromPercent(33, 15), 5);
+        compare(StatusIcons.brightnessFromPercent(1, 10000), 100);
+        compare(StatusIcons.brightnessFromPercent(0, 10000), 100);
+        compare(StatusIcons.brightnessFromPercent(0, 15), 1);
+    }
+
     // Dimmed below the floor elsewhere: scrolling down leaves it there
     // rather than brightening it, and scrolling up starts from where it is.
     function test_below_the_floor_is_not_snapped_up() {
@@ -591,5 +616,17 @@ TestCase {
                 "Camera in use by Zoom\nMicrophone in use by Chrome, Discord");
         compare(StatusIcons.privacyTooltip({ microphone: ["Chrome"], camera: [] }, true),
                 "Microphone in use by Chrome (muted)");
+    }
+
+    // The middle-click hint comes only with a microphone in use, and says
+    // which way a click would go.
+    function test_privacy_hint() {
+        compare(StatusIcons.privacyHint({ microphone: ["Chrome"], camera: [] }, false),
+                "Microphone in use by Chrome\nMiddle-click to mute the microphone");
+        compare(StatusIcons.privacyHint({ microphone: ["Chrome"], camera: [] }, true),
+                "Microphone in use by Chrome (muted)\nMiddle-click to unmute the microphone");
+        compare(StatusIcons.privacyHint({ microphone: [], camera: ["Zoom"] }, false), "Camera in use by Zoom");
+        compare(StatusIcons.privacyHint({ microphone: [], camera: [] }, false), "");
+        compare(StatusIcons.privacyHint(undefined, false), "");
     }
 }

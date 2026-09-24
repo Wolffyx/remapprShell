@@ -95,6 +95,20 @@ QtObject {
         root._flush();
     }
 
+    // One display at `percent` of its range, as a slider asks for it -- never
+    // below the floor (StatusIcons.brightnessFromPercent).
+    function setPercent(name, percent) {
+        const display = root.displayNamed(name);
+        if (display)
+            root.setBrightness(name, StatusIcons.brightnessFromPercent(percent, display.max));
+    }
+
+    // Every display at `percent`, as one slider for all of them asks.
+    function setAllPercent(percent) {
+        for (const d of root.displays)
+            root.setPercent(d.name, percent);
+    }
+
     // Every display at once, by wheel notches, as the brightness keys do.
     function step(steps, stepPercent) {
         for (const d of root.displays)

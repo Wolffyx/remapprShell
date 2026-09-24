@@ -255,4 +255,17 @@ QtObject {
             return window.desktopFile;
         return window.appId.toLowerCase();
     }
+
+    // A hue per application, 0 to 1, for Qt.hsla: two windows of one program
+    // are tinted alike and two programs apart. The window switcher and the
+    // overview both tint their cards this way, so the same program looks the
+    // same in both. A hash of the id, not a table -- any application gets
+    // one, and always the same one.
+    function tintHue(appId) {
+        const s = String(appId ?? "");
+        let h = 0;
+        for (let i = 0; i < s.length; i++)
+            h = (h * 31 + s.charCodeAt(i)) % 360;
+        return h / 360;
+    }
 }

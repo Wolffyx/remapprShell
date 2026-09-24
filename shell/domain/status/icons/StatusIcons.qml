@@ -100,6 +100,21 @@ QtObject {
         return mbps >= 1000 ? `${mbps / 1000} Gbit/s` : `${mbps} Mbit/s`;
     }
 
+    // What hovering the network says: a line per connection -- a wired one
+    // with its speed where that is known, a wireless one with its strength --
+    // and a last line when NetworkManager's check says it goes nowhere.
+    // `connections` is NetworkStatus's: [{ kind, name, speed, strength }].
+    function networkTooltip(connections, connectivity) {
+        const lines = (connections ?? []).map(c => c.kind === "wired"
+            ? [c.name, root.linkSpeed(c.speed)].filter(s => s).join(" · ")
+            : `${c.name} · ${root.percent(c.strength)}`);
+        if (lines.length === 0)
+            return "Not connected";
+        if (root.isLimited(connectivity))
+            lines.push(connectivity === "Portal" ? "A sign-in page is in the way" : "No internet");
+        return lines.join("\n");
+    }
+
     // ---- bluetooth -------------------------------------------------------
 
     function bluetoothIcon(enabled, connected) {
@@ -321,6 +336,13 @@ QtObject {
         return Math.max(Math.min(root.brightnessFloor(max), current), Math.min(max, next));
     }
 
+    // The raw value a slider at `percent` asks for, on a display whose top
+    // is `max`: never below the floor, so the bottom of a slider cannot black
+    // out the screen it is drawn on.
+    function brightnessFromPercent(percent, max) {
+        return Math.max(root.brightnessFloor(max), Math.round(percent * max / 100));
+    }
+
     function brightnessIcon(fraction) {
         return fraction < 0.5 ? "brightness-low" : "brightness-high";
     }
@@ -450,6 +472,16 @@ QtObject {
         if (users?.microphone?.length > 0)
             lines.push(`Microphone in use by ${users.microphone.join(", ")}${micMuted ? " (muted)" : ""}`);
         return lines.join("\n");
+    }
+
+    // The tooltip of a widget that mutes the microphone on a middle click:
+    // who is recording, and then how to stop it being heard -- the hint only
+    // while something is using the microphone.
+    function privacyHint(users, micMuted) {
+        return [root.privacyTooltip(users, micMuted),
+                users?.microphone?.length > 0
+                    ? (micMuted ? "Middle-click to unmute the microphone" : "Middle-click to mute the microphone")
+                    : ""].filter(s => s).join("\n");
     }
 
     // One icon for both, where there is room for only one: the camera outranks
