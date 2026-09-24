@@ -91,19 +91,13 @@ configured_key() {   # <action> [merged json]
 # Writes an action's key into the active profile, so the configuration says
 # what KDE was just told.
 configure_key() {   # <action> <key|none>
-    local profile tmp
-    profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
-    mkdir -p "$(dirname "$profile")"
-    if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
-        log_warn "$profile does not parse; the shortcut is bound but not saved in the configuration"
-        return 1
-    fi
-    tmp=$(mktemp)
-    if [ -f "$profile" ]; then
-        jq --arg a "$1" --arg k "$2" '.shortcuts = ((.shortcuts // {}) + {($a): $k})' "$profile" > "$tmp"
-    else
-        jq -n --arg a "$1" --arg k "$2" '{shortcuts: {($a): $k}}' > "$tmp"
-    fi && mv "$tmp" "$profile" || { rm -f "$tmp"; return 1; }
+    config_set_string ".shortcuts[\"$1\"]" "$2"
+    case $? in
+        0) return 0 ;;
+        2) log_warn "$(profile_file) does not parse; the shortcut is bound but not saved in the configuration"
+           return 1 ;;
+        *) return 1 ;;
+    esac
 }
 
 # Everything currently bound to a key, as "group: name", so a conflict can be

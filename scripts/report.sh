@@ -24,16 +24,12 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
 
 REPORT_DIR="$STATE_DIR/diagnostics"
 JOURNAL_LINES=${JOURNAL_LINES:-200}
-
-active_profile() {
-    local state="$CONFIG_DIR/state.json"
-    [ -f "$state" ] && jq -r '.profile // "default"' "$state" 2>/dev/null || echo default
-}
 
 # --- the four parts --------------------------------------------------------
 
@@ -97,22 +93,12 @@ part_environment() {
 
 part_config() {
     local dir=$1
-    local defaults="$DATA_DIR/config/defaults/shell.json"
-    [ -f "$defaults" ] || defaults="$REPO_ROOT/config/defaults/shell.json"
-    local profile
-    profile="$CONFIG_DIR/profiles/$(active_profile)/shell.json"
 
-    local merged
-    if [ -f "$profile" ] && jq -e . "$profile" >/dev/null 2>&1; then
-        merged=$(jq -s '.[0] * .[1]' "$defaults" "$profile")
-    else
-        merged=$(cat "$defaults" 2>/dev/null || echo '{}')
-        # Worth saying out loud: an unparseable profile is itself the most
-        # likely reason a report is being written.
-        [ -f "$profile" ] && printf 'the profile does not parse: %s\n' "$profile" >> "$dir/error.txt"
-    fi
+    # Worth saying out loud: an unparseable profile is itself the most likely
+    # reason a report is being written.
+    config_profile_broken && printf 'the profile does not parse: %s\n' "$(profile_file)" >> "$dir/error.txt"
 
-    printf '%s' "$merged" | redact_json "$HOME" "${USER:-$(id -un)}" > "$dir/config.json"
+    config_merged | redact_json "$HOME" "${USER:-$(id -un)}" > "$dir/config.json"
 
     # Proof the pass ran, for anyone about to paste this somewhere. A bundle
     # that merely claims to be redacted is not worth much.

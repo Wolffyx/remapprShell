@@ -27,26 +27,11 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/appletsrc.sh"
 source "$REPO_ROOT/scripts/lib/renderers.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 
 BACKUP_DIR="$STATE_DIR/renderer-backups"
 
 # --- what the shell is configured to do -----------------------------------
-
-active_profile() {
-    local state="$CONFIG_DIR/state.json"
-    [ -f "$state" ] && jq -r '.profile // "default"' "$state" 2>/dev/null || echo default
-}
-
-profile_file() { printf '%s/profiles/%s/shell.json' "$CONFIG_DIR" "$(active_profile)"; }
-
-defaults_file() {
-    # The installed copy first: that is what the running shell reads, and a
-    # renderer generated from a different description than the one on screen
-    # would be a confusing thing to debug.
-    local installed="$DATA_DIR/config/defaults/shell.json"
-    [ -f "$installed" ] && { printf '%s' "$installed"; return; }
-    printf '%s/config/defaults/shell.json' "$REPO_ROOT"
-}
 
 widget_index() {
     local installed="$QS_CONFIG_DIR/widgets/index.json"
@@ -55,18 +40,14 @@ widget_index() {
 }
 
 # Defaults plus the user's sparse delta, which is what the shell itself draws
-# from. Generating the Plasma panel from anything else would let the two
-# renderers disagree about what the panel contains.
+# from (lib/config.sh). Generating the Plasma panel from anything else would
+# let the two renderers disagree about what the panel contains -- and the
+# defaults are the installed copy first for the same reason: a renderer
+# generated from a different description than the one on screen would be a
+# confusing thing to debug.
 effective_config() {
-    local defaults profile
-    defaults=$(defaults_file)
-    profile=$(profile_file)
-    if [ -f "$profile" ] && jq -e . "$profile" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1]' "$defaults" "$profile"
-    else
-        [ -f "$profile" ] && log_warn "$profile does not parse; using the shipped defaults"
-        cat "$defaults"
-    fi
+    config_profile_broken && log_warn "$(profile_file) does not parse; using the shipped defaults"
+    config_merged
 }
 
 configured_renderer() { renderer_normalize "$(effective_config | jq -r '.panel.renderer // "quickshell"')"; }
@@ -336,23 +317,14 @@ restart_plasmashell() {
 write_renderer_setting() {
     local target=$1 file
     file=$(profile_file)
-    mkdir -p "$(dirname "$file")"
-
-    if [ -f "$file" ] && ! jq -e . "$file" >/dev/null 2>&1; then
-        log_error "$file does not parse; refusing to write over it"
-        log_info "  fix it first: jq . $file"
-        return 1
-    fi
-
-    local tmp
-    tmp=$(mktemp)
-    if [ -f "$file" ]; then
-        jq --arg r "$target" '.panel = ((.panel // {}) + {renderer: $r})' "$file" > "$tmp" || return 1
-    else
-        jq -n --arg r "$target" '{panel: {renderer: $r}}' > "$tmp" || return 1
-    fi
-    mv "$tmp" "$file"
-    log_debug "set panel.renderer=$target in $file"
+    config_set_string '.panel.renderer' "$target"
+    case $? in
+        0) log_debug "set panel.renderer=$target in $file" ;;
+        2) log_error "$file does not parse; refusing to write over it"
+           log_info "  fix it first: jq . $file"
+           return 1 ;;
+        *) return 1 ;;
+    esac
 }
 
 # --- Plasma's tray-only services -------------------------------------------

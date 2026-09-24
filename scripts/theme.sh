@@ -934,22 +934,12 @@ osd_mode() {
 # that must agree are better set by one thing.
 set_osd_enabled() {
     local value=$1
-    local profile="$CONFIG_DIR/profiles/$( [ -f "$CONFIG_DIR/state.json" ] && jq -r '.profile // "default"' "$CONFIG_DIR/state.json" 2>/dev/null || echo default )/shell.json"
-    mkdir -p "$(dirname "$profile")"
-
-    if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
-        log_warn "$profile does not parse; leaving osd.enabled alone"
-        return 0
-    fi
-
-    local tmp
-    tmp=$(mktemp)
-    if [ -f "$profile" ]; then
-        jq --argjson v "$value" '.osd = ((.osd // {}) + {enabled: $v})' "$profile" > "$tmp" || return 1
-    else
-        jq -n --argjson v "$value" '{osd: {enabled: $v}}' > "$tmp" || return 1
-    fi
-    mv "$tmp" "$profile"
+    config_set '.osd.enabled' "$value"
+    case $? in
+        0) return 0 ;;
+        2) log_warn "$(profile_file) does not parse; leaving osd.enabled alone"; return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 case "$cmd" in

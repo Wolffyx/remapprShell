@@ -46,7 +46,7 @@ done
 # used to read profiles/default alone, so an update channel set in any other
 # profile -- including from the settings window -- was ignored.
 source "$REPO_ROOT/scripts/lib/config.sh"
-profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
+profile=$(profile_file)
 
 [ -n "$CHANNEL" ]      || CHANNEL=$(config_get '.update.channel' 'main')
 [ -n "$LOCAL_SOURCE" ] || LOCAL_SOURCE=$(config_get '.update.localSource' '')

@@ -239,9 +239,7 @@ fi
 # The headline failure mode of having two renderers: both drawing at once.
 # Counted rather than assumed, because the case that matters is the one where
 # the configuration and what is on screen have come apart.
-configured_renderer=$(config_get '.panel.renderer' quickshell)
-[ "$configured_renderer" = "null" ] && configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$defaults_file" 2>/dev/null || echo quickshell)
-configured_renderer=$(renderer_normalize "$configured_renderer")
+configured_renderer=$(renderer_normalize "$(config_get '.panel.renderer' quickshell)")
 
 case "$configured_renderer" in
     plasma)     expected_pkg="$PLASMA_SHELL_PACKAGE_ID" ;;
@@ -843,7 +841,7 @@ fi
 
 section "AI assist"
 
-merged_cfg=$(jq -s '.[0] * (.[1] // {})' "$defaults_file" "$profile_file" 2>/dev/null || cat "$defaults_file" 2>/dev/null || echo '{}')
+merged_cfg=$(config_merged)
 ai_enabled=$(jq -r '.ai.enabled // false' <<< "$merged_cfg")
 ai_provider=$(jq -r '.ai.provider // "clipboard"' <<< "$merged_cfg")
 history_on=$(jq -r '.notifications.history // false' <<< "$merged_cfg")

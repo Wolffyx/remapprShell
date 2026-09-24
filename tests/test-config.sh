@@ -40,4 +40,30 @@ echo "== a profile that does not parse is ignored, as the shell ignores it =="
 write_profile '{ this is not json'
 check "the defaults are used"      "$(config_get '.panel.renderer' 'none')"       "quickshell"
 
+# Every command that changes a setting writes it through config_set: into the
+# active profile, only the one path, and by a rename beside the file the shell
+# is watching -- never a truncate in place, never a copy in from /tmp.
+echo "== one setting written into the profile =="
+write_profile '{ "panel": { "thickness": 44 }, "keep": "me" }'
+config_set_string '.panel.renderer' plasma; rc=$?
+check "written"                    "$rc:$(jq -c '.panel' "$profile")"         '0:{"thickness":44,"renderer":"plasma"}'
+check "and nothing else touched"   "$(jq -r '.keep' "$profile")"                "me"
+config_set '.osd.enabled' false
+check "JSON goes in as JSON"       "$(jq -c '.osd' "$profile")"                 '{"enabled":false}'
+check "and reads back"             "$(config_get '.osd.enabled' true)"          "false"
+TMPDIR=/nonexistent config_set '.panel.thickness' 50; rc=$?
+check "not by way of /tmp"         "$rc:$(jq -r '.panel.thickness' "$profile")" "0:50"
+check "and nothing left beside it" "$(ls -A "$(dirname "$profile")" | grep -vx shell.json | wc -l)" "0"
+
+printf '{"profile": "other"}\n' > "$CONFIG_DIR/state.json"
+config_set_string '.panel.position' left
+check "into the active profile"    "$(jq -r '.panel.position' "$CONFIG_DIR/profiles/other/shell.json")" "left"
+check "not the default one"        "$(jq -r '.panel.position // "untouched"' "$profile")" "untouched"
+rm -f "$CONFIG_DIR/state.json"
+
+write_profile '{ this is not json'
+config_set_string '.panel.renderer' plasma; rc=$?
+check "a broken profile says so"   "$rc" "2"
+check "and is left exactly as it was" "$(cat "$profile")" '{ this is not json'
+
 harness_done
