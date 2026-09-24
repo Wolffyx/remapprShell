@@ -31,8 +31,6 @@ QtObject {
     // do not know whether the list is empty or absent.
     property bool _answered: false
 
-    readonly property var activeWindow: root.windows.find(w => w.active) ?? null
-
     // uuid -> when that window began asking for attention. See
     // WindowEvents.attentionSince.
     property var attentionSince: ({})
