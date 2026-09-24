@@ -30,6 +30,7 @@ Column {
     // How it looks. The defaults are the media widget's.
     property color trackColor: Theme.alpha(Theme.fg, 0.2)
     property color fillColor: Theme.acc
+    property real trackRadius: Theme.radiusOf(2)
     property color timeColor: Theme.mut
     property string timeFamily: Theme.fontFamily
     property int timeSize: 10
@@ -42,7 +43,7 @@ Column {
         id: track
         width: parent.width
         height: 4
-        radius: Theme.radiusOf(2)
+        radius: root.trackRadius
         color: root.trackColor
 
         Rectangle {

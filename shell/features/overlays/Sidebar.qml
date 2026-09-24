@@ -343,28 +343,11 @@ PanelWindow {
                     width: parent.width
                     spacing: 14
 
-                    Rectangle {
+                    AlbumArt {
                         width: 56
                         height: 56
                         radius: 14
-                        color: Theme.accC
-                        clip: true
-
-                        Image {
-                            anchors.fill: parent
-                            source: win.player?.trackArtUrl ?? ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            visible: status === Image.Ready
-                        }
-
-                        Glyph {
-                            anchors.centerIn: parent
-                            visible: !(win.player?.trackArtUrl)
-                            name: "music_note"
-                            size: 26
-                            color: Theme.accCFg
-                        }
+                        source: win.player?.trackArtUrl ?? ""
                     }
 
                     Column {
@@ -401,41 +384,18 @@ PanelWindow {
                     width: parent.width
                     height: 30
 
-                    Rectangle {
-                        id: track
+                    SeekBar {
                         y: 6
                         width: parent.width
-                        height: 4
-                        radius: 2
-                        color: Theme.alpha(Theme.fg, 0.12)
-
-                        Rectangle {
-                            width: parent.width * Math.max(0, Math.min(1, (win.player?.position ?? 0) / Math.max(1, win.player?.length ?? 1)))
-                            height: parent.height
-                            radius: parent.radius
-                            color: Theme.acc
-                        }
-
-                        TapHandler {
-                            onTapped: point => MediaStatus.seek((win.player?.length ?? 0) * point.position.x / track.width)
-                        }
-                    }
-
-                    PanelText {
-                        y: 14
-                        text: StatusIcons.trackTime(win.player?.position ?? 0)
-                        font.family: Theme.monoFamily
-                        font.pixelSize: 11
-                        color: Theme.mut
-                    }
-
-                    PanelText {
-                        y: 14
-                        anchors.right: parent.right
-                        text: StatusIcons.trackTime(win.player?.length ?? 0)
-                        font.family: Theme.monoFamily
-                        font.pixelSize: 11
-                        color: Theme.mut
+                        spacing: 4
+                        position: win.player?.position ?? 0
+                        length: win.player?.length ?? 0
+                        canSeek: win.player?.canSeek ?? false
+                        trackColor: Theme.alpha(Theme.fg, 0.12)
+                        trackRadius: 2
+                        timeFamily: Theme.monoFamily
+                        timeSize: 11
+                        onSeek: seconds => MediaStatus.seek(seconds)
                     }
                 }
 
