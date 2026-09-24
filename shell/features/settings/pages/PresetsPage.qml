@@ -11,6 +11,7 @@ import Quickshell.Io
 import qs.core
 import qs.domain.theme
 import qs.ui.primitives
+import qs.ui.controls
 
 CardGrid {
     id: root
@@ -66,63 +67,25 @@ CardGrid {
         Repeater {
             model: root.presets
 
-            Rectangle {
+            OptionRow {
                 id: preset
 
                 required property var modelData
 
                 width: card.contentWidth
                 height: 58
-                radius: Theme.radiusOf(12)
-                color: presetHover.hovered ? Theme.hover : Theme.s1
+                hoverable: true
+                title: preset.modelData.id
+                detail: preset.modelData.description
 
-                Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 12
-                    spacing: 10
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - applyButton.width - parent.spacing
-                        spacing: 1
-
-                        PanelText {
-                            text: preset.modelData.id
-                            font.pixelSize: 14
-                        }
-
-                        PanelText {
-                            text: preset.modelData.description
-                            width: parent.width
-                            elide: Text.ElideRight
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-                    }
-
-                    Rectangle {
-                        id: applyButton
-
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 74
-                        height: 30
-                        radius: Theme.radiusOf(10)
-                        color: applyHover.hovered ? Theme.acc : Theme.accC
-
-                        PanelText {
-                            anchors.centerIn: parent
-                            text: "Apply"
-                            font.pixelSize: 13
-                            color: applyHover.hovered ? Theme.primaryFg : Theme.accCFg
-                        }
-
-                        HoverHandler { id: applyHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.apply(preset.modelData.id) }
-                    }
+                TextButton {
+                    tonal: true
+                    width: 74
+                    height: 30
+                    radius: Theme.radiusOf(10)
+                    text: "Apply"
+                    onActivated: root.apply(preset.modelData.id)
                 }
-
-                HoverHandler { id: presetHover }
             }
         }
 

@@ -9,6 +9,7 @@ import qs.core
 import qs.domain.config
 import qs.domain.theme
 import qs.ui.primitives
+import qs.ui.controls
 
 CardGrid {
     id: root
@@ -63,63 +64,25 @@ CardGrid {
         Repeater {
             model: root.profiles
 
-            Rectangle {
+            OptionRow {
                 id: profile
 
                 required property var modelData
 
                 width: profileCard.contentWidth
                 height: 50
-                radius: Theme.radiusOf(12)
-                color: profile.modelData.active ? Theme.accC : Theme.s1
+                title: profile.modelData.name
+                detail: profile.modelData.detail
+                selected: profile.modelData.active
 
-                Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 12
-                    spacing: 10
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - use.width - parent.spacing
-                        spacing: 1
-
-                        PanelText {
-                            text: profile.modelData.name
-                            font.pixelSize: 14
-                            color: profile.modelData.active ? Theme.accCFg : Theme.fg
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: profile.modelData.detail
-                            font.pixelSize: 12
-                            color: profile.modelData.active ? Theme.accCFg : Theme.mut
-                            opacity: profile.modelData.active ? 0.8 : 1
-                        }
-                    }
-
-                    Rectangle {
-                        id: use
-
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: !profile.modelData.active
-                        width: visible ? 66 : 0
-                        height: 28
-                        radius: Theme.radiusOf(10)
-                        color: useHover.hovered ? Theme.acc : Theme.accC
-
-                        PanelText {
-                            anchors.centerIn: parent
-                            text: "Use"
-                            font.pixelSize: 13
-                            color: useHover.hovered ? Theme.primaryFg : Theme.accCFg
-                        }
-
-                        HoverHandler { id: useHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.run(["profile", "use", profile.modelData.name]) }
-                    }
+                TextButton {
+                    visible: !profile.modelData.active
+                    tonal: true
+                    width: 66
+                    height: 28
+                    radius: Theme.radiusOf(10)
+                    text: "Use"
+                    onActivated: root.run(["profile", "use", profile.modelData.name])
                 }
             }
         }
