@@ -1,10 +1,14 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on the **evening of 2026-09-23**
+sessions, and added to since -- most recently on **2026-09-24**, a cleanup
+of the whole tree for duplicated and wasteful code that found a dozen bugs in
+the copies (read "The cleanup of 2026-09-24" first: it says what now has one
+home, and what needs checking on the real desktop). Before that, the
+**evening of 2026-09-23**
 (twelve lock screens, a reworked taskbar preview, and the global shortcuts
 moved into the shell's configuration: read "The evening of 2026-09-23" and
-"Twelve lock screens" first). Before that, the **morning of 2026-09-23**,
+"Twelve lock screens" next). Before that, the **morning of 2026-09-23**,
 which was one bug in two halves: the desktop came up dark two hours after
 sunrise while every name in `kdeglobals` said light and all three of this
 project's checks agreed with the names -- and then, the colours mended, the
@@ -198,6 +202,12 @@ uses. Pointing that at kglobalaccel would delete the whole class.
 declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
 any disagreement, in `make lint` and in CI.
 
+**Since the cleanup of 2026-09-24**, before anything below: `make link` and
+`rmpr windows restart` (the daemon is a rendered copy), then the checks
+listed under "Needs the real desktop" in that entry. `make lint` and `make
+test` are clean; `dev` is **not pushed** -- the three commits of 2026-09-23's
+evening and the cleanup's 94 are local.
+
 **What to pick up first, 2026-09-24.** Nothing is half-written; `make lint`,
 `make test` and `rmpr doctor` are all clean, and `dev` is pushed.
 
@@ -282,6 +292,119 @@ any disagreement, in `make lint` and in CI.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The cleanup of 2026-09-24: duplicates, waste, and what they were hiding
+
+**93 commits on `dev`, one pass over the whole tree for duplicated and
+wasteful code**, asked for by the user before carrying on. Six read-only
+audits (domain, features and ui, widgets, lock screens, scripts, tests) found
+about eighty things; the ones worth doing were done in six git worktrees and
+cherry-picked into one line, so the history is still merge-free. Where the
+copies had drifted, the drift was usually a bug -- which is the argument for
+the whole exercise.
+
+**Do it in a worktree, always, for anything bigger than a line.**
+`~/.config/quickshell/<slug>` is a symlink to *this checkout's* `shell/`, and
+Quickshell reloads on every save: an edit made here is on the user's panel a
+second later, half-finished or not. This pass never touched the checkout
+until the end, when `dev` was fast-forwarded to the verified result.
+
+**Bugs the duplicates were hiding, now fixed:**
+- `snapshots.keep` never pruned: `snapshot.sh` did not source `config.sh`, so
+  the lookup was "command not found", silenced by `2>/dev/null`, and read as 0.
+- The CLI and the daemon kept separate key tables that disagreed: the CLI
+  accepted "Volume Up", Search, the media keys and `~`, and the daemon could
+  not bind them. One table now, `scripts/lib/keycodes.tsv`, rendered into
+  windowsd, with a parity test. The action list is one file too
+  (`scripts/lib/shortcut-actions.tsv`).
+- `theme status`/`variant`/`apply` waited five seconds whenever Night Light
+  was off, because "off" and "no answer" looked the same.
+- Five profile writers used `mktemp` in /tmp and `mv`: a copy across
+  filesystems onto the file the shell watches, not the atomic replace it
+  looked like. One writer now, `config_set`, in the profile's own directory.
+- `ask`, renderer switches and doctor hardcoded the installed IPC path, so
+  under `make run` they talked to nothing; doctor called the working-tree
+  shell "another Quickshell".
+- ConfigStore applied its own save two or three more times after writing it
+  (the "profile changed on disk; merging our delta onto it" line on every
+  save, 25 times in a minute of use this morning), and a `set()` made while a
+  write was in flight was undone and never saved.
+- `test-windows.sh` renamed the daemon's shortcut-owner name along with its
+  bus name, so the test daemon believed it owned the user's keys; only the
+  no-session switch kept it off them. Six suites did not set that switch
+  themselves -- one of them, run by hand, opened the real sidebar this
+  session. Every suite sets it now, through `tests/lib/harness.sh`.
+- Quick settings: a Wi-Fi password being typed was wiped by the next scan's
+  re-sort; the brightness slider was rebuilt under the pointer while dragged.
+  The taskbar rebuilt every button, and restarted every preview stream, on
+  any window's title change.
+- The sidebar's seek bar sought on players that cannot seek. The ambient
+  lock screen's media artist line was white on white. The secure lock
+  screen's layout tile never showed on a machine without a battery. The
+  wizard showed the AI hint on the theme step.
+
+**What is shared now, for whoever writes the next copy:** `BusMonitor`
+(every `busctl monitor`), `Dbus.send`/`setProperty`/`invokeShortcut`
+(fire-and-forget calls, which also stopped dropping a call made while the
+last was running -- fast workspace scrolling), `CtlRun` and `CtlSession` (the
+CLI, from the shell and from six settings pages), `Clipboard`, `core/Ini`,
+`Env.xdgConfigHome`/`xdgDataHome`; in `ui/`: `PopoutColumn`, `PopoutHeader`,
+`LevelSlider`, `AlbumArt`, `SeekBar`, `Hint`, `KeyCap`, `OptionRow`,
+`ReorderState`/`DragGrip`, `ConfigToggleRow`/`ConfigSliderRow`/
+`ConfigSegmented`, and `BarWidget.tileSize`/`barVertical`/`indexAlong`/
+`centreAlong`; on the lock screen: `LockKeys`, `LockText`, `LockPicture`,
+`ui.battery`, `LockStyle.px()`; in the scripts: `lib/kwin.sh`'s scripting
+calls, `config_load`/`config_set`, `lib/reports.sh`, `confirm_or_die`; in
+the tests: `tests/lib/harness.sh` and `tests/fixtures/bus.js`.
+
+**Measured.** `make test` 3m21s → about 1m15s (suites found, not listed, and
+run side by side; `TEST_JOBS=1` runs them in turn). 483 → 539 QML cases,
+808 → 856 shell checks, qmllint 57 → 54 warnings. A preview sweep of 41
+targets, dev against the result, differs only where intended (below) and in
+the clock's minute. All twelve lock styles load in the greeter, and 244 of
+268 lock previews are pixel-identical to before; the rest are simulated
+batteries now reaching every style. Executable code is about 300 lines
+shorter; comments about 960 longer, and tests about 850.
+
+**Intended visible changes:** the settings close button (1 px smaller glyph,
+the common hover colour); shortcut and taskbar-menu rows 4 px in, where they
+had overhung their cards; icon buttons show their tooltips (the restore
+point's "click again" was never seen); a held notification's countdown
+stops; lock-screen media cards scale with the screen; the lockout toast
+fades out instead of vanishing; album-art stand-ins show while a cover loads.
+
+**Needs the real desktop, and nobody has done it yet:**
+- `make link` then `rmpr windows restart`: the daemon is a rendered copy and
+  still has the old key table until then. Then bind a media key and put it
+  back; `rmpr shortcuts status`, `rmpr edges shell`.
+- `rmpr lockscreen try` again before `enable`: the package hash changed.
+- Type a Wi-Fi password while the list scans; drag a brightness slider; hover
+  the taskbar while a window's title changes (previews should keep
+  streaming); keep a notification group open while new ones arrive.
+- Fold and unfold sidebar cards; drag rows on the widgets and tray pages;
+  scroll quickly over the workspaces widget.
+
+**Left alone, on purpose:**
+- **A single `gdbus monitor` per service** instead of ten watchers: a real
+  saving, untested ground.
+- **A shared base for the two switchers:** it is held-key race code.
+- **`Surfaces.heldCommitFresh` is a bug, not fixed:** a binding on
+  `Date.now()` never goes stale, so a stray release after the switcher
+  closed stays "fresh" and the next Alt+Tab can commit on sight. The fix is a
+  function called at its four read sites -- to be proven with the key press
+  already in the queue below.
+- **Wording that needs the user:** five lock styles say "too many attempts"
+  during the 3-second pause after *one* wrong password (screenshot evidence
+  was taken); the bluetooth, volume and battery tooltips say different things
+  in the status glyph and the widget; the theme-parts descriptions differ
+  between the appearance page and the wizard.
+- **Smaller, found and reported:** two outputs given identical overrides in
+  one flush leave the second's file unwritten (FileView skips a write equal
+  to the previous path's text); `ShellNotifications.hold` does not pause the
+  deadline; RendererPage's "Done…" may overwrite a failed switch's error;
+  seven more pages run hand-written processes `CtlRun` could replace; the CI
+  workflows could share one job; `config/migrations/` is read by nothing now
+  that update.sh reads the steps from `Migrations.qml`.
 
 ### The evening of 2026-09-23: previews, and the keys moved into the configuration
 
