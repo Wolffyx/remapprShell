@@ -63,18 +63,15 @@ QtObject {
     // something.
     readonly property Process _initial: Process {
         running: true
-        command: ["busctl", "--user", "--json=short", "call",
-                  Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List"]
+        command: Dbus.callArgs(Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List")
         stdout: StdioCollector {
             onStreamFinished: {
-                let payload;
-                try {
-                    payload = JSON.parse(text).data?.[0];
-                } catch (e) {
+                const reply = Dbus.unwrap(text, "Windows.List");
+                if (reply === undefined) {
                     Log.debug("windows", "the window daemon is not answering yet");
                     return;
                 }
-                root._apply(WindowEvents.parseList(payload));
+                root._apply(WindowEvents.parseList(reply?.[0]));
                 Log.info("windows", `${root.windows.length} window(s) from the daemon`);
             }
         }
@@ -321,14 +318,8 @@ QtObject {
     // The active window, minimised, by KWin's own "Window Minimize" action --
     // what its key does. Only ever asked for when the window clicked is the
     // active one, which is the one that action works on.
-    readonly property Process _minimize: Process {
-        command: ["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                  "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Window Minimize"]
-    }
-
     function minimizeActive() {
-        root._minimize.running = false;
-        root._minimize.running = true;
+        Dbus.invokeShortcut("Window Minimize");
     }
 
     // Any window, closed. KWin has no call for it, so the CLI loads a
@@ -342,14 +333,9 @@ QtObject {
 
     // KWin's own runner. The id it expects is the uuid in braces behind a
     // "0_" prefix, which is what its Match() hands out.
-    readonly property Process _activate: Process {}
-
     function activate(uuid) {
         if (!uuid)
             return;
-        root._activate.running = false;
-        root._activate.command = ["busctl", "--user", "call", "org.kde.KWin", "/WindowsRunner",
-                                  "org.kde.krunner1", "Run", "ss", `0_{${uuid}}`, ""];
-        root._activate.running = true;
+        Dbus.send("org.kde.KWin", "/WindowsRunner", "org.kde.krunner1", "Run", "ss", [`0_{${uuid}}`, ""]);
     }
 }

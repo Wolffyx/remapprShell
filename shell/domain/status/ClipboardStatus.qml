@@ -114,8 +114,7 @@ QtObject {
 
     function clear() {
         if (root.klipper) {
-            clearKlipper.running = false;
-            clearKlipper.running = true;
+            Dbus.send("org.kde.klipper", "/klipper", "org.kde.klipper.klipper", "clearClipboardHistory");
         } else {
             root._forget(StatusIcons.clipboardOrphans(root.ownEntries, []));
             root.ownEntries = [];
@@ -200,23 +199,13 @@ QtObject {
 
     readonly property Process _history: Process {
         id: history
-        command: ["busctl", "--user", "--json=short", "call", "org.kde.klipper", "/klipper",
-                  "org.kde.klipper.klipper", "getClipboardHistoryMenu"]
+        command: Dbus.callArgs("org.kde.klipper", "/klipper", "org.kde.klipper.klipper", "getClipboardHistoryMenu")
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    root.klipperEntries = StatusIcons.klipperEntries(JSON.parse(this.text).data[0]);
-                } catch (e) {
-                    root.klipperEntries = [];
-                }
+                const reply = Dbus.unwrap(this.text, "getClipboardHistoryMenu");
+                root.klipperEntries = StatusIcons.klipperEntries(Array.isArray(reply?.[0]) ? reply[0] : []);
             }
         }
-    }
-
-    readonly property Process _clearKlipper: Process {
-        id: clearKlipper
-        command: ["busctl", "--user", "call", "org.kde.klipper", "/klipper",
-                  "org.kde.klipper.klipper", "clearClipboardHistory"]
     }
 
     // One JSON line per clipboard change, from a script run by wl-paste with

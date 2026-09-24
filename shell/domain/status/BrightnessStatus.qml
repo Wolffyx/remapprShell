@@ -104,7 +104,7 @@ QtObject {
     function toggleNightLight() {
         if (!["warm", "day", "suspended"].includes(root.nightState))
             return;
-        toggle.running = true;
+        Dbus.invokeShortcut("Toggle Night Color");
     }
 
     function refresh() {
@@ -184,12 +184,6 @@ QtObject {
                 root.displays = StatusIcons.brightnessDisplays(text.split("\n"));
             }
         }
-    }
-
-    readonly property Process _toggle: Process {
-        id: toggle
-        command: Dbus.callArgs("org.kde.kglobalaccel", "/component/kwin", "org.kde.kglobalaccel.Component",
-                               "invokeShortcut", "s", ["Toggle Night Color"])
     }
 
     // Signals come in bursts -- one per step of a drag, one per display --

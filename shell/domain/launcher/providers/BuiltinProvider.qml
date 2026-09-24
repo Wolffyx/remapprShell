@@ -444,8 +444,7 @@ Provider {
             Quickshell.execDetached([Branding.ctlBin, "settings"]);
             break;
         case "taskview":
-            Quickshell.execDetached(["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                                     "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Overview"]);
+            Dbus.invokeShortcut("Overview");
             break;
         case "sidebar":
             Surfaces.toggleSidebar(screen);

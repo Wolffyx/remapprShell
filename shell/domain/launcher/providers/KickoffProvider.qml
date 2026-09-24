@@ -33,6 +33,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.platform.kde
 import qs.domain.launcher
 
 Provider {
@@ -109,6 +110,8 @@ Provider {
         }
     }
 
+    // The windowed menu is a process of its own, and opening it again
+    // replaces the last one rather than stacking a second window.
     readonly property Process _call: Process {}
 
     // Placement is not ours to control, and a menu appearing on the far side of
@@ -124,11 +127,10 @@ Provider {
         root._call.running = false;
         if (root.mode === "windowed") {
             root._call.command = ["plasmawindowed", "org.kde.plasma.kickoff"];
+            root._call.running = true;
         } else {
-            root._call.command = ["busctl", "--user", "call", "org.kde.plasmashell",
-                                  "/PlasmaShell", "org.kde.PlasmaShell", "activateLauncherMenu"];
+            Dbus.send("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "activateLauncherMenu");
         }
-        root._call.running = true;
     }
 
     function close() {}

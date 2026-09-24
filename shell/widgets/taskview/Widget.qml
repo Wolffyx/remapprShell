@@ -6,7 +6,7 @@
 // Meta+W cannot behave differently.
 
 import QtQuick
-import Quickshell
+import qs.platform.kde
 import qs.ui.primitives
 
 BarWidget {
@@ -22,8 +22,7 @@ BarWidget {
     implicitHeight: button.implicitHeight
 
     function handleActivate(button) {
-        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                                 "org.kde.kglobalaccel.Component", "invokeShortcut", "s", root.effect]);
+        Dbus.invokeShortcut(root.effect);
     }
 
     BarButton {
