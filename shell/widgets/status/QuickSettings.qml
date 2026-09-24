@@ -523,31 +523,17 @@ Item {
                     // and a slider per display. The tiles have had that since
                     // the design was drawn and the sliders had not, which left
                     // the output device pickable only in Plasma's own applet.
-                    Row {
+                    LevelSlider {
                         visible: !!AudioStatus.sink
                         width: parent.width
-                        spacing: 10
+                        glyph: AudioStatus.glyph
+                        iconName: AudioStatus.icon
+                        to: Math.round(AudioStatus.ceilingFor(AudioStatus.volume) * 100)
+                        value: AudioStatus.volume * 100
+                        onMoved: v => AudioStatus.setVolume(v / 100)
+                        onIconActivated: AudioStatus.toggleMute()
 
                         IconButton {
-                            id: muteButton
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: AudioStatus.glyph
-                            iconName: AudioStatus.icon
-                            onActivated: AudioStatus.toggleMute()
-                        }
-
-                        NumberSlider {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - muteButton.width - soundMore.width - 2 * parent.spacing
-                            live: true
-                            from: 0
-                            to: Math.round(AudioStatus.ceilingFor(AudioStatus.volume) * 100)
-                            value: AudioStatus.volume * 100
-                            onMoved: v => AudioStatus.setVolume(v / 100)
-                        }
-
-                        IconButton {
-                            id: soundMore
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "chevron_right"
                             iconName: "go-next"
@@ -557,34 +543,16 @@ Item {
 
                     // Every display powerdevil can dim, at once; the page
                     // behind this has a slider per display.
-                    Row {
+                    LevelSlider {
                         visible: BrightnessStatus.displays.length > 0
                         width: parent.width
-                        spacing: 10
+                        glyph: StatusIcons.brightnessGlyph(BrightnessStatus.level)
+                        iconName: BrightnessStatus.icon
+                        from: 1
+                        value: BrightnessStatus.level * 100
+                        onMoved: v => BrightnessStatus.setAllPercent(v)
 
                         IconButton {
-                            id: sun
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: StatusIcons.brightnessGlyph(BrightnessStatus.level)
-                            iconName: BrightnessStatus.icon
-                        }
-
-                        NumberSlider {
-                            anchors.verticalCenter: parent.verticalCenter
-                            // A Row skips a hidden child but its width is
-                            // still its own, so the room it would have taken
-                            // has to be given back by hand.
-                            width: parent.width - sun.width - parent.spacing
-                                   - (brightnessMore.visible ? brightnessMore.width + parent.spacing : 0)
-                            live: true
-                            from: 1
-                            to: 100
-                            value: BrightnessStatus.level * 100
-                            onMoved: v => BrightnessStatus.setAllPercent(v)
-                        }
-
-                        IconButton {
-                            id: brightnessMore
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "chevron_right"
                             iconName: "go-next"
@@ -916,27 +884,14 @@ Item {
 
         // The level itself, so the page it was reached from is not the only
         // place to set it.
-        Row {
+        LevelSlider {
             width: parent.width
-            spacing: 10
-
-            IconButton {
-                id: levelIcon
-                anchors.verticalCenter: parent.verticalCenter
-                glyph: level.glyph
-                onActivated: level.setMuted(!level.muted)
-            }
-
-            NumberSlider {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - levelIcon.width - parent.spacing
-                live: true
-                enabled: !level.muted
-                from: 0
-                to: Math.round(AudioStatus.ceilingFor(level.volume) * 100)
-                value: level.volume * 100
-                onMoved: v => level.setLevel(v / 100)
-            }
+            glyph: level.glyph
+            sliderEnabled: !level.muted
+            to: Math.round(AudioStatus.ceilingFor(level.volume) * 100)
+            value: level.volume * 100
+            onMoved: v => level.setLevel(v / 100)
+            onIconActivated: level.setMuted(!level.muted)
         }
 
         PanelText {
@@ -1090,25 +1045,12 @@ Item {
                             leftPadding: 4
                         }
 
-                        Row {
+                        LevelSlider {
                             width: parent.width
-                            spacing: 10
-
-                            IconButton {
-                                id: displayIcon
-                                anchors.verticalCenter: parent.verticalCenter
-                                glyph: StatusIcons.brightnessGlyph((screen.display.brightness ?? 0) / Math.max(1, screen.display.max))
-                            }
-
-                            NumberSlider {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - displayIcon.width - parent.spacing
-                                live: true
-                                from: 1
-                                to: 100
-                                value: 100 * (screen.display.brightness ?? 0) / Math.max(1, screen.display.max)
-                                onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
-                            }
+                            glyph: StatusIcons.brightnessGlyph((screen.display.brightness ?? 0) / Math.max(1, screen.display.max))
+                            from: 1
+                            value: 100 * (screen.display.brightness ?? 0) / Math.max(1, screen.display.max)
+                            onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
                         }
                     }
                 }

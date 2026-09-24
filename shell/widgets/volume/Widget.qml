@@ -72,28 +72,16 @@ BarWidget {
             font.pixelSize: 11
         }
 
-        Row {
+        LevelSlider {
             width: parent.width
             spacing: 6
-
-            IconButton {
-                id: mute
-                anchors.verticalCenter: parent.verticalCenter
-                iconName: channel.iconName
-                onActivated: channel.toggleMute()
-            }
-
-            NumberSlider {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - mute.width - parent.spacing
-                live: true
-                from: 0
-                // A level already past the cap stays reachable on the slider,
-                // rather than the handle pinned at the end of a shorter track.
-                to: Math.max(channel.ceiling, channel.level) * 100
-                value: channel.level * 100
-                onMoved: v => channel.setLevel(v / 100)
-            }
+            iconName: channel.iconName
+            // A level already past the cap stays reachable on the slider,
+            // rather than the handle pinned at the end of a shorter track.
+            to: Math.max(channel.ceiling, channel.level) * 100
+            value: channel.level * 100
+            onMoved: v => channel.setLevel(v / 100)
+            onIconActivated: channel.toggleMute()
         }
     }
 
