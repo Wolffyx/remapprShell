@@ -39,6 +39,7 @@ import QtQuick
 import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.status.icons
 
@@ -86,23 +87,20 @@ QtObject {
 
     // Put an entry back on the clipboard. Text goes through stdin, so it is
     // never in a process's arguments where any local user could read it from
-    // /proc; an image is a file, and wl-copy reads it the same way.
+    // /proc; an image is a file, and wl-copy reads it the same way. See
+    // Clipboard.
     function pick(entry) {
         if (!entry)
             return;
         if (entry.image) {
             if (!entry.path || root.klipper)
                 return;
-            copyImage.command = ["sh", "-c", 'wl-copy --type image/png < "$1"', "--", String(entry.path)];
-            copyImage.running = false;
-            copyImage.running = true;
+            Clipboard.copyFile(entry.path, "image/png");
             return;
         }
         if (!entry.text)
             return;
-        root._pending = entry.text;
-        copy.stdinEnabled = true;
-        copy.running = true;
+        Clipboard.copyText(entry.text);
     }
 
     // Whether choosing this entry would do anything. An image in Klipper's
@@ -160,8 +158,6 @@ QtObject {
         history.running = false;
         history.running = true;
     }
-
-    property string _pending: ""
 
     Component.onCompleted: root._checkKlipper()
 
@@ -233,17 +229,6 @@ QtObject {
         }
     }
 
-    readonly property Process _copy: Process {
-        id: copy
-        command: ["wl-copy"]
-        stdinEnabled: true
-        onStarted: {
-            copy.write(root._pending);
-            root._pending = "";
-            copy.stdinEnabled = false;
-        }
-    }
-
     // Images, watched apart from text. `wl-paste --watch` hands the contents
     // to a command on stdin, and the type has to be asked for: a watcher for
     // text/plain never fires for a picture, which is why a copied image used
@@ -280,8 +265,6 @@ QtObject {
             }
         }
     }
-
-    readonly property Process _copyImage: Process { id: copyImage }
 
     readonly property Process _remove: Process { id: remove }
 }

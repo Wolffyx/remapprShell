@@ -9,7 +9,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.launcher
@@ -19,6 +18,7 @@ import qs.domain.session
 import qs.domain.surfaces
 import qs.domain.windows
 import qs.platform.kde
+import qs.platform.system
 
 Provider {
     id: root
@@ -474,23 +474,7 @@ Provider {
 
     // A sum's answer onto the clipboard: through wl-copy's stdin, as the
     // clipboard widget does, so it is never in a process's arguments.
-    property string _pending: ""
-
     function copy(text) {
-        root._pending = String(text ?? "");
-        copier.running = false;
-        copier.stdinEnabled = true;
-        copier.running = true;
-    }
-
-    readonly property Process _copier: Process {
-        id: copier
-        command: ["wl-copy"]
-        stdinEnabled: true
-        onStarted: {
-            copier.write(root._pending);
-            root._pending = "";
-            copier.stdinEnabled = false;
-        }
+        Clipboard.copyText(text);
     }
 }
