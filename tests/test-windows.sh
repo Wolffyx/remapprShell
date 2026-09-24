@@ -428,4 +428,72 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
+# Both run on the thread that answers D-Bus, so both are about time. Finding
+# which window a process owns is an xprop per window on the display, and it
+# was done again for every window in an update that had no icon yet; and the
+# icon's pixels were reordered one at a time in Python.
+echo "== the daemon's icon work, once an update and not pixel by pixel =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+class Counting(mod["WindowIcons"]):
+    def __init__(self):
+        self._cache, self._misses, self._available = {}, {}, True
+        self._windows_by_pid, self.sweeps, self.asked = None, 0, []
+    def _x11_windows_by_pid(self):
+        self.sweeps += 1
+        return {1: "0x1", 2: "0x2"}
+    def _extract(self, window, app_id):
+        self.asked.append(window)
+        return None
+
+icons = Counting()
+icons.new_update()
+for app, pid in (("a", 1), ("b", 2), ("c", 3)):
+    icons.path_for(app, pid)
+check("one sweep for a whole update", icons.sweeps, 1)
+check("and every window found in it", icons.asked, ["0x1", "0x2"])
+icons.new_update()
+icons.path_for("d", 1)
+check("the next update sweeps again", icons.sweeps, 2)
+
+try:
+    from PIL import Image
+except ImportError:
+    print("  SKIP  Pillow is not installed; the pixels were not checked")
+    sys.exit(1 if fails else 0)
+
+# Two pixels, as xprop prints the property: opaque blue, and black at 0x81.
+class Run:
+    stdout = "_NET_WM_ICON(CARDINAL) = 2, 1, 4278190335, 2164260864"
+class FakeSubprocess:
+    @staticmethod
+    def run(*_args, **_kwargs):
+        return Run()
+mod["subprocess"] = FakeSubprocess
+mod["ICON_CACHE"] = os.path.join(sandbox, "icons")
+path = mod["WindowIcons"]._extract(icons, "0x1", "some.app")
+image = Image.open(path)
+check("the icon is its size",     image.size, (2, 1))
+check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0))],
+                                  [(0, 0, 255, 255), (0, 0, 0, 0x81)])
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+5)); else fail=$((fail+1)); fi
+
 harness_done

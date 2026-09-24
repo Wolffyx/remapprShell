@@ -46,6 +46,7 @@ import signal
 import subprocess
 import sys
 import time
+from array import array
 
 import gi
 
@@ -526,11 +527,7 @@ class Pointer:
     draw.
     """
 
-    def __init__(self):
-        self._connection = None
-
     def handle_call(self, connection, _sender, _path, _interface, method, params, invocation):
-        self._connection = connection
         if method != "At":
             invocation.return_error_literal(
                 Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
@@ -551,6 +548,10 @@ class Pointer:
             GLib.Variant("(siis)", (action, int(params[1]), int(params[2]), str(params[3]))),
         )
         invocation.return_value(None)
+
+
+# An array typecode four bytes wide, which is what one pixel is.
+_U32 = "I" if array("I").itemsize == 4 else "L"
 
 
 class WindowIcons:
@@ -591,6 +592,7 @@ class WindowIcons:
     def __init__(self):
         self._cache = {}          # appId -> path or None
         self._misses = {}         # appId -> (attempts, monotonic of the last)
+        self._windows_by_pid = None   # pid -> X11 window, for one update
         self._available = self._check()
 
     @staticmethod
@@ -700,18 +702,37 @@ class WindowIcons:
             return False
         return time.monotonic() - last >= self.MISS_RETRY_SECONDS
 
+    def new_update(self):
+        """Forget which window belongs to which process.
+
+        That was true of the last update. Finding it out is an `xprop` for
+        every window on the display, and this runs on the thread that answers
+        D-Bus -- so it is done at most once an update, however many windows
+        in it have no icon yet, rather than once for each of them.
+        """
+        self._windows_by_pid = None
+
+    def _x11_window_for(self, pid):
+        if self._windows_by_pid is None:
+            # Set before the sweep, so one that fails is not tried again for
+            # every other window in the same update.
+            self._windows_by_pid = {}
+            self._windows_by_pid = self._x11_windows_by_pid()
+        return self._windows_by_pid.get(int(pid))
+
     @staticmethod
-    def _x11_window_for(pid):
+    def _x11_windows_by_pid():
+        """pid -> the first of its windows in the display's client list."""
         out = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"],
                              capture_output=True, text=True, timeout=5).stdout
-        ids = re.findall(r"0x[0-9a-fA-F]+", out)
-        for window in ids:
+        found = {}
+        for window in re.findall(r"0x[0-9a-fA-F]+", out):
             prop = subprocess.run(["xprop", "-id", window, "_NET_WM_PID"],
                                   capture_output=True, text=True, timeout=5).stdout
             match = re.search(r"=\s*(\d+)", prop)
-            if match and int(match.group(1)) == int(pid):
-                return window
-        return None
+            if match:
+                found.setdefault(int(match.group(1)), window)
+        return found
 
     def _extract(self, window, app_id):
         out = subprocess.run(["xprop", "-id", window, "-notype", "32c", "_NET_WM_ICON"],
@@ -724,18 +745,21 @@ class WindowIcons:
         width, height, pixels = image
         from PIL import Image
 
-        # _NET_WM_ICON is ARGB packed into 32-bit cardinals, which is not a
-        # byte order any image library reads directly.
-        data = bytearray()
-        for value in pixels:
-            data += bytes(((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF, (value >> 24) & 0xFF))
+        # _NET_WM_ICON is ARGB packed into 32-bit cardinals. Laid out as
+        # native unsigned ints those are the bytes B, G, R, A on a
+        # little-endian machine and A, R, G, B on a big-endian one, both raw
+        # modes Pillow reads as they are. Reordering them here one pixel at a
+        # time was a Python loop over up to 65536 of them, on the thread that
+        # answers D-Bus.
+        data = array(_U32, (value & 0xFFFFFFFF for value in pixels)).tobytes()
+        rawmode = "BGRA" if sys.byteorder == "little" else "ARGB"
 
         os.makedirs(ICON_CACHE, exist_ok=True)
         # The application id is a window class and can contain anything; it is
         # about to become a filename.
         safe = re.sub(r"[^A-Za-z0-9._-]", "_", app_id)[:96]
         path = os.path.join(ICON_CACHE, f"{safe}.png")
-        Image.frombytes("RGBA", (width, height), bytes(data)).save(path)
+        Image.frombytes("RGBA", (width, height), data, "raw", rawmode).save(path)
         return path
 
     @staticmethod
@@ -786,6 +810,7 @@ class WindowList:
 
         # A window with no application to match keeps the icon it carries
         # itself, which is the only copy of it that exists.
+        self._icons.new_update()
         for window in windows:
             if not isinstance(window, dict) or window.get("desktopFile"):
                 continue
@@ -810,8 +835,7 @@ class WindowList:
             None, OBJECT_PATH, INTERFACE, "Changed", GLib.Variant("(s)", (self._json,))
         )
 
-    def handle_call(self, connection, sender, path, interface, method, params, invocation):
-        self._connection = connection
+    def handle_call(self, _connection, _sender, _path, _interface, method, params, invocation):
         if method == "Update":
             self.update(params[0])
             invocation.return_value(None)
