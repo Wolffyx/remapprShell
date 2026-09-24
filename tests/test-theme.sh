@@ -89,8 +89,10 @@ check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group Ge
 check "but the icons are ours"      "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 check "and the decorations"         "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
 check "the package is still active" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
-check "status says which"           "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.colours')" "false"
-check "and which are on"            "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.icons')" "true"
+# One read for the checks against one state: here each read is five seconds.
+s=$("$REPO_ROOT/scripts/theme.sh" status --json)
+check "status says which"           "$(jq -r '.desktop.colours' <<<"$s")" "false"
+check "and which are on"            "$(jq -r '.desktop.icons' <<<"$s")" "true"
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
 
 echo "== the whole switch off writes nothing outside our own package =="
@@ -199,8 +201,9 @@ check "and back to dark"              "$(kreadconfig6 --file kdeglobals --group 
 check "with dark icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 
 check "a variant nobody has"          "$("$REPO_ROOT/scripts/theme.sh" variant sideways >/dev/null 2>&1 && echo ran || echo refused)" "refused"
-check "status carries it"             "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.resolved')" "light"
-check "and whether it follows"        "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.follows')" "false"
+s=$("$REPO_ROOT/scripts/theme.sh" status --json)
+check "status carries it"             "$(jq -r '.variant.resolved' <<<"$s")" "light"
+check "and whether it follows"        "$(jq -r '.variant.follows' <<<"$s")" "false"
 
 # An apply in light leaves the desktop in light, not in whatever the file
 # happens to list first.
@@ -349,11 +352,12 @@ check "still silenced after apply" "$(grep -c 'drawn as nothing' "$osd_file")" "
 echo "== widget style =="
 th() { "$REPO_ROOT/scripts/theme.sh" "$@"; }
 tjs() { th status --json 2>/dev/null | jq -r "$1"; }
-check "every part reported"          "$(tjs '[.package, .parts.switcher, .parts.desktoptheme, .parts.splash, .parts.schemes] | map(tostring) | join(",")')" "true,true,true,true,2"
-check "an installed style offered"   "$(tjs '.styles[] | select(.id == "darkly") | .installed')" "true"
-check "a missing one is not"         "$(tjs '.styles[] | select(.id == "union") | .installed')" "false"
-check "Fusion is built into Qt"      "$(tjs '.styles[] | select(.id == "fusion") | .installed')" "true"
-check "the theme's style read back"  "$(tjs .style)" "breeze"
+s=$(th status --json 2>/dev/null)
+check "every part reported"          "$(jq -r '[.package, .parts.switcher, .parts.desktoptheme, .parts.splash, .parts.schemes] | map(tostring) | join(",")' <<<"$s")" "true,true,true,true,2"
+check "an installed style offered"   "$(jq -r '.styles[] | select(.id == "darkly") | .installed' <<<"$s")" "true"
+check "a missing one is not"         "$(jq -r '.styles[] | select(.id == "union") | .installed' <<<"$s")" "false"
+check "Fusion is built into Qt"      "$(jq -r '.styles[] | select(.id == "fusion") | .installed' <<<"$s")" "true"
+check "the theme's style read back"  "$(jq -r .style <<<"$s")" "breeze"
 th style darkly >/dev/null 2>&1
 check "written as Qt's key"          "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "Darkly"
 check "refuses one not installed"    "$(th style union >/dev/null 2>&1 && echo ran || echo refused)" "refused"
