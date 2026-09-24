@@ -642,15 +642,17 @@ class WindowIcons:
     # for the life of the daemon is the whole of "some icons are missing until
     # I restart the shell": the restart was doing nothing but forgetting.
     #
-    # Tried again, but not on every KWin event. Finding the window is an
-    # `xprop` sweep of every window on the display and there is an update per
-    # window change, so an unbounded retry would be a poor way to draw a
-    # panel. Six attempts at three seconds apart covers a slow start and then
-    # stops -- which is also all a Wayland-native window costs, there being no
-    # X11 window to find for it. An icon change KWin announces starts the
-    # count again.
-    MISS_RETRY_SECONDS = 3.0
-    MISS_ATTEMPTS = 6
+    # Tried again on a clock of its own, soon and then less often: a tenth of
+    # a second, a quarter, a half, one, two, four. The retry used to wait
+    # three seconds *and* for KWin's next event, so a game whose window was
+    # listed a moment after KWin announced it showed the wrong icon for
+    # seconds -- reported 2026-09-24 as "the icon takes at least a second".
+    # A look costs a few milliseconds here (one `xprop` sweep of the
+    # display's managed windows, 5 ms for three), so six of them over eight
+    # seconds is nothing, and then it stops -- which is also all a
+    # Wayland-native window costs, there being no X11 window to find for it.
+    # An icon change KWin announces starts the count again.
+    MISS_DELAYS = (0.1, 0.25, 0.5, 1.0, 2.0, 4.0)
 
     def __init__(self):
         self._x11 = {}            # uuid -> the X11 window it is, once found
@@ -720,9 +722,22 @@ class WindowIcons:
     def _worth_another_look(self, uuid):
         """Whether a lookup that found nothing should be made again yet."""
         attempts, last = self._misses.get(uuid, (0, 0.0))
-        if attempts >= self.MISS_ATTEMPTS:
+        if attempts >= len(self.MISS_DELAYS):
             return False
-        return time.monotonic() - last >= self.MISS_RETRY_SECONDS
+        return time.monotonic() - last >= self.MISS_DELAYS[max(0, attempts - 1)]
+
+    def next_look(self):
+        """Seconds until a window still without its icon is worth a look, or None.
+
+        What WindowList sets its clock by: the soonest of every window's next
+        try, so a window that is listed a moment late is found without waiting
+        for anything else to happen on screen.
+        """
+        now = time.monotonic()
+        waits = [max(0.0, last + self.MISS_DELAYS[max(0, attempts - 1)] - now)
+                 for attempts, last in self._misses.values()
+                 if attempts < len(self.MISS_DELAYS)]
+        return min(waits) if waits else None
 
     def new_update(self):
         """Forget what windows the display has.
@@ -1175,6 +1190,8 @@ class WindowList:
         self._connection = None
         self._icons = WindowIcons()
         self._processes = Processes()
+        self._windows = []        # the last update, as it was sent on
+        self._relook_id = 0       # the clock for icons still being looked for
 
     def update(self, payload):
         # Validated rather than trusted: this crosses a process boundary, and a
@@ -1218,6 +1235,8 @@ class WindowList:
                 window["iconPath"] = path
         self._icons.forget_all_but(present)
         self._processes.forget_all_but(pids)
+        self._windows = [w for w in windows if isinstance(w, dict)]
+        self._schedule_relook()
 
         # Re-serialised from the parsed value, so whatever reaches the shell is
         # known to be valid JSON of the shape it expects.
@@ -1228,6 +1247,36 @@ class WindowList:
         self._json = normalised
         self._emit()
         return True
+
+    # A window whose icon was not there to read -- listed by the display a
+    # moment after KWin announced it, or its icon set a moment after it
+    # appeared -- is looked at again on a clock of its own (MISS_DELAYS), and
+    # the list goes out again as soon as the icon is found. Waiting for KWin's
+    # next event instead left a game on the wrong icon for as long as nothing
+    # else happened on screen.
+    def _schedule_relook(self):
+        if self._relook_id:
+            GLib.source_remove(self._relook_id)
+            self._relook_id = 0
+        wait = self._icons.next_look()
+        if wait is not None:
+            self._relook_id = GLib.timeout_add(max(1, int(wait * 1000)), self._relook)
+
+    def _relook(self):
+        self._relook_id = 0
+        self._icons.new_update()
+        for window in self._windows:
+            if window.get("iconPath"):
+                continue
+            path = self._icons.path_for(window)
+            if path:
+                window["iconPath"] = path
+        normalised = json.dumps(self._windows, separators=(",", ":"))
+        if normalised != self._json:
+            self._json = normalised
+            self._emit()
+        self._schedule_relook()
+        return False    # this timeout is spent; _schedule_relook set the next
 
     def _emit(self):
         if self._connection is None:

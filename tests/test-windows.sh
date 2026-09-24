@@ -429,7 +429,7 @@ if [ $? -eq 0 ]; then pass=$((pass+20)); else fail=$((fail+1)); fi
 # own icon over its toolkit's first one was otherwise drawn with the first.
 echo "== a window's icon is looked at again when it may have changed =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
-import sys, os
+import sys, os, json
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
@@ -441,7 +441,7 @@ exec(compile(src, "windowsd", "exec"), mod)
 
 class Probe(mod["WindowIcons"]):
     """The real path_for, with the display replaced by a script of answers."""
-    MISS_RETRY_SECONDS = 0.0        # the waiting is not what is under test
+    MISS_DELAYS = (0.0,) * 6        # the waiting is not what is under test
 
     def __init__(self, script):
         self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
@@ -492,9 +492,33 @@ check("and kept until it changes again",         (p.path_for(window(serial=1)), 
 p = Probe([])
 for _ in range(20):
     p.path_for(window("never"))
-check("a real miss gives up",           p.looks, Probe.MISS_ATTEMPTS)
+check("a real miss gives up",           p.looks, len(Probe.MISS_DELAYS))
 p.path_for(window("never", serial=1))
-check("until KWin announces a change",  p.looks, Probe.MISS_ATTEMPTS + 1)
+check("until KWin announces a change",  p.looks, len(Probe.MISS_DELAYS) + 1)
+
+# A miss is looked at again on a clock, soon: the first retry is a tenth of a
+# second away, not three seconds and KWin's next event (2026-09-24).
+class Timed(Probe):
+    MISS_DELAYS = mod["WindowIcons"].MISS_DELAYS
+p = Timed([])
+check("nothing to wait for before a miss", p.next_look(), None)
+p.path_for(window("late"))
+wait = p.next_look()
+check("a miss is tried again within a tenth of a second", wait is not None and 0 < wait <= 0.1, True)
+p = Timed([late])
+p.path_for(window("found"))
+check("and a window with its icon asks for nothing", p.next_look(), None)
+
+# The window list sends itself again when a late icon turns up, with nothing
+# else having happened on screen.
+wl = mod["WindowList"]()
+wl._icons = Probe([None, late])
+wl.update(json.dumps([{"uuid": "slow", "pid": 1, "iconSerial": 0, "title": "t"}]))
+check("the first list goes without the icon", "iconPath" in json.loads(wl._json)[0], False)
+wl._relook()
+check("the next look sends it with the icon", json.loads(wl._json)[0].get("iconPath"), late)
+if wl._relook_id:
+    mod["GLib"].source_remove(wl._relook_id)
 
 # The path is cached, not the picture, and a path can stop being true.
 gone = icon("gone.png")
