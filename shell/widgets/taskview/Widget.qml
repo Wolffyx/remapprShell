@@ -27,7 +27,7 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         glyph: "grid_view"
         fallback: "view-app-grid"

@@ -261,7 +261,7 @@ BarWidget {
     readonly property int flashMs: 6000
 
     implicitWidth: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
-    implicitHeight: root.bar.thickness
+    implicitHeight: root.barThickness
 
     function handleHover(position, horizontal) {
         root.hoveredIndex = root.indexAt(position);
@@ -500,7 +500,7 @@ BarWidget {
                 // well as tint.
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: parent.height + Math.max(1, Math.round(((root.bar?.thickness ?? 40) - root.buttonHeight) / 2 - 7))
+                    y: parent.height + Math.max(1, Math.round((root.barThickness - root.buttonHeight) / 2 - 7))
                     spacing: 3
 
                     Repeater {

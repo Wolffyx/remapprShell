@@ -31,10 +31,10 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: "content_paste"
         fallback: "klipper-symbolic"
         glyphSize: root.panelIconSize

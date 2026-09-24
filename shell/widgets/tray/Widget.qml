@@ -224,9 +224,7 @@ BarWidget {
         id: row
         anchors.centerIn: parent
         spacing: root.spacing
-        columns: (root.bar?.horizontal ?? true)
-            ? Math.max(1, root.shown.length + (root.hasOverflow ? 1 : 0))
-            : 1
+        columns: root.barVertical ? 1 : Math.max(1, root.shown.length + (root.hasOverflow ? 1 : 0))
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 

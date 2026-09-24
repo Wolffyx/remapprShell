@@ -24,7 +24,6 @@ BarWidget {
     readonly property string style: root.widgetConfig?.style ?? "numbers"
     readonly property int maxShown: Math.max(1, root.widgetConfig?.maxShown ?? 8)
     readonly property bool showNames: root.widgetConfig?.showNames ?? false
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
 
     // Scrolling through desktops is a convenience, not everyone's preference:
     // it is easy to trigger by accident while reaching past the panel.
@@ -74,7 +73,7 @@ BarWidget {
     }
     tooltipCentre: {
         const p = pills.itemAt(root.hoveredIndex);
-        return p ? (root.vertical ? p.y + p.height / 2 : p.x + p.width / 2) : -1;
+        return p ? (root.barVertical ? p.y + p.height / 2 : p.x + p.width / 2) : -1;
     }
 
     function handleHover(position, horizontal) {
@@ -83,8 +82,8 @@ BarWidget {
             const p = pills.itemAt(i);
             if (!p)
                 continue;
-            const start = root.vertical ? p.y : p.x;
-            const size = root.vertical ? p.height : p.width;
+            const start = root.barVertical ? p.y : p.x;
+            const size = root.barVertical ? p.height : p.width;
             if (position >= start - row.spacing / 2 && position < start + size + row.spacing / 2) {
                 root.hoveredIndex = i;
                 return;
@@ -111,7 +110,7 @@ BarWidget {
         id: row
         anchors.centerIn: parent
         spacing: Math.max(2, Math.round(5 * root.unit))
-        columns: root.vertical ? 1 : Math.max(1, root.shownDesktops.length)
+        columns: root.barVertical ? 1 : Math.max(1, root.shownDesktops.length)
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 
@@ -133,8 +132,8 @@ BarWidget {
                 readonly property int pad: Math.round((pill.active ? 13 : 11) * root.k)
                 readonly property real along: pill.compact ? Math.round(26 * root.k) : content.implicitWidth + 2 * pill.pad
 
-                implicitWidth: root.vertical ? root.pillSize : pill.along
-                implicitHeight: root.vertical ? (pill.compact ? Math.round(22 * root.k) : content.implicitHeight + 2 * Math.round(8 * root.k)) : root.pillSize
+                implicitWidth: root.barVertical ? root.pillSize : pill.along
+                implicitHeight: root.barVertical ? (pill.compact ? Math.round(22 * root.k) : content.implicitHeight + 2 * Math.round(8 * root.k)) : root.pillSize
                 radius: Math.round(11 * root.k)
 
                 color: pill.active ? Theme.acc
@@ -150,14 +149,14 @@ BarWidget {
                     id: content
                     anchors.centerIn: parent
                     visible: !pill.compact
-                    columns: root.vertical ? 1 : 3
+                    columns: root.barVertical ? 1 : 3
                     spacing: Math.round(6 * root.k)
                     verticalItemAlignment: Grid.AlignVCenter
                     horizontalItemAlignment: Grid.AlignHCenter
 
                     PanelText {
                         visible: root.style === "numbers" || (root.style === "icons" && pill.windows.length === 0)
-                        text: root.showNames && !root.vertical && (pill.modelData.name ?? "").length > 0
+                        text: root.showNames && !root.barVertical && (pill.modelData.name ?? "").length > 0
                             ? pill.modelData.name : String(root.numberOf(pill.modelData))
                         font.pixelSize: 13
                         font.weight: pill.active ? Font.Medium : Font.Normal
@@ -165,7 +164,7 @@ BarWidget {
                     }
 
                     Repeater {
-                        model: root.style === "icons" ? pill.windows.slice(0, root.vertical ? 1 : 2) : []
+                        model: root.style === "icons" ? pill.windows.slice(0, root.barVertical ? 1 : 2) : []
 
                         PanelIcon {
                             required property var modelData

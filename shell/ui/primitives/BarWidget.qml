@@ -21,10 +21,22 @@ Item {
     // `iconSize`, for a tray or status icon, and `spacing`, between widgets.
     required property var bar
 
+    // The panel's thickness -- 40 until there is a panel to ask -- and whether
+    // it runs down the side of the screen rather than along an edge. Nearly
+    // every widget needs one or the other, so they are read here once rather
+    // than in twenty places.
+    readonly property real barThickness: root.bar?.thickness ?? 40
+    readonly property bool barVertical: !(root.bar?.horizontal ?? true)
+
     // The design's proportions are for a 64 px panel; a widget scales from
     // this rather than hardcoding sizes that only fit one thickness.
-    readonly property real unit: (root.bar?.thickness ?? 40) / 64
+    readonly property real unit: root.barThickness / 64
     readonly property int panelIconSize: root.bar?.iconSize ?? 19
+
+    // The side of a square panel button: the design's 40 at 64 px, never
+    // under 22. What most widgets hand their BarButton; the search field, the
+    // task view and the sidebar keep BarButton's own, larger default.
+    readonly property int tileSize: Math.max(22, Math.round(40 * root.unit))
 
     // This widget's own configuration: its manifest defaults merged with the
     // user's overrides. Never the whole shell config.

@@ -33,11 +33,11 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
-        vertical: !(root.bar?.horizontal ?? true)
+        thickness: root.barThickness
+        vertical: root.barVertical
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: PowerStatus.glyph
         fallback: PowerStatus.icon
         glyphSize: root.panelIconSize

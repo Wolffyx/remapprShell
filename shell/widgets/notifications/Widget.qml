@@ -55,10 +55,10 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: root.quiet ? "notifications_off" : "notifications"
         fallback: root.quiet ? "notifications-disabled" : "notifications"
     }

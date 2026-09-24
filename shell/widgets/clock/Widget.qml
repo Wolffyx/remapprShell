@@ -24,11 +24,10 @@ BarWidget {
     readonly property string timeFormat: root.customFormat.length > 0 ? root.customFormat
         : (root.hour12 ? "h:mm" : "HH:mm") + (root.showSeconds ? ":ss" : "") + (root.hour12 ? " ap" : "")
 
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
-    readonly property real across: (root.bar?.thickness ?? 40) - 8
-    readonly property bool dateShown: root.showDate && !root.vertical
+    readonly property real across: root.barThickness - 8
+    readonly property bool dateShown: root.showDate && !root.barVertical
     // Two lines need a panel thick enough to hold them.
-    readonly property bool stacked: (root.bar?.thickness ?? 40) >= 44
+    readonly property bool stacked: root.barThickness >= 44
 
     // The whole date, in the user's own locale, whatever the panel shows.
     tooltip: root.clock.date.toLocaleDateString(Qt.locale(), Locale.LongFormat)
@@ -58,8 +57,8 @@ BarWidget {
             root.popoutVisible = !root.popoutVisible;
     }
 
-    implicitWidth: root.vertical ? root.across : layout.implicitWidth + 2 * Math.round(14 * root.k)
-    implicitHeight: root.vertical ? layout.implicitHeight + 12 : Math.max(24, Math.round(44 * root.unit))
+    implicitWidth: root.barVertical ? root.across : layout.implicitWidth + 2 * Math.round(14 * root.k)
+    implicitHeight: root.barVertical ? layout.implicitHeight + 12 : Math.max(24, Math.round(44 * root.unit))
 
     Rectangle {
         anchors.fill: parent
@@ -82,11 +81,11 @@ BarWidget {
         PanelText {
             text: Qt.formatDateTime(root.clock.date, root.timeFormat)
             // Shrinks to fit a narrow side panel rather than overflowing it.
-            width: root.vertical ? Math.min(implicitWidth, root.across) : implicitWidth
-            fontSizeMode: root.vertical ? Text.HorizontalFit : Text.FixedSize
+            width: root.barVertical ? Math.min(implicitWidth, root.across) : implicitWidth
+            fontSizeMode: root.barVertical ? Text.HorizontalFit : Text.FixedSize
             minimumPixelSize: 8
             horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: root.vertical ? 13 : Math.round(14 * Math.min(1, Math.max(0.9, root.unit)))
+            font.pixelSize: root.barVertical ? 13 : Math.round(14 * Math.min(1, Math.max(0.9, root.unit)))
             font.weight: Font.Medium
             lineHeight: 1.1
         }

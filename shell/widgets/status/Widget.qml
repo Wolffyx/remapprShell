@@ -25,9 +25,7 @@ BarWidget {
     readonly property var tiles: root.widgetConfig?.tiles
         ?? ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"]
     readonly property int step: root.widgetConfig?.step ?? 5
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
     readonly property real k: Math.max(0.7, root.unit)
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
 
     // Which page of quick settings is showing. Kept here rather than in the
     // popout, so that closing it and opening it again starts at the top.
@@ -97,21 +95,21 @@ BarWidget {
         const g = glyphs.itemAt(root.hoveredIndex);
         if (!g)
             return -1;
-        return root.vertical ? layout.y + g.y + g.height / 2 : layout.x + g.x + g.width / 2;
+        return root.barVertical ? layout.y + g.y + g.height / 2 : layout.x + g.x + g.width / 2;
     }
 
     wantsHover: true
     wantsWheel: true
 
     function handleHover(position, horizontal) {
-        const p = position - (root.vertical ? layout.y : layout.x);
+        const p = position - (root.barVertical ? layout.y : layout.x);
         root.hoveredIndex = -1;
         for (let i = 0; i < glyphs.count; i++) {
             const g = glyphs.itemAt(i);
             if (!g)
                 continue;
-            const start = root.vertical ? g.y : g.x;
-            const length = root.vertical ? g.height : g.width;
+            const start = root.barVertical ? g.y : g.x;
+            const length = root.barVertical ? g.height : g.width;
             if (p >= start - layout.spacing / 2 && p < start + length + layout.spacing / 2) {
                 root.hoveredIndex = i;
                 return;
@@ -153,8 +151,8 @@ BarWidget {
         QuickSettings { widget: root }
     }
 
-    implicitWidth: root.vertical ? root.size : layout.implicitWidth + 2 * Math.round(13 * root.k)
-    implicitHeight: root.vertical ? layout.implicitHeight + 2 * Math.round(11 * root.k) : root.size
+    implicitWidth: root.barVertical ? root.tileSize : layout.implicitWidth + 2 * Math.round(13 * root.k)
+    implicitHeight: root.barVertical ? layout.implicitHeight + 2 * Math.round(11 * root.k) : root.tileSize
 
     Rectangle {
         anchors.fill: parent
@@ -167,7 +165,7 @@ BarWidget {
     Grid {
         id: layout
         anchors.centerIn: parent
-        columns: root.vertical ? 1 : Math.max(1, root.parts.length)
+        columns: root.barVertical ? 1 : Math.max(1, root.parts.length)
         spacing: Math.round(11 * root.k)
 
         Repeater {

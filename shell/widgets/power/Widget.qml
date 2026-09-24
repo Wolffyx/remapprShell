@@ -31,9 +31,9 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: "power_settings_new"
         fallback: "system-shutdown"
     }

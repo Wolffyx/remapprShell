@@ -18,11 +18,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
-
     readonly property var users: PrivacyStatus.users
     readonly property bool recordingSound: root.users.microphone.length > 0
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
 
     present: PrivacyStatus.present
 
@@ -31,8 +28,8 @@ BarWidget {
                                                           : "Middle-click to mute the microphone") : ""]
         .filter(s => s).join("\n")
 
-    implicitWidth: Math.max(root.size, icons.implicitWidth + 16)
-    implicitHeight: root.vertical ? Math.max(root.size, icons.implicitHeight + 16) : root.size
+    implicitWidth: Math.max(root.tileSize, icons.implicitWidth + 16)
+    implicitHeight: root.barVertical ? Math.max(root.tileSize, icons.implicitHeight + 16) : root.tileSize
 
     // Muting is for the default microphone, as it is in Plasma's indicator:
     // it is the one the icon's state is read from. A middle click keeps doing
@@ -142,16 +139,16 @@ BarWidget {
 
     BarButton {
         anchors.fill: parent
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: root.size
+        size: root.tileSize
     }
 
     Grid {
         id: icons
         anchors.centerIn: parent
-        columns: root.vertical ? 1 : 2
+        columns: root.barVertical ? 1 : 2
         spacing: 4
 
         Glyph {

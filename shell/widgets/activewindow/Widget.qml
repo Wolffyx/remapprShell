@@ -18,8 +18,6 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
-
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 320
     readonly property bool showIcon: root.widgetConfig?.showIcon ?? true
     readonly property bool showAppName: root.widgetConfig?.showAppName ?? false
@@ -38,7 +36,7 @@ BarWidget {
     tooltip: root.appName && root.appName !== root.title ? `${root.title}\n${root.appName}` : root.title
 
     implicitWidth: row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit))
-    implicitHeight: root.size
+    implicitHeight: root.tileSize
 
     function handleHover(position, horizontal) {
         root.pointed = true;
@@ -54,9 +52,9 @@ BarWidget {
 
     BarButton {
         anchors.fill: parent
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.pointed
-        size: root.size
+        size: root.tileSize
     }
 
     Row {
