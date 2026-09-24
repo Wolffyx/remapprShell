@@ -31,36 +31,13 @@ CardGrid {
         ConfigStore.set("bar.entries", next);
     }
 
-    // Reordering by dragging.
-    //
-    // The list is not rewritten while the pointer moves: dragging is a
-    // question until it is released, and writing on every frame would put a
-    // configuration write and a panel rebuild behind each pixel. The rows move
-    // under the pointer, and one write happens on release.
-    property int dragIndex: -1        // the row being dragged
-    property int dropIndex: -1        // where it would land
-    property real rowHeight: 56
-
-    function commitDrag() {
-        const from = root.dragIndex;
-        const to = root.dropIndex;
-        root.dragIndex = -1;
-        root.dropIndex = -1;
-        if (from < 0 || to < 0 || from === to)
-            return;
-        root.moveEntry(from, to - from);
-    }
-
-    // Where a row sits while a drag is in progress: the dragged one follows the
-    // pointer, and the rows it has passed shift by one to open a gap.
-    function dragShift(index) {
-        if (root.dragIndex < 0 || index === root.dragIndex)
-            return 0;
-        if (root.dragIndex < root.dropIndex && index > root.dragIndex && index <= root.dropIndex)
-            return -root.rowHeight;
-        if (root.dragIndex > root.dropIndex && index >= root.dropIndex && index < root.dragIndex)
-            return root.rowHeight;
-        return 0;
+    // Reordering by dragging, written once on release. The rows are measured
+    // rather than assumed -- one opened to its settings is taller -- so each
+    // sets `rowHeight` as it is laid out.
+    readonly property ReorderState reorder: ReorderState {
+        rowHeight: 56
+        maxIndex: root.entries.length - 1
+        onDropped: (from, to) => root.moveEntry(from, to - from)
     }
 
     function moveEntry(index, delta) {
@@ -116,19 +93,19 @@ CardGrid {
                 radius: Theme.radiusOf(12)
                 color: Theme.s1
 
-                readonly property bool dragging: root.dragIndex === entryRow.index
+                readonly property bool dragging: root.reorder.dragIndex === entryRow.index
 
                 // Above the others while it moves, so it is not drawn behind the
                 // rows it is passing.
                 z: entryRow.dragging ? 2 : 1
                 opacity: entryRow.dragging ? 0.85 : 1
 
-                onHeightChanged: if (entryRow.height > 0) root.rowHeight = entryRow.height + 4
+                onHeightChanged: if (entryRow.height > 0) root.reorder.rowHeight = entryRow.height + 4
 
                 HoverHandler { id: rowHover }
 
                 transform: Translate {
-                    y: entryRow.dragging ? dragHandler.activeTranslation.y : root.dragShift(entryRow.index)
+                    y: entryRow.dragging ? grip.translation : root.reorder.shift(entryRow.index)
 
                     // Only the rows making way animate; the dragged one must track
                     // the pointer exactly or it feels like it is lagging behind.
@@ -211,45 +188,12 @@ CardGrid {
                         // for anyone who cannot drag -- shown when the row is
                         // under the pointer, so they are available without being
                         // permanent furniture.
-                        Item {
+                        DragGrip {
                             id: grip
 
                             anchors.verticalCenter: parent.verticalCenter
-                            implicitWidth: 22
-                            implicitHeight: 22
-
-                            Glyph {
-                                anchors.centerIn: parent
-                                name: "drag_indicator"
-                                fallback: "transform-move"
-                                size: 18
-                                color: Theme.mut
-                                opacity: entryRow.dragging ? 1 : 0.7
-                            }
-
-                            DragHandler {
-                                id: dragHandler
-                                target: null            // the row moves itself
-                                xAxis.enabled: false
-                                cursorShape: Qt.ClosedHandCursor
-
-                                onActiveChanged: {
-                                    if (active) {
-                                        root.dragIndex = entryRow.index;
-                                        root.dropIndex = entryRow.index;
-                                    } else {
-                                        root.commitDrag();
-                                    }
-                                }
-
-                                onTranslationChanged: {
-                                    if (!dragHandler.active)
-                                        return;
-                                    const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
-                                    const target = entryRow.index + steps;
-                                    root.dropIndex = Math.max(0, Math.min(root.entries.length - 1, target));
-                                }
-                            }
+                            reorder: root.reorder
+                            index: entryRow.index
                         }
 
                         IconButton {
