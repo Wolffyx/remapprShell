@@ -71,23 +71,64 @@ ACTIONS=(
     "lockscreen|border|Lock the screen"
 )
 
-action_field() {   # <id> <2 = store, 3 = label>
-    local a
+# The table above, split once. Everything below used to cut a field out of it
+# with a process per lookup -- `status --json` came to about three hundred.
+declare -A ACTION_STORE=() ACTION_LABEL=() STORE_ACTION=()
+ACTION_IDS=()
+EFFECT_STORES=()
+_actions_load() {
+    local a id store label
     for a in "${ACTIONS[@]}"; do
-        [ "${a%%|*}" = "$1" ] && { cut -d'|' -f"$2" <<< "$a"; return 0; }
+        IFS='|' read -r id store label <<< "$a"
+        ACTION_IDS+=("$id")
+        ACTION_STORE[$id]=$store
+        ACTION_LABEL[$id]=$label
+        [ -n "$store" ] && [ -z "${STORE_ACTION[$store]+x}" ] && STORE_ACTION[$store]=$id
     done
-    return 1
+    # The effect keys, each once, in the order they are always written in.
+    mapfile -t EFFECT_STORES < <(printf '%s\n' "${ACTION_STORE[@]}" | grep ':' | sort -u)
 }
-action_ids() { local a; for a in "${ACTIONS[@]}"; do printf '%s\n' "${a%%|*}"; done; }
-effect_stores() { local a; for a in "${ACTIONS[@]}"; do cut -d'|' -f2 <<< "$a"; done | grep ':' | sort -u; }
+_actions_load
 
-# The edges an effect is bound to, one index per line, 9 and junk dropped.
-effect_list() {
-    local store=$1
-    kreadconfig6 --file kwinrc --group "${store%%:*}" --key "${store#*:}" --default 9 \
-      | tr ',' '\n' | grep -xE '[0-7]' | sort -n | uniq
+action_field() {   # <id> <2 = store, 3 = label>
+    [ -n "$1" ] && [ -n "${ACTION_LABEL[$1]+x}" ] || return 1
+    case "$2" in
+        2) printf '%s\n' "${ACTION_STORE[$1]}" ;;
+        3) printf '%s\n' "${ACTION_LABEL[$1]}" ;;
+    esac
 }
-joined() { local j; j=$(grep . | paste -sd,); printf '%s' "${j:-9}"; }
+action_ids() { printf '%s\n' "${ACTION_IDS[@]}"; }
+action_for_store() { printf '%s' "${STORE_ACTION[$1]:-}"; }
+
+# The edges each effect is bound to, as "i,j" in order -- 9 and junk dropped,
+# nothing at all for no edge -- read from kwinrc once and kept up to date by
+# every write below.
+declare -A EFFECT_EDGES=()
+EFFECT_EDGES_READ=0
+effect_edges_read() {
+    local s
+    for s in "${EFFECT_STORES[@]}"; do
+        EFFECT_EDGES[$s]=$(_edge_list_with \
+            "$(kreadconfig6 --file kwinrc --group "${s%%:*}" --key "${s#*:}" --default 9)")
+    done
+    EFFECT_EDGES_READ=1
+}
+
+# A list of edges with one added or taken out: sorted, each once, only 0-7.
+_edge_list_with() {   # <"i,j,..."> [add|remove <index>]
+    local -a parts=() seen=()
+    local p out=""
+    IFS=, read -ra parts <<< "$1"
+    for p in "${parts[@]}"; do
+        [[ $p =~ ^[0-7]$ ]] && seen[p]=1
+    done
+    case "${2:-}" in
+        add)    seen[$3]=1 ;;
+        remove) unset 'seen[$3]' ;;
+    esac
+    for p in "${!seen[@]}"; do out+=${out:+,}$p; done
+    printf '%s' "$out"
+}
 
 # What one edge does. The corner's own action wins over an effect on the same
 # edge, as it does in KWin, where the border action is reserved first.
@@ -100,15 +141,14 @@ edge_action() {
         printf '%s' "$cur"
         return
     fi
-    while IFS= read -r store; do
-        if effect_list "$store" | grep -qxF "$idx"; then
-            action_for_store "$store"
-            return
-        fi
-    done < <(effect_stores)
+    [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
+    for store in "${EFFECT_STORES[@]}"; do
+        case ",${EFFECT_EDGES[$store]}," in
+            *",$idx,"*) action_for_store "$store"; return ;;
+        esac
+    done
     printf 'none'
 }
-action_for_store() { local a; for a in "${ACTIONS[@]}"; do [ "$(cut -d'|' -f2 <<< "$a")" = "$1" ] && { printf '%s' "${a%%|*}"; return; }; done; }
 
 # The master switch is off exactly while its own ledger scope holds records:
 # turning it back on is reverting that scope, so there is no second copy of
@@ -145,19 +185,23 @@ set_edge() {
     cur=$(kreadconfig6 --file kwinrc --group ElectricBorders --key "$edge" --default None)
     [ "${cur,,}" = "${want,,}" ] || kconfig_set edges kwinrc ElectricBorders "$edge" "$want"
 
-    while IFS= read -r s; do
-        old=$(effect_list "$s" | joined)
+    [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
+    for s in "${EFFECT_STORES[@]}"; do
+        old=${EFFECT_EDGES[$s]}
         if [ "$s" = "$store" ]; then
-            new=$({ effect_list "$s"; printf '%s\n' "$idx"; } | sort -n | uniq | joined)
+            new=$(_edge_list_with "$old" add "$idx")
         else
-            new=$(effect_list "$s" | grep -vxF "$idx" | joined)
+            new=$(_edge_list_with "$old" remove "$idx")
         fi
-        [ "$new" = "$old" ] || kconfig_set edges kwinrc "${s%%:*}" "${s#*:}" "$new"
-    done < <(effect_stores)
+        [ "$new" = "$old" ] && continue
+        kconfig_set edges kwinrc "${s%%:*}" "${s#*:}" "${new:-9}"
+        EFFECT_EDGES[$s]=$new
+    done
 }
 
 status_json() {
     local e rows=""
+    effect_edges_read
     for e in "${EDGE_NAMES[@]}"; do
         rows+="$e"$'\t'"$(edge_action "$e")"$'\n'
     done
@@ -166,8 +210,8 @@ status_json() {
     [ -s "$led" ] && jq -e '[.entries[] | select(.scope == "edges" or .scope == "edges-off")] | length > 0' "$led" >/dev/null 2>&1 \
         && customised=true
 
-    local actions
-    actions=$(for a in "${ACTIONS[@]}"; do printf '%s\t%s\n' "${a%%|*}" "$(cut -d'|' -f3 <<< "$a")"; done \
+    local actions id
+    actions=$(for id in "${ACTION_IDS[@]}"; do printf '%s\t%s\n' "$id" "${ACTION_LABEL[$id]}"; done \
         | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {id: .[0], label: .[1]})')
 
     printf '%s' "$rows" | jq -R -s -c \
@@ -277,6 +321,7 @@ case "$cmd" in
         fi
         printf 'mouse triggers: %s\n\n' "$(triggers_off && echo "off  ($ALIAS edges enable-all puts them back)" || echo on)"
         echo "corners and edges:"
+        effect_edges_read
         for e in "${EDGE_NAMES[@]}"; do
             a=$(edge_action "$e")
             printf '  %-12s %s\n' "$e" "$(action_field "$a" 3 || printf '%s (not one of ours)' "$a")"
@@ -294,8 +339,8 @@ case "$cmd" in
         ;;
 
     actions)
-        for a in "${ACTIONS[@]}"; do
-            printf '%-20s %s\n' "${a%%|*}" "$(cut -d'|' -f3 <<< "$a")"
+        for a in "${ACTION_IDS[@]}"; do
+            printf '%-20s %s\n' "$a" "${ACTION_LABEL[$a]}"
         done
         ;;
 
@@ -315,10 +360,11 @@ case "$cmd" in
         [ "$fx" = desktopgrid ] \
             && die "KWin 6 has no desktop grid effect; the grid is part of the overview now: $ALIAS edges set <Edge> grid"
         store=$(action_field "$fx" 2)
-        [[ "$store" == *:* ]] || die "unknown effect '$fx' (one of: $(effect_stores | while read -r s; do action_for_store "$s"; printf ' '; done))"
+        [[ "$store" == *:* ]] || die "unknown effect '$fx' (one of: $(for s in "${EFFECT_STORES[@]}"; do action_for_store "$s"; printf ' '; done))"
         require_triggers_on
         if [ "$edge" = none ]; then
-            [ "$(effect_list "$store" | joined)" = 9 ] || kconfig_set edges kwinrc "${store%%:*}" "${store#*:}" 9
+            effect_edges_read
+            [ -z "${EFFECT_EDGES[$store]}" ] || kconfig_set edges kwinrc "${store%%:*}" "${store#*:}" 9
         else
             set_edge "$edge" "$fx"
         fi
@@ -352,9 +398,9 @@ case "$cmd" in
         for e in "${EDGE_NAMES[@]}"; do
             kconfig_set edges-off kwinrc ElectricBorders "$e" None
         done
-        while IFS= read -r s; do
+        for s in "${EFFECT_STORES[@]}"; do
             kconfig_set edges-off kwinrc "${s%%:*}" "${s#*:}" 9
-        done < <(effect_stores)
+        done
         kconfig_set edges-off kwinrc Windows ElectricBorderTiling false
         kconfig_set edges-off kwinrc Windows ElectricBorderMaximize false
         kwin_reconfigure
