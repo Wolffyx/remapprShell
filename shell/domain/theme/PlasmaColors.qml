@@ -8,9 +8,9 @@ pragma Singleton
 // immediately, and there is no second palette to keep in sync.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 
 QtObject {
     id: root
@@ -67,7 +67,7 @@ QtObject {
     }
 
     readonly property FileView _view: FileView {
-        path: `${Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")}/kdeglobals`
+        path: `${Env.xdgConfigHome()}/kdeglobals`
         watchChanges: true
         printErrors: false
 

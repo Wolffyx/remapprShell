@@ -22,9 +22,9 @@ pragma Singleton
 // that knows which of eight terminals is the right one.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.launcher.apps
 import qs.domain.theme
 
@@ -75,11 +75,8 @@ QtObject {
         return root.terminal.length > 0 && root.terminal === wanted.split(".").pop();
     }
 
-    readonly property string _configHome:
-        Quickshell.env("XDG_CONFIG_HOME") || `${Quickshell.env("HOME")}/.config`
-
     readonly property FileView _mimeapps: FileView {
-        path: `${root._configHome}/mimeapps.list`
+        path: `${Env.xdgConfigHome()}/mimeapps.list`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()

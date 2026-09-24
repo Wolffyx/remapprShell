@@ -15,9 +15,9 @@ pragma Singleton
 // `revert` would be wrong.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 
 QtObject {
     id: root
@@ -69,7 +69,7 @@ QtObject {
 
     readonly property FileView _view: FileView {
         id: view
-        path: `${Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")}/plasmanotifyrc`
+        path: `${Env.xdgConfigHome()}/plasmanotifyrc`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()

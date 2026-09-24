@@ -61,9 +61,9 @@ QtObject {
         // correct both when running from the repo and when installed. A plain
         // Qt.resolvedUrl would return Quickshell's internal qs:@/ scheme, which
         // is not a filesystem path.
-        return root.isBuiltin(id)
-            ? `file://${Quickshell.shellPath(`widgets/${id}/${entry}`)}`
-            : `file://${Paths.userWidgetsDir}/${id}/${entry}`;
+        return Paths.fileUrl(root.isBuiltin(id)
+            ? Quickshell.shellPath(`widgets/${id}/${entry}`)
+            : `${Paths.userWidgetsDir}/${id}/${entry}`);
     }
 
     function supportsRenderer(id, renderer) {

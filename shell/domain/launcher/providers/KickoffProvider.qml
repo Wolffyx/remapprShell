@@ -34,6 +34,7 @@ import QtQuick
 import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.launcher
 
 Provider {
@@ -64,7 +65,7 @@ Provider {
     property string _shellPackage: "org.kde.plasma.desktop"
 
     readonly property FileView _shellrc: FileView {
-        path: `${Branding.xdgConfigDir}/plasmashellrc`
+        path: `${Env.xdgConfigHome()}/plasmashellrc`
         watchChanges: true
         printErrors: false
 
@@ -82,7 +83,7 @@ Provider {
 
     // That package's applet layout, which is where a launcher applet would be.
     readonly property FileView _hostView: FileView {
-        path: `${Branding.xdgConfigDir}/plasma-${root._shellPackage}-appletsrc`
+        path: `${Env.xdgConfigHome()}/plasma-${root._shellPackage}-appletsrc`
         watchChanges: true
         printErrors: false
 

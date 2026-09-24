@@ -171,7 +171,7 @@ QtObject {
     // the window carries. The daemon writes that out; this is the file.
     function iconFileFor(window) {
         const path = String(window?.iconPath ?? "");
-        return path.length > 0 ? `file://${path}` : "";
+        return path.length > 0 ? Paths.fileUrl(path) : "";
     }
 
     // "Dolphin", not "org.kde.dolphin".
