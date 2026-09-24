@@ -318,71 +318,51 @@ Item {
         // the menu could be opened and not closed. EdgeWindow caps the room
         // on the panel side at the gap for exactly this.
         //
-        // A popout with a tail takes it on its neck as well, so the pointer
-        // crossing from the button to the card never leaves the popout: the
-        // neck is the way there.
-        mask: (root.widget?.popoutGrabsFocus ?? false) ? null : popout.tail ? popout.cardAndNeck : popout.cardOnly
+        // A popout with a bridge takes the pointer on it as well, so the
+        // pointer crossing from the button to the card never leaves the
+        // popout: the bridge is the way there.
+        mask: (root.widget?.popoutGrabsFocus ?? false) ? null : popout.tail ? popout.cardAndBridge : popout.cardOnly
         readonly property Region cardOnly: Region { item: card }
-        readonly property Region cardAndNeck: Region {
+        readonly property Region cardAndBridge: Region {
             item: card
-            regions: [popout._neckInput]
+            regions: [popout._bridgeInput]
         }
-        readonly property Region _neckInput: NeckRegion { box: popout.neckBox; hollows: popout.neckHollows }
+        readonly property Region _bridgeInput: Region {
+            x: Math.round(popout.bridgeBox.x)
+            y: Math.round(popout.bridgeBox.y)
+            width: Math.round(popout.bridgeBox.width)
+            height: Math.round(popout.bridgeBox.height)
+        }
 
-        // Frosted behind, where the compositor offers it -- the neck too, with
-        // the corners beside it as round as the neck has left them.
-        BackgroundEffect.blurRegion: Theme.translucent ? (popout.tail ? popout._tailBlur : popout._blur) : null
+        // Frosted behind, where the compositor offers it: the card, and only
+        // the card. The bridge is not drawn, so nothing of it may show -- a
+        // blurred strip under it would be a neck by another name.
+        BackgroundEffect.blurRegion: Theme.translucent ? popout._blur : null
         readonly property Region _blur: Region { item: card; radius: card.radius }
-        readonly property Region _tailBlur: Region {
-            id: tailBlur
-            readonly property var corners: Tail.corners(popout.neck, popout.edge)
-            item: card
-            radius: card.radius
-            topLeftRadius: Math.round(tailBlur.corners.topLeft)
-            topRightRadius: Math.round(tailBlur.corners.topRight)
-            bottomLeftRadius: Math.round(tailBlur.corners.bottomLeft)
-            bottomRightRadius: Math.round(tailBlur.corners.bottomRight)
-            regions: [popout._neckBlur]
-        }
-        readonly property Region _neckBlur: NeckRegion { box: popout.neckBox; hollows: popout.neckHollows }
 
-        // ---- the tail -------------------------------------------------------
+        // ---- the bridge -----------------------------------------------------
         //
-        // A popout that asked for one hangs from its widget by a neck across
-        // the gap, landing on the point the widget named (Tail). The window
-        // already reaches the panel's edge for it (EdgeWindow.tail).
-        //
-        // Where it lands is followed rather than jumped to once the popout is
-        // up, so the neck slides from one taskbar button to the next with the
-        // pointer. It is followed on the screen, not on the card: a card
-        // centred on each button in turn moves under it, and the neck swings
-        // across from the button it was on; a card held at the end of the
-        // screen stays, and the neck runs along it. While the popout is still
-        // arriving it goes straight there, so it never opens pointing at the
-        // button the last one was about.
-        readonly property real tailTarget: popout.slotStart + popout.centre
-        property real tailPoint: popout.tailTarget
-        Behavior on tailPoint {
-            enabled: popout.tail && popout.visible && !enter.running
-            NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic }
-        }
-
+        // A popout that asked for one (`popoutTail`) takes the pointer across
+        // the gap between its card and the panel, on a strip exactly as wide
+        // as the widget's button (`popoutTailWidth`), from the card's edge to
+        // the panel's, on the point the widget named. Nothing of it is drawn
+        // -- a visible neck was tried and not wanted (2026-09-24) -- it only
+        // keeps the pointer going up from a button to its card on the popout,
+        // so the card does not start closing on the way. The window already
+        // reaches the panel's edge for it (EdgeWindow.tail).
         readonly property real tailWidth: (root.widget?.popoutTailWidth ?? -1) > 0
             ? root.widget.popoutTailWidth : (root.widget?.tileSize ?? 40)
+        readonly property var bridge: Tail.bridge(popout.horizontal ? card.width : card.height,
+                                                  popout.slotStart + popout.centre - popout.placedAlong - popout.padLead,
+                                                  popout.tailWidth, popout.reach)
+        readonly property var bridgeBox: Tail.box(popout.bridge, card.width, card.height, popout.edge, card.x, card.y)
 
-        // The neck on this card, measured along it from its leading edge.
-        readonly property var neck: Tail.neck(popout.horizontal ? card.width : card.height, card.radius,
-                                              popout.tailPoint - popout.placedAlong - popout.padLead,
-                                              popout.tailWidth, popout.reach)
-        readonly property var neckBox: Tail.box(popout.neck, card.width, card.height, popout.edge, card.x, card.y)
-        readonly property var neckHollows: Tail.hollows(popout.neck, card.width, card.height, popout.edge, card.x, card.y)
-
-        // The pointer on the card or its neck. Told to the widget (see the
+        // The pointer on the card or its bridge. Told to the widget (see the
         // Binding at the top): the task list keeps its preview open on it,
         // where it used to watch its own contents -- which stop short of the
-        // card's padding, and of the neck, so crossing either started the
+        // card's padding, and of the bridge, so crossing either started the
         // countdown to closing.
-        readonly property bool hovered: popout.visible && (cardHover.hovered || neckHover.hovered)
+        readonly property bool hovered: popout.visible && (cardHover.hovered || bridgeHover.hovered)
 
         // One popout open at a time, closed by a click anywhere else: see
         // PanelModel. A preview that follows the pointer closes by itself and
@@ -452,10 +432,8 @@ Item {
             height: parent.height - popout.padV
             radius: Math.min((root.widget?.popoutRadius ?? -1) >= 0 ? root.widget.popoutRadius : Theme.radius,
                              width / 2, height / 2)
-            // With a tail, the outline below draws the background and the
-            // border, card and neck in one.
-            color: popout.tail ? "transparent" : Theme.glass
-            border.width: popout.tail ? 0 : 1
+            color: Theme.glass
+            border.width: 1
             border.color: Theme.out
             opacity: popout.shown
 
@@ -472,26 +450,15 @@ Item {
 
             HoverHandler { id: cardHover }
 
-            Loader {
-                anchors.fill: parent
-                active: popout.tail
-                sourceComponent: PopoutOutline {
-                    neck: popout.neck
-                    edge: popout.edge
-                    fill: Theme.glass
-                    border: Theme.out
-                }
-            }
-
-            // The neck takes the pointer as the card does.
+            // The bridge takes the pointer as the card does, and draws nothing.
             Item {
-                readonly property var box: Tail.box(popout.neck, card.width, card.height, popout.edge, 0, 0)
+                readonly property var box: Tail.box(popout.bridge, card.width, card.height, popout.edge, 0, 0)
                 visible: popout.tail
                 x: box.x
                 y: box.y
                 width: box.width
                 height: box.height
-                HoverHandler { id: neckHover }
+                HoverHandler { id: bridgeHover }
             }
 
             Loader {

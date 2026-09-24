@@ -179,16 +179,15 @@ BarWidget {
     readonly property int menuWidth: 262
     popoutWidth: root.popoutMode === "menu" ? root.menuWidth : -1
 
-    // The preview hangs from its button: the card flows into a neck that
-    // meets the panel on the button and follows the pointer from one button
-    // to the next. Floating a gap above the row, it was a card near the
-    // buttons rather than one of them -- and the gap was the one stretch of
-    // the way to it that was not the card. The neck is three quarters of the
-    // button's tile where it lands, so it narrows onto the button like a
-    // drop rather than plugging into it at full width. The menu is a menu,
-    // and stands clear as the others do.
+    // The preview is reached across an invisible bridge from its button:
+    // the gap above the row was the one stretch of the way to the card that
+    // was not the card, and the card started closing while the pointer
+    // crossed it. The bridge is exactly as wide as the button the preview is
+    // about -- its icon and its margin -- and nothing of it is drawn
+    // (BarWidget.popoutTail). The menu is a menu, and stands clear as the
+    // others do.
     popoutTail: root.popoutMode !== "menu"
-    popoutTailWidth: Math.round(root.drawnIconOnly * 0.75)
+    popoutTailWidth: buttons.itemAt(root.items.findIndex(i => i.key === root.previewKey))?.width ?? root.drawnIconOnly
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a

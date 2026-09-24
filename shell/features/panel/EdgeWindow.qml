@@ -39,9 +39,9 @@ PanelWindow {
     // "start". See Placement.
     property string align: "centre"
 
-    // Whether what is drawn hangs from the slot by a neck across the gap,
-    // rather than standing clear of the panel (Tail; `popoutTail` on the
-    // widget). The window then reaches all the way to the panel's edge: the
+    // Whether the popout takes the pointer across the gap on an invisible
+    // bridge (Tail; `popoutTail` on the widget). The window then reaches all
+    // the way to the panel's edge, for the bridge to be in: the
     // room on that side is the whole distance to the card, `reach`, rather
     // than the shadow's margin. The card itself lands where it always does.
     property bool tail: false
