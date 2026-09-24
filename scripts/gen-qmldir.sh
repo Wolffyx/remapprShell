@@ -42,7 +42,17 @@ while IFS= read -r dir; do
                 printf '%s 1.0 %s.qml\n' "$base" "$base"
             fi
         done
-    } > "$dir/qmldir"
+    } > "$dir/.qmldir.new"
+    # Replaced whole, and only when it changed. The running shell reads these
+    # the moment one changes: a qmldir truncated and written line by line was
+    # read half-written, and a type still in it was "not a type" for one
+    # reload (2026-09-24). A rename is atomic, and one left alone is not
+    # a reason to reload at all.
+    if cmp -s "$dir/.qmldir.new" "$dir/qmldir"; then
+        rm -f "$dir/.qmldir.new"
+    else
+        mv -f "$dir/.qmldir.new" "$dir/qmldir"
+    fi
     count=$((count + 1))
 done < <(find shell -type d | sort)
 
