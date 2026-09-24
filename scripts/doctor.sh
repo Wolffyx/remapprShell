@@ -141,6 +141,18 @@ if [ -f "$preview_module" ]; then
     fi
 fi
 
+# The other module the same build installs, beside it. It answers what QML
+# cannot ask without an event to hang the question on: which keys are held and
+# which locks are on. Without it the lock-key OSD is silent, and the switchers
+# cannot check whether their key is still down.
+input_module="$preview_dir/ShellInput/libshellinputplugin.so"
+if [ -f "$input_module" ]; then
+    ok "the input module is installed (held keys, lock keys)"
+else
+    warn "no input module: no lock-key OSD, and the switchers cannot check which keys are held"
+    fix "build it with: make plugin  (the same build as the previews)"
+fi
+
 if [ -d /usr/lib/qt6/qml/org/kde/pipewire ]; then
     ok "kpipewire present (it draws the stream)"
 else
