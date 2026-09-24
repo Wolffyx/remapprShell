@@ -206,7 +206,7 @@ any disagreement, in `make lint` and in CI.
 `rmpr windows restart` (the daemon is a rendered copy), then the checks
 listed under "Needs the real desktop" in that entry. `make lint` and `make
 test` are clean; `dev` is **not pushed** -- the three commits of 2026-09-23's
-evening and the cleanup's 94 are local.
+evening and the cleanup's 97 are local.
 
 **What to pick up first, 2026-09-24.** Nothing is half-written; `make lint`,
 `make test` and `rmpr doctor` are all clean, and `dev` is pushed.
@@ -372,6 +372,15 @@ had overhung their cards; icon buttons show their tooltips (the restore
 point's "click again" was never seen); a held notification's countdown
 stops; lock-screen media cards scale with the screen; the lockout toast
 fades out instead of vanishing; album-art stand-ins show while a cover loads.
+
+**Two more, reported by the user from the running build afterwards:**
+middle-clicking a pinned application's last window left its preview card up
+(on the old build, the closed window stayed on it; on the new one it turned
+into "Pinned -- click to start it" under the pointer), and the tray's hidden
+icons were dimmed to half strength in the overflow, which on the light theme
+made grey icons nearly invisible. Both fixed: the card closes when its group
+goes from some windows to none, and the overflow no longer dims passive
+items.
 
 **Needs the real desktop, and nobody has done it yet:**
 - `make link` then `rmpr windows restart`: the daemon is a rendered copy and
