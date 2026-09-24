@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 // door.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.theme
@@ -17,8 +16,6 @@ CardGrid {
     id: root
 
     property var presets: []
-
-    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
     count: 1
 
@@ -31,7 +28,7 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [root.ctl, "preset", "list"]
+        command: [Branding.ctlBin, "preset", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = [];
@@ -51,7 +48,7 @@ CardGrid {
 
     function apply(id) {
         applyProc.running = false;
-        applyProc.command = [root.ctl, "preset", "apply", id];
+        applyProc.command = [Branding.ctlBin, "preset", "apply", id];
         applyProc.running = true;
     }
 

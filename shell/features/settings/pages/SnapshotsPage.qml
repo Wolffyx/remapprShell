@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 // reimplementing the logic, so the two cannot drift apart.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.config
@@ -22,8 +21,6 @@ CardGrid {
 
     property var snapshots: []
     property string status: ""
-
-    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
     count: 2
 
@@ -40,7 +37,7 @@ CardGrid {
         // wider than its column leaves one space instead of two -- which this
         // page, splitting on runs of spaces, read as part of the name. Long
         // names arrived with the date stuck to them and the date line short.
-        command: [root.ctl, "snapshot", "list", "--json"]
+        command: [Branding.ctlBin, "snapshot", "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -72,7 +69,7 @@ CardGrid {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [root.ctl].concat(args);
+        runProc.command = [Branding.ctlBin].concat(args);
         runProc.running = true;
     }
 

@@ -14,7 +14,6 @@ CardGrid {
     id: root
 
     property var profiles: []
-    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
 
     count: 2
 
@@ -27,7 +26,7 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [root.ctl, "profile", "list"]
+        command: [Branding.ctlBin, "profile", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = [];
@@ -51,7 +50,7 @@ CardGrid {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [root.ctl].concat(args);
+        runProc.command = [Branding.ctlBin].concat(args);
         runProc.running = true;
     }
 
