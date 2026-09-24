@@ -15,13 +15,7 @@ import qs.domain.widgets
 QtObject {
     id: root
 
-    readonly property var zones: ["left", "middle", "right"]
-
-    readonly property string position: ConfigStore.value("panel.position", "bottom")
-    readonly property int thickness: ConfigStore.value("panel.thickness", 40)
     readonly property string renderer: ConfigStore.value("panel.renderer", "quickshell")
-
-    readonly property bool horizontal: root.position === "top" || root.position === "bottom"
 
     // A left click on a widget, asked for by name rather than by a pointer.
     // Every slot holding `widgetId` on `screen` answers, exactly as it would
@@ -133,6 +127,12 @@ QtObject {
         const p = root.positionFor(name);
         return p === "top" || p === "bottom";
     }
+    // Entries for one zone of one screen's panel, enabled only, in config
+    // order.
+    //
+    // An entry with no `zone` is a config error rather than a silent default:
+    // a widget quietly appearing in the left zone because a key was misspelled
+    // is a confusing bug to chase.
     function entriesForScreen(name, zone) {
         const entries = ConfigStore.valueFor(name, "bar.entries", []) ?? [];
         const way = root.horizontalFor(name) ? "horizontal" : "vertical";
@@ -140,7 +140,7 @@ QtObject {
             if (!e || e.enabled === false)
                 return false;
             if (!e.zone) {
-                Log.warn("panel", `entry '${e.id ?? "?"}' has no zone; ignoring it`);
+                root._sayOnce("warn", `entry '${e.id ?? "?"}' has no zone; ignoring it`);
                 return false;
             }
             if (e.zone !== zone)
@@ -152,33 +152,35 @@ QtObject {
             // loaded there is no manifest to ask, and the entry stays.
             const ways = WidgetRegistry.manifest(e.id)?.orientation;
             if (Array.isArray(ways) && ways.indexOf(way) < 0) {
-                Log.info("panel", `'${e.id}' is not drawn on a ${way} panel (${name}); its manifest says ${ways.join(", ")}`);
+                root._sayOnce("info", `'${e.id}' is not drawn on a ${way} panel (${name}); its manifest says ${ways.join(", ")}`);
                 return false;
             }
             return true;
         });
     }
 
+    // What entriesForScreen has already said. It runs inside ZoneRow's
+    // binding, which is read again on every configuration change -- folding a
+    // sidebar card is one -- so an entry with no zone was reported once per
+    // zone, per screen, per write, for the rest of the session. Each thing is
+    // said once now, and again only once the entries themselves have changed.
+    property var _said: ({})
+    readonly property string entriesKey: JSON.stringify(root.entries ?? [])
+    onEntriesKeyChanged: root._said = ({})
+
+    function _sayOnce(level, message) {
+        if (root._said[message])
+            return;
+        root._said[message] = true;
+        if (level === "warn")
+            Log.warn("panel", message);
+        else
+            Log.info("panel", message);
+    }
+
     // The raw ordered list from config. Order within a zone is significant, so
     // it is preserved exactly as written rather than sorted.
     readonly property var entries: ConfigStore.value("bar.entries", [])
-
-    // Entries for one zone, enabled only, in config order.
-    //
-    // An entry with no `zone` is a config error rather than a silent default:
-    // a widget quietly appearing in the left zone because a key was misspelled
-    // is a confusing bug to chase.
-    function entriesFor(zone) {
-        return (root.entries ?? []).filter(e => {
-            if (!e || e.enabled === false)
-                return false;
-            if (!e.zone) {
-                Log.warn("panel", `entry '${e.id ?? "?"}' has no zone; ignoring it`);
-                return false;
-            }
-            return e.zone === zone;
-        });
-    }
 
     // Per-widget configuration, lowest precedence first:
     //

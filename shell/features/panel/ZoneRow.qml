@@ -140,11 +140,22 @@ Item {
             WidgetSlot {
                 id: slot
                 required property var modelData
+
+                // The same trick as `entriesKey`, for the same reason. The
+                // merge is read again on every configuration change of any
+                // kind -- folding a sidebar card writes one -- and each time
+                // it made a new object, which WidgetHost handed to the widget
+                // as a new configuration: every widget on every panel
+                // re-evaluated everything it reads from its configuration,
+                // for a key none of them read. The string is equal unless
+                // this widget's configuration really changed.
+                readonly property string configKey: JSON.stringify(PanelModel.configFor(slot.modelData))
+
                 room: root.roomFor(slot)
                 entry: modelData
                 bar: root.bar
                 screenName: root.screenName
-                widgetConfig: PanelModel.configFor(modelData)
+                widgetConfig: JSON.parse(slot.configKey)
             }
         }
     }
