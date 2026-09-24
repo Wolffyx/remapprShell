@@ -21,12 +21,14 @@ pragma ComponentBehavior: Bound
 // Pinned applications stay on the taskbar, first and in the order pinned,
 // whether or not they are running. KWin does everything asked of it; nothing
 // here moves or rearranges a window.
+//
+// This file is the row's state and what the panel's clicks and hovers do to
+// it. A button is drawn by TaskButton, and the popout -- the menu, or the
+// preview (TaskPreview) -- is TaskPopout.
 
 import QtQuick
 import Quickshell
-import qs.domain.config
 import qs.domain.desktops
-import qs.domain.theme
 import qs.domain.windows
 import qs.domain.windows.events
 import qs.ui.primitives
@@ -387,251 +389,13 @@ BarWidget {
             // list, and reads its item through itemFor.
             model: ScriptModel { values: root.items.map(i => i.key) }
 
-            Rectangle {
-                id: button
-
-                // The button's key, and its place on the taskbar.
-                required property string modelData
-                required property int index
-                readonly property var item: root.itemFor(button.index, button.modelData)
-
-                readonly property bool isActive: button.item.active === true
-                // A group is dimmed only when every window in it is minimised:
-                // one visible window means the application is on screen. A
-                // pinned application with no windows is not minimised, just
-                // not running.
-                readonly property bool isMinimized: button.windowCount > 0
-                                                    && button.item.windows.every(w => w.minimized)
-                readonly property bool isHovered: button.index === root.hoveredIndex
-                readonly property int windowCount: button.item.windows.length
-
-                width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
-                                      : root.drawnIconOnly
-                height: root.buttonHeight
-                radius: Math.round(14 * Math.max(0.7, root.unit))
-
-                // Buttons sit on the panel itself, as the design draws them:
-                // no tile until hovered, and the focused window's in the
-                // accent's container colour.
-                color: button.isActive  ? Theme.accC
-                     : button.isHovered ? Theme.s2
-                                        : "transparent"
-
-                // A minimised window is still there and still clickable; it is
-                // dimmed rather than hidden, which is the whole difference
-                // between a task list and a window list.
-                opacity: button.isMinimized ? 0.55 : 1
-
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                // A window asking for attention -- a message arrived, a
-                // dialog wants an answer -- flashes its button for a few
-                // seconds and then keeps an orange tint until it is looked
-                // at, as Windows does. KWin clears the request when the window
-                // is activated, and the tint goes with it.
-                //
-                // The moment the request began is kept by WindowsService, not
-                // here: a button is made again whenever its window leaves the
-                // list and comes back -- to another desktop and back, or the
-                // grouping switched -- and a flash timed from the button would
-                // start over each time.
-                readonly property bool wantsAttention: button.item.attention === true && !button.isActive
-                property bool flashing: false
-
-                function startFlash() {
-                    const left = root.flashMs - (Date.now() - (button.item.attentionSince ?? 0));
-                    button.flashing = button.wantsAttention && left > 0;
-                    if (button.flashing) {
-                        flashStop.interval = left;
-                        flashStop.restart();
-                    }
-                }
-
-                onWantsAttentionChanged: button.startFlash()
-                Component.onCompleted: button.startFlash()
-
-                Timer {
-                    id: flashStop
-                    onTriggered: button.flashing = false
-                }
-
-                Rectangle {
-                    id: attentionTint
-                    anchors.fill: parent
-                    radius: parent.radius
-                    color: Theme.neutral
-                    visible: button.wantsAttention
-                    opacity: 0.45
-
-                    SequentialAnimation on opacity {
-                        running: button.flashing
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.9; duration: 420; easing.type: Easing.InOutQuad }
-                        NumberAnimation { to: 0.15; duration: 420; easing.type: Easing.InOutQuad }
-                    }
-                }
-
-                onFlashingChanged: if (!button.flashing) attentionTint.opacity = 0.45
-
-                Row {
-                    id: content
-                    anchors.centerIn: parent
-                    spacing: Math.round(10 * Math.max(0.7, root.unit))
-
-                    Item {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: root.drawnIcon
-                        height: root.drawnIcon
-
-                        // Several windows: a square behind the icon, up and to
-                        // the right, as if a second copy of the application
-                        // were stacked under the first -- the count read at a
-                        // glance on the button itself, not only in the marks
-                        // under it.
-                        Rectangle {
-                            visible: root.stackGroups && button.windowCount > 1
-                            width: Math.round(root.drawnIcon * 0.86)
-                            height: width
-                            x: Math.round(root.drawnIcon * 0.26)
-                            y: -Math.round(root.drawnIcon * 0.14)
-                            radius: Math.round(width * 0.24)
-                            color: Theme.alpha(Theme.fg, button.isActive ? 0.3 : 0.2)
-                            border.width: 1
-                            border.color: Theme.alpha(Theme.fg, 0.4)
-                        }
-
-                        PanelIcon {
-                            anchors.fill: parent
-                            implicitSize: root.drawnIcon
-                            iconName: button.item.iconName
-                            iconFile: button.item.iconFile
-                        }
-                    }
-
-                    PanelText {
-                        id: title
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: root.titlesFit
-                        width: Math.min(title.implicitWidth, root.titleRoom)
-                        elide: Text.ElideRight
-                        text: button.item.windows.length === 1
-                            ? WindowEvents.label(button.item.windows[0])
-                            : button.item.appName
-                    }
-                }
-
-                // Under the button, in the panel's margin: how many windows
-                // the application has, and whether one of them is focused --
-                // a long accent bar for the focused one, a short mark per
-                // other window. Colour alone is the distinction a person with
-                // low vision may not see at all, so the count is shape as
-                // well as tint.
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: parent.height + Math.max(1, Math.round((root.barThickness - root.buttonHeight) / 2 - 7))
-                    spacing: 3
-
-                    Repeater {
-                        // Past four the marks stop being countable and start
-                        // being noise.
-                        model: Math.min(4, button.windowCount)
-
-                        Rectangle {
-                            required property int index
-
-                            width: button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, root.unit))
-                                                                 : Math.round(6 * Math.max(0.7, root.unit))
-                            height: 3
-                            radius: 1.5
-                            color: button.isActive && index === 0 ? Theme.acc : Theme.alpha(Theme.fg, 0.4)
-                        }
-                    }
-                }
-            }
+            TaskButton { taskbar: root }
         }
     }
 
-    // One popout, two contents: a button's menu, or the preview.
+    // One popout, two contents: a button's menu, or the preview. What each
+    // is and does is TaskPopout's.
     popout: Component {
-        Item {
-            // The loaded contents are Items; the linter only knows they are
-            // QObjects, so they are read through a typed alias.
-            readonly property Item shownContent: (menuLoader.item ?? previewLoader.item) as Item
-
-            // In menu mode the width is the widget's to state, not the
-            // menu's to work out: the rows are as wide as the menu and the
-            // menu as wide as the card, so asking the menu how wide it wants
-            // to be is a loop. The card's own width is what breaks it.
-            implicitWidth: root.popoutMode === "menu" ? root.menuWidth
-                                                      : (shownContent?.implicitWidth ?? 1)
-            implicitHeight: shownContent?.implicitHeight ?? 1
-
-            Loader {
-                id: menuLoader
-
-                // The menu's rows are as wide as the menu, and the menu is as
-                // wide as it is given: `popoutWidth` above fixes the card at
-                // 262 and this Loader is what passes that on. Without a width
-                // here every row laid out 0 wide inside a card the right size,
-                // which is a right click that does nothing at all.
-                width: parent.width
-                active: root.popoutMode === "menu" && root.menuItem !== null
-                sourceComponent: TaskMenu {
-                    item: root.menuItem
-                    entry: WindowsService.entryById(WindowEvents.appIdOf(root.menuItem))
-                    pinned: root.menuItem?.pinned === true
-
-                    onLaunch: action => {
-                        WindowsService.launch(WindowEvents.appIdOf(root.menuItem), action);
-                        root.popoutVisible = false;
-                    }
-                    onTogglePin: {
-                        ConfigStore.set("widgets.tasks.pinned",
-                                        WindowEvents.togglePinned(root.pinned, WindowEvents.appIdOf(root.menuItem)));
-                        root.popoutVisible = false;
-                    }
-                    onCloseWindows: {
-                        for (const w of root.menuItem?.windows ?? [])
-                            WindowsService.close(w.uuid);
-                        root.popoutVisible = false;
-                    }
-                }
-            }
-
-            Loader {
-                id: previewLoader
-                active: root.popoutMode !== "menu"
-                sourceComponent: root.preview
-            }
-
-            // The card is as tall as whichever is loaded. The menu's height is
-            // the sum of its rows, which it only knows once it has a width.
-        }
-    }
-
-    // The preview.
-    //
-    // It shows a live picture of the window where the compositor gives one --
-    // KWin's screencast protocol, through this project's one compiled part
-    // (plugin/) -- and the application's icon where it does not.
-    //
-    // A group of several windows is a picture each, not a list of titles, and
-    // every one of them is a target: hovering a grouped button and then being
-    // unable to say which window you meant is the whole complaint against a
-    // grouped taskbar, and "click to move through them" is an answer only for
-    // somebody who already knows which one is next.
-    //
-    // The previous note here said a picture was impossible. It was wrong in an
-    // instructive way: the protocol is restricted rather than absent, and KWin
-    // gives it to a client whose desktop file asks for it by name.
-    readonly property Component preview: Component {
-        TaskPreview {
-            item: root.previewItem
-            showHeader: root.previewHeader
-            showScreen: root.previewScreen
-            windows: item?.windows ?? []
-
-            onPicked: root.popoutVisible = false
-        }
+        TaskPopout { taskbar: root }
     }
 }
