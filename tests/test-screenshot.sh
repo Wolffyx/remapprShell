@@ -42,7 +42,13 @@ PICTURES="$HOME/Pictures/Screenshots"
 echo "== the helper, with no bus at all =="
 out=$(env -u "$NO_SESSION_VAR" python3 "$HELPER" 2>&1); rc=$?
 check "no session bus is no portal"      "$rc" "3"
-contains "and says so"                   "$out" "no session bus"
+# Without python-gobject the helper cannot reach a bus to find it empty, and
+# says that first -- which is what CI's container, with no GObject, sees.
+if python3 -c "import gi" 2>/dev/null; then
+    contains "and says so"               "$out" "no session bus"
+else
+    contains "and says so"               "$out" "python-gobject is not installed"
+fi
 env -u "$NO_SESSION_VAR" python3 "$HELPER" --check >/dev/null 2>&1; rc=$?
 check "and --check says the same"        "$rc" "3"
 python3 "$HELPER" --timeout soon >/dev/null 2>&1; rc=$?
