@@ -60,3 +60,11 @@ SecurePasswordPanel 1.0 SecurePasswordPanel.qml
 SecureKeyPanel 1.0 SecureKeyPanel.qml
 SecureRail 1.0 SecureRail.qml
 SecureStatusTiles 1.0 SecureStatusTiles.qml
+AccessibleLook 1.0 AccessibleLook.qml
+AccessibleRing 1.0 AccessibleRing.qml
+AccessibleChoice 1.0 AccessibleChoice.qml
+AccessibleChoices 1.0 AccessibleChoices.qml
+AccessibleFact 1.0 AccessibleFact.qml
+AccessibleFacts 1.0 AccessibleFacts.qml
+AccessiblePrompt 1.0 AccessiblePrompt.qml
+AccessibleCaptions 1.0 AccessibleCaptions.qml

@@ -42,11 +42,15 @@
 
     Reduce motion stops the digits rolling, the fades, and (through
     `reduceMotion`) the shutter.
+
+    This file keeps the choices and the words; what they make of the page is
+    AccessibleLook, and the page is drawn by the Accessible* parts beside it
+    -- the bar of choices, the cards under the clock, the way in, and the
+    caption strip.
 */
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.plasma.private.mpris as Mpris
 
 LockStyle {
     id: access
@@ -61,24 +65,12 @@ LockStyle {
 
     readonly property real s: access.unit * access.size
 
-    // The design's two palettes.
-    readonly property bool high: access.contrast === "high"
-    readonly property color bg: access.high ? "#000000" : "#1c1a17"
-    readonly property color fg: access.high ? "#ffffff" : "#f4efe8"
-    readonly property color sub: access.high ? "#e6e6e6" : "#cfc7bd"
-    readonly property color acc: access.high ? "#ffd84a" : Qt.tint(access.ui.accent, Qt.rgba(1, 1, 1, 0.5))
-    readonly property color bd: access.high ? "#ffffff" : Qt.rgba(1, 1, 1, 0.34)
-    readonly property color bdSoft: access.high ? "#8a8a8a" : Qt.rgba(1, 1, 1, 0.14)
-    readonly property color card: access.high ? "#121212" : "#27241f"
-    readonly property color accentFg: access.high ? "#000000" : "#14161f"
-    readonly property color err: access.high ? "#ff7a6b" : "#e0786a"
-    readonly property color warn: access.high ? "#ffd84a" : "#e0c98a"
-    readonly property color hot: access.high ? "#262626" : "#332f29"
-
-    // The borders the design draws at 2 and 3 px, and the focus ring.
-    readonly property int line: Math.max(2, Math.round(2 * access.s))
-    readonly property int thick: Math.max(3, Math.round(3 * access.s))
-    readonly property int ringGap: Math.max(3, Math.round(4 * access.s))
+    // The design's two palettes, and the borders drawn at `s`.
+    readonly property AccessibleLook look: AccessibleLook {
+        s: access.s
+        contrast: access.contrast
+        accent: access.ui.accent
+    }
 
     readonly property int margin: Math.round(80 * access.unit)
     readonly property int fade: access.reduceMotion ? 0 : 250
@@ -86,8 +78,8 @@ LockStyle {
     blursWallpaper: false
     scrimsWallpaper: false
 
-    promptField: password
-    promptBlock: unlockButton
+    promptField: right.field
+    promptBlock: right.button
 
     // The lockout countdown goes just above the caption strip, where there
     // is nothing, rather than over the bar of choices at the top.
@@ -135,15 +127,13 @@ LockStyle {
         }
     }
 
-    readonly property LockPower battery: access.ui.battery
-
     // The characters typed so far, and why the count went down.
     property int typed: 0
 
     Connections {
-        target: password
+        target: right.field
         function onTextChanged() {
-            const n = password.text.length;
+            const n = right.field.text.length;
             if (n > access.typed)
                 access.say("Password field. " + access.count(n) + " entered.", false);
             else if (n === 0 && access.typed > 1)
@@ -155,9 +145,9 @@ LockStyle {
     }
 
     Connections {
-        target: password.field
+        target: right.field.field
         function onShowPasswordChanged() {
-            access.say(password.field.showPassword ? "Password shown." : "Password hidden.", true);
+            access.say(right.field.field.showPassword ? "Password shown." : "Password hidden.", true);
         }
     }
 
@@ -193,290 +183,52 @@ LockStyle {
         }
     }
 
-    // --- the parts ---------------------------------------------------------
-
-    // A ring outside whatever has the keyboard focus, clear of it by a gap
-    // so that it shows around a filled button as well as an empty one.
-    component Ring: Rectangle {
-        required property Rectangle target
-
-        anchors.fill: parent
-        anchors.margins: -(access.ringGap + access.thick)
-        visible: target.activeFocus
-        radius: target.radius + access.ringGap + access.thick
-        color: "transparent"
-        border.width: access.thick
-        border.color: access.acc
-    }
-
-    // A segment of the text size and contrast choices, or one of the
-    // switches: a bordered box, filled with the accent while it is on.
-    component Choice: Rectangle {
-        id: choice
-
-        property string label: ""
-        property string glyph: ""
-        property bool on: false
-        property bool isSwitch: false
-        property string description: ""
-        signal activated
-
-        function activate(): void {
-            choice.activated();
-        }
-
-        width: choiceRow.implicitWidth + 2 * Math.round(18 * access.s)
-        height: Math.round(52 * access.s)
-        radius: Math.round(12 * access.s)
-        color: choice.on ? access.acc : (choiceHover.hovered ? access.hot : "transparent")
-        border.width: access.line
-        border.color: access.bd
-        activeFocusOnTab: true
-
-        Row {
-            id: choiceRow
-
-            anchors.centerIn: parent
-            spacing: Math.round(10 * access.s)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: choice.glyph !== ""
-                text: choice.glyph
-                font.family: "Material Symbols Rounded"
-                font.pixelSize: Math.round(24 * access.s)
-                color: choice.on ? access.accentFg : access.fg
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: choice.isSwitch ? `${choice.label}: ${choice.on ? "On" : "Off"}` : choice.label
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: Math.round(18 * access.s)
-                font.weight: Font.Medium
-                color: choice.on ? access.accentFg : access.fg
-            }
-        }
-
-        Ring { target: choice }
-
-        HoverHandler { id: choiceHover; cursorShape: Qt.PointingHandCursor }
-        // A click leaves the keyboard in the password field; a key press on
-        // a focused switch leaves it on the switch, where Tab put it.
-        TapHandler {
-            onTapped: {
-                choice.activate();
-                access.ui.focusPassword();
-            }
-        }
-        Keys.onSpacePressed: choice.activate()
-        Keys.onReturnPressed: choice.activate()
-        Keys.onEnterPressed: choice.activate()
-
-        Accessible.role: choice.isSwitch ? Accessible.CheckBox : Accessible.RadioButton
-        Accessible.name: choice.label
-        Accessible.description: choice.description
-        Accessible.checkable: true
-        Accessible.checked: choice.on
-        Accessible.focusable: true
-        Accessible.onPressAction: choice.activate()
-        Accessible.onToggleAction: choice.activate()
-    }
-
-    // One of the cards under the clock: a glyph in the accent and a line
-    // of large type.
-    component Fact: Rectangle {
-        id: fact
-
-        property string glyph: ""
-        property string text: ""
-        property string description: ""
-        // The layout card switches to the next layout.
-        property bool pressable: false
-        signal activated
-
-        width: parent?.width ?? 0
-        height: factText.implicitHeight + 2 * Math.round(18 * access.s)
-        radius: Math.round(18 * access.s)
-        color: fact.pressable && factHover.hovered ? access.hot : access.card
-        border.width: access.line
-        border.color: access.bdSoft
-        activeFocusOnTab: fact.pressable
-
-        Text {
-            id: factGlyph
-
-            x: Math.round(22 * access.s)
-            anchors.verticalCenter: parent.verticalCenter
-            text: fact.glyph
-            font.family: "Material Symbols Rounded"
-            font.pixelSize: Math.round(34 * access.s)
-            color: access.acc
-        }
-
-        Text {
-            id: factText
-
-            anchors.left: factGlyph.right
-            anchors.leftMargin: Math.round(18 * access.s)
-            anchors.right: parent.right
-            anchors.rightMargin: Math.round(22 * access.s)
-            anchors.verticalCenter: parent.verticalCenter
-            text: fact.text
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            lineHeight: 1.2
-            font.family: "Rubik"
-            font.pixelSize: Math.round(22 * access.s)
-            color: access.fg
-        }
-
-        Ring { target: fact }
-
-        HoverHandler {
-            id: factHover
-            enabled: fact.pressable
-            cursorShape: Qt.PointingHandCursor
-        }
-        TapHandler {
-            enabled: fact.pressable
-            onTapped: {
-                fact.activated();
-                access.ui.focusPassword();
-            }
-        }
-        Keys.onSpacePressed: if (fact.pressable) fact.activated()
-        Keys.onReturnPressed: if (fact.pressable) fact.activated()
-        Keys.onEnterPressed: if (fact.pressable) fact.activated()
-
-        Accessible.role: fact.pressable ? Accessible.Button : Accessible.StaticText
-        Accessible.name: fact.text
-        Accessible.description: fact.description
-        Accessible.onPressAction: if (fact.pressable) fact.activated()
-    }
-
     // --- the page ----------------------------------------------------------
 
     Rectangle {
         anchors.fill: parent
-        color: access.bg
+        color: access.look.bg
     }
 
     // --- the choices -------------------------------------------------------
 
-    Flow {
+    AccessibleChoices {
         id: choices
 
         x: access.margin
         y: Math.round(64 * access.unit)
         width: access.width - 2 * access.margin
-        spacing: Math.round(28 * access.s)
+        ui: access.ui
+        look: access.look
+        size: access.size
+        contrast: access.contrast
+        captions: access.captions
+        reduceMotion: access.reduceMotion
         opacity: access.ui.unlock.shown ? 1 : 0
         enabled: access.ui.unlock.shown
 
         Behavior on opacity { NumberAnimation { duration: access.fade } }
 
-        Row {
-            spacing: Math.round(10 * access.s)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Text size"
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: Math.round(17 * access.s)
-                font.weight: Font.Medium
-                color: access.sub
-                Accessible.ignored: true
-            }
-
-            Repeater {
-                model: [[1, "100%"], [1.2, "120%"], [1.4, "140%"]]
-
-                Choice {
-                    required property var modelData
-                    label: modelData[1]
-                    on: Math.abs(access.size - modelData[0]) < 0.01
-                    description: "Text size. Lasts for this lock only."
-                    onActivated: {
-                        access.size = modelData[0];
-                        access.say(`Text size ${modelData[1]}.`, true);
-                    }
-                }
-            }
+        onSizeChosen: (value, label) => {
+            access.size = value;
+            access.say(`Text size ${label}.`, true);
         }
-
-        Row {
-            spacing: Math.round(10 * access.s)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Contrast"
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: Math.round(17 * access.s)
-                font.weight: Font.Medium
-                color: access.sub
-                Accessible.ignored: true
-            }
-
-            Repeater {
-                model: [["standard", "Standard"], ["high", "High"]]
-
-                Choice {
-                    required property var modelData
-                    label: modelData[1]
-                    on: access.contrast === modelData[0]
-                    description: "Contrast. Lasts for this lock only."
-                    onActivated: {
-                        access.contrast = modelData[0];
-                        access.say(`${modelData[1]} contrast.`, true);
-                    }
-                }
-            }
+        onContrastChosen: (value, label) => {
+            access.contrast = value;
+            access.say(`${label} contrast.`, true);
         }
-
-        Row {
-            spacing: Math.round(10 * access.s)
-
-            Choice {
-                isSwitch: true
-                glyph: "closed_caption"
-                label: "Captions"
-                on: access.captions
-                description: "Shows what this screen announces, along the bottom. Lasts for this lock only."
-                onActivated: {
-                    access.captions = !access.captions;
-                    access.say(access.captions ? "Captions on." : "Captions off.", true);
-                }
-            }
-
-            Choice {
-                isSwitch: true
-                visible: access.ui.keyboardAvailable
-                glyph: "keyboard"
-                label: "Keyboard"
-                on: access.ui.keyboardShown
-                description: "Shows or hides the on-screen keyboard."
-                onActivated: {
-                    const showing = !access.ui.keyboardShown;
-                    access.ui.toggleKeyboard();
-                    access.say(showing ? "On-screen keyboard shown." : "On-screen keyboard hidden.", true);
-                }
-            }
-
-            Choice {
-                isSwitch: true
-                glyph: "animation"
-                label: "Reduce motion"
-                on: access.reduceMotion
-                description: "Stops the clock rolling and the fades. Lasts for this lock only."
-                onActivated: {
-                    access.reduceMotion = !access.reduceMotion;
-                    access.say(access.reduceMotion ? "Reduce motion on." : "Reduce motion off.", true);
-                }
-            }
+        onCaptionsToggled: {
+            access.captions = !access.captions;
+            access.say(access.captions ? "Captions on." : "Captions off.", true);
+        }
+        onKeyboardToggled: {
+            const showing = !access.ui.keyboardShown;
+            access.ui.toggleKeyboard();
+            access.say(showing ? "On-screen keyboard shown." : "On-screen keyboard hidden.", true);
+        }
+        onMotionToggled: {
+            access.reduceMotion = !access.reduceMotion;
+            access.say(access.reduceMotion ? "Reduce motion on." : "Reduce motion off.", true);
         }
     }
 
@@ -505,8 +257,8 @@ LockStyle {
             opacity: access.ui.showClock ? 1 : 0
             raised: false
             animated: !access.reduceMotion
-            ink: access.fg
-            dateInk: access.sub
+            ink: access.look.fg
+            dateInk: access.look.sub
             timeSize: Math.round(130 * access.s)
             dateSize: Math.round(28 * access.s)
             timeWeight: Font.Light
@@ -521,310 +273,40 @@ LockStyle {
             height: Math.round(40 * access.s)
         }
 
-        Column {
+        AccessibleFacts {
             width: parent.width
-            spacing: Math.round(14 * access.s)
-
-            Fact {
-                visible: access.battery.present
-                glyph: access.battery.plugged ? "battery_charging_full" : "battery_5_bar"
-                text: {
-                    const b = access.battery;
-                    const left = b.smoothedRemainingMsec > 0 ? LockText.duration(b.smoothedRemainingMsec, true) : "";
-                    if (b.plugged && b.percent < 100)
-                        return `Battery ${b.percent}%, charging` + (left ? ` · full in ${left}` : "");
-                    if (b.plugged)
-                        return `Battery ${b.percent}%, plugged in`;
-                    return `Battery ${b.percent}%` + (left ? ` · about ${left} left` : "");
-                }
-            }
-
-            Fact {
-                glyph: "lock_clock"
-                text: "Locked at " + access.ui.lockedAt.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-            }
-
-            Fact {
-                visible: LockKeys.layouts.length > 1
-                pressable: true
-                glyph: "keyboard"
-                text: "Keyboard layout: " + LockKeys.layoutName
-                description: "Switches to the next keyboard layout."
-                onActivated: LockKeys.nextLayout()
-            }
-
-            Repeater {
-                model: LockKeys.players
-
-                Fact {
-                    required property var model
-                    visible: access.ui.setting("showMediaControls", true) && model.track.length > 0
-                    glyph: model.playbackStatus === Mpris.PlaybackStatus.Playing ? "graphic_eq" : "music_note"
-                    text: (model.playbackStatus === Mpris.PlaybackStatus.Playing ? "Playing " : "Paused: ")
-                        + model.track + (model.artist ? ` · ${model.artist}` : "")
-                }
-            }
+            ui: access.ui
+            look: access.look
         }
     }
 
     // --- the prompt ----------------------------------------------------------
 
-    Column {
+    AccessiblePrompt {
         id: right
 
         x: access.rightX
         y: access.colTop
         width: access.width - access.rightX - access.margin
-        spacing: 0
+        ui: access.ui
+        look: access.look
         opacity: access.ui.unlock.shown ? 1 : 0
         enabled: access.ui.unlock.shown
 
         Behavior on opacity { NumberAnimation { duration: access.fade } }
-
-        Text {
-            text: "Unlock this computer"
-            textFormat: Text.PlainText
-            font.family: "Rubik"
-            font.pixelSize: Math.round(34 * access.s)
-            font.weight: Font.Medium
-            color: access.fg
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-        }
-
-        Item { width: 1; height: Math.round(20 * access.s) }
-
-        Row {
-            spacing: Math.round(16 * access.s)
-
-            LockFace {
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.round(60 * access.s)
-                height: width
-                image: access.ui.userImage
-                userName: access.ui.userName
-                ink: access.fg
-                fill: access.card
-                ring: access.bd
-                ringWidth: access.line
-                Accessible.ignored: true
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: access.ui.userName
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: Math.round(22 * access.s)
-                font.weight: Font.Medium
-                color: access.fg
-                Accessible.role: Accessible.StaticText
-                Accessible.name: "Account: " + access.ui.userName
-            }
-        }
-
-        Item { width: 1; height: Math.round(22 * access.s) }
-
-        Text {
-            text: "Password"
-            textFormat: Text.PlainText
-            font.family: "Rubik"
-            font.pixelSize: Math.round(22 * access.s)
-            color: access.sub
-            Accessible.ignored: true
-        }
-
-        Item { width: 1; height: Math.round(10 * access.s) }
-
-        // The field's box: the design's thick border, in the accent while
-        // the field has the keyboard and in the error colour after a refusal.
-        Rectangle {
-            id: fieldBox
-
-            width: parent.width
-            height: Math.round(88 * access.s)
-            radius: Math.round(18 * access.s)
-            color: access.card
-            border.width: access.thick
-            border.color: password.stateBorder
-
-            LockPrompt {
-                id: password
-
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: Math.round(26 * access.s)
-                anchors.rightMargin: Math.round(12 * access.s)
-                anchors.verticalCenter: parent.verticalCenter
-                height: parent.height - 2 * access.thick
-                unlock: access.ui.unlock
-                unit: 1.5 * access.s
-                chrome: "none"
-                glyph: ""
-                showButton: false
-                placeholder: "Type your password"
-                ink: access.fg
-                dim: access.sub
-                accent: access.acc
-                errorColor: access.err
-                restBorder: access.bd
-            }
-        }
-
-        Item { width: 1; height: Math.round(14 * access.s) }
-
-        // Caps Lock, another layout, what PAM said, another reader -- or,
-        // with none of those, what to do.
-        LockMessage {
-            width: parent.width
-            unlock: access.ui.unlock
-            unit: 1.7 * access.s
-            align: Text.AlignLeft
-            ink: access.ui.unlock.resting ? access.err : access.fg
-            warn: access.warn
-        }
-
-        Text {
-            width: parent.width
-            visible: !access.ui.unlock.message && !LockKeys.caps && !LockKeys.otherLayout
-            text: access.ui.unlock.unlockedWithoutPassword
-                ? "No password is needed. Press Unlock to continue."
-                : "Type your password, then press Enter or Unlock."
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            font.family: "Rubik"
-            font.pixelSize: Math.round(22 * access.s)
-            color: access.sub
-        }
-
-        Item { width: 1; height: Math.round(18 * access.s) }
-
-        Rectangle {
-            id: unlockButton
-
-            function activate(): void {
-                if (access.ui.unlock.unlockedWithoutPassword)
-                    access.ui.unlock.confirm();
-                else
-                    password.submit();
-            }
-
-            width: parent.width
-            height: Math.round(76 * access.s)
-            radius: Math.round(18 * access.s)
-            color: unlockHover.hovered && unlockButton.enabled ? Qt.lighter(access.acc, 1.08) : access.acc
-            opacity: unlockButton.enabled ? 1 : 0.55
-            enabled: !access.ui.unlock.resting
-            activeFocusOnTab: true
-
-            Row {
-                anchors.centerIn: parent
-                spacing: Math.round(12 * access.s)
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "lock_open"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: Math.round(28 * access.s)
-                    color: access.accentFg
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Unlock"
-                    textFormat: Text.PlainText
-                    font.family: "Rubik"
-                    font.pixelSize: Math.round(22 * access.s)
-                    font.weight: Font.Medium
-                    color: access.accentFg
-                }
-            }
-
-            Ring { target: unlockButton }
-
-            HoverHandler { id: unlockHover; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: unlockButton.activate() }
-            Keys.onSpacePressed: unlockButton.activate()
-            Keys.onReturnPressed: unlockButton.activate()
-            Keys.onEnterPressed: unlockButton.activate()
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Unlock"
-            Accessible.description: access.ui.unlock.unlockedWithoutPassword
-                ? "Unlocks the session. No password is needed."
-                : "Sends the password and unlocks the session."
-            Accessible.focusable: true
-            Accessible.onPressAction: unlockButton.activate()
-        }
-
-        Item {
-            width: 1
-            height: Math.round(30 * access.s)
-            visible: actions.visible
-        }
-
-        LockActions {
-            id: actions
-            session: access.ui.session
-            shape: "text"
-            unit: 1.4 * access.s
-            spacing: Math.round(40 * access.s)
-            ink: access.fg
-        }
     }
 
     // --- the caption strip -----------------------------------------------------
 
-    Rectangle {
+    AccessibleCaptions {
         id: strip
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Math.round(76 * access.s)
         visible: access.captions && access.caption !== ""
-        color: access.acc
-
-        Text {
-            id: stripGlyph
-
-            x: access.margin
-            anchors.verticalCenter: parent.verticalCenter
-            text: "closed_caption"
-            font.family: "Material Symbols Rounded"
-            font.pixelSize: Math.round(28 * access.s)
-            color: access.accentFg
-        }
-
-        Text {
-            anchors.left: stripGlyph.right
-            anchors.leftMargin: Math.round(16 * access.s)
-            anchors.right: stripLabel.left
-            anchors.rightMargin: Math.round(24 * access.s)
-            anchors.verticalCenter: parent.verticalCenter
-            text: access.caption
-            textFormat: Text.PlainText
-            elide: Text.ElideRight
-            font.family: "Rubik"
-            font.pixelSize: Math.round(21 * access.s)
-            font.weight: Font.Medium
-            color: access.accentFg
-            // Announced from `say`, not read again as a label.
-            Accessible.ignored: true
-        }
-
-        Text {
-            id: stripLabel
-
-            anchors.right: parent.right
-            anchors.rightMargin: access.margin
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Captions · what this screen announces"
-            textFormat: Text.PlainText
-            font.family: "JetBrains Mono"
-            font.pixelSize: Math.round(16 * access.s)
-            color: access.accentFg
-            Accessible.ignored: true
-        }
+        look: access.look
+        caption: access.caption
+        margin: access.margin
     }
 }
