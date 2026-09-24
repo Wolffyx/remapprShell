@@ -213,6 +213,7 @@ Provider {
     function windowItem(window, appName) {
         return { kind: "window", uuid: window.uuid, name: window.title || appName,
                  icon: WindowsService.iconFor(window),
+                 iconFile: WindowsService.iconFileFor(window),
                  description: appName };
     }
 

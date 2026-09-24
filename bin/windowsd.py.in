@@ -1191,8 +1191,10 @@ class WindowList:
             print("ignoring an update that is not a list", file=sys.stderr)
             return False
 
-        # A window with no application to match keeps the icon it carries
-        # itself, which is the only copy of it that exists.
+        # The icon every X11 window carries itself, whether or not it has an
+        # application to match: which of the two to draw is the shell's
+        # decision, made the way Plasma makes it -- and an application whose
+        # entry names no icon the theme has is drawn with the window's own.
         self._icons.new_update()
         present, pids = set(), set()
         for window in windows:
@@ -1211,8 +1213,6 @@ class WindowList:
             if named:
                 window["appIdFile"] = named
 
-            if window.get("desktopFile"):
-                continue
             path = self._icons.path_for(window)
             if path:
                 window["iconPath"] = path

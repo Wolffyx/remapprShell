@@ -107,6 +107,35 @@ TestCase {
         compare(nonsense[0].desktops.length, 0);
     }
 
+    // What a window's application is matched by beyond its app id (see
+    // AppMatch), and what the daemon read about its process and the desktop
+    // files named by it. From a script or a daemon too old to send them they
+    // are empty rather than undefined, which only means fewer steps can match.
+    function test_what_a_window_is_matched_by_survives_the_parse() {
+        const w = WindowEvents.parseList(JSON.stringify([windowJson({
+            resourceName: "example-inst",
+            pid: 4242,
+            cmdline: "/usr/bin/example-prog --x",
+            processName: "example-prog",
+            executables: ["/usr/bin/example-prog"],
+            desktopHint: { variable: "APPDIR", path: "/m/x.desktop", name: "X", icon: "x", iconFile: "/m/x.png", extra: 1 },
+            appIdFile: { name: "a file with no path names nothing" },
+            iconPath: "/run/icons/0x1-abc.png"
+        })]))[0];
+        compare([w.resourceName, w.pid, w.cmdline, w.processName], ["example-inst", 4242, "/usr/bin/example-prog --x", "example-prog"]);
+        compare(w.executables, ["/usr/bin/example-prog"]);
+        compare(w.desktopHint, { variable: "APPDIR", path: "/m/x.desktop", id: "", name: "X", icon: "x", iconFile: "/m/x.png" });
+        compare(w.appIdFile, null);
+        compare(w.iconPath, "/run/icons/0x1-abc.png");
+
+        const old = WindowEvents.parseList(JSON.stringify([windowJson()]))[0];
+        compare([old.resourceName, old.pid, old.cmdline, old.processName, old.executables.length, old.desktopHint, old.appIdFile],
+                ["", 0, "", "", 0, null, null]);
+
+        const odd = WindowEvents.parseList(JSON.stringify([windowJson({ pid: "12", executables: "prog", desktopHint: "x" })]))[0];
+        compare([odd.pid, odd.executables.length, odd.desktopHint], [0, 0, null]);
+    }
+
     function test_parses_the_signal_wrapper() {
         const list = WindowEvents.parseSignal(signalLine(JSON.stringify([windowJson()])));
         compare(list.length, 1);

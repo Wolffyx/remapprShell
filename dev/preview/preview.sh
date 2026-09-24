@@ -126,8 +126,8 @@ PYEOF
     # picture is a blank square on every machine that does not have it.
     #
     # `demoIcon` and `demoName` are read by the two substitutions below and by
-    # nothing else, so the real lookup -- desktop entry first, window class
-    # second -- is exactly as it was.
+    # nothing else, so the real lookup -- AppMatch's, Plasma's order -- is
+    # exactly as it was for any window that does not carry them.
     demo "$root/domain/windows/WindowsService.qml" \
         'property var windows: []' \
         'property var windows: [
@@ -148,11 +148,11 @@ PYEOF
           active: false, minimized: true, desktops: [], output: "PREVIEW", width: 1600, height: 1000 }
     ]'
     demo "$root/domain/windows/WindowsService.qml" \
-        'return WindowEvents.iconName(window);' \
-        'return window?.demoIcon ?? WindowEvents.iconName(window);'
+        'return AppMatch.icon(app, window, name => Quickshell.hasThemeIcon(name));' \
+        'return window?.demoIcon ? { name: window.demoIcon, file: "" } : AppMatch.icon(app, window, name => Quickshell.hasThemeIcon(name));'
     demo "$root/domain/windows/WindowsService.qml" \
-        'return window?.appId ?? "";' \
-        'return window?.demoName ?? window?.appId ?? "";'
+        'return AppMatch.name(app, window);' \
+        'return window?.demoName ?? AppMatch.name(app, window);'
     # ...and the daemon must not put the real ones back a moment later.
     demo "$root/domain/windows/WindowsService.qml" \
         'root.windows = list;' \
