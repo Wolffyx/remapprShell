@@ -17,6 +17,9 @@ source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/renderers.sh"
 
+# Read once: every section below asks for a setting or two of its own.
+config_load
+
 problems=0
 warnings=0
 

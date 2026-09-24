@@ -34,6 +34,9 @@ source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
 
+# Read once: the provider checks ask for the same few settings over and over.
+config_load
+
 REPORT_DIR="$STATE_DIR/diagnostics"
 CONSENT_FILE="$STATE_DIR/ai-consent.json"
 PROVIDERS=(clipboard claude-code ollama custom)

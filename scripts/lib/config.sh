@@ -10,6 +10,10 @@
 # Which profile is active, and where it lives, are brand.sh's: active_profile,
 # profile_file.
 
+# What config_load read, when it has. Never taken from the environment: a
+# merge some other process made is not this one's configuration.
+unset CONFIG_MERGED
+
 # The shipped defaults: the installed copy, which is what the running shell
 # reads, and the checkout's before anything is installed.
 config_defaults_file() {
@@ -31,6 +35,7 @@ config_profile_broken() {
 # config_merged   -- the merged JSON on stdout. A profile that does not parse
 # is ignored, which is also what the running shell does with it.
 config_merged() {
+    [ -n "${CONFIG_MERGED:-}" ] && { printf '%s\n' "$CONFIG_MERGED"; return 0; }
     local defaults profile
     defaults=$(config_defaults_file)
     profile=$(profile_file)
@@ -39,6 +44,20 @@ config_merged() {
     else
         cat "$defaults" 2>/dev/null || echo '{}'
     fi
+}
+
+# config_load   -- merge once, and have every read after it use that.
+#
+# A command asks for many settings -- `theme status` for eighteen, doctor for
+# a dozen -- and each config_get merged the two files again, four jq runs at a
+# time. Called at a script's top level, never inside `$(...)`: an assignment
+# made in a subshell dies with it, and every read would go on merging.
+# config_set loads again after it writes, so nothing reads a setting from
+# before its own write. Not exported, so a command this one runs reads the
+# files for itself.
+config_load() {
+    CONFIG_MERGED=""
+    CONFIG_MERGED=$(config_merged)
 }
 
 # config_get <jq path> [default]   -- one value, raw. Arrays come back as JSON.
@@ -91,4 +110,6 @@ _config_write() {   # <path> <--arg|--argjson> <value>
         jq -n "$how" v "$value" "$path = \$v" > "$tmp"
     fi || { rm -f "$tmp"; return 1; }
     mv -f "$tmp" "$file" || { rm -f "$tmp"; return 1; }
+    if [ -n "${CONFIG_MERGED:-}" ]; then config_load; fi
+    return 0
 }

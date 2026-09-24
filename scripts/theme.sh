@@ -45,6 +45,9 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 
+# Read once: most commands here ask for the configuration many times over.
+config_load
+
 LNF_SRC="$REPO_ROOT/theme/lookandfeel"
 
 # Two packages, light and dark, and LNF_DEST is the light one -- the id this

@@ -66,4 +66,18 @@ config_set_string '.panel.renderer' plasma; rc=$?
 check "a broken profile says so"   "$rc" "2"
 check "and is left exactly as it was" "$(cat "$profile")" '{ this is not json'
 
+# A command that asks for many settings reads the files once. What it read is
+# what it goes on reading -- until it writes, when it reads again, so no
+# command sees a setting from before its own write.
+echo "== read once, and again after a write =="
+write_profile '{ "panel": { "thickness": 44 } }'
+config_load
+check "what was loaded"            "$(config_get '.panel.thickness' 0)" "44"
+write_profile '{ "panel": { "thickness": 45 } }'
+check "is what is read"            "$(config_get '.panel.thickness' 0)" "44"
+config_set '.panel.thickness' 46
+check "until a write loads again"  "$(config_get '.panel.thickness' 0)" "46"
+check "and the rest is still there" "$(config_get '.panel.renderer' none)" "quickshell"
+unset CONFIG_MERGED
+
 harness_done
