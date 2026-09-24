@@ -350,315 +350,307 @@ BarWidget {
     }
 
     popout: Component {
-        // An Item that knows its own width, like every other widget's popout.
-        // The window is sized from the content's implicit size on the frame it
-        // is shown, and a bare Column has none until its children have been laid
-        // out: opened cold this drew the card a few pixels square -- a round blob
-        // with nothing in it -- and only the second opening looked right.
-        Item {
+        // A PopoutColumn, like every other widget's popout -- this is the one
+        // that found out why a bare Column will not do (see PopoutColumn).
+        PopoutColumn {
+            id: centre
+
+            readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
+            property real now: Date.now()
+
+            // Midnight this morning, which is all the stream's days depend
+            // on. Handed `now` itself, the days were worked out again on
+            // every tick of the timer below, and the rows were kept only
+            // because the Repeater happened to find the new list equal to
+            // the old one -- which it does, as of Qt 6.11.
+            readonly property real today: {
+                const d = new Date(centre.now);
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            }
+
+            readonly property var groups: root.style === "grouped" ? Centre.groups(centre.entries) : []
+            readonly property var buckets: root.style === "stream" ? Centre.buckets(centre.entries, centre.today) : []
+
+            // A group or a day by its place, as long as its name agrees,
+            // and by name while the list is still moving under it. The
+            // Repeaters below are over the names, so a new notification
+            // moves a card rather than making every card again -- an
+            // opened-out group stays open.
+            function groupAt(index, app) {
+                const at = centre.groups[index];
+                return at?.app === app ? at : (centre.groups.find(g => g.app === app) ?? { app: app, icon: "", entries: [] });
+            }
+
+            function bucketAt(index, label) {
+                const at = centre.buckets[index];
+                return at?.label === label ? at : (centre.buckets.find(b => b.label === label) ?? { label: label, entries: [] });
+            }
+
             implicitWidth: 384
-            implicitHeight: centre.implicitHeight
+            spacing: 14
 
-            Column {
-                id: centre
+            Timer {
+                interval: 30000
+                running: true
+                repeat: true
+                onTriggered: centre.now = Date.now()
+            }
 
-                readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
-                property real now: Date.now()
-
-                // Midnight this morning, which is all the stream's days depend
-                // on. Handed `now` itself, the days were worked out again on
-                // every tick of the timer below, and the rows were kept only
-                // because the Repeater happened to find the new list equal to
-                // the old one -- which it does, as of Qt 6.11.
-                readonly property real today: {
-                    const d = new Date(centre.now);
-                    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-                }
-
-                readonly property var groups: root.style === "grouped" ? Centre.groups(centre.entries) : []
-                readonly property var buckets: root.style === "stream" ? Centre.buckets(centre.entries, centre.today) : []
-
-                // A group or a day by its place, as long as its name agrees,
-                // and by name while the list is still moving under it. The
-                // Repeaters below are over the names, so a new notification
-                // moves a card rather than making every card again -- an
-                // opened-out group stays open.
-                function groupAt(index, app) {
-                    const at = centre.groups[index];
-                    return at?.app === app ? at : (centre.groups.find(g => g.app === app) ?? { app: app, icon: "", entries: [] });
-                }
-
-                function bucketAt(index, label) {
-                    const at = centre.buckets[index];
-                    return at?.label === label ? at : (centre.buckets.find(b => b.label === label) ?? { label: label, entries: [] });
-                }
-
+            Item {
                 width: parent.width
-                spacing: 14
+                height: 34
 
-                Timer {
-                    interval: 30000
-                    running: true
-                    repeat: true
-                    onTriggered: centre.now = Date.now()
+                PanelText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Notifications"
+                    font.pixelSize: 18
+                    font.weight: Font.Medium
                 }
 
-                Item {
-                    width: parent.width
-                    height: 34
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
 
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Notifications"
-                        font.pixelSize: 18
-                        font.weight: Font.Medium
-                    }
-
-                    Row {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 6
-
-                        TextButton {
-                            text: "Do not disturb"
-                            checked: DoNotDisturb.active
-                            onActivated: DoNotDisturb.toggle()
-                        }
-
-                        TextButton {
-                            visible: NotificationWatch.entries.length > 0
-                            text: "Clear all"
-                            onActivated: NotificationWatch.clear()
-                        }
-                    }
-                }
-
-                // Off: say so, and offer to start it.
-                Column {
-                    visible: !NotificationWatch.enabled
-                    width: parent.width
-                    spacing: 12
-
-                    PanelText {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        color: Theme.mut
-                        font.pixelSize: 13
-                        lineHeight: 1.2
-                        text: `The history is off, so nothing is being kept. ${DoNotDisturb.shellDraws ? "This shell" : "Plasma"} draws every notification either way; the history remembers them, in memory only, until the shell stops.`
+                    TextButton {
+                        text: "Do not disturb"
+                        checked: DoNotDisturb.active
+                        onActivated: DoNotDisturb.toggle()
                     }
 
                     TextButton {
-                        primary: true
-                        glyph: "history"
-                        iconName: "view-history"
-                        text: "Keep a history"
-                        onActivated: ConfigStore.set("notifications.history", true)
+                        visible: NotificationWatch.entries.length > 0
+                        text: "Clear all"
+                        onActivated: NotificationWatch.clear()
                     }
                 }
+            }
+
+            // Off: say so, and offer to start it.
+            Column {
+                visible: !NotificationWatch.enabled
+                width: parent.width
+                spacing: 12
 
                 PanelText {
-                    visible: NotificationWatch.enabled && NotificationWatch.entries.length === 0
                     width: parent.width
                     wrapMode: Text.WordWrap
                     color: Theme.mut
                     font.pixelSize: 13
-                    text: "Nothing yet. Notifications are remembered from the moment the shell starts, and only in memory."
+                    lineHeight: 1.2
+                    text: `The history is off, so nothing is being kept. ${DoNotDisturb.shellDraws ? "This shell" : "Plasma"} draws every notification either way; the history remembers them, in memory only, until the shell stops.`
                 }
 
-                Flickable {
-                    id: scroller
-                    visible: centre.entries.length > 0
-                    width: parent.width
-                    height: Math.min(contentHeight, 560)
-                    contentHeight: list.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
+                TextButton {
+                    primary: true
+                    glyph: "history"
+                    iconName: "view-history"
+                    text: "Keep a history"
+                    onActivated: ConfigStore.set("notifications.history", true)
+                }
+            }
 
-                    Column {
-                        id: list
-                        width: scroller.width
-                        spacing: 12
+            PanelText {
+                visible: NotificationWatch.enabled && NotificationWatch.entries.length === 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Theme.mut
+                font.pixelSize: 13
+                text: "Nothing yet. Notifications are remembered from the moment the shell starts, and only in memory."
+            }
 
-                        Repeater {
-                            model: ScriptModel { values: centre.groups.map(g => g.app) }
+            Flickable {
+                id: scroller
+                visible: centre.entries.length > 0
+                width: parent.width
+                height: Math.min(contentHeight, 560)
+                contentHeight: list.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
 
-                            GroupCard {
-                                id: groupCard
-                                // The application, and its place in the list.
-                                required property string modelData
-                                required property int index
-                                group: centre.groupAt(groupCard.index, groupCard.modelData)
-                                now: centre.now
-                            }
+                Column {
+                    id: list
+                    width: scroller.width
+                    spacing: 12
+
+                    Repeater {
+                        model: ScriptModel { values: centre.groups.map(g => g.app) }
+
+                        GroupCard {
+                            id: groupCard
+                            // The application, and its place in the list.
+                            required property string modelData
+                            required property int index
+                            group: centre.groupAt(groupCard.index, groupCard.modelData)
+                            now: centre.now
                         }
+                    }
 
-                        Repeater {
-                            model: ScriptModel { values: centre.buckets.map(b => b.label) }
+                    Repeater {
+                        model: ScriptModel { values: centre.buckets.map(b => b.label) }
 
-                            Column {
-                                id: bucket
+                        Column {
+                            id: bucket
 
-                                // The day's label, and its place in the list.
-                                required property string modelData
-                                required property int index
-                                readonly property var day: centre.bucketAt(bucket.index, bucket.modelData)
+                            // The day's label, and its place in the list.
+                            required property string modelData
+                            required property int index
+                            readonly property var day: centre.bucketAt(bucket.index, bucket.modelData)
 
-                                width: list.width
+                            width: list.width
 
-                                MenuTitle {
-                                    leftPadding: 0
-                                    text: bucket.day.label
+                            MenuTitle {
+                                leftPadding: 0
+                                text: bucket.day.label
+                            }
+
+                            Repeater {
+                                // By identity, as in a group card.
+                                model: ScriptModel {
+                                    values: bucket.day.entries
+                                    comparisonMode: ObjectComparison.Identity
                                 }
 
-                                Repeater {
-                                    // By identity, as in a group card.
-                                    model: ScriptModel {
-                                        values: bucket.day.entries
-                                        comparisonMode: ObjectComparison.Identity
+                                Item {
+                                    id: line
+
+                                    required property var modelData
+                                    required property int index
+
+                                    readonly property string picture: NotificationWatch.pictureOf(line.modelData)
+                                    readonly property bool openable: NotificationWatch.openable(line.modelData)
+
+                                    width: bucket.width
+                                    height: lineBody.implicitHeight + 24
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.margins: 2
+                                        radius: Theme.radiusOf(12)
+                                        visible: lineHover.hovered && line.openable
+                                        color: Theme.alpha(Theme.fg, 0.06)
                                     }
 
-                                    Item {
-                                        id: line
+                                    NoteIcon {
+                                        y: 13
+                                        size: 20
+                                        source: line.modelData.appIcon ?? ""
+                                    }
 
-                                        required property var modelData
-                                        required property int index
+                                    Column {
+                                        id: lineBody
+                                        x: 34
+                                        y: 12
+                                        width: parent.width - 34
 
-                                        readonly property string picture: NotificationWatch.pictureOf(line.modelData)
-                                        readonly property bool openable: NotificationWatch.openable(line.modelData)
+                                        Item {
+                                            width: parent.width
+                                            height: summary.implicitHeight
 
-                                        width: bucket.width
-                                        height: lineBody.implicitHeight + 24
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            anchors.margins: 2
-                                            radius: Theme.radiusOf(12)
-                                            visible: lineHover.hovered && line.openable
-                                            color: Theme.alpha(Theme.fg, 0.06)
-                                        }
-
-                                        NoteIcon {
-                                            y: 13
-                                            size: 20
-                                            source: line.modelData.appIcon ?? ""
-                                        }
-
-                                        Column {
-                                            id: lineBody
-                                            x: 34
-                                            y: 12
-                                            width: parent.width - 34
-
-                                            Item {
-                                                width: parent.width
-                                                height: summary.implicitHeight
-
-                                                PanelText {
-                                                    id: summary
-                                                    width: parent.width - stamp.width - 8
-                                                    elide: Text.ElideRight
-                                                    text: line.modelData.summary
-                                                    font.pixelSize: 14
-                                                    font.weight: Font.Medium
-                                                    color: line.modelData.urgency >= 2 ? Theme.error : Theme.fg
-                                                }
-
-                                                PanelText {
-                                                    id: stamp
-                                                    anchors.right: parent.right
-                                                    text: Qt.formatDateTime(new Date(line.modelData.when), "HH:mm")
-                                                    font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
-                                                    color: Theme.mut
-                                                }
+                                            PanelText {
+                                                id: summary
+                                                width: parent.width - stamp.width - 8
+                                                elide: Text.ElideRight
+                                                text: line.modelData.summary
+                                                font.pixelSize: 14
+                                                font.weight: Font.Medium
+                                                color: line.modelData.urgency >= 2 ? Theme.error : Theme.fg
                                             }
 
                                             PanelText {
-                                                visible: line.modelData.body.length > 0
-                                                width: parent.width
-                                                topPadding: 2
-                                                text: line.modelData.body
-                                                wrapMode: Text.WordWrap
-                                                maximumLineCount: 2
-                                                elide: Text.ElideRight
-                                                font.pixelSize: 13
+                                                id: stamp
+                                                anchors.right: parent.right
+                                                text: Qt.formatDateTime(new Date(line.modelData.when), "HH:mm")
+                                                font.family: Theme.monoFamily
+                                                font.pixelSize: 11
                                                 color: Theme.mut
                                             }
+                                        }
 
-                                            // The picture it is about, as in
-                                            // the grouped view.
-                                            Item {
+                                        PanelText {
+                                            visible: line.modelData.body.length > 0
+                                            width: parent.width
+                                            topPadding: 2
+                                            text: line.modelData.body
+                                            wrapMode: Text.WordWrap
+                                            maximumLineCount: 2
+                                            elide: Text.ElideRight
+                                            font.pixelSize: 13
+                                            color: Theme.mut
+                                        }
+
+                                        // The picture it is about, as in
+                                        // the grouped view.
+                                        Item {
+                                            width: parent.width
+                                            height: visible ? 108 : 0
+                                            visible: line.picture.length > 0 && streamShot.status !== Image.Error
+
+                                            Rectangle {
+                                                y: 8
                                                 width: parent.width
-                                                height: visible ? 108 : 0
-                                                visible: line.picture.length > 0 && streamShot.status !== Image.Error
+                                                height: 100
+                                                radius: Theme.radiusOf(12)
+                                                color: Theme.s2
+                                                clip: true
 
-                                                Rectangle {
-                                                    y: 8
-                                                    width: parent.width
-                                                    height: 100
-                                                    radius: Theme.radiusOf(12)
-                                                    color: Theme.s2
-                                                    clip: true
-
-                                                    Image {
-                                                        id: streamShot
-                                                        anchors.fill: parent
-                                                        source: line.picture
-                                                        sourceSize: Qt.size(760, 300)
-                                                        fillMode: Image.PreserveAspectCrop
-                                                        asynchronous: true
-                                                        cache: false
-                                                    }
+                                                Image {
+                                                    id: streamShot
+                                                    anchors.fill: parent
+                                                    source: line.picture
+                                                    sourceSize: Qt.size(760, 300)
+                                                    fillMode: Image.PreserveAspectCrop
+                                                    asynchronous: true
+                                                    cache: false
                                                 }
                                             }
                                         }
+                                    }
 
-                                        Rectangle {
-                                            anchors.bottom: parent.bottom
-                                            width: parent.width
-                                            height: 1
-                                            color: Theme.out
-                                            visible: line.index < bucket.day.entries.length - 1
-                                        }
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        width: parent.width
+                                        height: 1
+                                        color: Theme.out
+                                        visible: line.index < bucket.day.entries.length - 1
+                                    }
 
-                                        HoverHandler {
-                                            id: lineHover
-                                            cursorShape: line.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        }
+                                    HoverHandler {
+                                        id: lineHover
+                                        cursorShape: line.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    }
 
-                                        TapHandler {
-                                            enabled: line.openable
-                                            onTapped: {
-                                                NotificationWatch.open(line.modelData);
-                                                root.closePopout();
-                                            }
+                                    TapHandler {
+                                        enabled: line.openable
+                                        onTapped: {
+                                            NotificationWatch.open(line.modelData);
+                                            root.closePopout();
                                         }
+                                    }
 
-                                        IconButton {
-                                            anchors.right: parent.right
-                                            anchors.bottom: parent.bottom
-                                            anchors.bottomMargin: 4
-                                            visible: root.askable && lineHover.hovered
-                                            size: 30
-                                            glyph: "help"
-                                            iconName: "help-hint"
-                                            onActivated: root.ask(line.modelData)
-                                        }
+                                    IconButton {
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 4
+                                        visible: root.askable && lineHover.hovered
+                                        size: 30
+                                        glyph: "help"
+                                        iconName: "help-hint"
+                                        onActivated: root.ask(line.modelData)
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                PanelText {
-                    visible: NotificationWatch.entries.length > root.shown
-                    width: parent.width
-                    color: Theme.mut
-                    font.pixelSize: 12
-                    text: `and ${NotificationWatch.entries.length - root.shown} older`
-                }
+            PanelText {
+                visible: NotificationWatch.entries.length > root.shown
+                width: parent.width
+                color: Theme.mut
+                font.pixelSize: 12
+                text: `and ${NotificationWatch.entries.length - root.shown} older`
             }
         }
     }

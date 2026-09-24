@@ -42,93 +42,87 @@ BarWidget {
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 300
-            implicitHeight: body.implicitHeight
+            spacing: 8
 
-            Column {
-                id: body
+            // One row per application, per device it holds. An application
+            // with both is two rows: it is two things it is doing, and one
+            // of them can be stopped from here.
+            Repeater {
+                model: root.users.camera.map(app => ({ kind: "camera", app: app }))
+                    .concat(root.users.microphone.map(app => ({ kind: "microphone", app: app })))
 
+                Row {
+                    id: user
+
+                    required property var modelData
+                    readonly property bool isMic: user.modelData.kind === "microphone"
+
+                    width: body.width
+                    spacing: 10
+
+                    PanelIcon {
+                        id: userIcon
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitSize: 22
+                        iconName: user.isMic
+                            ? StatusIcons.micIcon(AudioStatus.micVolume, AudioStatus.micMuted)
+                            : "camera-on"
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - userIcon.width - parent.spacing
+                        spacing: 1
+
+                        PanelText {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: user.modelData.app
+                        }
+
+                        PanelText {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: user.isMic
+                                ? (AudioStatus.micMuted ? "Using the microphone · muted" : "Using the microphone")
+                                : "Using the camera"
+                            font.pixelSize: 11
+                            color: user.isMic && AudioStatus.micMuted ? Theme.mut : Theme.warning
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: root.recordingSound
                 width: parent.width
-                spacing: 8
+                height: 1
+                color: Theme.out
+            }
 
-                // One row per application, per device it holds. An application
-                // with both is two rows: it is two things it is doing, and one
-                // of them can be stopped from here.
-                Repeater {
-                    model: root.users.camera.map(app => ({ kind: "camera", app: app }))
-                        .concat(root.users.microphone.map(app => ({ kind: "microphone", app: app })))
+            // The one thing this can actually stop. There is no equivalent for
+            // the camera: PipeWire has no mute for a video node, and a camera
+            // is released by the application that took it.
+            TextButton {
+                visible: root.recordingSound
+                width: parent.width
+                glyph: AudioStatus.micMuted ? "mic" : "mic_off"
+                iconName: AudioStatus.micMuted ? "microphone-sensitivity-high" : "microphone-sensitivity-muted"
+                text: AudioStatus.micMuted ? "Unmute the microphone" : "Mute the microphone"
+                onActivated: AudioStatus.toggleMicMute()
+            }
 
-                    Row {
-                        id: user
-
-                        required property var modelData
-                        readonly property bool isMic: user.modelData.kind === "microphone"
-
-                        width: body.width
-                        spacing: 10
-
-                        PanelIcon {
-                            id: userIcon
-                            anchors.verticalCenter: parent.verticalCenter
-                            implicitSize: 22
-                            iconName: user.isMic
-                                ? StatusIcons.micIcon(AudioStatus.micVolume, AudioStatus.micMuted)
-                                : "camera-on"
-                        }
-
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - userIcon.width - parent.spacing
-                            spacing: 1
-
-                            PanelText {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                text: user.modelData.app
-                            }
-
-                            PanelText {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                text: user.isMic
-                                    ? (AudioStatus.micMuted ? "Using the microphone · muted" : "Using the microphone")
-                                    : "Using the camera"
-                                font.pixelSize: 11
-                                color: user.isMic && AudioStatus.micMuted ? Theme.mut : Theme.warning
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    visible: root.recordingSound
-                    width: parent.width
-                    height: 1
-                    color: Theme.out
-                }
-
-                // The one thing this can actually stop. There is no equivalent for
-                // the camera: PipeWire has no mute for a video node, and a camera
-                // is released by the application that took it.
-                TextButton {
-                    visible: root.recordingSound
-                    width: parent.width
-                    glyph: AudioStatus.micMuted ? "mic" : "mic_off"
-                    iconName: AudioStatus.micMuted ? "microphone-sensitivity-high" : "microphone-sensitivity-muted"
-                    text: AudioStatus.micMuted ? "Unmute the microphone" : "Mute the microphone"
-                    onActivated: AudioStatus.toggleMicMute()
-                }
-
-                TextButton {
-                    width: parent.width
-                    glyph: "tune"
-                    iconName: "preferences-desktop-sound"
-                    text: "Sound settings…"
-                    onActivated: {
-                        PlasmaApplets.openSettings("kcm_pulseaudio");
-                        root.popoutVisible = false;
-                    }
+            TextButton {
+                width: parent.width
+                glyph: "tune"
+                iconName: "preferences-desktop-sound"
+                text: "Sound settings…"
+                onActivated: {
+                    PlasmaApplets.openSettings("kcm_pulseaudio");
+                    root.popoutVisible = false;
                 }
             }
         }

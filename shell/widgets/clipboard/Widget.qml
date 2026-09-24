@@ -41,101 +41,87 @@ BarWidget {
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 340
-            implicitHeight: body.implicitHeight
+            spacing: 6
 
-            Column {
-                id: body
+            PopoutHeader {
+                title: "Clipboard"
+
+                IconButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: ClipboardStatus.entries.length > 0
+                    iconName: "edit-clear-history"
+                    onActivated: ClipboardStatus.clear()
+                }
+            }
+
+            PanelText {
+                visible: ClipboardStatus.source === "own"
                 width: parent.width
-                spacing: 6
+                wrapMode: Text.WordWrap
+                color: Theme.foregroundInactive
+                font.pixelSize: 10
+                text: "Plasma's clipboard manager is not running, so this shell keeps the history: text only, in memory, gone when the shell stops. Nothing a password manager marks secret is kept."
+            }
 
-                Row {
-                    width: parent.width
-                    spacing: 8
+            Repeater {
+                model: ClipboardStatus.entries.slice(0, root.shown)
+
+                Rectangle {
+                    id: row
+
+                    required property var modelData
+
+                    width: body.width
+                    height: 26
+                    radius: Theme.radiusOf(5)
+                    color: rowHover.hovered && !row.modelData.image ? Theme.hoverBackground : "transparent"
+                    opacity: row.modelData.image ? 0.5 : 1
+
+                    PanelIcon {
+                        x: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitSize: 14
+                        iconName: row.modelData.image ? "image-x-generic" : "edit-paste"
+                    }
 
                     PanelText {
+                        x: 28
                         anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - clear.width - 8
-                        text: "Clipboard"
-                        font.bold: true
+                        width: parent.width - 34
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        text: row.modelData.image ? "An image -- choose it from Plasma's clipboard (Meta+V)"
+                                                  : StatusIcons.clipboardPreview(row.modelData.text, 80)
                     }
 
-                    IconButton {
-                        id: clear
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: ClipboardStatus.entries.length > 0
-                        iconName: "edit-clear-history"
-                        onActivated: ClipboardStatus.clear()
-                    }
-                }
-
-                PanelText {
-                    visible: ClipboardStatus.source === "own"
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 10
-                    text: "Plasma's clipboard manager is not running, so this shell keeps the history: text only, in memory, gone when the shell stops. Nothing a password manager marks secret is kept."
-                }
-
-                Repeater {
-                    model: ClipboardStatus.entries.slice(0, root.shown)
-
-                    Rectangle {
-                        id: row
-
-                        required property var modelData
-
-                        width: body.width
-                        height: 26
-                        radius: Theme.radiusOf(5)
-                        color: rowHover.hovered && !row.modelData.image ? Theme.hoverBackground : "transparent"
-                        opacity: row.modelData.image ? 0.5 : 1
-
-                        PanelIcon {
-                            x: 6
-                            anchors.verticalCenter: parent.verticalCenter
-                            implicitSize: 14
-                            iconName: row.modelData.image ? "image-x-generic" : "edit-paste"
-                        }
-
-                        PanelText {
-                            x: 28
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - 34
-                            elide: Text.ElideRight
-                            font.pixelSize: 11
-                            text: row.modelData.image ? "An image -- choose it from Plasma's clipboard (Meta+V)"
-                                                      : StatusIcons.clipboardPreview(row.modelData.text, 80)
-                        }
-
-                        HoverHandler { id: rowHover }
-                        TapHandler {
-                            enabled: !row.modelData.image
-                            onTapped: {
-                                ClipboardStatus.pick(row.modelData);
-                                root.popoutVisible = false;
-                            }
+                    HoverHandler { id: rowHover }
+                    TapHandler {
+                        enabled: !row.modelData.image
+                        onTapped: {
+                            ClipboardStatus.pick(row.modelData);
+                            root.popoutVisible = false;
                         }
                     }
                 }
+            }
 
-                PanelText {
-                    visible: ClipboardStatus.entries.length === 0
-                    width: parent.width
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
-                    text: "Nothing copied yet."
-                }
+            PanelText {
+                visible: ClipboardStatus.entries.length === 0
+                width: parent.width
+                color: Theme.foregroundInactive
+                font.pixelSize: 11
+                text: "Nothing copied yet."
+            }
 
-                PanelText {
-                    visible: ClipboardStatus.entries.length > root.shown
-                    width: parent.width
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 10
-                    text: `and ${ClipboardStatus.entries.length - root.shown} older`
-                }
+            PanelText {
+                visible: ClipboardStatus.entries.length > root.shown
+                width: parent.width
+                color: Theme.foregroundInactive
+                font.pixelSize: 10
+                text: `and ${ClipboardStatus.entries.length - root.shown} older`
             }
         }
     }

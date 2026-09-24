@@ -54,197 +54,192 @@ BarWidget {
 
     popoutWidth: 320
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 320
-            implicitHeight: body.implicitHeight
+            spacing: 12
 
-            Column {
-                id: body
+            Row {
                 width: parent.width
                 spacing: 12
 
-                Row {
-                    width: parent.width
-                    spacing: 12
-
-                    Glyph {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: WeatherStatus.condition.glyph
-                        size: 42
-                        color: Theme.acc
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 54
-
-                        PanelText {
-                            text: WeatherStatus.ready ? WeatherStatus.temperatureText : "--"
-                            font.pixelSize: 26
-                            font.weight: Font.Medium
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: WeatherStatus.ready
-                                ? [WeatherStatus.condition.label, WeatherStatus.placeName].filter(s => s).join(" · ")
-                                : (WeatherStatus.error.length > 0 ? WeatherStatus.error : "Asking…")
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-                    }
-                }
-
-                Row {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    spacing: 14
-
-                    PanelText {
-                        text: WeatherStatus.current
-                            ? `Feels ${Forecast.degrees(WeatherStatus.current.feelsLike, WeatherStatus.temperatureUnit)}` : ""
-                        font.pixelSize: 11
-                        color: Theme.mut
-                    }
-                    PanelText {
-                        text: WeatherStatus.current ? `Humidity ${Math.round(WeatherStatus.current.humidity)}%` : ""
-                        font.pixelSize: 11
-                        color: Theme.mut
-                    }
-                    PanelText {
-                        text: WeatherStatus.current
-                            ? `Wind ${Math.round(WeatherStatus.current.wind)} ${WeatherStatus.forecast?.windUnit ?? ""}` : ""
-                        font.pixelSize: 11
-                        color: Theme.mut
-                    }
-                }
-
-                // The next hours, across, scrolled by dragging.
-                Flickable {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    height: 72
-                    contentWidth: hours.implicitWidth
-                    flickableDirection: Flickable.HorizontalFlick
-                    clip: true
-
-                    Row {
-                        id: hours
-                        spacing: 2
-
-                        Repeater {
-                            model: WeatherStatus.hours.slice(0, 12)
-
-                            Column {
-                                id: hour
-                                required property var modelData
-                                width: 48
-                                spacing: 3
-
-                                PanelText {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: Qt.formatDateTime(new Date(hour.modelData.when), "HH")
-                                    font.pixelSize: 11
-                                    color: Theme.mut
-                                }
-
-                                Glyph {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    name: Forecast.describe(hour.modelData.code, hour.modelData.isDay).glyph
-                                    size: 18
-                                    color: Theme.acc
-                                }
-
-                                PanelText {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: Forecast.degrees(hour.modelData.temperature, "°")
-                                    font.pixelSize: 12
-                                }
-
-                                PanelText {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    visible: hour.modelData.rain > 0
-                                    text: `${Math.round(hour.modelData.rain)}%`
-                                    font.pixelSize: 10
-                                    color: Theme.mut
-                                }
-                            }
-                        }
-                    }
+                Glyph {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: WeatherStatus.condition.glyph
+                    size: 42
+                    color: Theme.acc
                 }
 
                 Column {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    spacing: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 54
+
+                    PanelText {
+                        text: WeatherStatus.ready ? WeatherStatus.temperatureText : "--"
+                        font.pixelSize: 26
+                        font.weight: Font.Medium
+                    }
+
+                    PanelText {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        text: WeatherStatus.ready
+                            ? [WeatherStatus.condition.label, WeatherStatus.placeName].filter(s => s).join(" · ")
+                            : (WeatherStatus.error.length > 0 ? WeatherStatus.error : "Asking…")
+                        font.pixelSize: 12
+                        color: Theme.mut
+                    }
+                }
+            }
+
+            Row {
+                visible: WeatherStatus.ready
+                width: parent.width
+                spacing: 14
+
+                PanelText {
+                    text: WeatherStatus.current
+                        ? `Feels ${Forecast.degrees(WeatherStatus.current.feelsLike, WeatherStatus.temperatureUnit)}` : ""
+                    font.pixelSize: 11
+                    color: Theme.mut
+                }
+                PanelText {
+                    text: WeatherStatus.current ? `Humidity ${Math.round(WeatherStatus.current.humidity)}%` : ""
+                    font.pixelSize: 11
+                    color: Theme.mut
+                }
+                PanelText {
+                    text: WeatherStatus.current
+                        ? `Wind ${Math.round(WeatherStatus.current.wind)} ${WeatherStatus.forecast?.windUnit ?? ""}` : ""
+                    font.pixelSize: 11
+                    color: Theme.mut
+                }
+            }
+
+            // The next hours, across, scrolled by dragging.
+            Flickable {
+                visible: WeatherStatus.ready
+                width: parent.width
+                height: 72
+                contentWidth: hours.implicitWidth
+                flickableDirection: Flickable.HorizontalFlick
+                clip: true
+
+                Row {
+                    id: hours
+                    spacing: 2
 
                     Repeater {
-                        model: WeatherStatus.days.slice(0, Math.max(1, root.days))
+                        model: WeatherStatus.hours.slice(0, 12)
 
-                        Item {
-                            id: line
+                        Column {
+                            id: hour
                             required property var modelData
-                            width: parent.width
-                            height: 20
+                            width: 48
+                            spacing: 3
 
                             PanelText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 64
-                                text: Forecast.dayName(line.modelData.when, Date.now(), Qt.locale())
-                                font.pixelSize: 12
-                                color: Theme.mut
-                            }
-
-                            Glyph {
-                                x: 68
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: Forecast.describe(line.modelData.code, true).glyph
-                                size: 16
-                                color: Theme.acc
-                            }
-
-                            PanelText {
-                                x: 94
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: line.modelData.rain > 0
-                                text: `${Math.round(line.modelData.rain)}%`
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: Qt.formatDateTime(new Date(hour.modelData.when), "HH")
                                 font.pixelSize: 11
                                 color: Theme.mut
                             }
 
+                            Glyph {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                name: Forecast.describe(hour.modelData.code, hour.modelData.isDay).glyph
+                                size: 18
+                                color: Theme.acc
+                            }
+
                             PanelText {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: `${Forecast.degrees(line.modelData.high, "°")} / ${Forecast.degrees(line.modelData.low, "°")}`
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: Forecast.degrees(hour.modelData.temperature, "°")
                                 font.pixelSize: 12
+                            }
+
+                            PanelText {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                visible: hour.modelData.rain > 0
+                                text: `${Math.round(hour.modelData.rain)}%`
+                                font.pixelSize: 10
+                                color: Theme.mut
                             }
                         }
                     }
                 }
+            }
 
-                Item {
-                    width: parent.width
-                    height: 20
+            Column {
+                visible: WeatherStatus.ready
+                width: parent.width
+                spacing: 6
 
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: WeatherStatus.fetchedAt > 0
-                            ? `Open-Meteo · ${Qt.formatDateTime(new Date(WeatherStatus.fetchedAt), "HH:mm")}`
-                            : "Open-Meteo"
-                        font.pixelSize: 10
-                        color: Theme.mut
+                Repeater {
+                    model: WeatherStatus.days.slice(0, Math.max(1, root.days))
+
+                    Item {
+                        id: line
+                        required property var modelData
+                        width: parent.width
+                        height: 20
+
+                        PanelText {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 64
+                            text: Forecast.dayName(line.modelData.when, Date.now(), Qt.locale())
+                            font.pixelSize: 12
+                            color: Theme.mut
+                        }
+
+                        Glyph {
+                            x: 68
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: Forecast.describe(line.modelData.code, true).glyph
+                            size: 16
+                            color: Theme.acc
+                        }
+
+                        PanelText {
+                            x: 94
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: line.modelData.rain > 0
+                            text: `${Math.round(line.modelData.rain)}%`
+                            font.pixelSize: 11
+                            color: Theme.mut
+                        }
+
+                        PanelText {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: `${Forecast.degrees(line.modelData.high, "°")} / ${Forecast.degrees(line.modelData.low, "°")}`
+                            font.pixelSize: 12
+                        }
                     }
+                }
+            }
 
-                    IconButton {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        size: 24
-                        glyph: "refresh"
-                        iconName: "view-refresh"
-                        color: Theme.mut
-                        onActivated: WeatherStatus.refresh(true)
-                    }
+            Item {
+                width: parent.width
+                height: 20
+
+                PanelText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: WeatherStatus.fetchedAt > 0
+                        ? `Open-Meteo · ${Qt.formatDateTime(new Date(WeatherStatus.fetchedAt), "HH:mm")}`
+                        : "Open-Meteo"
+                    font.pixelSize: 10
+                    color: Theme.mut
+                }
+
+                IconButton {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: 24
+                    glyph: "refresh"
+                    iconName: "view-refresh"
+                    color: Theme.mut
+                    onActivated: WeatherStatus.refresh(true)
                 }
             }
         }
