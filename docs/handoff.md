@@ -206,7 +206,7 @@ any disagreement, in `make lint` and in CI.
 `rmpr windows restart` (the daemon is a rendered copy), then the checks
 listed under "Needs the real desktop" in that entry. `make lint` and `make
 test` are clean; `dev` is **not pushed** -- the three commits of 2026-09-23's
-evening and the cleanup's 97 are local.
+evening and the cleanup's 99 are local.
 
 **What to pick up first, 2026-09-24.** Nothing is half-written; `make lint`,
 `make test` and `rmpr doctor` are all clean, and `dev` is pushed.
@@ -381,6 +381,16 @@ icons were dimmed to half strength in the overflow, which on the light theme
 made grey icons nearly invisible. Both fixed: the card closes when its group
 goes from some windows to none, and the overflow no longer dims passive
 items.
+
+**A trap the PR's CI found, worth knowing before adding a lock-screen
+singleton:** Qt loads *every* singleton a `qmldir` names whenever it compiles
+*any* file in that directory, used or not. `LockKeys` imported three of
+Plasma's private modules, so `Unlock` -- pure logic -- needed Plasma to
+compile, and `tst_LockUnlock` failed in CI's container, which has none. It
+passed here because Plasma is installed. `LockKeys` now makes those objects
+at run time from text, compiles with QtQuick alone, and a missing module
+costs only its own part. The CI job can be replayed locally, exactly:
+`docker run archlinux:latest` with the packages in `.github/workflows/ci.yml`.
 
 **Needs the real desktop, and nobody has done it yet:**
 - `make link` then `rmpr windows restart`: the daemon is a rendered copy and
