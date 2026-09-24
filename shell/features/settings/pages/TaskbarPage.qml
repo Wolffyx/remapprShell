@@ -25,6 +25,12 @@ Column {
 
     readonly property bool autoHide: ConfigStore.value("panel.autoHide", false) === true
 
+    // The choices the shared rows and each monitor's rows both offer.
+    readonly property var positionValues: ["top", "bottom", "left", "right"]
+    readonly property var positionLabels: ["Top", "Bottom", "Left", "Right"]
+    readonly property var styleValues: ["full", "floating", "islands"]
+    readonly property var styleLabels: ["Full width", "Floating bar", "Islands"]
+
     // The right-click menu. What the monitor row can be set to is what is
     // installed -- PanelMenuModel is the one place that knows -- plus the two
     // answers that are not an application: follow what is installed, or no row.
@@ -79,8 +85,8 @@ Column {
 
         ConfigSegmented {
             width: parent.width
-            values: ["top", "bottom", "left", "right"]
-            labels: ["Top", "Bottom", "Left", "Right"]
+            values: root.positionValues
+            labels: root.positionLabels
             path: "panel.position"
         }
 
@@ -106,8 +112,8 @@ Column {
 
         ConfigSegmented {
             width: parent.width
-            values: ["full", "floating", "islands"]
-            labels: ["Full width", "Floating bar", "Islands"]
+            values: root.styleValues
+            labels: root.styleLabels
             path: "panel.style"
         }
 
@@ -459,8 +465,8 @@ Column {
 
                 ConfigSegmented {
                     width: parent.width
-                    values: ["top", "bottom", "left", "right"]
-                    labels: ["Top", "Bottom", "Left", "Right"]
+                    values: root.positionValues
+                    labels: root.positionLabels
                     screen: screenBlock.name
                     path: "panel.position"
                 }
@@ -476,8 +482,8 @@ Column {
 
                 ConfigSegmented {
                     width: parent.width
-                    values: ["full", "floating", "islands"]
-                    labels: ["Full width", "Floating bar", "Islands"]
+                    values: root.styleValues
+                    labels: root.styleLabels
                     screen: screenBlock.name
                     path: "panel.style"
                 }

@@ -20,17 +20,23 @@ Column {
     readonly property bool builtinMenu: LauncherService.appsProvider?.providerId === "builtin"
     readonly property bool builtinSearch: LauncherService.searchProvider?.providerId === "builtin"
 
-    readonly property var sources: ConfigStore.value("launcher.searchSources",
-                                                     ["apps", "windows", "files", "settings"]) ?? []
+    // What search can look through, once: the switches below are drawn from
+    // it, and the list is written back in its order.
+    readonly property var sourceRows: [
+        { id: "apps", label: "Applications", description: "Everything installed, by name, by the binary, or by its initials." },
+        { id: "windows", label: "Open windows", description: "By their titles, so a window can be raised by the page it is showing." },
+        { id: "files", label: "Recent files", description: "What KDE and GTK applications record having opened." },
+        { id: "settings", label: "This shell's settings", description: "The pages of this window, by name." }
+    ]
+    readonly property var sourceIds: root.sourceRows.map(s => s.id)
+
+    readonly property var sources: ConfigStore.value("launcher.searchSources", root.sourceIds) ?? []
 
     // Written back in the order the switches are drawn, not the order they
-    // were turned on: the file is read by people as well as by the shell.
+    // were turned on: the file is read by people as well as by the shell. The
+    // schema's `set` keys are chosen the same way, by the same function.
     function setSource(id, on) {
-        const all = ["apps", "windows", "files", "settings"];
-        const chosen = root.sources.slice().filter(s => s !== id);
-        if (on)
-            chosen.push(id);
-        ConfigStore.set("launcher.searchSources", all.filter(s => chosen.indexOf(s) >= 0));
+        ConfigStore.set("launcher.searchSources", SettingGroups.chooseFrom(root.sourceIds, root.sources, id, on));
     }
 
     spacing: 14
@@ -153,12 +159,7 @@ Column {
         // A list rather than a key each: the order results appear in is the
         // shell's, and what a person wants to say here is "not my files".
         Repeater {
-            model: [
-                { id: "apps", label: "Applications", description: "Everything installed, by name, by the binary, or by its initials." },
-                { id: "windows", label: "Open windows", description: "By their titles, so a window can be raised by the page it is showing." },
-                { id: "files", label: "Recent files", description: "What KDE and GTK applications record having opened." },
-                { id: "settings", label: "This shell's settings", description: "The pages of this window, by name." }
-            ]
+            model: root.sourceRows
 
             ToggleRow {
                 required property var modelData
