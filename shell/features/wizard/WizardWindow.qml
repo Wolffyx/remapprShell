@@ -348,6 +348,18 @@ FloatingWindow {
                     onPicked: value => root.ai = value
                 }
             }
+
+            // Under the choice it explains. It was drawn a step later, under
+            // the theme's switches, where it answered a question nobody had
+            // just been asked.
+            PanelText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Theme.foregroundInactive
+                text: root.aiProviders.length === 0
+                    ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
+                    : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
+            }
         }
 
         // ---- 6: what the theme changes
@@ -389,15 +401,6 @@ FloatingWindow {
                         }
                     }
                 }
-            }
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: root.aiProviders.length === 0
-                    ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
-                    : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
             }
         }
 
