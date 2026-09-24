@@ -310,4 +310,32 @@ check "package back to stock"     "$(kreadconfig6 --file plasmashellrc --group S
 check_unchanged "KDE's own config files byte-identical after revert" \
     "$before_sums" "$(kde_sums "${kde_files[@]}")"
 
+# The shell's own process, as every script asks after it -- with the process
+# list the suite says is running (_shell_processes, above). A shell started by
+# `make run` from this tree was named "another Quickshell" by doctor and
+# preflight, and was not the copy the IPC calls or the notification checks
+# looked for, so they talked to nothing.
+echo "== this shell, whichever copy is running =="
+FAKE_PROC="42 /usr/bin/quickshell -n -p $REPO_ROOT/shell/shell.qml"
+check "the IPC goes to the working tree"  "$(shell_ipc_path)" "$REPO_ROOT/shell/shell.qml"
+check "which is not another shell"        "$(other_quickshells)" ""
+FAKE_PROC="42 /usr/bin/quickshell -n -p $QS_CONFIG_DIR/shell.qml"
+check "the installed copy is not either"  "$(other_quickshells)" ""
+check "and has the IPC when it runs"      "$(shell_ipc_path)" "$QS_CONFIG_DIR/shell.qml"
+FAKE_PROC="43 /usr/bin/quickshell -c caelestia"
+check "somebody else's shell is named"    "$(other_quickshells)" "43 /usr/bin/quickshell -c caelestia"
+
+fakebus="$SANDBOX/fakebus"; mkdir -p "$fakebus"
+cat > "$fakebus/busctl" <<STUB
+#!/usr/bin/env bash
+printf 'PID=77\nComm=quickshell\nCommandLine=/usr/bin/quickshell -n -p $REPO_ROOT/shell/shell.qml\n'
+STUB
+chmod +x "$fakebus/busctl"
+check "one field of a name's owner"       "$(PATH="$fakebus:$PATH" bus_status_field org.freedesktop.Notifications PID)" "77"
+FAKE_PROC="42 /usr/bin/quickshell -n -p $REPO_ROOT/shell/shell.qml"
+check "held by the shell from this tree"  "$(PATH="$fakebus:$PATH" shell_holds_bus_name org.freedesktop.Notifications && echo yes || echo no)" "yes"
+FAKE_PROC="42 /usr/bin/quickshell -n -p $QS_CONFIG_DIR/shell.qml"
+check "which is not the installed copy"   "$(PATH="$fakebus:$PATH" shell_holds_bus_name org.freedesktop.Notifications && echo yes || echo no)" "no"
+FAKE_PROC=""
+
 harness_done

@@ -342,11 +342,11 @@ write_renderer_setting() {
 stop_hosted_services() {
     session_available || return 0
     local pid name owner
-    pid=$(busctl --user status org.kde.plasmawindowed 2>/dev/null | sed -n 's/^PID=//p')
+    pid=$(bus_status_field org.kde.plasmawindowed PID)
     [ -n "$pid" ] || return 0
     local hosting=0 it id
     for name in org.freedesktop.Notifications org.kde.klipper; do
-        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        owner=$(bus_status_field "$name" PID)
         [ "$owner" = "$pid" ] && hosting=1
     done
     # The device notifier holds no bus name; its tray item, which only
@@ -373,10 +373,9 @@ stop_hosted_services() {
 # the switch. So it is asked to let go first, and given a moment to.
 release_shell_notifications() {
     session_available || return 0
-    ours() { busctl --user status org.freedesktop.Notifications 2>/dev/null \
-               | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; }
+    ours() { shell_holds_bus_name org.freedesktop.Notifications; }
     ours || return 0
-    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications release >/dev/null 2>&1 || true
+    quickshell ipc --path "$(shell_ipc_path)" call notifications release >/dev/null 2>&1 || true
     local i
     for i in 1 2 3 4 5 6 7 8 9 10; do
         ours || return 0
@@ -390,10 +389,10 @@ release_shell_notifications() {
 plasmashell_holds_tray_services() {
     session_available || return 1
     local shell name owner
-    shell=$(busctl --user status org.kde.plasmashell 2>/dev/null | sed -n 's/^PID=//p')
+    shell=$(bus_status_field org.kde.plasmashell PID)
     [ -n "$shell" ] || return 1
     for name in org.freedesktop.Notifications org.kde.klipper; do
-        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        owner=$(bus_status_field "$name" PID)
         [ "$owner" = "$shell" ] && return 0
     done
     return 1
@@ -403,7 +402,7 @@ plasmashell_holds_tray_services() {
 # again at once, rather than wait for a bus name to change hands.
 rehost_services() {
     session_available || return 0
-    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call services rehost >/dev/null 2>&1 || true
+    quickshell ipc --path "$(shell_ipc_path)" call services rehost >/dev/null 2>&1 || true
 }
 
 # --- reporting -------------------------------------------------------------

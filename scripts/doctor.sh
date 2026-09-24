@@ -322,7 +322,7 @@ if renderer_is_foreign "$configured_renderer"; then
     fi
 fi
 
-others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+others=$(other_quickshells)
 [ -n "$foreign" ] && others=$(printf '%s\n' "$others" | grep -vE -- "(-c|--config)[ =]$foreign( |\$)|/quickshell/$foreign/" || true)
 if [ -n "$others" ]; then
     warn "another Quickshell shell is running"
@@ -873,7 +873,7 @@ fi
 
 if [ "$ai_enabled" = true ] || [ "$history_on" = true ]; then
     if shell_running; then
-        n=$(quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications count 2>/dev/null || echo '?')
+        n=$(quickshell ipc --path "$(shell_ipc_path)" call notifications count 2>/dev/null || echo '?')
         ok "the notification listener is wanted and the shell is running ($n remembered)"
     else
         warn "the notification listener is wanted, but the shell is not running"
@@ -895,11 +895,11 @@ live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>
 notif_server=$(jq -r '.notifications.server // "plasma"' <<< "$merged_cfg" 2>/dev/null)
 for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
     name=${pair%%:*}; what=${pair#*:}
-    comm=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^Comm=//p')
+    comm=$(bus_status_field "$name" Comm)
     # Asked to serve them itself, the shell waits for whoever holds the name
     # rather than taking it -- so the one thing worth saying is who that is.
     if [ "$name" = org.freedesktop.Notifications ] && [ "$notif_server" = shell ]; then
-        if busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; then
+        if shell_holds_bus_name "$name"; then
             ok "notifications: served by this shell (notifications.server)"
             continue
         elif [ -n "$comm" ]; then
@@ -923,7 +923,7 @@ for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipb
         fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
     elif [ "$comm" = quickshell ]; then
         # Ours is Quickshell too, and so is caelestia's bar: name the config.
-        cfg=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' \
+        cfg=$(bus_status_field "$name" CommandLine \
               | grep -o -- '-p [^ ]*' | sed 's/^-p //; s|/shell.qml$||; s|.*/||')
         ok "$what: provided by quickshell (${cfg:-unknown config})"
     elif [ -n "$comm" ]; then

@@ -121,7 +121,7 @@ create_report() {
 }
 
 shell_ipc() {
-    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call "$@" 2>/dev/null
+    quickshell ipc --path "$(shell_ipc_path)" call "$@" 2>/dev/null
 }
 
 # Each of these leaves a report directory in $DIR and a one-line question in

@@ -89,10 +89,7 @@ LNF_DARK_PACKAGE_ID="$SLUG-dark.lookandfeel"
 # rather than by care.
 PLASMA_SHELL_PACKAGE_ID="${SLUG}-plasma.desktop"
 SAFE_MODE_VAR="${ENV_PREFIX}_SAFE_MODE"
-# Set to keep a command away from the live session -- no DBus calls, no service
-# restarts, no package cache rebuild. Tests run against a throwaway HOME but
-# share the real session bus, so without this a test switching shell packages
-# would switch the desktop the person is sitting in front of.
+
 # Is this shell's Quickshell running -- installed, or straight from a checkout?
 #
 # `make run` starts it from the working tree ("quickshell -n -p
@@ -136,6 +133,38 @@ shell_ipc_path() {
     fi
 }
 
+# Every Quickshell running that is not this shell -- neither the installed copy
+# nor this checkout -- as "pid command" lines. What doctor and preflight warn
+# about as a second shell drawing beside ours. They used to match the installed
+# directory alone, and so named the copy `make run` starts from this tree as a
+# competitor of itself.
+other_quickshells() {
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            *"$QS_CONFIG_DIR"*|*"$REPO_ROOT/shell/shell.qml"*) continue ;;
+        esac
+        printf '%s\n' "$line"
+    done < <(_shell_processes)
+    return 0
+}
+
+# One field of what the session bus knows about a name's owner -- PID, Comm,
+# CommandLine -- or nothing when nobody holds the name.
+bus_status_field() {   # <bus name> <field>
+    busctl --user status "$1" 2>/dev/null | sed -n "s/^$2=//p"
+}
+
+# Whether this shell holds a bus name, whichever copy of it is running: the
+# owner's command line names the config path the shell was started with.
+shell_holds_bus_name() {   # <bus name>
+    bus_status_field "$1" CommandLine | grep -qF -- "$(shell_ipc_path)"
+}
+
+# Set to keep a command away from the live session -- no DBus calls, no service
+# restarts, no package cache rebuild. Tests run against a throwaway HOME but
+# share the real session bus, so without this a test switching shell packages
+# would switch the desktop the person is sitting in front of.
 NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 
