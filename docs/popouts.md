@@ -153,6 +153,22 @@ blur, a mask, a layer or a shadow is right.
 A preview reads a copy of the profile and keeps its state in its own
 temporary root: it never writes the running shell's files.
 
+To see a popout **where it opens** -- the screen, the panel along an edge,
+the widget and its popout's window beside it, placed by the real arithmetic --
+use `inplace.qml`:
+
+```bash
+PREVIEW_DEMO=1 PREVIEW_WIDGET=tasks PREVIEW_EDGE=bottom PREVIEW_BAR=floating \
+    dev/preview/preview.sh dev/preview/inplace.qml out.png 1280 720 light 3000
+```
+
+It takes `PREVIEW_ZONE`, `PREVIEW_ALONE`, `PREVIEW_BUTTON` (which taskbar
+button the pointer rests on) and `PREVIEW_POPOUT` (also save the popout's
+window alone -- the thing to compare before and after a change). The popout
+is its own window offscreen too, so it is photographed and laid over the
+panel. Shadows are shader effects and do not render in the offscreen harness
+at all.
+
 ### On the real screen
 
 `grim` writes nothing here -- KWin does not implement `wlr-screencopy`.
