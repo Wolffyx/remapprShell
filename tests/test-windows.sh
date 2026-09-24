@@ -218,13 +218,13 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
 
-# A game's window carries whatever icon its engine set, and under Proton that
-# is the generic rectangle Windows gives a window with none -- which is what
-# the panel drew for World of Tanks. Steam has the real one on disk, in a
-# directory of artwork where the *icon* is the one file named for its hash.
-echo "== a Steam game's icon comes from Steam =="
+# Where the icons are written. A copy of what a window holds is worth keeping
+# only while the window can be, so they go to the session's runtime
+# directory, which logout empties -- not the state directory, where they
+# outlived every session. The directories are the user's alone.
+echo "== window icons live in the session's runtime directory =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
-import sys, os
+import sys, os, io, stat, tempfile, contextlib
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
@@ -233,25 +233,7 @@ for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
-
-steam = os.path.join(sandbox, "steam")
-lib = os.path.join(steam, "appcache", "librarycache", "1407200")
-os.makedirs(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db"), exist_ok=True)
-icon = os.path.join(lib, "3ba3158e913a637a1fbe033db4f88fccc52f1ff4.jpg")
-for name in ("library_hero.jpg", "logo.png", "header.jpg", "library_600x900.jpg"):
-    open(os.path.join(lib, name), "w").close()
-open(icon, "w").close()
-# The artwork also sits in hash-named *directories*, which are not the icon.
-open(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db", "library_header.jpg"), "w").close()
-
-class Steamy(mod["WindowIcons"]):
-    STEAM_DIRS = (steam,)
-    def __init__(self):
-        self._cache, self._misses, self._available = {}, {}, False
-        self.looks = 0
-    def _x11_window_for(self, pid):
-        self.looks += 1
-        return None
+icon_dir = mod["icon_dir"]
 
 fails = 0
 def check(name, got, want):
@@ -260,26 +242,38 @@ def check(name, got, want):
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
     fails += 0 if ok else 1
 
-check("the hash-named file is the icon", Steamy._steam_icon("steam_app_1407200"), icon)
-check("the artwork beside it is not",    os.path.basename(Steamy._steam_icon("steam_app_1407200")), os.path.basename(icon))
-check("a game Steam has nothing for",    Steamy._steam_icon("steam_app_4"), None)
-check("an ordinary application",         Steamy._steam_icon("org.kde.dolphin"), None)
-check("steam itself is not an app id",   Steamy._steam_icon("steam"), None)
+def mode(path):
+    return oct(stat.S_IMODE(os.stat(path).st_mode))
 
-# It is found without a display, and without touching the window at all.
-probe = Steamy()
-check("found with no X11 lookup",        (probe.path_for("steam_app_1407200", 1), probe.looks), (icon, 0))
-# An icon Steam writes later is still picked up: the cheap check is not budgeted.
-probe = Steamy()
-probe.path_for("steam_app_4", 1)
-late = os.path.join(steam, "appcache", "librarycache", "4")
-os.makedirs(late, exist_ok=True)
-late_icon = os.path.join(late, "a" * 40 + ".png")
-open(late_icon, "w").close()
-check("an icon written later is found",  probe.path_for("steam_app_4", 1), late_icon)
+run = os.path.join(sandbox, "run")
+os.makedirs(run, mode=0o700)
+os.environ["XDG_RUNTIME_DIR"] = run
+found = icon_dir()
+check("under the runtime directory",       found, os.path.join(run, "t", "window-icons"))
+check("private all the way down",          [mode(os.path.join(run, "t")), mode(found)], ["0o700", "0o700"])
+check("the same one when asked again",     icon_dir(), found)
+check("nothing in the state directory",    os.path.exists(os.path.join(os.environ["XDG_STATE_HOME"], "t")), False)
+
+# No runtime directory, or one that cannot be written: a directory of the
+# daemon's own in the temporary one, made once rather than once an icon.
+tmp = os.path.join(sandbox, "tmp")
+os.makedirs(tmp)
+tempfile.tempdir = tmp
+del os.environ["XDG_RUNTIME_DIR"]
+said = io.StringIO()
+with contextlib.redirect_stderr(said):
+    fallback = icon_dir()
+    again = icon_dir()
+check("without one, a private directory",  (os.path.dirname(fallback), mode(fallback)), (tmp, "0o700"))
+check("made once, not once an icon",       again, fallback)
+check("and it says where",                 fallback in said.getvalue(), True)
+os.environ["XDG_RUNTIME_DIR"] = os.path.join(sandbox, "not-a-directory")
+open(os.environ["XDG_RUNTIME_DIR"], "w").close()
+with contextlib.redirect_stderr(io.StringIO()):
+    check("an unusable one falls back too", icon_dir(), fallback)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
 
 # A lookup that found nothing is a fact about the moment, not about the
 # application: `_NET_WM_ICON` is set a little after the window is mapped, so a
@@ -486,14 +480,17 @@ class FakeSubprocess:
     def run(*_args, **_kwargs):
         return Run()
 mod["subprocess"] = FakeSubprocess
-mod["ICON_CACHE"] = os.path.join(sandbox, "icons")
+run = os.path.join(sandbox, "run-pixels")
+os.makedirs(run, mode=0o700)
+os.environ["XDG_RUNTIME_DIR"] = run
 path = mod["WindowIcons"]._extract(icons, "0x1", "some.app")
 image = Image.open(path)
+check("written to the runtime directory", path, os.path.join(run, "t", "window-icons", "some.app.png"))
 check("the icon is its size",     image.size, (2, 1))
 check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0))],
                                   [(0, 0, 255, 255), (0, 0, 0, 0x81)])
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+5)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+6)); else fail=$((fail+1)); fi
 
 harness_done

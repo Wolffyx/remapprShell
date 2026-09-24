@@ -45,6 +45,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from array import array
 
@@ -54,10 +55,6 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 BUS_NAME = "@DBUS_NAME@"
-ICON_CACHE = os.path.join(
-    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
-    "@SLUG@", "window-icons",
-)
 OBJECT_PATH = "/Windows"
 INTERFACE = "@DBUS_NAME@.Windows"
 
@@ -554,20 +551,69 @@ class Pointer:
 _U32 = "I" if array("I").itemsize == 4 else "L"
 
 
+# Where the icons taken from windows are written: this login's runtime
+# directory, which the system empties at logout.
+#
+# They used to go under the state directory, which outlives the session -- a
+# folder that kept a picture of every program ever opened, long after the
+# windows were gone. Nothing is lost by keeping them only for the session:
+# each file is a copy of what a window still holds, and the daemon makes it
+# again the first time it sees that window after the next login.
+#
+# Without XDG_RUNTIME_DIR, which a systemd login always sets, a directory of
+# the daemon's own under the system's temporary directory stands in: made
+# fresh for this process and readable by nobody else, so no other user can
+# have put anything there first. That one lasts until the temporary directory
+# is next cleared rather than until logout.
+_icon_fallback = None
+
+
+def icon_dir():
+    """The directory window icons are written to, made on first use."""
+    global _icon_fallback
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+    if runtime:
+        path = runtime
+        try:
+            # One level at a time: makedirs gives its mode to the last
+            # directory only, and ours should be private all the way down.
+            for part in ("@SLUG@", "window-icons"):
+                path = os.path.join(path, part)
+                os.makedirs(path, mode=0o700, exist_ok=True)
+            return path
+        except OSError as exc:
+            print(f"cannot write window icons under {runtime}: {exc}", file=sys.stderr)
+    if _icon_fallback is None or not os.path.isdir(_icon_fallback):
+        _icon_fallback = tempfile.mkdtemp(prefix="@SLUG@-window-icons-")
+        print(f"no usable XDG_RUNTIME_DIR; window icons go to {_icon_fallback}",
+              file=sys.stderr)
+    return _icon_fallback
+
+
 class WindowIcons:
     """Icons taken from the windows themselves.
 
-    Most windows are matched to an installed application by the shell, which is
-    where an icon normally comes from. Some have no application to match: a
-    Steam game's window class is a numeric app id, and Steam installs a desktop
-    entry for only some of them. Those windows still *have* an icon -- they set
-    `_NET_WM_ICON`, which is what Plasma's own task manager draws -- and it is
-    the only place that icon exists.
+    Most windows are matched to an installed application by the shell, and the
+    application's desktop entry names the icon. Some windows match nothing: a
+    program started by another program often reports a window class that no
+    desktop entry mentions. Those windows usually still *have* an icon -- an
+    X11 window can carry its own, `_NET_WM_ICON`, which is what Plasma's own
+    task manager draws -- and it is the only place that icon exists.
 
-    So it is read from there and cached as a PNG. Reading it needs `xprop` and
-    writing it needs Pillow; where either is missing this does nothing at all
-    and the shell falls back to guessing from the window class, which is what
-    it did before.
+    Why it has to become a file. The shell draws every icon from a URL: a name
+    the icon theme turns into a file, or a file itself. `_NET_WM_ICON` is
+    neither. It is raw pixels stored on the window, with no name to look up
+    and nothing on disk, and QML has no way to read a property off another
+    program's X11 window. So the daemon reads the pixels with `xprop`, writes
+    them out as a PNG in the session's runtime directory (see `icon_dir`), and
+    hands the shell the path. Sending the pixels instead would put up to
+    65,536 of them, written out as numbers, into every window list the shell
+    is sent.
+
+    Reading needs `xprop` and writing needs Pillow; where either is missing
+    this does nothing at all and the shell guesses from the window class. A
+    Wayland-native window has no `_NET_WM_ICON` to read, and is guessed for in
+    the same way.
     """
 
     # How often a lookup that found nothing is tried again, and how many times.
@@ -607,68 +653,21 @@ class WindowIcons:
             return False
         return bool(os.environ.get("DISPLAY"))
 
-    # Where Steam keeps the icon it shows in its own library, and what the file
-    # is called. Every app has a directory named for its id; the artwork in it
-    # is named for what it is (`library_hero.jpg`, `logo.png`, `header.jpg`)
-    # and the **icon** is named for its hash -- forty hex characters, 32x32.
-    # That is the only rule that tells the icon from the cover art.
-    STEAM_DIRS = (
-        "~/.local/share/Steam",
-        "~/.steam/root",
-        "~/.var/app/com.valvesoftware.Steam/data/Steam",
-    )
-    STEAM_APP = re.compile(r"steam_app_(\d+)\Z")
-    STEAM_ICON = re.compile(r"[0-9a-f]{40}\.(?:jpg|jpeg|png)\Z", re.IGNORECASE)
-
-    @classmethod
-    def _steam_icon(cls, app_id):
-        """Steam's own icon for a `steam_app_<id>` window, or None.
-
-        A game's window carries whatever icon its engine set, and under Proton
-        that is usually the generic rectangle Windows gives a window with none
-        -- which is what the panel drew for World of Tanks. Steam has the real
-        one on disk all along.
-        """
-        match = cls.STEAM_APP.match(app_id)
-        if not match:
-            return None
-        for root in cls.STEAM_DIRS:
-            directory = os.path.join(os.path.expanduser(root),
-                                     "appcache", "librarycache", match.group(1))
-            try:
-                names = sorted(os.listdir(directory))
-            except OSError:
-                continue
-            for name in names:
-                path = os.path.join(directory, name)
-                if cls.STEAM_ICON.match(name) and os.path.isfile(path):
-                    return path
-        return None
-
     def path_for(self, app_id, pid):
         """A cached icon for this application, or None."""
         if not app_id:
             return None
 
         # What is cached is a path, not a picture, and a path can stop being
-        # true: restoring a snapshot, or clearing the state directory, takes
-        # the file out from under it. The shell was then handed a path to a
-        # file that is gone, drew nothing, and said so only in the journal --
-        # which is what "some icons stopped working" was, after a restore
-        # removed the cache directory. So a cached hit is trusted only while
-        # the file behind it is still there; otherwise it is read again.
+        # true: whatever empties the directory takes the file out from under
+        # it. The shell was then handed a path to a file that is gone, drew
+        # nothing, and said so only in the journal -- which is what "some
+        # icons stopped working" was, after a restored snapshot removed the
+        # directory these were kept in then. So a cached hit is trusted only
+        # while the file behind it is still there; otherwise it is read again.
         cached = self._cache.get(app_id)
         if cached is not None and os.path.exists(cached):
             return cached
-
-        # Steam is asked every time, ahead of the budget below: it is two
-        # filesystem calls, and it means an icon Steam writes after the game
-        # first runs is picked up without waiting for anything.
-        found = self._steam_icon(app_id)
-        if found:
-            self._cache[app_id] = found
-            self._misses.pop(app_id, None)
-            return found
 
         # A miss is kept too, or every update would sweep the display for the
         # handful of applications that genuinely have no icon. It is kept for a
@@ -754,11 +753,10 @@ class WindowIcons:
         data = array(_U32, (value & 0xFFFFFFFF for value in pixels)).tobytes()
         rawmode = "BGRA" if sys.byteorder == "little" else "ARGB"
 
-        os.makedirs(ICON_CACHE, exist_ok=True)
         # The application id is a window class and can contain anything; it is
         # about to become a filename.
         safe = re.sub(r"[^A-Za-z0-9._-]", "_", app_id)[:96]
-        path = os.path.join(ICON_CACHE, f"{safe}.png")
+        path = os.path.join(icon_dir(), f"{safe}.png")
         Image.frombytes("RGBA", (width, height), data, "raw", rawmode).save(path)
         return path
 
