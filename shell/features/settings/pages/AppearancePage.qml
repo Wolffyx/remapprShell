@@ -53,8 +53,6 @@ CardGrid {
         return out;
     }
 
-    count: 7
-
     Component.onCompleted: root.ctl.refresh()
 
     Card {
@@ -157,11 +155,7 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: {
                 const now = `The shell is ${Theme.mode} now`;
                 if (Theme.modeSetting !== "auto")
@@ -171,6 +165,7 @@ CardGrid {
                     ? `${now}${plasma}. Plasma switches between its light and dark theme by itself, and the shell follows it.`
                     : `${now}${plasma}. Plasma can also switch between a light and a dark theme by itself at sunset, and the shell will follow it: that is in Plasma's global theme settings.`;
             }
+            lineHeight: 1
         }
 
         TextButton {
@@ -249,12 +244,9 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: "Plasma is Plasma's own accent colour -- which System Settings can take from the wallpaper. Every other colour here is worked out from the accent, in Material Design's roles."
+            lineHeight: 1
         }
 
     }
@@ -266,7 +258,6 @@ CardGrid {
         spacing: 6
 
         SectionLabel { text: "Shape" }
-
 
         Row {
             width: parent.width
@@ -322,12 +313,9 @@ CardGrid {
             onToggled: value => ConfigStore.set("theme.shadows", value)
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            font.pixelSize: 12
-            color: Theme.mut
+        Hint {
             text: `Type: ${Theme.fontFamily}${Theme.fontFamily === "Rubik" ? "" : " (Rubik is not installed)"} · icons: ${Theme.hasIconFont ? Theme.iconFont : "the icon theme (Material Symbols Rounded is not installed)"}`
+            lineHeight: 1
         }
     }
 
@@ -359,31 +347,25 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: {
                 const s = root.styles.find(x => x.id === root.themeState?.style);
                 const what = s ? `${s.key}: ${s.label}. ` : "";
                 return `${what}KDE applications already open change at once; others when next started.`;
             }
+            lineHeight: 1
         }
 
         Repeater {
             model: root.styles.filter(s => !s.installed)
 
-            PanelText {
+            Hint {
                 required property var modelData
 
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.mut
-                font.pixelSize: 12
                 text: modelData.install.length > 0
                     ? `${modelData.key} is not installed. In a terminal: ${modelData.install}`
                     : `${modelData.key} is not installed.`
+                lineHeight: 1
             }
         }
 
@@ -402,11 +384,7 @@ CardGrid {
             font.pixelSize: 13
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: {
                 if (!root.themeState)
                     return "";
@@ -416,6 +394,7 @@ CardGrid {
                 const gaps = root.missing.length > 0 ? ` Missing: ${root.missing.join(", ")}.` : " Every part is installed.";
                 return state + gaps;
             }
+            lineHeight: 1
         }
 
         TextButton {
@@ -427,12 +406,9 @@ CardGrid {
             onActivated: root.ctl.run(["apply"])
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: "A restore point is taken first, and every key is recorded, so \"Undo everything\" puts the desktop back exactly as it was."
+            lineHeight: 1
         }
     }
 

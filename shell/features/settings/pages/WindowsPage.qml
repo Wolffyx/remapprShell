@@ -48,13 +48,11 @@ Column {
         root.ctl.run(["set", id, value]);
     }
 
-    PanelText {
+    Hint {
         visible: root.ctl.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
         text: root.ctl.status
-        font.pixelSize: 12
-        color: Theme.error
+        tone: "error"
+        lineHeight: 1
     }
 
     Card {
@@ -70,13 +68,8 @@ Column {
             onPicked: value => root.set("focus", value)
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Strictly under the mouse gives focus to nothing at all when the pointer is over the desktop."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SliderRow {
@@ -136,13 +129,8 @@ Column {
             onToggled: value => root.set("borderlessMaximized", value)
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Title bars, their buttons and the corner radius belong to the window decoration, which is Plasma's own page and applies to every application."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -158,15 +146,10 @@ Column {
 
         SectionLabel { text: "Tiling" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: root.tilingScripts.length > 0
                 ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge may go to it rather than to KWin's snapping.`
                 : "KWin has no tiling layouts of its own: it has snapping at the edges, and custom tiles under Meta+T. Gaps between windows and rounded window corners come from a tiling script, not from a shell, so nothing here pretends to set them."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -202,14 +185,9 @@ Column {
             }
         }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !WindowsService.available
-            wrapMode: Text.WordWrap
             text: "The task list and the window title need a small KWin script, which `rmpr windows enable` installs."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 }

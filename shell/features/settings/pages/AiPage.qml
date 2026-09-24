@@ -14,7 +14,6 @@ import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.settings.groups
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -26,8 +25,6 @@ CardGrid {
 
     property var providers: []
     readonly property var available: root.providers.filter(p => p.available).map(p => p.id)
-
-    count: 3
 
     Component.onCompleted: listProc.running = true
 
@@ -66,7 +63,7 @@ CardGrid {
         SectionLabel { text: "Assist" }
 
         SettingRow {
-            width: what.width - 2 * what.padding
+            width: what.contentWidth
             label: "AI assist"
             description: "Turns on the ask actions: in the notification history, as a global shortcut, and as `rmpr ask`. The notification listener runs while this is on."
             overridden: ConfigStore.isOverridden("ai.enabled")
@@ -78,7 +75,7 @@ CardGrid {
         }
 
         SettingRow {
-            width: what.width - 2 * what.padding
+            width: what.contentWidth
             label: "Provider"
             description: {
                 const p = root.providers.find(x => x.id === root.provider);
@@ -102,13 +99,9 @@ CardGrid {
             }
         }
 
-        PanelText {
+        Hint {
             visible: root.providers.some(p => !p.available)
-            width: what.width - 2 * what.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+            width: what.contentWidth
             text: "Not available here: " + root.providers.filter(p => !p.available)
                 .map(p => `${p.id} (${p.reason})`).join(", ")
         }
@@ -125,7 +118,7 @@ CardGrid {
 
         SettingRow {
             visible: root.provider === "ollama"
-            width: providerCard.width - 2 * providerCard.padding
+            width: providerCard.contentWidth
             label: "Address"
             description: "An address that is not this machine is confirmed like any other."
             overridden: ConfigStore.isOverridden("ai.ollamaUrl")
@@ -142,7 +135,7 @@ CardGrid {
 
         SettingRow {
             visible: root.provider === "ollama"
-            width: providerCard.width - 2 * providerCard.padding
+            width: providerCard.contentWidth
             label: "Model"
             description: "Empty picks the first model Ollama lists."
             overridden: ConfigStore.isOverridden("ai.ollamaModel")
@@ -156,7 +149,7 @@ CardGrid {
 
         SettingRow {
             visible: root.provider === "custom"
-            width: providerCard.width - 2 * providerCard.padding
+            width: providerCard.contentWidth
             stacked: true
             label: "Command"
             description: "Run as written. %report becomes the redacted bundle's path; without it, the bundle arrives on standard input."
@@ -183,7 +176,7 @@ CardGrid {
         SectionLabel { text: "What gets sent" }
 
         Flow {
-            width: sending.width - 2 * sending.padding
+            width: sending.contentWidth
             spacing: 8
 
             TextButton {
@@ -201,12 +194,8 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: sending.width - 2 * sending.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: sending.contentWidth
             text: `Every report is written locally first and redacted there; 'rmpr report show' prints the same text a provider receives. A provider that sends off this machine asks once, showing the whole bundle, and remembers the answer until it is withdrawn here. Bind a key to ask about the last notification with: rmpr shortcuts set ask <key>`
         }
     }

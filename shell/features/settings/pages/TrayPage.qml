@@ -132,8 +132,6 @@ CardGrid {
         root.commit(flat);
     }
 
-    count: 2
-
     // The three lists are dragged between, so this card takes the whole row.
     Card {
         id: lists
@@ -143,12 +141,7 @@ CardGrid {
 
         SectionLabel { text: "The three lists" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
             text: root.items.length === 0
                 ? "Nothing is in the tray at the moment. Applications appear here as they start."
                 : "Drag a row into another list. Icons on the panel keep the order you leave them in."
@@ -302,12 +295,7 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
             text: "One icon always stays on the panel: an empty list means 'show everything', so emptying it would bring them all back. An application that is not running keeps its place until you move it."
         }
     }

@@ -11,7 +11,6 @@ import QtQuick
 import Quickshell
 import qs.domain.config
 import qs.domain.notifications
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -34,17 +33,12 @@ Column {
             path: "notifications.server"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: root.server === "shell"
                 ? (ShellNotifications.active
                     ? "The shell holds org.freedesktop.Notifications and draws the popups below."
                     : `Not drawing them${ShellNotifications.reason ? ": " + ShellNotifications.reason : " yet"}. Nothing is taken from whoever holds the name; the shell waits for it to be let go of.`)
                 : "Plasma's own notifications, through the applet this shell hosts outside the panel. Its history and do-not-disturb are in that applet."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -71,13 +65,8 @@ Column {
             path: "notifications.popupTimeout"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "An application that asks for a particular time gets it; an urgent notification stays until it is answered."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {

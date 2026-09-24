@@ -62,8 +62,6 @@ CardGrid {
         ConfigStore.set("bar.entries", next);
     }
 
-    count: 2
-
     // A widget's row carries its name, its zone, a switch and five buttons, so
     // both cards here take the whole row rather than half of it.
     Card {
@@ -88,7 +86,7 @@ CardGrid {
                 readonly property bool quarantined: Quarantine.isQuarantined(entryRow.modelData.id)
                 property bool expanded: false
 
-                width: onPanel.width - 2 * onPanel.padding
+                width: onPanel.contentWidth
                 height: body.implicitHeight + 12
                 radius: Theme.radiusOf(12)
                 color: Theme.s1
@@ -293,7 +291,7 @@ CardGrid {
         SectionLabel { text: "Available widgets" }
 
         Flow {
-            width: availableCard.width - 2 * availableCard.padding
+            width: availableCard.contentWidth
             spacing: 6
 
             Repeater {

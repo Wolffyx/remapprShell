@@ -46,13 +46,11 @@ Column {
 
     Component.onCompleted: root.ctl.refresh()
 
-    PanelText {
+    Hint {
         visible: root.ctl.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
         text: root.ctl.status
-        font.pixelSize: 12
-        color: Theme.error
+        tone: "error"
+        lineHeight: 1
     }
 
     Card {
@@ -80,13 +78,8 @@ Column {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Plasma's greeter does the locking either way; only the drawing would be this shell's. Try it first: it fills every screen and takes the keyboard, exactly as a real lock does, but nothing is locked and typing your password ends it. Turning it on before it has unlocked once is refused."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {
@@ -137,13 +130,10 @@ Column {
 
         SectionLabel { text: "How it looks" }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !root.installed
-            wrapMode: Text.WordWrap
             text: "Saved now, and drawn when this lock screen is turned on."
-            font.pixelSize: 12
-            color: Theme.mut
+            lineHeight: 1
         }
 
         // Twelve lock screens, not twelve colour schemes: they differ on where
@@ -229,14 +219,9 @@ Column {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             visible: root.installed
             text: "A style changes at the next lock. The one that was tried is the one that is installed, so a style picked here is drawn without trying it again -- the password is taken the same way in all seven."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SettingRow {
@@ -363,13 +348,8 @@ Column {
             onToggled: value => root.ctl.run(["set", "session", value])
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Notifications are not shown on the lock screen. The greeter is a separate program with none of this shell's memory, and notification bodies are never written to disk for something else to read -- so there is nothing there to draw, and a switch that promised otherwise would be a lie."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -378,13 +358,8 @@ Column {
 
         SectionLabel { text: "Locking" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "When the screen locks -- after how long, on suspend, whether a password is needed straight away -- is Plasma's, and applies whichever lock screen is drawn."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {
@@ -418,13 +393,8 @@ Column {
             path: "session.prompt"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Either way the session ends through Plasma's session manager, so applications are asked to save and one with unsaved work can still object. This only chooses which screen does the asking."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {

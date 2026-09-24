@@ -102,15 +102,11 @@ Column {
 
         SectionLabel { text: "Global shortcuts" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: root.grabbed
                 ? "Click a shortcut and press the keys you want. Esc leaves it as it was; Backspace unbinds it. A key already held by something else is taken from it — and taken back at every login, if something grabs it again. “Revert every shortcut” gives them all back."
                 : "These are recorded but not grabbed: nothing owns them, so none of them fire. The session daemon is the owner — if it is not running, a key here will do nothing however it is bound."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: root.grabbed ? Theme.mut : Theme.error
+            tone: root.grabbed ? "muted" : "error"
         }
 
         Repeater {
@@ -236,13 +232,8 @@ Column {
 
         SectionLabel { text: "Undo" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Gives every key this project bound back to whoever held it before, including the ones taken from KWin and from another shell."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -253,13 +244,11 @@ Column {
             onActivated: root.ctl.run(["revert"])
         }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: root.ctl.status.length > 0
-            wrapMode: Text.WordWrap
             text: root.ctl.status
-            font.pixelSize: 12
-            color: Theme.error
+            tone: "error"
+            lineHeight: 1
         }
     }
 }

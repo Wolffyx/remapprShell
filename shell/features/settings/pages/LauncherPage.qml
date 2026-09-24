@@ -11,7 +11,6 @@ import QtQuick
 import qs.domain.config
 import qs.domain.settings.groups
 import qs.domain.launcher
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -119,13 +118,10 @@ Column {
             path: "launcher.layout"
         }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !root.builtinMenu
-            wrapMode: Text.WordWrap
             text: "The menu key opens Plasma's Kickoff at the moment, which has a layout of its own."
-            font.pixelSize: 12
-            color: Theme.mut
+            lineHeight: 1
         }
     }
 
@@ -186,12 +182,9 @@ Column {
             path: "launcher.learn"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: `${Object.keys(Frecency.entries).length} thing(s) remembered.`
-            font.pixelSize: 12
-            color: Theme.mut
+            lineHeight: 1
         }
 
         TextButton {
@@ -213,13 +206,8 @@ Column {
             path: "launcher.actionPrefix"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Typed at the start of a search, this runs the shell's own actions -- lock, log out, the sidebar, the key sheet -- instead of looking for applications."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {

@@ -14,7 +14,6 @@ import QtQuick
 import qs.core
 import qs.platform.system
 import qs.domain.config
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -35,8 +34,6 @@ CardGrid {
     readonly property string drawnByWindows: ConfigStore.value("switching.windows", "plasma")
     readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "plasma")
     readonly property var keys: root.switcherState?.keys ?? []
-
-    count: 4
 
     Component.onCompleted: root.ctl.refresh()
 
@@ -66,7 +63,7 @@ CardGrid {
         SectionLabel { text: "Who draws it" }
 
         SettingRow {
-            width: drawnBy.width - 2 * drawnBy.padding
+            width: drawnBy.contentWidth
             enabled: !root.ctl.busy
             label: "Alt+Tab"
             description: root.drawnByWindows === "shell"
@@ -92,18 +89,15 @@ CardGrid {
         // It is a real choice and it stays -- it is the only one this project
         // can restyle. But someone choosing it should know what they are
         // taking on, and KWin's is the one that ships.
-        PanelText {
-            width: drawnBy.width - 2 * drawnBy.padding
+        Hint {
+            width: drawnBy.contentWidth
             visible: root.drawnByWindows === "shell"
-            wrapMode: Text.WordWrap
             text: "Held keys are less reliable here than in KWin's. This shell is not the compositor: the key press and the key release each cross four processes to reach it, and they race. Pressed quickly, the switcher can stay on screen after the key is let go. KWin's switcher has none of that, shows a real picture of each window, and is what this shell uses unless you change it."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.error
+            tone: "error"
         }
 
         SettingRow {
-            width: drawnBy.width - 2 * drawnBy.padding
+            width: drawnBy.contentWidth
             enabled: !root.ctl.busy
             label: "Meta+Tab"
             description: root.drawnByDesktops === "shell"
@@ -129,7 +123,7 @@ CardGrid {
         SectionLabel { text: "Alt+Tab looks like" }
 
         Flow {
-            width: look.width - 2 * look.padding
+            width: look.contentWidth
             spacing: 6
             enabled: !root.ctl.busy
 
@@ -146,13 +140,9 @@ CardGrid {
             }
         }
 
-        PanelText {
+        Hint {
             visible: root.switcherState !== null && !root.layouts.some(l => l.id === Branding.slug)
-            width: look.width - 2 * look.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+            width: look.contentWidth
             text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
         }
     }
@@ -170,35 +160,35 @@ CardGrid {
         SectionLabel { text: "The desktop overview" }
 
         ConfigToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+            width: overviewCard.contentWidth
             label: "Closes when the key is released"
             description: "Held, like Alt+Tab. Off, one press opens it and it stays until you choose, press Escape or click away."
             path: "switching.overviewHold"
         }
 
         ConfigToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+            width: overviewCard.contentWidth
             label: "Window titles"
             description: "The title strip along the top of each card."
             path: "switching.overviewTitles"
         }
 
         ConfigToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+            width: overviewCard.contentWidth
             label: "List minimised windows"
             description: "Off lists only what is on screen."
             path: "switching.overviewMinimised"
         }
 
         ConfigToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+            width: overviewCard.contentWidth
             label: "The desktop strip"
             description: "Every desktop along the bottom, with what is on each and a tile for one more."
             path: "switching.overviewStrip"
         }
 
         ConfigSliderRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+            width: overviewCard.contentWidth
             label: "Widest a window card gets"
             from: 260
             to: 720
@@ -224,7 +214,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: keyCard.width - 2 * keyCard.padding
+                width: keyCard.contentWidth
                 enabled: !root.ctl.busy
                 label: `${keyRow.modelData.key}: ${keyRow.modelData.label.toLowerCase()}`
                 description: root.describe(keyRow.modelData)

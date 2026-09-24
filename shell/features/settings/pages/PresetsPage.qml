@@ -17,8 +17,6 @@ CardGrid {
 
     property var presets: []
 
-    count: 1
-
     Component.onCompleted: root.reload()
 
     function reload() {
@@ -60,12 +58,8 @@ CardGrid {
 
         SectionLabel { text: "Shipped layouts" }
 
-        PanelText {
-            width: card.width - 2 * card.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: card.contentWidth
             text: "Applying a layout replaces your current panel configuration. The previous one is saved first, and the path is printed in the log."
         }
 
@@ -77,7 +71,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: card.width - 2 * card.padding
+                width: card.contentWidth
                 height: 58
                 radius: Theme.radiusOf(12)
                 color: presetHover.hovered ? Theme.hover : Theme.s1

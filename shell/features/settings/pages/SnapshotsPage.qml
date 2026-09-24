@@ -22,8 +22,6 @@ CardGrid {
     property var snapshots: []
     property string status: ""
 
-    count: 2
-
     Component.onCompleted: root.refresh()
 
     function refresh() {
@@ -84,13 +82,13 @@ CardGrid {
         // What it is called in the list. Empty is "manual", as from the CLI.
         TextInputRow {
             id: labelField
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             placeholderText: "What it is before -- \"trying a new theme\", say"
             onAccepted: takeButton.activated()
         }
 
         Flow {
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             spacing: 8
 
             TextButton {
@@ -111,17 +109,13 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: take.width - 2 * take.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: take.contentWidth
             text: "Restore points are never removed when reverting or uninstalling. They are removed only here, or by pruning, which never takes a locked one or the oldest. Removing one is permanent."
         }
 
         SettingRow {
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             stacked: true
             label: "Keep at most"
             description: root.keep === 0
@@ -159,7 +153,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: saved.width - 2 * saved.padding
+                width: saved.contentWidth
                 height: 48
                 radius: Theme.radiusOf(12)
                 color: Theme.s1

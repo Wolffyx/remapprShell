@@ -111,13 +111,8 @@ Column {
             path: "panel.style"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Full width is a strip along the whole edge. Floating is a rounded bar held clear of it. Islands draws no bar at all: each zone is a rounded island of its own."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -201,14 +196,11 @@ Column {
             onCommitted: value => ConfigStore.set("widgets.clock.format", value.trim())
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: clockCard.customFormat.length > 0
                 ? `A format of your own, "${clockCard.customFormat}", is in use, so the choices above wait. Empty the field to use them again.`
                 : "A format of your own, as Qt writes one -- \"ddd HH:mm\", say -- wins over the choices above. Empty for those."
+            lineHeight: 1
         }
     }
 
@@ -241,13 +233,8 @@ Column {
             fallback: true
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "These are KWin's virtual desktops. Adding and naming them is System Settings' page, which Plasma and this shell both read."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -304,13 +291,8 @@ Column {
 
         SectionLabel { text: "Right-click menu" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "The menu a right click on empty panel opens. Its first rows -- settings, widgets, reloading -- are fixed; the monitor it offers and anything below it are yours."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SettingRow {
@@ -337,13 +319,8 @@ Column {
 
         SectionLabel { text: "Your own entries" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Each row runs a command line, the way a terminal would -- pipes, arguments and $HOME all work. It is run detached, so a script that keeps going is not stopped when the menu closes. A row with no name or no command is not drawn."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Repeater {
@@ -407,13 +384,8 @@ Column {
 
         SectionLabel { text: "Entries" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Which widgets are on the panel, in which zone and in which order, is the Widgets page -- where a row is dragged rather than typed."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -429,15 +401,10 @@ Column {
 
         SectionLabel { text: "Displays" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: Quickshell.screens.length > 1
                 ? "Each monitor draws its own panel. Where it sits, how it is drawn, whether it hides and its size can differ per monitor; the widgets are shared."
                 : "One monitor. With a second one connected, each draws its own panel and can keep its own position, style, hiding and size."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Repeater {

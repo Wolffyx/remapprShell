@@ -143,13 +143,10 @@ PanelWindow {
                     }
                 }
 
-                PanelText {
+                Hint {
                     visible: ClipboardStatus.entries.length === 0
-                    width: parent.width
-                    wrapMode: Text.WordWrap
                     text: "Nothing copied yet."
-                    font.pixelSize: 12
-                    color: Theme.mut
+                    lineHeight: 1
                 }
 
                 Repeater {

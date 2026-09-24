@@ -591,15 +591,12 @@ PanelWindow {
             content: [
                 // Off, or not yet answered: one line that says which, rather
                 // than an empty card that looks broken.
-                PanelText {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
+                Hint {
                     visible: !WeatherStatus.ready
                     text: !WeatherStatus.enabled
                         ? "Off. Settings → Weather turns it on; it asks Open-Meteo for a forecast and nothing else."
                         : (WeatherStatus.error.length > 0 ? WeatherStatus.error : "Asking…")
-                    font.pixelSize: 12
-                    color: Theme.mut
+                    lineHeight: 1
                 },
 
                 Row {
@@ -814,14 +811,11 @@ PanelWindow {
             readonly property int shown: noteCard.open ? 10 : 3
 
             content: [
-                PanelText {
-                    width: parent.width
+                Hint {
                     visible: !NotificationWatch.enabled || NotificationWatch.entries.length === 0
-                    wrapMode: Text.WordWrap
                     text: NotificationWatch.enabled ? "Nothing recent."
                         : "The history is off; Settings → Notifications keeps one."
-                    font.pixelSize: 12
-                    color: Theme.mut
+                    lineHeight: 1
                 },
 
                 Repeater {

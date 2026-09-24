@@ -293,14 +293,9 @@ FloatingWindow {
                     width: root.width - nav.width - 76
                     spacing: 16
 
-                    PanelText {
+                    Hint {
                         visible: (root.currentSection?.description ?? "").length > 0
                         text: root.currentSection?.description ?? ""
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 12
-                        lineHeight: 1.35
-                        color: Theme.mut
                     }
 
                     // A section either lists keys, which the schema renderer turns

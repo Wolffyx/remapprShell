@@ -15,8 +15,6 @@ CardGrid {
 
     property var profiles: []
 
-    count: 2
-
     Component.onCompleted: root.reload()
 
     function reload() {
@@ -70,7 +68,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: profileCard.width - 2 * profileCard.padding
+                width: profileCard.contentWidth
                 height: 50
                 radius: Theme.radiusOf(12)
                 color: profile.modelData.active ? Theme.accC : Theme.s1
@@ -142,12 +140,8 @@ CardGrid {
 
         SectionLabel { text: "Per-monitor overrides" }
 
-        PanelText {
-            width: monitors.width - 2 * monitors.padding
-            wrapMode: Text.WordWrap
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
+        Hint {
+            width: monitors.contentWidth
             text: `Anything in the panel settings can differ per screen. Create a file named after the output in ${Paths.profileDir(ConfigStore.profile)}/monitors/, holding only the keys that differ.`
         }
 
@@ -159,7 +153,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: monitors.width - 2 * monitors.padding
+                width: monitors.contentWidth
                 spacing: 10
 
                 PanelText {

@@ -58,8 +58,6 @@ CardGrid {
         return root.places.find(p => p.edge === edge)?.name ?? edge;
     }
 
-    count: 3
-
     Component.onCompleted: root.ctl.refresh()
 
     // The picture is 460px of screen with a chip in each corner, so this card
@@ -73,7 +71,7 @@ CardGrid {
         SectionLabel { text: "Corners and edges" }
 
         SettingRow {
-            width: screenCard.width - 2 * screenCard.padding
+            width: screenCard.contentWidth
             enabled: !root.ctl.busy
             label: "Mouse triggers at the screen edges"
             description: root.triggersOn
@@ -89,7 +87,7 @@ CardGrid {
         Item {
             id: picture
 
-            width: screenCard.width - 2 * screenCard.padding
+            width: screenCard.contentWidth
             height: screenFrame.height + 8
             enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
@@ -145,7 +143,7 @@ CardGrid {
         }
 
         SettingRow {
-            width: screenCard.width - 2 * screenCard.padding
+            width: screenCard.contentWidth
             enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
             label: root.nameOf(root.selected)
@@ -173,7 +171,7 @@ CardGrid {
         SectionLabel { text: "Snapping" }
 
         SettingRow {
-            width: snapCard.width - 2 * snapCard.padding
+            width: snapCard.contentWidth
             enabled: root.triggersOn && !root.ctl.busy
             opacity: root.triggersOn ? 1 : 0.4
             label: "Snap windows to the screen edges"
