@@ -6,7 +6,6 @@
 
 import QtQuick
 import qs.ui.primitives
-import qs.domain.theme
 import qs.domain.launcher
 
 BarWidget {

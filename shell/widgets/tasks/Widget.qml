@@ -133,9 +133,7 @@ BarWidget {
     // below a readable width, down to the icon alone.
     readonly property real iconOnly: root.iconSize + 2 * root.padding
     givesWay: true
-    readonly property real share: root.room >= 0 && root.items.length > 0
-        ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
-        : 1e9
+    readonly property real share: Math.max(root.iconOnly, root.wanted)
 
     // Past a certain number of windows even the icon alone does not fit, and a
     // Row does not shrink: the buttons kept their width and ran on past the

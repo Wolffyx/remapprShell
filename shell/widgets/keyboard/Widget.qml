@@ -11,7 +11,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.domain.status
 import qs.domain.status.icons
-import qs.domain.theme
 import qs.ui.primitives
 
 BarWidget {

@@ -8,7 +8,6 @@
 import QtQuick
 import qs.domain.session
 import qs.ui.primitives
-import qs.domain.theme
 
 BarWidget {
     id: root

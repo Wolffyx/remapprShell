@@ -18,7 +18,6 @@ import qs.domain.launcher.apps
 import qs.domain.launcher.providers
 import qs.domain.session
 import qs.domain.status
-import qs.domain.status.icons
 import qs.domain.system
 import qs.domain.system.stats
 import qs.domain.theme
