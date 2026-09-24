@@ -37,6 +37,13 @@ QtObject {
     // settings page says which of the two is happening.
     property bool automaticLookAndFeel: false
 
+    // All of kdeglobals, parsed: { group: { key: value } }. Empty until it
+    // has been read, and again if it cannot be. Kept for the other things
+    // that want a key of it -- the terminal KDE runs commands in, for one --
+    // so the file is read once, on the debounce below, and not once more per
+    // reader on every one of the watcher's four notifications.
+    property var groups: ({})
+
     // Derived, so widgets never hand-roll an alpha.
     function alpha(c, a) {
         return Qt.rgba(c.r, c.g, c.b, a);
@@ -45,29 +52,6 @@ QtObject {
     readonly property color panelBackground: root.alpha(root.background, 0.85)
     readonly property color hoverBackground: root.alpha(root.foreground, 0.12)
     readonly property color pressedBackground: root.alpha(root.foreground, 0.2)
-
-    // kdeglobals is an INI file with [Group] headers and Key=Value lines.
-    // Parsed here rather than shelled out to kreadconfig6 once per key: that
-    // would be a dozen processes on the startup path for one file.
-    function _parse(text) {
-        const groups = {};
-        let current = "";
-        for (const raw of text.split("\n")) {
-            const line = raw.trim();
-            if (line.length === 0 || line.startsWith("#"))
-                continue;
-            if (line.startsWith("[")) {
-                current = line.replace(/^\[|\]$/g, "");
-                groups[current] = groups[current] ?? {};
-                continue;
-            }
-            const eq = line.indexOf("=");
-            if (eq < 0 || current === "")
-                continue;
-            groups[current][line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-        }
-        return groups;
-    }
 
     // KDE writes colours as "r,g,b" triples in kdeglobals, but colour schemes
     // installed as .colors files may use #rrggbb. Both are accepted.
@@ -94,8 +78,12 @@ QtObject {
         // change repainted everything four times.
         onFileChanged: settle.restart()
 
+        // kdeglobals is an INI file, parsed here rather than shelled out to
+        // kreadconfig6 once per key: that would be a dozen processes on the
+        // startup path for one file.
         onLoaded: {
-            const g = root._parse(text());
+            const g = Ini.parse(text());
+            root.groups = g;
             const win = g["Colors:Window"] ?? {};
             const sel = g["Colors:Selection"] ?? {};
 
@@ -115,7 +103,10 @@ QtObject {
             Log.info("theme", "colour scheme loaded from kdeglobals");
         }
 
-        onLoadFailed: Log.warn("theme", "kdeglobals unreadable; using built-in colours")
+        onLoadFailed: {
+            root.groups = ({});
+            Log.warn("theme", "kdeglobals unreadable; using built-in colours");
+        }
     }
 
     readonly property Timer _settle: Timer {

@@ -36,6 +36,14 @@ TestCase {
         compare(m.ksmserver["Log Out"].keys, []);
     }
 
+    // Read the way every KDE file here is read (see Ini): a key is trimmed,
+    // so a hand-edited line with spaces round the "=" is still that action.
+    function test_a_key_is_read_trimmed() {
+        const m = KeyMap.parse("[kwin]\nOverview = Meta+W,Meta+W,Toggle Overview\n");
+        compare(m.kwin.Overview.keys, ["Meta+W"]);
+        compare(m.kwin.Overview.label, "Toggle Overview");
+    }
+
     function test_keys_of_something_missing() {
         compare(KeyMap.keysOf(KeyMap.parse(file), "kwin", "Nothing"), []);
         compare(KeyMap.keysOf({}, "kwin", "Overview"), []);

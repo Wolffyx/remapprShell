@@ -69,9 +69,9 @@ Provider {
         printErrors: false
 
         onFileChanged: reload()
+        // In [Shell], where plasmashell and every script here read it.
         onLoaded: {
-            const match = text().match(/^\s*ShellPackage\s*=\s*(.+)$/m);
-            const next = match ? match[1].trim() : "org.kde.plasma.desktop";
+            const next = Ini.value(text(), "Shell", "ShellPackage") || "org.kde.plasma.desktop";
             if (next !== root._shellPackage) {
                 root._shellPackage = next;
                 root._hostView.reload();

@@ -73,20 +73,7 @@ QtObject {
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: {
-            let group = "";
-            let until = "";
-            for (const raw of text().split("\n")) {
-                const line = raw.trim();
-                if (line.startsWith("[")) {
-                    group = line;
-                    continue;
-                }
-                if (group === "[DoNotDisturb]" && line.startsWith("Until="))
-                    until = line.slice(6);
-            }
-            root.plasmaUntil = until;
-        }
+        onLoaded: root.plasmaUntil = Ini.parse(text()).DoNotDisturb?.Until ?? ""
         onLoadFailed: root.plasmaUntil = ""
     }
 

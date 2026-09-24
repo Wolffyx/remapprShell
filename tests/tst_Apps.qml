@@ -98,21 +98,6 @@ TestCase {
 
     // ---- what the system opens things with ---------------------------------
 
-    function test_one_key_of_one_group() {
-        const kdeglobals = `[General]
-BrowserApplication=google-chrome.desktop
-TerminalApplication=alacritty
-
-[Icons]
-Theme=breeze-dark
-`
-        compare(Apps.iniValue(kdeglobals, "General", "TerminalApplication"), "alacritty");
-        compare(Apps.iniValue(kdeglobals, "Icons", "Theme"), "breeze-dark");
-        // A key of another group is not this group's.
-        compare(Apps.iniValue(kdeglobals, "Icons", "TerminalApplication"), "");
-        compare(Apps.iniValue(kdeglobals, "Nothing", "Theme"), "");
-    }
-
     function test_what_xdg_mime_answered() {
         // One line per type asked about, in order; a type nothing handles
         // answers with an empty line, and a type with fallbacks answers with

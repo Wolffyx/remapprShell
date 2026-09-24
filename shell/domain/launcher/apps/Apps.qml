@@ -138,27 +138,6 @@ QtObject {
 
     // ---- what the system opens things with ----------------------------------
 
-    // The value of one key in one group of an INI-shaped file, or "".
-    //
-    // Small and forgiving on purpose: this is asked of KDE's own files, which
-    // are written by KDE and read here only to learn what is already true.
-    function iniValue(text, group, key) {
-        let inGroup = false;
-        for (const raw of String(text ?? "").split("\n")) {
-            const line = raw.trim();
-            if (line.startsWith("[")) {
-                inGroup = line === `[${group}]`;
-                continue;
-            }
-            if (!inGroup)
-                continue;
-            const eq = line.indexOf("=");
-            if (eq > 0 && line.slice(0, eq).trim() === key)
-                return line.slice(eq + 1).trim();
-        }
-        return "";
-    }
-
     // What `xdg-mime query default` answered, one type per line, in the order
     // the types were asked about.
     //
