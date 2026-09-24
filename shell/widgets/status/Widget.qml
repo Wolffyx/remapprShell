@@ -53,21 +53,9 @@ BarWidget {
     function tipFor(id) {
         switch (id) {
         case "privacy":
-            return [StatusIcons.privacyTooltip(PrivacyStatus.users, AudioStatus.micMuted),
-                    PrivacyStatus.users.microphone.length > 0
-                        ? (AudioStatus.micMuted ? "Middle-click to unmute the microphone"
-                                                : "Middle-click to mute the microphone")
-                        : ""].filter(s => s).join("\n");
-        case "network": {
-            const lines = NetworkStatus.connections.map(c => c.kind === "wired"
-                ? [c.name, StatusIcons.linkSpeed(c.speed)].filter(s => s).join(" · ")
-                : `${c.name} · ${StatusIcons.percent(c.strength)}`);
-            if (lines.length === 0)
-                return "Not connected";
-            if (StatusIcons.isLimited(NetworkStatus.connectivity))
-                lines.push(NetworkStatus.connectivity === "Portal" ? "A sign-in page is in the way" : "No internet");
-            return lines.join("\n");
-        }
+            return StatusIcons.privacyHint(PrivacyStatus.users, AudioStatus.micMuted);
+        case "network":
+            return StatusIcons.networkTooltip(NetworkStatus.connections, NetworkStatus.connectivity);
         case "bluetooth": {
             if (!BluetoothStatus.enabled)
                 return "Bluetooth is off";

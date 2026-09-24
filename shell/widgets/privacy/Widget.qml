@@ -23,10 +23,7 @@ BarWidget {
 
     present: PrivacyStatus.present
 
-    tooltip: [StatusIcons.privacyTooltip(root.users, AudioStatus.micMuted),
-              root.recordingSound ? (AudioStatus.micMuted ? "Middle-click to unmute the microphone"
-                                                          : "Middle-click to mute the microphone") : ""]
-        .filter(s => s).join("\n")
+    tooltip: StatusIcons.privacyHint(root.users, AudioStatus.micMuted)
 
     implicitWidth: Math.max(root.tileSize, icons.implicitWidth + 16)
     implicitHeight: root.barVertical ? Math.max(root.tileSize, icons.implicitHeight + 16) : root.tileSize
