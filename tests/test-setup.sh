@@ -8,6 +8,7 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/tests/lib/harness.sh"
 harness_init
+source "$REPO_ROOT/scripts/lib/dialog.sh"
 
 UI_VAR="${ENV_PREFIX}_UI"
 setup() { "$REPO_ROOT/scripts/setup.sh" "$@" 2>&1; }
@@ -17,19 +18,19 @@ setup() { "$REPO_ROOT/scripts/setup.sh" "$@" 2>&1; }
 # cannot put a dialog on the screen of whoever is running the suite.
 printf '#!/bin/sh\nexit 0\n' > "$FAKEBIN/kdialog"; chmod +x "$FAKEBIN/kdialog"
 
-# The library under test, in a subshell per case: ui_backend remembers its
-# answer, which is the point of it and would make the cases depend on order.
+# The library under test, in a subshell per case with its answer forgotten:
+# ui_backend remembers what it decided, which is the point of it and would
+# make the cases depend on order. Sourced once, above: sourcing it per case
+# read branding.json again every time, nine jq runs for each of twenty.
 #
 # The session this suite is run from is not the session under test: a real
 # WAYLAND_DISPLAY would make every detection case answer kdialog.
 ui() {
     local backend=$1; shift
-    ( export "$UI_VAR=$backend"
+    ( DIALOG_UI=
+      export "$UI_VAR=$backend"
       unset WAYLAND_DISPLAY DISPLAY
       [ -n "${TEST_WAYLAND:-}" ] && export WAYLAND_DISPLAY="$TEST_WAYLAND"
-      source "$REPO_ROOT/scripts/lib/log.sh"
-      source "$REPO_ROOT/scripts/lib/brand.sh"
-      source "$REPO_ROOT/scripts/lib/dialog.sh"
       "$@" )
 }
 
