@@ -711,7 +711,17 @@ Item {
                 spacing: 2
 
                 Repeater {
-                    model: NetworkStatus.wifiEnabled ? wifi.networks : []
+                    // Through a ScriptModel, not the array: the list is sorted
+                    // by signal strength, so every scan made a new one, and a
+                    // Repeater handed a new array rebuilds every row -- the
+                    // password field with them, emptied under the person
+                    // typing into it. A network is the same object from one
+                    // scan to the next, so a re-sort is now a move and a row
+                    // lives as long as its network is on the list.
+                    model: ScriptModel {
+                        values: NetworkStatus.wifiEnabled ? wifi.networks : []
+                        comparisonMode: ObjectComparison.Identity
+                    }
 
                     Column {
                         id: network
