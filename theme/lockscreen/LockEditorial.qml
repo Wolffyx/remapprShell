@@ -23,7 +23,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: editorial
 
-    readonly property real unit: editorial.ui.unit
     readonly property int panelX: Math.round(editorial.width * 0.615)
 
     readonly property color ink: "#f4efe8"

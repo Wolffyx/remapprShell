@@ -23,7 +23,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: board
 
-    readonly property real unit: board.ui.unit
     readonly property color ink: "#ffffff"
     readonly property color dim: Qt.rgba(1, 1, 1, 0.8)
     readonly property int cardRadius: Math.round(26 * board.unit)

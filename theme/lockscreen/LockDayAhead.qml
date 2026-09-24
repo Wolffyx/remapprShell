@@ -44,12 +44,6 @@ import org.kde.plasma.workspace.keyboardlayout as Layouts
 LockStyle {
     id: day
 
-    readonly property real unit: day.ui.unit
-
-    function px(v: real): int {
-        return Math.round(v * day.unit);
-    }
-
     blursWallpaper: false
     scrimsWallpaper: false
 

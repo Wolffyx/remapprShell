@@ -38,8 +38,6 @@ import org.kde.plasma.workspace.keyboardlayout as Layouts
 LockStyle {
     id: secure
 
-    readonly property real unit: secure.ui.unit
-
     // The design's slate, cooler than the other dark styles.
     readonly property color ground: "#0e1012"
     readonly property color railGround: "#121417"
@@ -59,10 +57,6 @@ LockStyle {
 
     promptField: password
     promptBlock: authCard
-
-    function px(n: real): int {
-        return Math.round(n * secure.unit);
-    }
 
     // --- what the greeter says it has --------------------------------------
 

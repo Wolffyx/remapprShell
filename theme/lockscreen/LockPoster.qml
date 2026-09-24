@@ -21,7 +21,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: poster
 
-    readonly property real unit: poster.ui.unit
     readonly property color ink: "#ffffff"
     readonly property color dim: Qt.rgba(1, 1, 1, 0.78)
 

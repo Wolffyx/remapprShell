@@ -27,8 +27,6 @@ import org.kde.plasma.private.mpris as Mpris
 LockStyle {
     id: console_
 
-    readonly property real unit: console_.ui.unit
-
     readonly property color ink: "#cdc6be"
     readonly property color mut: "#8a8378"
     readonly property color accent: console_.ui.accent

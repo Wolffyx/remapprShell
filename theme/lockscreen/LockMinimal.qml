@@ -37,7 +37,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: minimal
 
-    readonly property real unit: minimal.ui.unit
     readonly property bool shown: minimal.ui.unlock.shown
 
     blursWallpaper: false

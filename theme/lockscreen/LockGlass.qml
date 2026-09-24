@@ -19,7 +19,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: glass
 
-    readonly property real unit: glass.ui.unit
     readonly property bool clockLeft: Options.clockPosition !== "center"
 
     promptField: password

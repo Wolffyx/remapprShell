@@ -38,8 +38,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: kiosk
 
-    readonly property real unit: kiosk.ui.unit
-
     // "Larger text", for this lock only: every line of reading size is drawn
     // a quarter larger. The headline is already as large as the page allows.
     property bool larger: false

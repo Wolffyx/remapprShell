@@ -54,8 +54,6 @@ import org.kde.plasma.workspace.keyboardlayout as Layouts
 LockStyle {
     id: access
 
-    readonly property real unit: access.ui.unit
-
     // --- this lock's choices ---------------------------------------------
 
     // The text size, as the design offers it; everything but the page's own

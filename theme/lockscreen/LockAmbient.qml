@@ -20,8 +20,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: ambient
 
-    readonly property real unit: ambient.ui.unit
-
     readonly property color ink: "#2a2521"
     readonly property color dim: Qt.rgba(0.16, 0.15, 0.13, 0.8)
     readonly property color hair: Qt.rgba(0.16, 0.15, 0.13, 0.3)

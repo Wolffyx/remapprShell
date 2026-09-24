@@ -27,8 +27,6 @@ import org.kde.plasma.private.sessions as Sessions
 LockStyle {
     id: seats
 
-    readonly property real unit: seats.ui.unit
-
     readonly property color ink: "#f4efe8"
     readonly property color mut: "#8a8378"
     readonly property color accent: seats.ui.accent
