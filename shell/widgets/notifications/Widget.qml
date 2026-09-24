@@ -122,11 +122,12 @@ BarWidget {
     component GroupCard: Item {
         id: card
 
-        required property var modelData
+        // { app, icon, entries }, from Centre.groups.
+        required property var group
         required property real now
         property bool expanded: false
 
-        readonly property var entries: card.modelData.entries
+        readonly property var entries: card.group.entries
         readonly property int count: card.entries.length
         readonly property bool stacked: card.count > 1 && !card.expanded
 
@@ -169,12 +170,12 @@ BarWidget {
 
                         NoteIcon {
                             anchors.verticalCenter: parent.verticalCenter
-                            source: card.modelData.icon
+                            source: card.group.icon
                         }
 
                         PanelText {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: card.modelData.app
+                            text: card.group.app
                             font.pixelSize: 13
                             font.weight: Font.Medium
                         }
@@ -208,7 +209,14 @@ BarWidget {
                 }
 
                 Repeater {
-                    model: card.expanded ? card.entries.slice(0, 8) : card.entries.slice(0, 1)
+                    // By identity: an entry is the same object for as long as
+                    // the history keeps it, so a new one arriving adds a row
+                    // rather than rebuilding the card's -- and reloading their
+                    // pictures, which are not cached.
+                    model: ScriptModel {
+                        values: card.expanded ? card.entries.slice(0, 8) : card.entries.slice(0, 1)
+                        comparisonMode: ObjectComparison.Identity
+                    }
 
                     // One notification in the card. An Item rather than a bare
                     // Column: a click has to land on the whole row -- the space
@@ -357,6 +365,34 @@ BarWidget {
                 readonly property var entries: NotificationWatch.entries.slice(0, root.shown)
                 property real now: Date.now()
 
+                // Midnight this morning, which is all the stream's days depend
+                // on. Handed `now` itself, the days were worked out again on
+                // every tick of the timer below, and the rows were kept only
+                // because the Repeater happened to find the new list equal to
+                // the old one -- which it does, as of Qt 6.11.
+                readonly property real today: {
+                    const d = new Date(centre.now);
+                    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                }
+
+                readonly property var groups: root.style === "grouped" ? Centre.groups(centre.entries) : []
+                readonly property var buckets: root.style === "stream" ? Centre.buckets(centre.entries, centre.today) : []
+
+                // A group or a day by its place, as long as its name agrees,
+                // and by name while the list is still moving under it. The
+                // Repeaters below are over the names, so a new notification
+                // moves a card rather than making every card again -- an
+                // opened-out group stays open.
+                function groupAt(index, app) {
+                    const at = centre.groups[index];
+                    return at?.app === app ? at : (centre.groups.find(g => g.app === app) ?? { app: app, icon: "", entries: [] });
+                }
+
+                function bucketAt(index, label) {
+                    const at = centre.buckets[index];
+                    return at?.label === label ? at : (centre.buckets.find(b => b.label === label) ?? { label: label, entries: [] });
+                }
+
                 width: parent.width
                 spacing: 14
 
@@ -445,28 +481,42 @@ BarWidget {
                         spacing: 12
 
                         Repeater {
-                            model: root.style === "grouped" ? Centre.groups(centre.entries) : []
+                            model: ScriptModel { values: centre.groups.map(g => g.app) }
 
-                            GroupCard { now: centre.now }
+                            GroupCard {
+                                id: groupCard
+                                // The application, and its place in the list.
+                                required property string modelData
+                                required property int index
+                                group: centre.groupAt(groupCard.index, groupCard.modelData)
+                                now: centre.now
+                            }
                         }
 
                         Repeater {
-                            model: root.style === "stream" ? Centre.buckets(centre.entries, centre.now) : []
+                            model: ScriptModel { values: centre.buckets.map(b => b.label) }
 
                             Column {
                                 id: bucket
 
-                                required property var modelData
+                                // The day's label, and its place in the list.
+                                required property string modelData
+                                required property int index
+                                readonly property var day: centre.bucketAt(bucket.index, bucket.modelData)
 
                                 width: list.width
 
                                 MenuTitle {
                                     leftPadding: 0
-                                    text: bucket.modelData.label
+                                    text: bucket.day.label
                                 }
 
                                 Repeater {
-                                    model: bucket.modelData.entries
+                                    // By identity, as in a group card.
+                                    model: ScriptModel {
+                                        values: bucket.day.entries
+                                        comparisonMode: ObjectComparison.Identity
+                                    }
 
                                     Item {
                                         id: line
@@ -569,7 +619,7 @@ BarWidget {
                                             width: parent.width
                                             height: 1
                                             color: Theme.out
-                                            visible: line.index < bucket.modelData.entries.length - 1
+                                            visible: line.index < bucket.day.entries.length - 1
                                         }
 
                                         HoverHandler {
