@@ -41,6 +41,10 @@ QtObject {
     // The sheet: what is worth a line, in the order a person looks for it,
     // each with the keys actually bound. A line with no keys is left out, and
     // so is a section left empty.
+    //
+    // Plasma's own keys and this shell's, and no application's: what another
+    // program binds is that program's to show. A screenshot key is on the
+    // sheet when it is the shell's own action, with the rest of shellRows.
     readonly property var wanted: [
         { title: "Shell", rows: [
             ["plasmashell", "activate application launcher", "Application menu"],
@@ -50,7 +54,6 @@ QtObject {
             ["kwin", "Show Desktop", "Show the desktop"],
             ["ksmserver", "Lock Session", "Lock"],
             ["ksmserver", "Log Out", "Log out"],
-            ["services][org.kde.spectacle.desktop", "RectangularRegionScreenShot", "Screenshot of a region"],
             ["kwin", "Toggle Night Color", "Night Light"]
         ] },
         { title: "Windows and desktops", rows: [
