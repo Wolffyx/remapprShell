@@ -20,8 +20,8 @@ pragma Singleton
 // actions listed here -- see SHELL_ACTIONS there, which names this file.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.kde
 import qs.domain.shortcuts.events
 
 QtObject {
@@ -55,24 +55,20 @@ QtObject {
     // component's own object path as well as the interface: every shell on the
     // machine announces its keys here, and there is no reason for ours to see
     // theirs go past.
-    readonly property Process _monitor: Process {
-        running: true
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='signal',interface='${ShortcutEvents.interfaceName}',path='${ShortcutEvents.pathFor(Branding.slug)}'`]
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='signal',interface='${ShortcutEvents.interfaceName}',path='${ShortcutEvents.pathFor(Branding.slug)}'`
 
-        stdout: SplitParser {
-            onRead: line => {
-                const event = ShortcutEvents.parse(line, Branding.slug);
-                if (!event || !root.takes(event.action))
-                    return;
-                if (event.kind === "pressed")
-                    root.pressed(event.action);
-                else
-                    root.released(event.action);
-            }
+        onRead: line => {
+            const event = ShortcutEvents.parse(line, Branding.slug);
+            if (!event || !root.takes(event.action))
+                return;
+            if (event.kind === "pressed")
+                root.pressed(event.action);
+            else
+                root.released(event.action);
         }
 
-        onRunningChanged: if (running)
+        onListeningChanged: if (listening)
             Log.info("shortcuts", "listening for this shell's own keys");
     }
 }

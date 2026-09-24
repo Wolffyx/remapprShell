@@ -18,6 +18,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.kde
 import qs.domain.windows.events
 
 QtObject {
@@ -81,38 +82,30 @@ QtObject {
 
     // And then followed. A match rule rather than a whole-bus monitor: this
     // wants two signals, not every message on the session bus.
-    property int _dropped: 0
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='signal',interface='${Branding.dbusName}.Windows'`
 
-    readonly property Process _monitor: Process {
-        running: true
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='signal',interface='${Branding.dbusName}.Windows'`]
-        stdout: SplitParser {
-            onRead: line => {
-                const list = WindowEvents.parseSignal(line);
-                if (list === null) {
-                    // A dropped line means the window list on screen is now
-                    // out of date and nothing will say so, since the daemon
-                    // sends state rather than changes. Worth a warning, unlike
-                    // the ordinary case of a line that is simply not ours.
-                    if (BusLine.dropped > root._dropped) {
-                        root._dropped = BusLine.dropped;
-                        Log.warn("windows", "a window update was too large to read; the list may be stale");
-                    }
-                    return;
-                }
-                // A window opening or closing is worth a journal line; a title
-                // changing is not, and there are a great many of those.
-                const changed = list.length !== root.windows.length;
-                root._apply(list);
-                if (changed)
-                    Log.info("windows", `${list.length} window(s)`);
-                else
-                    Log.debug("windows", `${list.length} window(s), details changed`);
-            }
+        onRead: line => {
+            const list = WindowEvents.parseSignal(line);
+            if (list === null)
+                return;
+            // A window opening or closing is worth a journal line; a title
+            // changing is not, and there are a great many of those.
+            const changed = list.length !== root.windows.length;
+            root._apply(list);
+            if (changed)
+                Log.info("windows", `${list.length} window(s)`);
+            else
+                Log.debug("windows", `${list.length} window(s), details changed`);
         }
 
-        onRunningChanged: if (!running) Log.warn("windows", "the window list stopped following changes")
+        // A dropped line means the window list on screen is now out of date
+        // and nothing will say so, since the daemon sends state rather than
+        // changes. Worth a warning, unlike the ordinary case of a line that is
+        // simply not ours.
+        onDropped: Log.warn("windows", "a window update was too large to read; the list may be stale")
+
+        onListeningChanged: if (!listening) Log.warn("windows", "the window list stopped following changes")
     }
 
     // ---- matching a window to the application that owns it ---------------
