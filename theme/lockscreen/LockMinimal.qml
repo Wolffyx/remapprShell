@@ -122,10 +122,9 @@ LockStyle {
         anchors.verticalCenter: toggle.verticalCenter
         enabled: minimal.shown
         opacity: promptColumn.opacity
-        keyboard: minimal.ui.keyboard
+        ui: minimal.ui
         ink: minimal.sub
         textSize: Math.round(12 * minimal.unit)
-        onFocusRequested: minimal.ui.focusPassword()
     }
 
     // --- the clock --------------------------------------------------------

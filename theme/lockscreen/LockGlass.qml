@@ -143,7 +143,6 @@ LockStyle {
 
             LockActions {
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: Options.showSessionButtons
                 enabled: glass.ui.unlock.shown
                 session: glass.ui.session
                 unit: glass.unit
@@ -169,9 +168,8 @@ LockStyle {
                 id: statusRow
 
                 anchors.centerIn: parent
-                keyboard: glass.ui.keyboard
+                ui: glass.ui
                 ink: glass.ui.fg
-                onFocusRequested: glass.ui.focusPassword()
             }
         }
     }

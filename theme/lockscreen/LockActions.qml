@@ -10,7 +10,8 @@
 
     The designs draw these three ways -- round on glass, square on a bar, as
     words in a row -- so the shape is the style's to choose and the actions
-    are not.
+    are not. Nor is whether they are drawn at all: `showSessionButtons` is
+    applied here, for every style.
 */
 pragma ComponentBehavior: Bound
 
@@ -32,6 +33,13 @@ Row {
     property real unit: 1
     property int size: Math.round(46 * actions.unit)
 
+    // Whether there is anything to draw: the setting allows it and the
+    // machine can do at least one of the three. For a style that puts the
+    // row in a card of its own, which should go when the row has nothing.
+    readonly property bool any: Options.showSessionButtons
+        && (actions.session.canSuspend || actions.session.canHibernate || actions.session.canSwitchUser)
+
+    visible: Options.showSessionButtons
     spacing: Math.round(10 * actions.unit)
 
     component Action: Item {

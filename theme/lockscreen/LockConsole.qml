@@ -338,10 +338,9 @@ LockStyle {
         LockStatus {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            keyboard: console_.ui.keyboard
+            ui: console_.ui
             ink: console_.ink
             textSize: Math.round(15 * console_.unit)
-            onFocusRequested: console_.ui.focusPassword()
         }
 
         Text {

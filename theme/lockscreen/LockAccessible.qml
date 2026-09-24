@@ -454,15 +454,14 @@ LockStyle {
 
             Choice {
                 isSwitch: true
-                visible: access.ui.keyboard?.status === Loader.Ready
+                visible: access.ui.keyboardAvailable
                 glyph: "keyboard"
                 label: "Keyboard"
-                on: access.ui.keyboard?.keyboardActive ?? false
+                on: access.ui.keyboardShown
                 description: "Shows or hides the on-screen keyboard."
                 onActivated: {
-                    const showing = !(access.ui.keyboard?.keyboardActive ?? false);
-                    access.ui.focusPassword();
-                    access.ui.keyboard.showHide();
+                    const showing = !access.ui.keyboardShown;
+                    access.ui.toggleKeyboard();
                     access.say(showing ? "On-screen keyboard shown." : "On-screen keyboard hidden.", true);
                 }
             }
@@ -766,8 +765,6 @@ LockStyle {
 
         LockActions {
             id: actions
-
-            visible: Options.showSessionButtons
             session: access.ui.session
             shape: "text"
             unit: 1.4 * access.s

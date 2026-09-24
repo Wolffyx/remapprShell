@@ -86,10 +86,9 @@ LockStyle {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             enabled: board.ui.unlock.shown
-            keyboard: board.ui.keyboard
+            ui: board.ui
             ink: board.ink
             textSize: Math.round(13 * board.unit)
-            onFocusRequested: board.ui.focusPassword()
         }
     }
 
@@ -313,7 +312,6 @@ LockStyle {
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: Options.showSessionButtons
             enabled: board.ui.unlock.shown
             session: board.ui.session
             shape: "square"

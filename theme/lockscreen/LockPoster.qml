@@ -178,15 +178,13 @@ LockStyle {
             LockStatus {
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: poster.ui.unlock.shown
-                keyboard: poster.ui.keyboard
+                ui: poster.ui
                 ink: poster.ink
                 textSize: Math.round(12.5 * poster.unit)
-                onFocusRequested: poster.ui.focusPassword()
             }
 
             LockActions {
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Options.showSessionButtons
                 enabled: poster.ui.unlock.shown
                 session: poster.ui.session
                 unit: poster.unit

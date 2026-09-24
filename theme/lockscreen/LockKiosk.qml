@@ -455,12 +455,11 @@ LockStyle {
 
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    keyboard: kiosk.ui.keyboard
+                    ui: kiosk.ui
                     ink: kiosk.sub
                     warn: "#8a5a20"
                     textSize: Math.round(12 * kiosk.textUnit)
                     spacing: Math.round(10 * kiosk.unit)
-                    onFocusRequested: kiosk.ui.focusPassword()
                 }
             }
 

@@ -347,8 +347,17 @@ Item {
         passwordField: ui.prompt?.field ?? null
     }
 
-    // Read by the styles, which draw the button that shows and hides it.
-    readonly property Item keyboard: inputPanel
+    // For the styles, which draw the button that shows and hides it: whether
+    // Plasma's keyboard loaded at all, whether it is up, and the press. The
+    // password field is focused first, so that the first key typed on the
+    // keyboard goes into the password rather than nowhere.
+    readonly property bool keyboardAvailable: inputPanel.status === Loader.Ready
+    readonly property bool keyboardShown: inputPanel.keyboardActive
+
+    function toggleKeyboard(): void {
+        ui.focusPassword();
+        inputPanel.showHide();
+    }
 
     Binding {
         target: ui.unlock

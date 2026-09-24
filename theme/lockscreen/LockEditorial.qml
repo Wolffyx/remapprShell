@@ -216,7 +216,6 @@ LockStyle {
             LockActions {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Options.showSessionButtons
                 enabled: editorial.ui.unlock.shown
                 session: editorial.ui.session
                 shape: "text"
@@ -229,10 +228,9 @@ LockStyle {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: editorial.ui.unlock.shown
-                keyboard: editorial.ui.keyboard
+                ui: editorial.ui
                 ink: editorial.dim
                 textSize: Math.round(13 * editorial.unit)
-                onFocusRequested: editorial.ui.focusPassword()
             }
         }
     }

@@ -629,12 +629,12 @@ LockStyle {
         // Where the design has the help desk: the one other way in there is.
         Row {
             anchors.verticalCenter: parent.verticalCenter
-            visible: secure.ui.keyboard?.status === Loader.Ready
+            visible: secure.ui.keyboardAvailable
             spacing: secure.px(12)
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: secure.ui.keyboard?.keyboardActive ? "keyboard_hide" : "keyboard"
+                text: secure.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 font.family: "Material Symbols Rounded"
                 font.pixelSize: secure.px(22)
                 color: oskHover.hovered ? secure.ink : secure.sub
@@ -642,7 +642,7 @@ LockStyle {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: secure.ui.keyboard?.keyboardActive ? "Hide on-screen keyboard" : "On-screen keyboard"
+                text: secure.ui.keyboardShown ? "Hide on-screen keyboard" : "On-screen keyboard"
                 textFormat: Text.PlainText
                 font.family: "Rubik"
                 font.pixelSize: secure.px(14)
@@ -651,10 +651,7 @@ LockStyle {
 
             HoverHandler { id: oskHover; cursorShape: Qt.PointingHandCursor }
             TapHandler {
-                onTapped: {
-                    secure.ui.focusPassword();
-                    secure.ui.keyboard.showHide();
-                }
+                onTapped: secure.ui.toggleKeyboard()
             }
             Accessible.role: Accessible.Button
             Accessible.name: "On-screen keyboard"
@@ -663,7 +660,6 @@ LockStyle {
         LockActions {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: Options.showSessionButtons
             session: secure.ui.session
             shape: "square"
             unit: secure.unit

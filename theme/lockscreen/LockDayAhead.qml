@@ -378,13 +378,10 @@ LockStyle {
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
 
             StatusButton {
-                visible: day.ui.keyboard?.status === Loader.Ready
-                glyph: day.ui.keyboard?.keyboardActive ? "keyboard_hide" : "keyboard"
+                visible: day.ui.keyboardAvailable
+                glyph: day.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 name: "On-screen keyboard"
-                onActivated: {
-                    day.ui.focusPassword();
-                    day.ui.keyboard.showHide();
-                }
+                onActivated: day.ui.toggleKeyboard()
             }
 
             // The layout by its short name, as the design draws it; a press
@@ -1004,8 +1001,10 @@ LockStyle {
             y: board.height - height - day.px(72)
             width: side.width
             height: sessionBody.height + day.px(44)
-            visible: Options.showSessionButtons
-                && (day.ui.session.canSuspend || day.ui.session.canHibernate || day.ui.session.canSwitchUser)
+            // The row's `any`, not its `visible`: a child reads as hidden for
+            // as long as its card is, so a card that asked could never
+            // come back.
+            visible: sessionActions.any
             opacity: board.shownOpacity
 
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
@@ -1023,6 +1022,8 @@ LockStyle {
                 }
 
                 LockActions {
+                    id: sessionActions
+
                     enabled: day.ui.unlock.shown
                     session: day.ui.session
                     shape: "round"

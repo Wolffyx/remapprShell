@@ -75,10 +75,9 @@ LockStyle {
         x: ambient.width - width - Math.round(56 * ambient.unit)
         y: Math.round(52 * ambient.unit)
         enabled: ambient.ui.unlock.shown
-        keyboard: ambient.ui.keyboard
+        ui: ambient.ui
         ink: ambient.dim
         textSize: Math.round(13 * ambient.unit)
-        onFocusRequested: ambient.ui.focusPassword()
     }
 
     // --- the clock --------------------------------------------------------
@@ -166,7 +165,6 @@ LockStyle {
     LockActions {
         x: (ambient.width - width) / 2
         y: ambient.height - height - Math.round(64 * ambient.unit)
-        visible: Options.showSessionButtons
         enabled: ambient.ui.unlock.shown
         opacity: promptColumn.opacity
         session: ambient.ui.session

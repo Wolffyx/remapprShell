@@ -24,11 +24,10 @@ import org.kde.breeze.components as Breeze
 Row {
     id: status
 
-    // The frame's VirtualKeyboardLoader, or null where there is none. A var
-    // rather than its own type: it comes from org.kde.breeze.components, and
-    // importing Breeze here to name it would pull the whole set in for one
-    // property.
-    property var keyboard: null
+    // The frame, for its on-screen keyboard: whether there is one, whether
+    // it is up, and the press that shows or hides it. A var rather than
+    // LockUi, which loads the style that makes this. Null draws no button.
+    property var ui: null
 
     property color ink: "#ffffff"
     // Caps Lock, and a layout that is not the person's first: the two things
@@ -36,10 +35,6 @@ Row {
     // words under the field by LockMessage.
     property color warn: "#e0c98a"
     property int textSize: 12
-
-    // Asked for before the keyboard is shown, so the first key typed on it
-    // goes into the password rather than nowhere.
-    signal focusRequested
 
     // The frame asks Kirigami for light-on-dark, which is right for five of
     // the seven styles and invisible on the two that draw dark type on a
@@ -66,12 +61,9 @@ Row {
         focusPolicy: Qt.TabFocus
         text: "On-screen keyboard"
         display: QQC2.AbstractButton.IconOnly
-        icon.name: status.keyboard?.keyboardActive ? "input-keyboard-virtual-on" : "input-keyboard-virtual-off"
-        visible: status.keyboard?.status === Loader.Ready
-        onClicked: {
-            status.focusRequested();
-            status.keyboard.showHide();
-        }
+        icon.name: status.ui?.keyboardShown ? "input-keyboard-virtual-on" : "input-keyboard-virtual-off"
+        visible: status.ui?.keyboardAvailable ?? false
+        onClicked: status.ui.toggleKeyboard()
     }
 
     Item {

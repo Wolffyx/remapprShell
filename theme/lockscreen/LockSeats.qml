@@ -268,10 +268,9 @@ LockStyle {
             anchors.left: parent.left
             anchors.leftMargin: Math.round(64 * seats.unit)
             anchors.verticalCenter: parent.verticalCenter
-            keyboard: seats.ui.keyboard
+            ui: seats.ui
             ink: "#cdc6be"
             textSize: Math.round(13 * seats.unit)
-            onFocusRequested: seats.ui.focusPassword()
         }
 
         Row {
@@ -293,7 +292,6 @@ LockStyle {
 
             LockActions {
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Options.showSessionButtons
                 session: seats.ui.session
                 shape: "square"
                 unit: seats.unit
