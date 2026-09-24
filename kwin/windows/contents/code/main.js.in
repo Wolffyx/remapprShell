@@ -56,11 +56,15 @@ function describe(window) {
         appId: window.resourceClass || "",
         desktopFile: window.desktopFileName || "",
         // The other half of an X11 window's class -- the instance name -- and
-        // for a Wayland window the name of the program's executable. The
-        // daemon tells one X11 window of a process from another by it.
+        // for a Wayland window the name of the program's executable. Plasma's
+        // task manager matches desktop entries' StartupWMClass against this
+        // before anything else, so the shell does too; the daemon tells one
+        // X11 window of a process from another by it.
         resourceName: window.resourceName || "",
-        // The process, whose X11 windows the daemon looks through for this
-        // one's own icon.
+        // The process: what the daemon reads the command line and two
+        // environment variables of, for the windows that match no
+        // application by themselves, and whose X11 windows it looks through
+        // for this one's own icon.
         pid: window.pid || 0,
         iconSerial: iconSerials.get(uuid) || 0,
         minimized: window.minimized === true,
@@ -115,6 +119,11 @@ function watch(window) {
     window.skipTaskbarChanged.connect(publish);
     window.demandsAttentionChanged.connect(publish);
     window.outputChanged.connect(publish);
+    // What the application is matched by can change after the window
+    // appears -- a desktop file named late, a class set again -- and Plasma
+    // matches such a window again when it does.
+    window.windowClassChanged.connect(publish);
+    window.desktopFileNameChanged.connect(publish);
     window.iconChanged.connect(() => {
         const uuid = uuidOf(window);
         iconSerials.set(uuid, (iconSerials.get(uuid) || 0) + 1);
