@@ -4,11 +4,12 @@
     What is playing, as the design draws it: the art, the track, a line of
     progress and three buttons.
 
-    The players come from `org.kde.plasma.private.mpris`, which is the module
-    Plasma's own lock screen uses -- the greeter has no session of ours to ask,
-    and this way a player that Plasma's lock screen can control is one this one
-    can control too. Shown only when Plasma's own "show media controls" setting
-    is on, which is the setting System Settings already offers.
+    The players come from LockKeys, out of `org.kde.plasma.private.mpris`,
+    which is the module Plasma's own lock screen uses -- the greeter has no
+    session of ours to ask, and this way a player that Plasma's lock screen can
+    control is one this one can control too. Shown only when Plasma's own
+    "show media controls" setting is on, which is the setting System Settings
+    already offers.
 */
 pragma ComponentBehavior: Bound
 
@@ -47,7 +48,7 @@ Item {
 
     Repeater {
         id: players
-        model: Mpris.MultiplexerModel {}
+        model: LockKeys.players
 
         Item {
             id: row

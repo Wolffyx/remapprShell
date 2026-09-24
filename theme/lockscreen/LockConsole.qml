@@ -54,22 +54,7 @@ LockStyle {
     }
 
     // The one player Plasma's lock screen would control, or null.
-    Mpris.MultiplexerModel {
-        id: players
-    }
-
-    component Player: QtObject {
-        required property var model
-    }
-
-    Instantiator {
-        id: playerRow
-        model: players
-        delegate: Player {}
-    }
-
-    readonly property var player: console_.ui.setting("showMediaControls", true) && playerRow.count > 0
-        ? (playerRow.objectAt(0) as Player)?.model ?? null : null
+    readonly property var player: console_.ui.setting("showMediaControls", true) ? LockKeys.player : null
 
     readonly property var keys: [
         { key: "F1", label: "sleep", can: console_.ui.session.canSuspend && Options.showSessionButtons,

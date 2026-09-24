@@ -46,10 +46,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.plasma.private.battery
-import org.kde.plasma.private.keyboardindicator as KeyboardIndicator
 import org.kde.plasma.private.mpris as Mpris
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 LockStyle {
     id: access
@@ -121,24 +118,24 @@ LockStyle {
     Component.onCompleted: access.say(access.ui.unlock.shown ? access.intro
         : "Locked. Start typing your password, or move the mouse.", true)
 
-    KeyboardIndicator.KeyState {
-        id: capsLock
-        key: Qt.Key_CapsLock
-        onLockedChanged: access.say(capsLock.locked ? "Caps Lock is on." : "Caps Lock is off.", true)
+    Connections {
+        target: LockKeys.capsLock
+        function onLockedChanged() {
+            access.say(LockKeys.capsLock.locked ? "Caps Lock is on." : "Caps Lock is off.", true);
+        }
     }
 
-    Layouts.KeyboardLayout {
-        id: layouts
-        onLayoutChanged: {
-            const name = layouts.layoutsList[layouts.layout]?.longName ?? "";
+    Connections {
+        target: LockKeys.keyboardLayout
+        function onLayoutChanged() {
+            const layout = LockKeys.keyboardLayout;
+            const name = layout.layoutsList[layout.layout]?.longName ?? "";
             if (name)
                 access.say("Keyboard layout: " + name + ".", true);
         }
     }
 
-    BatteryControlModel {
-        id: battery
-    }
+    readonly property LockPower battery: access.ui.battery
 
     // The characters typed so far, and why the count went down.
     property int typed: 0
@@ -537,15 +534,16 @@ LockStyle {
             spacing: Math.round(14 * access.s)
 
             Fact {
-                visible: battery.hasInternalBatteries
-                glyph: battery.pluggedIn ? "battery_charging_full" : "battery_5_bar"
+                visible: access.battery.present
+                glyph: access.battery.plugged ? "battery_charging_full" : "battery_5_bar"
                 text: {
-                    const left = battery.smoothedRemainingMsec > 0 ? access.duration(battery.smoothedRemainingMsec) : "";
-                    if (battery.pluggedIn && battery.percent < 100)
-                        return `Battery ${battery.percent}%, charging` + (left ? ` · full in ${left}` : "");
-                    if (battery.pluggedIn)
-                        return `Battery ${battery.percent}%, plugged in`;
-                    return `Battery ${battery.percent}%` + (left ? ` · about ${left} left` : "");
+                    const b = access.battery;
+                    const left = b.smoothedRemainingMsec > 0 ? access.duration(b.smoothedRemainingMsec) : "";
+                    if (b.plugged && b.percent < 100)
+                        return `Battery ${b.percent}%, charging` + (left ? ` · full in ${left}` : "");
+                    if (b.plugged)
+                        return `Battery ${b.percent}%, plugged in`;
+                    return `Battery ${b.percent}%` + (left ? ` · about ${left} left` : "");
                 }
             }
 
@@ -555,16 +553,16 @@ LockStyle {
             }
 
             Fact {
-                visible: layouts.layoutsList.length > 1
+                visible: LockKeys.layouts.length > 1
                 pressable: true
                 glyph: "keyboard"
-                text: "Keyboard layout: " + (layouts.layoutsList[layouts.layout]?.longName ?? "")
+                text: "Keyboard layout: " + LockKeys.layoutName
                 description: "Switches to the next keyboard layout."
-                onActivated: layouts.switchToNextLayout()
+                onActivated: LockKeys.nextLayout()
             }
 
             Repeater {
-                model: Mpris.MultiplexerModel {}
+                model: LockKeys.players
 
                 Fact {
                     required property var model
@@ -695,8 +693,7 @@ LockStyle {
 
         Text {
             width: parent.width
-            visible: !access.ui.unlock.message && !capsLock.locked
-                && !(layouts.layoutsList.length > 1 && layouts.layout > 0)
+            visible: !access.ui.unlock.message && !LockKeys.caps && !LockKeys.otherLayout
             text: access.ui.unlock.unlockedWithoutPassword
                 ? "No password is needed. Press Unlock to continue."
                 : "Type your password, then press Enter or Unlock."

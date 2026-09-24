@@ -20,7 +20,6 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.workspace.components as PW
 import org.kde.breeze.components as Breeze
-import org.kde.plasma.private.keyboardindicator as KeyboardIndicator
 
 Row {
     id: status
@@ -52,14 +51,9 @@ Row {
 
     spacing: 14
 
-    KeyboardIndicator.KeyState {
-        id: capsLock
-        key: Qt.Key_CapsLock
-    }
-
     Text {
         anchors.verticalCenter: parent.verticalCenter
-        visible: capsLock.locked
+        visible: LockKeys.caps
         text: "keyboard_capslock"
         font.family: "Material Symbols Rounded"
         font.pixelSize: Math.round(status.textSize * 1.5)
@@ -92,7 +86,7 @@ Row {
             textFormat: Text.PlainText
             font.family: "monospace"
             font.pixelSize: status.textSize
-            color: layouts.keyboardLayout.layout > 0 ? status.warn : status.ink
+            color: LockKeys.otherLayout ? status.warn : status.ink
         }
 
         PW.KeyboardLayoutSwitcher {

@@ -364,6 +364,10 @@ Item {
         visible: !ui.leaving
     }
 
+    // The battery, for a style that draws one: this frame's, so that every
+    // style reads the same one -- and a preview's stand-in reaches them all.
+    readonly property LockPower battery: power
+
     LockLockout {
         z: 4
         anchors.horizontalCenter: parent.horizontalCenter

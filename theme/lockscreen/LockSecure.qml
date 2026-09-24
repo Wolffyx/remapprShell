@@ -32,8 +32,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.battery
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 LockStyle {
     id: secure
@@ -139,20 +137,7 @@ LockStyle {
 
     // --- the machine -------------------------------------------------------
 
-    BatteryControlModel {
-        id: battery
-    }
-
-    Layouts.KeyboardLayout {
-        id: layouts
-    }
-
-    readonly property string layoutName: layouts.layoutsList.length > 0
-        ? (layouts.layoutsList[layouts.layout]?.longName ?? "") : ""
-
-    readonly property string batteryGlyph: battery.pluggedIn ? "battery_charging_full"
-        : battery.percent >= 95 ? "battery_full"
-        : "battery_" + Math.max(0, Math.min(6, Math.floor(battery.percent / 15))) + "_bar"
+    readonly property LockPower battery: secure.ui.battery
 
     function duration(ms: real): string {
         const m = Math.round(ms / 60000);
@@ -977,38 +962,38 @@ LockStyle {
                 Tile {
                     id: layoutTile
 
-                    visible: secure.layoutName !== ""
+                    visible: LockKeys.layoutName !== ""
                     width: parent.tileWidth
                     glyph: "keyboard"
-                    label: layouts.layoutsList.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
-                    detail: secure.layoutName
-                    tint: layouts.layout > 0 ? secure.warn : secure.ink
+                    label: LockKeys.layouts.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
+                    detail: LockKeys.layoutName
+                    tint: LockKeys.otherLayout ? secure.warn : secure.ink
 
                     HoverHandler {
-                        enabled: layouts.layoutsList.length > 1
+                        enabled: LockKeys.layouts.length > 1
                         cursorShape: Qt.PointingHandCursor
                     }
                     TapHandler {
-                        enabled: layouts.layoutsList.length > 1 && secure.ui.unlock.shown
+                        enabled: LockKeys.layouts.length > 1 && secure.ui.unlock.shown
                         onTapped: {
-                            layouts.switchToNextLayout();
+                            LockKeys.nextLayout();
                             secure.ui.focusPassword();
                         }
                     }
                     Accessible.role: Accessible.Button
-                    Accessible.name: "Keyboard layout: " + secure.layoutName
+                    Accessible.name: "Keyboard layout: " + LockKeys.layoutName
                 }
 
                 Tile {
                     id: batteryTile
 
-                    visible: battery.hasInternalBatteries
+                    visible: secure.battery.present
                     width: parent.tileWidth
-                    glyph: secure.batteryGlyph
-                    label: `Battery · ${battery.percent}%`
-                    tint: battery.pluggedIn ? secure.good : secure.ink
-                    detail: battery.pluggedIn ? "plugged in"
-                        : battery.remainingMsec > 0 ? `on battery · ${secure.duration(battery.remainingMsec)} left`
+                    glyph: secure.battery.glyph
+                    label: `Battery · ${secure.battery.percent}%`
+                    tint: secure.battery.plugged ? secure.good : secure.ink
+                    detail: secure.battery.plugged ? "plugged in"
+                        : secure.battery.remainingMsec > 0 ? `on battery · ${secure.duration(secure.battery.remainingMsec)} left`
                         : "on battery"
                 }
             }

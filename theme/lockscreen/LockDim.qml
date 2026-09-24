@@ -15,7 +15,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.plasma.private.battery
 import org.kde.plasma.private.mpris as Mpris
 
 Rectangle {
@@ -36,10 +35,6 @@ Rectangle {
         anchors.fill: parent
         enabled: dim.dimmed
         onPressed: dim.ui.unlock.poke()
-    }
-
-    BatteryControlModel {
-        id: battery
     }
 
     Column {
@@ -86,13 +81,13 @@ Rectangle {
             }
 
             Fact {
-                visible: battery.hasInternalBatteries
-                glyph: battery.pluggedIn ? "battery_charging_full" : "battery_5_bar"
-                text: battery.percent + "%"
+                visible: dim.ui.battery.present
+                glyph: dim.ui.battery.plugged ? "battery_charging_full" : "battery_5_bar"
+                text: dim.ui.battery.percent + "%"
             }
 
             Repeater {
-                model: Mpris.MultiplexerModel {}
+                model: LockKeys.players
 
                 Fact {
                     required property var model

@@ -37,9 +37,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.battery
 import org.kde.plasma.private.mpris as Mpris
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 LockStyle {
     id: day
@@ -183,31 +181,18 @@ LockStyle {
 
     // --- the machine ------------------------------------------------------
 
-    BatteryControlModel {
-        id: battery
-    }
+    readonly property LockPower battery: day.ui.battery
 
-    readonly property bool hasBattery: battery.hasInternalBatteries
     readonly property string batteryLine: {
-        const left = day.dur(Math.max(1, Math.round(battery.remainingMsec / 60000)));
-        if (battery.pluggedIn) {
-            if (battery.state === BatteryControlModel.FullyCharged)
+        const left = day.dur(Math.max(1, Math.round(day.battery.remainingMsec / 60000)));
+        if (day.battery.plugged) {
+            if (day.battery.full)
                 return "plugged in · full";
-            if (battery.state === BatteryControlModel.Charging)
-                return battery.remainingMsec > 0 ? "charging · full in " + left : "charging";
+            if (day.battery.charging)
+                return day.battery.remainingMsec > 0 ? "charging · full in " + left : "charging";
             return "plugged in · not charging";
         }
-        return battery.remainingMsec > 0 ? "on battery · " + left + " left" : "on battery";
-    }
-
-    Layouts.KeyboardLayout {
-        id: layouts
-    }
-
-    readonly property var layoutNow: layouts.layoutsList[layouts.layout] ?? null
-
-    Mpris.MultiplexerModel {
-        id: players
+        return day.battery.remainingMsec > 0 ? "on battery · " + left + " left" : "on battery";
     }
 
     // --- pieces -----------------------------------------------------------
@@ -414,13 +399,12 @@ LockStyle {
             // is the next one. A layout that is not the person's first is in
             // the warning colour, as LockMessage says in words.
             StatusButton {
-                visible: day.layoutNow !== null
-                label: day.layoutNow?.shortName ?? ""
-                tint: layouts.layout > 0 ? day.warn : day.ink
-                name: "Keyboard layout: " + (day.layoutNow?.longName ?? "")
+                visible: LockKeys.current !== null
+                label: LockKeys.current?.shortName ?? ""
+                tint: LockKeys.otherLayout ? day.warn : day.ink
+                name: "Keyboard layout: " + LockKeys.layoutName
                 onActivated: {
-                    if (layouts.layoutsList.length > 1)
-                        layouts.switchToNextLayout();
+                    LockKeys.nextLayout();
                     day.ui.focusPassword();
                 }
             }
@@ -831,7 +815,7 @@ LockStyle {
             // the one button. Drawn here rather than by MediaCard, whose
             // second line is white on every ground.
             Repeater {
-                model: day.ui.setting("showMediaControls", true) ? players : null
+                model: day.ui.setting("showMediaControls", true) ? LockKeys.players : null
 
                 Card {
                     id: player
@@ -1009,14 +993,14 @@ LockStyle {
                     y: lockGrid.y + lockGrid.height + day.px(18)
                     width: parent.width - day.px(48)
                     spacing: day.px(6)
-                    visible: day.hasBattery
+                    visible: day.battery.present
 
                     Caption {
                         text: "BATTERY"
                     }
 
                     Figure {
-                        value: battery.percent + "%"
+                        value: day.battery.percent + "%"
                         note: day.batteryLine
                     }
 
@@ -1027,10 +1011,10 @@ LockStyle {
                         color: day.line
 
                         Rectangle {
-                            width: parent.width * Math.max(0, Math.min(100, battery.percent)) / 100
+                            width: parent.width * Math.max(0, Math.min(100, day.battery.percent)) / 100
                             height: parent.height
                             radius: height / 2
-                            color: battery.percent <= 15 && !battery.pluggedIn ? day.bad : "#7fb98a"
+                            color: day.battery.percent <= 15 && !day.battery.plugged ? day.bad : "#7fb98a"
                         }
                     }
                 }
