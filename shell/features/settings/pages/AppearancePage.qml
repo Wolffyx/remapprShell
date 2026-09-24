@@ -449,11 +449,10 @@ CardGrid {
         // Each one off keeps whatever System Settings says for it.
         SectionLabel { text: "What it themes" }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Theme the whole desktop"
             description: "Applications match the shell, rather than only the panel and its popouts."
-            checked: ConfigStore.value("theme.desktop.enabled", true) === true
-            onToggled: value => ConfigStore.set("theme.desktop.enabled", value)
+            path: "theme.desktop.enabled"
         }
 
         Column {
@@ -465,22 +464,20 @@ CardGrid {
             // Off by default, and not one of the parts: the parts say what an
             // apply writes once, this says the colours are rewritten again
             // every time night falls.
-            ToggleRow {
+            ConfigToggleRow {
                 label: "Applications follow day and night"
                 description: "With Colour scheme on auto, KDE's colour scheme and icons turn dark with the shell. Plasma's own widgets follow from the next start."
-                checked: ConfigStore.value("theme.desktop.followMode", false) === true
-                onToggled: value => ConfigStore.set("theme.desktop.followMode", value)
+                path: "theme.desktop.followMode"
             }
 
             // Not about who switches, but about noticing when the one who was
             // supposed to did not. Plasma's switch missed a sunset on
             // 2026-09-22 and the desktop stayed light behind a dark shell all
             // evening.
-            ToggleRow {
+            ConfigToggleRow {
                 label: "Fix day and night when Plasma forgets"
                 description: "Plasma's own \"Switch to Dark Mode at Night\" runs on a timer, and a timer can miss. When it does, the desktop is put in the right half here -- after twenty seconds' grace, so the two never write over each other."
-                checked: ConfigStore.value("theme.desktop.rescuePlasmaSwitch", true) === true
-                onToggled: value => ConfigStore.set("theme.desktop.rescuePlasmaSwitch", value)
+                path: "theme.desktop.rescuePlasmaSwitch"
             }
 
             Repeater {
@@ -493,20 +490,18 @@ CardGrid {
                     { key: "switcher",    label: "Alt+Tab switcher",     sub: "The window switcher's layout." }
                 ]
 
-                delegate: ToggleRow {
+                delegate: ConfigToggleRow {
                     required property var modelData
                     label: modelData.label
                     description: modelData.sub
-                    checked: ConfigStore.value(`theme.desktop.${modelData.key}`, true) === true
-                    onToggled: value => ConfigStore.set(`theme.desktop.${modelData.key}`, value)
+                    path: `theme.desktop.${modelData.key}`
                 }
             }
 
-            ToggleRow {
+            ConfigToggleRow {
                 label: "GTK applications"
                 description: "Chrome, Electron and GTK applications ask GTK whether to be dark, not KDE. With this on they are told too."
-                checked: ConfigStore.value("theme.desktop.gtk", true) === true
-                onToggled: value => ConfigStore.set("theme.desktop.gtk", value)
+                path: "theme.desktop.gtk"
             }
 
             // A theme whose name is the dark half of a pair stays dark whatever
@@ -544,12 +539,11 @@ CardGrid {
                 }
             }
 
-            ToggleRow {
+            ConfigToggleRow {
                 visible: root.materialYouInstalled
                 label: "kde-material-you-colors"
                 description: "It has a light and dark switch of its own and applies it at every login. With this on it is told which one, so the two agree."
-                checked: ConfigStore.value("theme.desktop.materialYou", false) === true
-                onToggled: value => ConfigStore.set("theme.desktop.materialYou", value)
+                path: "theme.desktop.materialYou"
             }
         }
 

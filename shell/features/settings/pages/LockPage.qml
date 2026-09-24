@@ -12,7 +12,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.platform.kde
 import qs.platform.system
-import qs.domain.config
 import qs.domain.session
 import qs.domain.surfaces
 import qs.domain.theme
@@ -412,12 +411,11 @@ Column {
 
         SectionLabel { text: "Ending the session" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["plasma", "shell"]
             labels: ["Plasma's prompt", "This shell's screen"]
-            current: ConfigStore.value("session.prompt", "plasma")
-            onPicked: value => ConfigStore.set("session.prompt", value)
+            path: "session.prompt"
         }
 
         PanelText {

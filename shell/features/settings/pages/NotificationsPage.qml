@@ -18,7 +18,7 @@ import qs.ui.controls
 Column {
     id: root
 
-    readonly property string server: ConfigStore.value("notifications.server", "plasma")
+    readonly property string server: ConfigStore.value("notifications.server", "shell")
 
     spacing: 14
 
@@ -27,12 +27,11 @@ Column {
 
         SectionLabel { text: "Drawn by" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["plasma", "shell"]
             labels: ["Plasma", "This shell"]
-            current: root.server
-            onPicked: value => ConfigStore.set("notifications.server", value)
+            path: "notifications.server"
         }
 
         PanelText {
@@ -55,23 +54,21 @@ Column {
 
         SectionLabel { text: "Popups" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             equal: false
             minimumWidth: 120
             values: ["auto", "top-right", "top-center", "top-left", "bottom-right", "bottom-center", "bottom-left"]
             labels: ["Beside the clock", "Top right", "Top centre", "Top left", "Bottom right", "Bottom centre", "Bottom left"]
-            current: ConfigStore.value("notifications.popupPosition", "auto")
-            onPicked: value => ConfigStore.set("notifications.popupPosition", value)
+            path: "notifications.popupPosition"
         }
 
-        SliderRow {
+        ConfigSliderRow {
             label: "Dismiss after"
             unit: "s"
             from: 2
             to: 20
-            value: ConfigStore.value("notifications.popupTimeout", 6)
-            onMoved: value => ConfigStore.set("notifications.popupTimeout", Math.round(value))
+            path: "notifications.popupTimeout"
         }
 
         PanelText {
@@ -99,29 +96,26 @@ Column {
 
         SectionLabel { text: "The centre" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["grouped", "stream"]
             labels: ["Grouped by application", "One long stream"]
-            current: ConfigStore.value("notifications.centreStyle", "grouped")
-            onPicked: value => ConfigStore.set("notifications.centreStyle", value)
+            path: "notifications.centreStyle"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Remember what went past"
             description: "In memory only, never written to disk. The bell widget reads it, and so does `rmpr ask --last-notification`."
-            checked: ConfigStore.value("notifications.history", false) === true
-            onToggled: value => ConfigStore.set("notifications.history", value)
+            path: "notifications.history"
         }
 
-        SliderRow {
+        ConfigSliderRow {
             label: "Remembered at most"
             unit: ""
             from: 10
             to: 300
             stepSize: 10
-            value: ConfigStore.value("notifications.historySize", 50)
-            onMoved: value => ConfigStore.set("notifications.historySize", Math.round(value))
+            path: "notifications.historySize"
         }
     }
 

@@ -57,7 +57,7 @@ Column {
             Select {
                 values: root.providerIds
                 labels: root.providerLabels
-                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.provider", "auto")))
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.provider", "builtin")))
                 onPicked: value => ConfigStore.set("launcher.provider", value)
             }
         }
@@ -70,7 +70,7 @@ Column {
             Select {
                 values: root.providerIds
                 labels: root.providerLabels
-                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.searchProvider", "auto")))
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.searchProvider", "builtin")))
                 onPicked: value => ConfigStore.set("launcher.searchProvider", value)
             }
         }
@@ -111,13 +111,12 @@ Column {
 
         SectionLabel { text: "Start menu layout" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["twopane", "grid", "list"]
             labels: ["Two-pane", "Pinned grid", "A–Z list"]
             glyphs: ["vertical_split", "grid_view", "sort_by_alpha"]
-            current: ConfigStore.value("launcher.layout", "twopane")
-            onPicked: value => ConfigStore.set("launcher.layout", value)
+            path: "launcher.layout"
         }
 
         PanelText {
@@ -136,17 +135,15 @@ Column {
 
         SectionLabel { text: "Search" }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Compact rows"
             description: "More results in the same room."
-            checked: ConfigStore.value("launcher.dense", false) === true
-            onToggled: value => ConfigStore.set("launcher.dense", value)
+            path: "launcher.dense"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Key hints along the bottom"
-            checked: ConfigStore.value("launcher.hints", true) === true
-            onToggled: value => ConfigStore.set("launcher.hints", value)
+            path: "launcher.hints"
         }
     }
 
@@ -183,11 +180,10 @@ Column {
 
         SectionLabel { text: "What it remembers" }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Learn what you open"
             description: "What has been opened before is offered first, and an empty search suggests it. Kept on this machine and sent nowhere."
-            checked: ConfigStore.value("launcher.learn", true) === true
-            onToggled: value => ConfigStore.set("launcher.learn", value)
+            path: "launcher.learn"
         }
 
         PanelText {
@@ -211,11 +207,10 @@ Column {
 
         SectionLabel { text: "Action prefix" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: [">", ":", "/"]
-            current: ConfigStore.value("launcher.actionPrefix", ">")
-            onPicked: value => ConfigStore.set("launcher.actionPrefix", value)
+            path: "launcher.actionPrefix"
         }
 
         PanelText {
