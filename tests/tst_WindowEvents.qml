@@ -9,6 +9,7 @@
 import QtQuick
 import QtTest
 import qs.domain.windows.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "WindowEvents"
@@ -25,12 +26,7 @@ TestCase {
     }
 
     function signalLine(payload) {
-        return JSON.stringify({
-            type: "signal",
-            interface: "com.remappr.Shell.Windows",
-            member: "Changed",
-            payload: { type: "s", data: [payload] }
-        });
+        return Bus.signal("com.remappr.Shell.Windows", "Changed", "s", [payload]);
     }
 
     function test_parses_a_list() {
