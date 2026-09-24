@@ -121,21 +121,45 @@ call Update s '[]' >/dev/null
 check "no windows is accepted"      "$(list)" "[]"
 
 # The signal is what the shell actually follows.
+#
+# One monitor watches both cases, and is waited for rather than slept for.
+# It is listening once a signal sent after it started has reached it, so it is
+# sent probes until one does. That was two monitors and six seconds of sleep,
+# the second monitor started while the first was still writing to the same
+# file.
 monitor_out="$SANDBOX/monitor.json"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
+timeout 20 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
+monitor_pid=$!
+seen() {   # seen <text> <count>: up to five seconds for that many lines with it
+    local i
+    for i in $(seq 1 100); do
+        [ "$(grep -c -- "$1" "$monitor_out")" -ge "$2" ] && return 0
+        sleep 0.05
+    done
+    return 1
+}
+for _ in $(seq 1 100); do
+    busctl --user emit /Windows "$TEST_NAME.Windows" Listening 2>/dev/null
+    sleep 0.05
+    grep -q '"member":"Listening"' "$monitor_out" && break
+done
+
 call Update s "$WINDOW" >/dev/null
-sleep 2
+seen '"member":"Changed"' 1
 check "announces a change"     "$(grep -c '"member":"Changed"' "$monitor_out")" "1"
 
 # KWin repeats itself -- the same list arrives again on events that changed
 # nothing -- and a signal per repeat would wake the shell for no reason.
-: > "$monitor_out"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
+#
+# A real change after the repeat marks the end: one sender's signals arrive in
+# the order they were sent, so once its signal is in, any the repeat sent is in
+# too. Two in all -- the change above and the marker -- means the repeat said
+# nothing.
 call Update s "$WINDOW" >/dev/null
-sleep 2
-check "says nothing when nothing changed" "$(grep -c '"member":"Changed"' "$monitor_out")" "0"
+call Update s '[{"uuid":"b","title":"end-of-test","appId":"x","minimized":false,"active":false}]' >/dev/null
+seen 'end-of-test' 1
+check "says nothing when nothing changed" "$(( $(grep -c '"member":"Changed"' "$monitor_out") - 2 ))" "0"
+kill "$monitor_pid" 2>/dev/null
 
 # Closing a window writes the id into a KWin script's source, so anything
 # that is not exactly a uuid must be refused before it gets that far -- and
