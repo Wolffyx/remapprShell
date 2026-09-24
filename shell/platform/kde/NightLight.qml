@@ -14,8 +14,15 @@ pragma Singleton
 // `known` is false when Night Light is missing, unsupported or switched off.
 // Nothing should guess in that case: there is no schedule to follow, and the
 // caller falls back to whatever it did before.
+//
+// This is the one reader of KWin's NightLight object. The brightness widget
+// shows the same properties -- the temperature, whether it is held off, when
+// it next changes -- and used to read them again, with a monitor of its own
+// on the same object; every tick of a transition then re-read every display
+// as well. It binds to `props` here instead.
 
 import QtQuick
+import Quickshell.Io
 import qs.core
 
 QtObject {
@@ -25,18 +32,27 @@ QtObject {
     readonly property string path: "/org/kde/KWin/NightLight"
     readonly property string iface: "org.kde.KWin.NightLight"
 
+    // Every property of the object, as it is on the bus: { available,
+    // enabled, inhibited, daylight, currentTemperature, mode,
+    // scheduledTransitionDateTime, ... }. Empty until KWin first answers.
+    // A read that gets no answer leaves the last one standing, as each
+    // property read on its own used to: KWin going quiet for a moment is
+    // not Night Light going away.
+    property var props: ({})
+
     // True while the sun is up, by KWin's reckoning.
-    readonly property bool daylight: _daylight.value === true
+    readonly property bool daylight: root.props.daylight === true
 
     // Whether that answer means anything.
     //
-    // Read from the value, not from `available`: DbusProperty sets `available`
-    // and then the value, and a binding is re-evaluated between the two
-    // statements -- so this said "night" for an instant on every start, with
-    // the value not yet in, and the shell flashed dark before going light.
-    readonly property bool known: _available.value === true
-                                  && _enabled.value === true
-                                  && _daylight.value !== undefined
+    // All three arrive together, in one reply. They used to be three reads,
+    // answering one by one, and a binding re-evaluated between them said
+    // "night" for an instant on every start -- the shell flashed dark before
+    // going light. `daylight` must still be there: an object that answers
+    // without it has no schedule to follow.
+    readonly property bool known: root.props.available === true
+                                  && root.props.enabled === true
+                                  && root.props.daylight !== undefined
 
     onKnownChanged: Log.info("theme", root.known
         ? `night light: ${root.daylight ? "daylight" : "night"}, and it says when that changes`
@@ -46,21 +62,21 @@ QtObject {
         Log.info("theme", `night light: ${root.daylight ? "daylight" : "night"}`);
 
     function refresh() {
-        _available.refresh();
-        _enabled.refresh();
-        _daylight.refresh();
+        getAll.running = false;
+        getAll.running = true;
     }
 
-    readonly property DbusProperty _available: DbusProperty {
-        service: root.service; path: root.path; iface: root.iface; name: "available"
-    }
-
-    readonly property DbusProperty _enabled: DbusProperty {
-        service: root.service; path: root.path; iface: root.iface; name: "enabled"
-    }
-
-    readonly property DbusProperty _daylight: DbusProperty {
-        service: root.service; path: root.path; iface: root.iface; name: "daylight"
+    readonly property Process _getAll: Process {
+        id: getAll
+        command: Dbus.callArgs(root.service, root.path, "org.freedesktop.DBus.Properties",
+                               "GetAll", "s", [root.iface])
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const reply = Dbus.unwrap(text, "NightLight");
+                if (reply !== undefined)
+                    root.props = BusLine.props(reply);
+            }
+        }
     }
 
     // The properties are re-read rather than taken from the signal: see

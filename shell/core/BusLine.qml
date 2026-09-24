@@ -162,4 +162,17 @@ QtObject {
             return null;
         return data;
     }
+
+    // An a{sv} as `busctl --json=short` renders it -- [{ Name: { type, data } }],
+    // the reply to a Properties.GetAll -- as a plain { Name: value }. Anything
+    // else is an empty object.
+    function props(data) {
+        const first = Array.isArray(data) ? data[0] : null;
+        const out = {};
+        if (!first || typeof first !== "object")
+            return out;
+        for (const key of Object.keys(first))
+            out[key] = first[key]?.data;
+        return out;
+    }
 }

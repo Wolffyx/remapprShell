@@ -70,8 +70,9 @@ QtObject {
     }
 
     // Night falls once; a colour scheme write arrives several times, and
-    // `theme.mode` can resolve twice while Night Light's properties come in
-    // one by one. One second of quiet is enough to ask only for the answer.
+    // `theme.mode` can resolve twice at startup -- once on the colour scheme,
+    // again when Night Light answers. One second of quiet is enough to ask
+    // only for the answer.
     readonly property Timer _debounce: Timer {
         id: debounce
         interval: 1000

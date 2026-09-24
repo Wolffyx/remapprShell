@@ -135,4 +135,32 @@ TestCase {
         compare(BusLine.payload(msg, 3), null);
         compare(BusLine.payload(BusLine.parse('{"member":"x"}'), 1), null);
     }
+
+    // ---- replies ----------------------------------------------------------
+
+    // The shape powerdevil replies to Properties.GetAll with for an external
+    // monitor over DDC, the model name replaced by a stand-in.
+    readonly property string getAll: '{"type":"a{sv}","data":[{"Brightness":{"type":"i","data":7500},'
+        + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"EXA Displays 27Q"},'
+        + '"MaxBrightness":{"type":"i","data":10000}}]}'
+
+    function test_properties_are_flattened() {
+        const p = BusLine.props(JSON.parse(getAll).data);
+        compare(p, { Brightness: 7500, IsInternal: false, Label: "EXA Displays 27Q", MaxBrightness: 10000 });
+    }
+
+    // A false and a zero are values, not absences.
+    function test_falsy_properties_are_kept() {
+        const p = BusLine.props([{ on: { type: "b", data: false }, n: { type: "u", data: 0 } }]);
+        verify("on" in p && p.on === false);
+        verify("n" in p && p.n === 0);
+    }
+
+    function test_anything_else_is_no_properties() {
+        compare(BusLine.props(null), {});
+        compare(BusLine.props(undefined), {});
+        compare(BusLine.props([]), {});
+        compare(BusLine.props(["a string"]), {});
+        compare(BusLine.props({ Brightness: 1 }), {});
+    }
 }

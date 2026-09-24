@@ -7,6 +7,7 @@
 
 import QtQuick
 import QtTest
+import qs.core
 import qs.domain.status.icons
 
 TestCase {
@@ -416,12 +417,6 @@ TestCase {
         + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"EXA Displays 27Q"},'
         + '"MaxBrightness":{"type":"i","data":10000}}]}'
 
-    function test_bus_props_are_flattened() {
-        compare(StatusIcons.busProps(JSON.parse(external).data).Label, "EXA Displays 27Q");
-        compare(Object.keys(StatusIcons.busProps(null)).length, 0);
-        compare(Object.keys(StatusIcons.busProps([])).length, 0);
-    }
-
     function test_displays_are_read_one_per_line() {
         const d = StatusIcons.brightnessDisplays([`display0 ${external}`, ""]);
         compare(d.length, 1);
@@ -469,6 +464,25 @@ TestCase {
 
     function nl(props) {
         return Object.assign({ available: true, enabled: true, inhibited: false, currentTemperature: 6500 }, props);
+    }
+
+    // KWin's reply to Properties.GetAll on /org/kde/KWin/NightLight, in the
+    // shape busctl gives it, trimmed to the properties read here. NightLight
+    // flattens it with BusLine.props, and the brightness widget reads the
+    // result through BusLine too: the one read serves both.
+    readonly property string nightGetAll: '{"type":"a{sv}","data":[{'
+        + '"available":{"type":"b","data":true},"enabled":{"type":"b","data":true},'
+        + '"inhibited":{"type":"b","data":false},"daylight":{"type":"b","data":false},'
+        + '"currentTemperature":{"type":"u","data":4500},"mode":{"type":"u","data":0},'
+        + '"scheduledTransitionDateTime":{"type":"t","data":1790000000}}]}'
+
+    function test_night_light_from_its_bus_reply() {
+        const nl = BusLine.props(JSON.parse(nightGetAll).data);
+        compare(StatusIcons.nightLightState(nl), "warm");
+        compare(nl.daylight, false);
+        compare(nl.scheduledTransitionDateTime, 1790000000);
+        // No reply at all is no Night Light, not an error.
+        compare(StatusIcons.nightLightState(BusLine.props(undefined)), "unavailable");
     }
 
     function test_night_light_states() {

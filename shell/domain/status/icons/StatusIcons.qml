@@ -12,6 +12,7 @@ pragma Singleton
 // for the same state, and an icon theme that styles one styles both.
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
@@ -272,18 +273,6 @@ QtObject {
 
     // ---- brightness ------------------------------------------------------
 
-    // An a{sv} as `busctl --json=short` renders it -- [{ Name: { type, data } }]
-    // -- as a plain { Name: value }. Anything else is an empty object.
-    function busProps(data) {
-        const first = Array.isArray(data) ? data[0] : null;
-        const out = {};
-        if (!first || typeof first !== "object")
-            return out;
-        for (const key of Object.keys(first))
-            out[key] = first[key]?.data;
-        return out;
-    }
-
     // powerdevil's displays, from lines of "<name> <GetAll reply>", one per
     // display. A line that does not parse, or a display with no range, is
     // dropped rather than drawn as a screen at 0%.
@@ -296,7 +285,7 @@ QtObject {
                 continue;
             let props;
             try {
-                props = root.busProps(JSON.parse(s.slice(space + 1)).data);
+                props = BusLine.props(JSON.parse(s.slice(space + 1)).data);
             } catch (e) {
                 continue;
             }
