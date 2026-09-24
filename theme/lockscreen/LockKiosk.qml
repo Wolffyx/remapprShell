@@ -29,6 +29,9 @@
     mid-lock, and so are "Accessibility", which would have no settings window
     to open, and "Read aloud", since the greeter has no speech. "Larger text"
     stays: it enlarges this style's own type, for this lock only.
+
+    This file is the page and its head and foot; the welcome and the staff
+    sign-in are KioskWelcome and KioskStaff, and the chips are KioskChip.
 */
 pragma ComponentBehavior: Bound
 
@@ -58,7 +61,7 @@ LockStyle {
     blursWallpaper: false
     scrimsWallpaper: false
 
-    promptField: password
+    promptField: staff.field
     promptBlock: staff
 
     Rectangle {
@@ -66,53 +69,13 @@ LockStyle {
         color: kiosk.paper
     }
 
-    // One of the design's white chips: a glyph and a word.
-    component Chip: Rectangle {
-        id: chip
-
-        property string glyph: ""
-        property string label: ""
-        property bool checked: false
-        property bool plain: false
-        signal activated
-
-        width: chipRow.implicitWidth + Math.round(32 * kiosk.textUnit)
-        height: chipRow.implicitHeight + Math.round(22 * kiosk.textUnit)
-        radius: Math.round(12 * kiosk.unit)
-        color: chip.checked ? kiosk.ink
-             : chip.plain ? (chipHover.hovered ? kiosk.hair : "transparent")
-             : (chipHover.hovered ? "#f8f5f0" : kiosk.card)
-        border.width: chip.plain ? 0 : 1
-        border.color: kiosk.hair
-
-        Row {
-            id: chipRow
-
-            anchors.centerIn: parent
-            spacing: Math.round(9 * kiosk.textUnit)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: chip.glyph
-                font.family: "Material Symbols Rounded"
-                font.pixelSize: Math.round(20 * kiosk.textUnit)
-                color: chip.checked ? kiosk.card : chip.plain ? kiosk.sub : kiosk.ink
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: chip.label
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: Math.round(14 * kiosk.textUnit)
-                color: chip.checked ? kiosk.card : chip.plain ? kiosk.sub : kiosk.ink
-            }
-        }
-
-        HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: chip.activated() }
-        Accessible.role: Accessible.Button
-        Accessible.name: chip.label
+    component Chip: KioskChip {
+        unit: kiosk.unit
+        textUnit: kiosk.textUnit
+        ink: kiosk.ink
+        sub: kiosk.sub
+        card: kiosk.card
+        hair: kiosk.hair
     }
 
     // --- the head ---------------------------------------------------------
@@ -199,154 +162,22 @@ LockStyle {
 
     // --- the welcome ------------------------------------------------------
 
-    Column {
-        id: welcome
-
+    KioskWelcome {
         x: kiosk.ui.edge
         // The design's 210, unless larger text needs the room above the foot.
         y: Math.max(brand.y + brand.height + Math.round(40 * kiosk.unit),
                     Math.min(Math.round(210 * kiosk.unit), foot.y - height - Math.round(48 * kiosk.unit)))
         width: Math.round(920 * kiosk.unit)
-        spacing: 0
-
-        Text {
-            width: parent.width
-            text: kiosk.canGuest ? "Welcome.\nUse this computer\nas a guest."
-                                 : "Welcome.\nThis computer is\nlocked for now."
-            textFormat: Text.PlainText
-            wrapMode: Text.WordWrap
-            lineHeightMode: Text.FixedHeight
-            lineHeight: Math.round(87 * kiosk.unit)
-            font.family: "Rubik"
-            font.pixelSize: Math.round(84 * kiosk.unit)
-            font.weight: Font.Light
-            font.letterSpacing: -Math.round(2.5 * kiosk.unit)
-            color: kiosk.ink
-        }
-
-        Item { width: 1; height: Math.round(24 * kiosk.unit); visible: lede.visible }
-
-        Text {
-            id: lede
-
-            width: Math.round(760 * kiosk.unit)
-            visible: kiosk.canGuest
-            text: "Start your own session from the login screen. Whoever was here before stays locked and private."
-            textFormat: Text.PlainText
-            wrapMode: Text.WordWrap
-            lineHeightMode: Text.FixedHeight
-            lineHeight: Math.round(31 * kiosk.textUnit)
-            font.family: "Rubik"
-            font.pixelSize: Math.round(21 * kiosk.textUnit)
-            color: kiosk.sub
-        }
-
-        Item { width: 1; height: Math.round(44 * kiosk.unit); visible: guest.visible }
-
-        // The one big action.
-        Rectangle {
-            id: guest
-
-            visible: kiosk.canGuest
-            width: Math.round(640 * kiosk.unit) + (kiosk.larger ? Math.round(120 * kiosk.unit) : 0)
-            height: Math.max(Math.round(104 * kiosk.unit), guestText.implicitHeight + Math.round(40 * kiosk.unit))
-            radius: Math.round(26 * kiosk.unit)
-            color: guestHover.hovered ? Qt.lighter(kiosk.accent, 1.1) : kiosk.accent
-
-            Text {
-                id: guestGlyph
-
-                x: Math.round(36 * kiosk.unit)
-                anchors.verticalCenter: parent.verticalCenter
-                text: "play_arrow"
-                font.family: "Material Symbols Rounded"
-                font.pixelSize: Math.round(36 * kiosk.textUnit)
-                color: "#ffffff"
-            }
-
-            Column {
-                id: guestText
-
-                anchors.left: guestGlyph.right
-                anchors.leftMargin: Math.round(16 * kiosk.unit)
-                anchors.right: parent.right
-                anchors.rightMargin: Math.round(22 * kiosk.unit)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Math.round(4 * kiosk.unit)
-
-                Text {
-                    width: parent.width
-                    text: "Start a guest session"
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    font.family: "Rubik"
-                    font.pixelSize: Math.round(30 * kiosk.textUnit)
-                    font.weight: Font.Medium
-                    color: "#ffffff"
-                }
-
-                Text {
-                    width: parent.width
-                    text: "Opens the login screen for a guest to sign in · this session stays locked"
-                    textFormat: Text.PlainText
-                    wrapMode: Text.WordWrap
-                    font.family: "Rubik"
-                    font.pixelSize: Math.round(15 * kiosk.textUnit)
-                    color: Qt.rgba(1, 1, 1, 0.84)
-                }
-            }
-
-            HoverHandler { id: guestHover; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: kiosk.ui.session.switchUser() }
-            Accessible.role: Accessible.Button
-            Accessible.name: "Start a guest session"
-            Accessible.description: "Opens the login screen for a guest to sign in. This session stays locked."
-        }
-
-        Item { width: 1; height: Math.round(48 * kiosk.unit); visible: note.visible }
-
-        // The house rule: one, the place's own, or none at all.
-        Rectangle {
-            id: note
-
-            visible: Options.kioskNote !== ""
-            width: guest.visible ? guest.width : Math.round(640 * kiosk.unit)
-            height: noteRow.height + Math.round(44 * kiosk.unit)
-            radius: Math.round(20 * kiosk.unit)
-            color: kiosk.card
-            border.width: 1
-            border.color: kiosk.hair
-
-            Row {
-                id: noteRow
-
-                x: Math.round(22 * kiosk.unit)
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 2 * x
-                spacing: Math.round(16 * kiosk.unit)
-
-                Text {
-                    id: noteGlyph
-
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "info"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: Math.round(26 * kiosk.textUnit)
-                    color: kiosk.accent
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: noteRow.width - noteGlyph.width - noteRow.spacing
-                    text: Options.kioskNote
-                    textFormat: Text.PlainText
-                    wrapMode: Text.WordWrap
-                    font.family: "Rubik"
-                    font.pixelSize: Math.round(17 * kiosk.textUnit)
-                    color: kiosk.ink
-                }
-            }
-        }
+        ui: kiosk.ui
+        unit: kiosk.unit
+        textUnit: kiosk.textUnit
+        larger: kiosk.larger
+        canGuest: kiosk.canGuest
+        ink: kiosk.ink
+        sub: kiosk.sub
+        card: kiosk.card
+        hair: kiosk.hair
+        accent: kiosk.accent
     }
 
     // --- the foot ---------------------------------------------------------
@@ -395,115 +226,25 @@ LockStyle {
 
     // --- the staff sign-in ------------------------------------------------
 
-    Rectangle {
+    KioskStaff {
         id: staff
 
         x: kiosk.width - width - kiosk.ui.edge
         y: foot.y - height - Math.round(14 * kiosk.unit)
         width: Math.round(460 * kiosk.textUnit)
-        height: staffColumn.height + Math.round(48 * kiosk.unit)
-        radius: Math.round(22 * kiosk.unit)
-        color: kiosk.card
-        border.width: 1
-        border.color: kiosk.hair
+        ui: kiosk.ui
+        unit: kiosk.unit
+        textUnit: kiosk.textUnit
+        ink: kiosk.ink
+        sub: kiosk.sub
+        card: kiosk.card
+        hair: kiosk.hair
+        accent: kiosk.accent
         enabled: kiosk.ui.unlock.shown
         opacity: kiosk.ui.unlock.shown ? 1 : 0
 
         Behavior on opacity {
             NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad }
-        }
-
-        Column {
-            id: staffColumn
-
-            x: Math.round(24 * kiosk.unit)
-            y: Math.round(24 * kiosk.unit)
-            width: staff.width - 2 * x
-            spacing: Math.round(14 * kiosk.unit)
-
-            Item {
-                width: parent.width
-                height: Math.max(staffTitle.height, status.height)
-
-                Column {
-                    id: staffTitle
-
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Math.round(3 * kiosk.unit)
-
-                    Text {
-                        text: "Staff sign-in"
-                        textFormat: Text.PlainText
-                        font.family: "Rubik"
-                        font.pixelSize: Math.round(17 * kiosk.textUnit)
-                        font.weight: Font.Medium
-                        color: kiosk.ink
-                    }
-
-                    // Whose session a right password opens.
-                    Text {
-                        text: "Unlocks " + kiosk.ui.userName + "’s session"
-                        textFormat: Text.PlainText
-                        font.family: "Rubik"
-                        font.pixelSize: Math.round(13 * kiosk.textUnit)
-                        color: kiosk.sub
-                    }
-                }
-
-                LockStatus {
-                    id: status
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    ui: kiosk.ui
-                    ink: kiosk.sub
-                    warn: "#8a5a20"
-                    textSize: Math.round(12 * kiosk.textUnit)
-                    spacing: Math.round(10 * kiosk.unit)
-                }
-            }
-
-            LockPrompt {
-                id: password
-
-                width: parent.width
-                height: Math.round(52 * kiosk.textUnit)
-                unlock: kiosk.ui.unlock
-                unit: kiosk.textUnit
-                glyph: "password"
-                showButton: false
-                radius: Math.round(12 * kiosk.unit)
-                ink: kiosk.ink
-                dim: kiosk.sub
-                accent: kiosk.accent
-                fieldColor: "#f5f1ea"
-                fieldBorder: kiosk.accent
-            }
-
-            // The hint, then whatever went wrong. Close together, so that an
-            // empty message costs the card next to nothing.
-            Column {
-                width: parent.width
-                spacing: Math.round(6 * kiosk.unit)
-
-                Text {
-                    width: parent.width
-                    text: kiosk.ui.unlock.resting ? "too many attempts · wait a moment" : "password · enter ⏎"
-                    textFormat: Text.PlainText
-                    font.family: "Rubik"
-                    font.pixelSize: Math.round(13 * kiosk.textUnit)
-                    color: kiosk.sub
-                }
-
-                LockMessage {
-                    width: parent.width
-                    unlock: kiosk.ui.unlock
-                    unit: kiosk.textUnit
-                    align: Text.AlignLeft
-                    ink: kiosk.ink
-                    warn: "#8a5a20"
-                }
-            }
         }
     }
 }

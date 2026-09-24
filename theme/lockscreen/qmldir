@@ -68,3 +68,6 @@ AccessibleFact 1.0 AccessibleFact.qml
 AccessibleFacts 1.0 AccessibleFacts.qml
 AccessiblePrompt 1.0 AccessiblePrompt.qml
 AccessibleCaptions 1.0 AccessibleCaptions.qml
+KioskChip 1.0 KioskChip.qml
+KioskWelcome 1.0 KioskWelcome.qml
+KioskStaff 1.0 KioskStaff.qml
