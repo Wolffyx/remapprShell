@@ -58,6 +58,8 @@ LockStyle {
     // --- the clock --------------------------------------------------------
 
     LockClock {
+        id: clock
+
         x: (seats.width - width) / 2
         y: Math.round(72 * seats.unit)
         centred: true
@@ -75,25 +77,12 @@ LockStyle {
 
         x: (seats.width - width) / 2
         y: Math.round(182 * seats.unit)
-        text: clockDate.now.toLocaleDateString(Qt.locale(), "dddd d MMMM").toUpperCase()
+        text: clock.now.toLocaleDateString(Qt.locale(), "dddd d MMMM").toUpperCase()
         textFormat: Text.PlainText
         font.family: "JetBrains Mono"
         font.pixelSize: Math.round(16 * seats.unit)
         font.letterSpacing: Math.round(0.6 * seats.unit)
         color: seats.mut
-
-        Timer {
-            interval: 60000
-            running: true
-            repeat: true
-            triggeredOnStart: true
-            onTriggered: clockDate.now = new Date()
-        }
-
-        QtObject {
-            id: clockDate
-            property date now: new Date()
-        }
     }
 
     // --- the seats --------------------------------------------------------

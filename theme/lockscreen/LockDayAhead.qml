@@ -145,7 +145,14 @@ LockStyle {
         return ((d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600) - 5 + 24) % 24 + 5;
     }
 
-    readonly property real cycleNow: day.cycleOf(clock.now)
+    // The clock's time, and the moment it locked, to the minute. What the
+    // ruler draws from them -- the now line, the hours it hides, where the
+    // band labels sit, the stretch this screen has been locked -- moves once
+    // a minute, not with every tick of the seconds beside the clock.
+    readonly property double minuteNow: Math.floor(clock.now.getTime() / 60000) * 60000
+    readonly property double lockedMinute: Math.floor(day.ui.lockedAt.getTime() / 60000) * 60000
+
+    readonly property real cycleNow: day.cycleOf(new Date(day.minuteNow))
     readonly property int bandIndex: day.bands.findIndex(b => day.cycleNow >= b.from && day.cycleNow < b.to)
     readonly property var band: day.bands[Math.max(0, day.bandIndex)]
     readonly property var nextBand: day.bands[(Math.max(0, day.bandIndex) + 1) % day.bands.length]
@@ -700,9 +707,9 @@ LockStyle {
                     // when it locked to now, or from dawn if it has been
                     // locked since before it.
                     Rectangle {
-                        readonly property real from: (clock.now.getTime() - day.ui.lockedAt.getTime()) >= 24 * 3600000
-                            || day.cycleOf(day.ui.lockedAt) > day.cycleNow
-                            ? 0 : ruler.yOf(day.cycleOf(day.ui.lockedAt))
+                        readonly property real from: day.minuteNow - day.lockedMinute >= 24 * 3600000
+                            || day.cycleOf(new Date(day.lockedMinute)) > day.cycleNow
+                            ? 0 : ruler.yOf(day.cycleOf(new Date(day.lockedMinute)))
 
                         x: ruler.railX
                         y: Math.min(from, ruler.nowY - height)

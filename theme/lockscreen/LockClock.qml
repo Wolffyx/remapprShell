@@ -3,10 +3,11 @@
 
     The time, and the date under it.
 
-    One timer, ticking once a second, shared by whichever style is drawn --
-    the designs differ on size, weight and where the line breaks, not on what
-    a clock is. Both lines are the locale's own: `ShortFormat` for the time
-    so a machine set to twelve hours shows twelve, `LongFormat` for the date.
+    One timer, ticking once a second while the clock can be seen, shared by
+    whichever style is drawn -- the designs differ on size, weight and where
+    the line breaks, not on what a clock is. Both lines are the locale's own:
+    `ShortFormat` for the time so a machine set to twelve hours shows twelve,
+    `LongFormat` for the date.
 
     The digits roll: each is a column of 0 to 9 behind a window one digit
     tall, and the column slides when the digit changes, as the design's
@@ -50,12 +51,26 @@ Column {
 
     spacing: 0
 
+    // Only while it can be seen. The dim screen's clock is made with the
+    // frame and waits hidden behind every style, and ticked every second of
+    // every lock for nobody. A clock shown again is set to the time at once
+    // -- `ticking` is false until then -- rather than rolled to it from
+    // whenever it was hidden.
+    property bool ticking: false
+
     Timer {
         interval: 1000
-        running: true
+        running: clock.visible
         repeat: true
         triggeredOnStart: true
-        onTriggered: clock.now = new Date()
+        onTriggered: {
+            clock.now = new Date();
+            clock.ticking = true;
+        }
+        onRunningChanged: {
+            if (!running)
+                clock.ticking = false;
+        }
     }
 
     // The time as a string, for a style that wants to say it elsewhere too.
@@ -105,7 +120,7 @@ Column {
                     y: glyph.digit ? -Number(glyph.ch) * glyph.step : 0
 
                     Behavior on y {
-                        enabled: clock.animated
+                        enabled: clock.animated && clock.ticking
                         NumberAnimation { duration: 700; easing.type: Easing.OutCubic }
                     }
 

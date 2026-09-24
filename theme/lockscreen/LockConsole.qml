@@ -38,16 +38,9 @@ LockStyle {
     promptField: password
     promptBlock: block
 
-    // "12 min ago", from when the greeter started, redrawn each minute.
-    property date now: new Date()
-    readonly property string lockedFor: LockText.ago(console_.ui.lockedAt, console_.now, false)
-
-    Timer {
-        interval: 30000
-        repeat: true
-        running: true
-        onTriggered: console_.now = new Date()
-    }
+    // "12 min ago", from when the greeter started, read off the clock that
+    // is ticking anyway.
+    readonly property string lockedFor: LockText.ago(console_.ui.lockedAt, clockLine.now, false)
 
     // The one player Plasma's lock screen would control, or null.
     readonly property var player: console_.ui.setting("showMediaControls", true) ? LockKeys.player : null
