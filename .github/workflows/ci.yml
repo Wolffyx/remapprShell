@@ -63,6 +63,11 @@ jobs:
       - name: Defaults lint
         run: ./scripts/lint-defaults.sh
 
+      # Fails if the shell starts an application anywhere but through Launch,
+      # where it gets a scope of its own instead of dying with the shell.
+      - name: Launch lint
+        run: ./scripts/lint-launch.sh
+
       # Fails if docs/config.md is not what the schema would generate. The
       # reference is committed because people read it on the forge, where
       # nothing runs, so a stale one is trusted and wrong.
