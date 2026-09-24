@@ -38,3 +38,17 @@ LockDayAhead 1.0 LockDayAhead.qml
 LockSecure 1.0 LockSecure.qml
 LockAccessible 1.0 LockAccessible.qml
 LockKiosk 1.0 LockKiosk.qml
+
+# The parts of the larger styles, each named for its style. Named here for
+# the same reason the styles are: a style that cannot see one of its parts
+# does not load, and the frame draws glass in its place.
+DayAheadPalette 1.0 DayAheadPalette.qml
+DayAheadGround 1.0 DayAheadGround.qml
+DayAheadCard 1.0 DayAheadCard.qml
+DayAheadCaption 1.0 DayAheadCaption.qml
+DayAheadStatusButton 1.0 DayAheadStatusButton.qml
+DayAheadToday 1.0 DayAheadToday.qml
+DayAheadTimeline 1.0 DayAheadTimeline.qml
+DayAheadPlayer 1.0 DayAheadPlayer.qml
+DayAheadLockCard 1.0 DayAheadLockCard.qml
+DayAheadPill 1.0 DayAheadPill.qml
