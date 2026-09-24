@@ -58,8 +58,8 @@ LockStyle {
 
     // --- what the greeter says it has --------------------------------------
 
-    readonly property bool hasFingerprint: (secure.ui.unlock.alternatives & secure.ui.unlock.fingerprint) !== 0
-    readonly property bool hasSmartcard: (secure.ui.unlock.alternatives & secure.ui.unlock.smartcard) !== 0
+    readonly property bool hasFingerprint: secure.ui.unlock.hasFingerprint
+    readonly property bool hasSmartcard: secure.ui.unlock.hasSmartcard
     readonly property bool hasAlternative: secure.hasFingerprint || secure.hasSmartcard
 
     // "key" or "password", as the tabs choose. The key comes first, as the
@@ -77,7 +77,6 @@ LockStyle {
 
     // --- the log of this lock ---------------------------------------------
 
-    property int refused: 0
     // Set once pam_faillock has said something: only then is it known to be
     // counting this account's failures.
     property bool faillock: false
@@ -105,8 +104,7 @@ LockStyle {
         target: secure.ui.unlock
 
         function onRejected() {
-            secure.refused += 1;
-            secure.addLog("Password refused", `attempt ${secure.refused} this lock`, secure.bad);
+            secure.addLog("Password refused", `attempt ${secure.ui.unlock.refusals} this lock`, secure.bad);
         }
 
         // Each new line PAM says, once. "Unlocking failed" is our own word
@@ -138,14 +136,6 @@ LockStyle {
     // --- the machine -------------------------------------------------------
 
     readonly property LockPower battery: secure.ui.battery
-
-    function duration(ms: real): string {
-        const m = Math.round(ms / 60000);
-        if (m < 60)
-            return `${m} min`;
-        const h = Math.floor(m / 60), r = m % 60;
-        return r ? `${h} h ${r} min` : `${h} h`;
-    }
 
     // --- the ground --------------------------------------------------------
 
@@ -475,8 +465,8 @@ LockStyle {
 
                     Text {
                         readonly property var parts: [
-                            secure.refused > 0
-                                ? `${secure.refused} refused since ${Qt.formatTime(secure.ui.lockedAt, secure.twelveHour ? "h:mm AP" : "HH:mm")}`
+                            secure.ui.unlock.refusals > 0
+                                ? `${secure.ui.unlock.refusals} refused since ${Qt.formatTime(secure.ui.lockedAt, secure.twelveHour ? "h:mm AP" : "HH:mm")}`
                                 : "enter ⏎ to unlock",
                             secure.faillock ? "failures on this account are counted by pam_faillock" : "",
                         ].filter(p => p)
@@ -1003,7 +993,7 @@ LockStyle {
                     label: `Battery · ${secure.battery.percent}%`
                     tint: secure.battery.plugged ? secure.good : secure.ink
                     detail: secure.battery.plugged ? "plugged in"
-                        : secure.battery.remainingMsec > 0 ? `on battery · ${secure.duration(secure.battery.remainingMsec)} left`
+                        : secure.battery.remainingMsec > 0 ? `on battery · ${LockText.duration(secure.battery.remainingMsec, true)} left`
                         : "on battery"
                 }
             }

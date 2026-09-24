@@ -126,9 +126,7 @@ Item {
         const ms = power.remainingMsec;
         if (power.override || !ms || ms <= 0)
             return "";
-        const minutes = Math.round(ms / 60000);
-        return minutes < 60 ? "about " + minutes + " min left"
-                            : "about " + Math.floor(minutes / 60) + " h " + (minutes % 60) + " min left";
+        return "about " + LockText.duration(ms, false) + " left";
     }
 
     // --- critical: the edges redden ---------------------------------------

@@ -130,21 +130,15 @@ LockStyle {
 
     // --- time -------------------------------------------------------------
 
-    function pad(n: int): string {
-        return String(n).padStart(2, "0");
-    }
-
     // A time of the palette's day ("05:00", "20:00"), 24 hours as drawn.
     function at(h: real): string {
-        return day.pad(Math.floor(h) % 24) + ":00";
+        return LockText.pad(Math.floor(h) % 24) + ":00";
     }
 
-    // The design's dur(): "40 min", "2 h", "2 h 28 min".
+    // The design's dur(), which counts in minutes: "40 min", "2 h",
+    // "2 h 28 min".
     function dur(mins: int): string {
-        if (mins < 60)
-            return mins + " min";
-        const h = Math.floor(mins / 60), r = mins % 60;
-        return h + " h" + (r ? " " + r + " min" : "");
+        return LockText.duration(mins * 60000, true);
     }
 
     // Where a moment falls on the palette's day, 5 to 29.
@@ -166,18 +160,10 @@ LockStyle {
         return "Good evening";
     }
 
-    // Minutes, so the line changes once a minute however often `now` ticks.
-    readonly property int lockedMins: Math.max(0, Math.floor((clock.now.getTime() - day.ui.lockedAt.getTime()) / 60000))
-    readonly property string lockedAgo: day.lockedMins < 1 ? "locked just now" : "locked " + day.dur(day.lockedMins) + " ago"
+    // In whole minutes, so the line changes once a minute however often
+    // `now` ticks.
+    readonly property string lockedAgo: "locked " + LockText.ago(day.ui.lockedAt, clock.now, true)
     readonly property string lockedTime: day.ui.lockedAt.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-
-    // Passwords refused while this screen has been up.
-    property int failures: 0
-
-    Connections {
-        target: day.ui.unlock
-        function onRejected() { day.failures += 1; }
-    }
 
     // --- the machine ------------------------------------------------------
 
@@ -455,7 +441,7 @@ LockStyle {
 
                 Text {
                     y: day.px(30)
-                    text: day.pad(clock.now.getSeconds())
+                    text: LockText.pad(clock.now.getSeconds())
                     textFormat: Text.PlainText
                     font.family: "JetBrains Mono"
                     font.pixelSize: day.px(20)
@@ -751,7 +737,7 @@ LockStyle {
                     Text {
                         x: ruler.timeX
                         y: ruler.nowY - height / 2
-                        text: day.pad(clock.now.getHours()) + ":" + day.pad(clock.now.getMinutes())
+                        text: LockText.pad(clock.now.getHours()) + ":" + LockText.pad(clock.now.getMinutes())
                         textFormat: Text.PlainText
                         font.family: "JetBrains Mono"
                         font.pixelSize: day.px(13)
@@ -979,9 +965,9 @@ LockStyle {
                         }
 
                         Figure {
-                            value: String(day.failures)
-                            note: day.failures === 1 ? "password" : "passwords"
-                            tint: day.failures > 0 ? day.bad : day.ink
+                            value: String(day.ui.unlock.refusals)
+                            note: day.ui.unlock.refusals === 1 ? "password" : "passwords"
+                            tint: day.ui.unlock.refusals > 0 ? day.bad : day.ink
                         }
                     }
                 }
@@ -1148,12 +1134,12 @@ LockStyle {
                     width: parent.width
                     elide: Text.ElideRight
                     text: day.ui.unlock.resting ? "wait a moment"
-                        : day.failures > 0 ? day.failures + " refused · try again"
+                        : day.ui.unlock.refusals > 0 ? day.ui.unlock.refusals + " refused · try again"
                         : "password · enter ⏎"
                     textFormat: Text.PlainText
                     font.family: "JetBrains Mono"
                     font.pixelSize: day.px(12)
-                    color: day.failures > 0 && !day.ui.unlock.resting ? day.bad : day.sub
+                    color: day.ui.unlock.refusals > 0 && !day.ui.unlock.resting ? day.bad : day.sub
                 }
             }
 

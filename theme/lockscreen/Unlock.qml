@@ -70,6 +70,14 @@ Item {
     readonly property int fingerprint: 1
     readonly property int smartcard: 2
     readonly property int alternatives: (unlock.authenticator && unlock.authenticator.authenticatorTypes) || 0
+    readonly property bool hasFingerprint: (unlock.alternatives & unlock.fingerprint) !== 0
+    readonly property bool hasSmartcard: (unlock.alternatives & unlock.smartcard) !== 0
+
+    // Passwords refused since the lock screen came up: wrong passwords, not
+    // a reader failing. Counted here once rather than by each style that
+    // says it, and counted before `rejected` so that a style told of a
+    // refusal reads a count that includes it. Only ever drawn.
+    property int refusals: 0
 
     signal clearPassword()
     signal rejected()
@@ -161,6 +169,7 @@ Item {
         function onFailed(kind) {
             if (kind !== 0)
                 return;
+            unlock.refusals += 1;
             unlock.say("Unlocking failed");
             unlock.rejected();
             restTimer.restart();

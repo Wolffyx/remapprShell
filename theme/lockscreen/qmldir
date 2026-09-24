@@ -5,6 +5,7 @@ LockOsd 1.0 LockOsd.qml
 MediaCard 1.0 MediaCard.qml
 singleton Options 1.0 Options.qml
 singleton LockKeys 1.0 LockKeys.qml
+singleton LockText 1.0 LockText.qml
 
 # The parts every style is built from.
 LockStyle 1.0 LockStyle.qml

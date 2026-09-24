@@ -112,7 +112,7 @@ LockStyle {
     }
 
     readonly property string intro: "Lock screen. Password field."
-        + ((access.ui.unlock.alternatives & access.ui.unlock.fingerprint) ? " Or touch the fingerprint sensor." : "")
+        + (access.ui.unlock.hasFingerprint ? " Or touch the fingerprint sensor." : "")
         + " Accessibility options are above."
 
     Component.onCompleted: access.say(access.ui.unlock.shown ? access.intro
@@ -356,13 +356,6 @@ LockStyle {
         Accessible.onPressAction: if (fact.pressable) fact.activated()
     }
 
-    function duration(ms: real): string {
-        const total = Math.round(ms / 60000);
-        const h = Math.floor(total / 60);
-        const m = total % 60;
-        return h > 0 ? (m > 0 ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
-    }
-
     // --- the page ----------------------------------------------------------
 
     Rectangle {
@@ -538,7 +531,7 @@ LockStyle {
                 glyph: access.battery.plugged ? "battery_charging_full" : "battery_5_bar"
                 text: {
                     const b = access.battery;
-                    const left = b.smoothedRemainingMsec > 0 ? access.duration(b.smoothedRemainingMsec) : "";
+                    const left = b.smoothedRemainingMsec > 0 ? LockText.duration(b.smoothedRemainingMsec, true) : "";
                     if (b.plugged && b.percent < 100)
                         return `Battery ${b.percent}%, charging` + (left ? ` · full in ${left}` : "");
                     if (b.plugged)

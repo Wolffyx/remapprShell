@@ -51,8 +51,8 @@ Column {
 
     Row {
         readonly property var ways: [
-            (message.unlock.alternatives & message.unlock.fingerprint) ? "fingerprint" : "",
-            (message.unlock.alternatives & message.unlock.smartcard) ? "badge" : "",
+            message.unlock.hasFingerprint ? "fingerprint" : "",
+            message.unlock.hasSmartcard ? "badge" : "",
         ].filter(w => w)
 
         x: message.align === Text.AlignHCenter ? (message.width - width) / 2 : 0

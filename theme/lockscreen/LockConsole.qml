@@ -40,11 +40,7 @@ LockStyle {
 
     // "12 min ago", from when the greeter started, redrawn each minute.
     property date now: new Date()
-    readonly property string lockedFor: {
-        const minutes = Math.floor((console_.now - console_.ui.lockedAt) / 60000);
-        return minutes < 1 ? "just now" : minutes < 60 ? minutes + " min ago"
-            : Math.floor(minutes / 60) + " h " + (minutes % 60) + " min ago";
-    }
+    readonly property string lockedFor: LockText.ago(console_.ui.lockedAt, console_.now, false)
 
     Timer {
         interval: 30000
