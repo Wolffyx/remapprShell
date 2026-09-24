@@ -320,8 +320,8 @@ are the shell's and stay in its unit. The CLI's own launches (`ask`'s
 terminal) are scoped the same way.
 
 **No other application named in the code**, at the user's request. Gone:
-Steam's icon lookup in the window daemon (so a Proton game shows the icon its
-window sets -- World of Tanks' is a grey rectangle -- or the generic one), the
+Steam's icon lookup in the window daemon (a game shows the icon its own
+window sets, as it does in Plasma's panel -- see the next paragraph), the
 `steam` icon rule in `WindowEvents`, Spectacle's row on the key sheet,
 Dolphin for device notifications (the default file manager opens the home
 folder now: the notification comes before anything is mounted), `ask`'s list
@@ -343,6 +343,22 @@ packages, and the optional KRunner, Kickoff, Klipper/plasmawindowed and
 System Settings links -- are still named: whether the optional ones go was
 asked and is the user's to answer. Prose that explains how other programs
 behave (Chrome and Electron asking GTK for dark mode, say) was kept.
+
+**Windows are matched to applications the way Plasma's own panel does it**
+(`qs.domain.windows.events.AppMatch`, following libtaskmanager's
+`serviceFromMetadata` step for step: StartupWMClass, a .desktop path, the
+entry id, the entry's Name, the process's `BAMF_DESKTOP_FILE_HINT`/`APPDIR`,
+its command line against Exec). Plasma has no application-specific rule
+either; what it cannot match it draws with **the window's own icon**. So does
+this shell now, read from *that* window (same process, same WM_CLASS, same
+title) and kept per window under the runtime directory, read again when KWin
+says the icon changed. **The grey rectangle was a stale cache, not the
+game**: World of Tanks' window carries its shield (32x32, checked on the live
+display), and the old per-application cache in `~/.local/state/<slug>/
+window-icons` held Wine's stock window icon, read before the game set its own
+on 2026-09-23 and kept ever since. An unmatched window is named by its title.
+KWin 6.7 gives scripts no X11 window id, which is why the window is found by
+process, class and title rather than by id.
 
 **The taskbar preview hangs from its button.** An opt-in on `BarWidget`
 (`popoutTail`, `popoutTailWidth`, `popoutHovered`), taken only by the task
@@ -367,8 +383,9 @@ build will refuse them.
 **Needs the real desktop:** start something from the start menu, the
 taskbar, a pinned app, the panel menu, a notification and quick settings,
 and see it under `systemctl --user list-units 'app-*'` and still running
-after a shell restart; press each screenshot key once; look at a Proton
-game's icon; hover the taskbar and cross to the card -- KWin's blur behind
+after a shell restart; press each screenshot key once; start a game and see its own icon and
+title on the taskbar (after `make link`, `rmpr windows restart` and a reload
+of the KWin script, whose window list carries new fields); hover the taskbar and cross to the card -- KWin's blur behind
 the neck and the crossing itself are the two things no render shows.
 
 ### The cleanup of 2026-09-24: duplicates, waste, and what they were hiding
