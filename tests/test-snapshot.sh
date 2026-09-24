@@ -155,4 +155,18 @@ cli --label=equals;             check "--label=X"     "$(newest)" "equals"
 cli plain;                      check "a bare label"  "$(newest)" "plain"
 cli --bogus;                    check "an unknown flag is refused" "$?" "1"
 
+# `snapshot create` read `snapshots.keep` through config.sh, which it never
+# sourced. The lookup failed out of sight, the setting read as 0, and a machine
+# told to keep two restore points went on keeping every one.
+echo "== snapshots.keep prunes after a create =="
+rm -rf "$(snapshot_root)"
+mkdir -p "$CONFIG_DIR/profiles/default"
+for l in k1 k2 k3; do cli "$l"; done
+check "unset, nothing is pruned"   "$(ls -1 "$(snapshot_root)" | wc -l)" "3"
+printf '{"snapshots": {"keep": 2}}\n' > "$CONFIG_DIR/profiles/default/shell.json"
+cli k4
+kept=$(ls -1 "$(snapshot_root)" | sed -E 's/^[0-9]{8}-[0-9]{6}-//' | paste -sd' ')
+check "keep=2 prunes on create"    "$kept" "k1 k3 k4"
+rm -f "$CONFIG_DIR/profiles/default/shell.json"
+
 harness_done

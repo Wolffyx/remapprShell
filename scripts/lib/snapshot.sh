@@ -14,7 +14,8 @@
 # changing a machine's snapshot policy is precisely the surprise this whole
 # mechanism exists to prevent.
 #
-# Requires brand.sh, log.sh, protected.sh.
+# Requires brand.sh, log.sh, protected.sh -- and config.sh, for the one setting
+# snapshot_autoprune reads.
 
 # Deliberately NOT inside STATE_DIR. The state directory is part of what a
 # snapshot captures and therefore part of what a restore overwrites, so an
@@ -421,9 +422,13 @@ snapshot_prune() {
 
 # Called after taking one. Off unless `snapshots.keep` says otherwise, because
 # deleting restore points is not a thing to start doing to somebody quietly.
+#
+# Its errors are not hidden. `snapshot create` once called this without
+# config.sh sourced: the lookup was "command not found", which a `2>/dev/null`
+# here swallowed, so keep read as 0 and nothing was pruned however it was set.
 snapshot_autoprune() {
     local keep
-    keep=$(config_get '.snapshots.keep' 0 2>/dev/null) || keep=0
+    keep=$(config_get '.snapshots.keep' 0) || keep=0
     case "$keep" in ''|*[!0-9]*) return 0 ;; esac
     [ "$keep" -ge 1 ] || return 0
     snapshot_prune "$keep"
