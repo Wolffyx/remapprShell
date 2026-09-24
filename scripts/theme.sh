@@ -328,21 +328,9 @@ plasma_fill_colours() {   # plasma_fill_colours <light|dark>
         || kconfig_set theme kdeglobals General ColorScheme "$SLUG-$variant"
 }
 
-# `night_light_daylight` and the rest of KWin's Night Light live in kwin.sh:
-# doctor asks the same question, and one copy of it is one answer.
-
-# Night Light answers over the bus, and on the login path it is asked seconds
-# after KWin started -- early enough to be told nothing at all. Answering
-# "no schedule" then is not neutral, so wait briefly for the real answer.
-night_light_wait() {   # [seconds]
-    local deadline=$(( SECONDS + ${1:-5} )) answer
-    while :; do
-        answer=$(night_light_daylight)
-        [ -n "$answer" ] && { printf '%s' "$answer"; return 0; }
-        [ "$SECONDS" -ge "$deadline" ] && return 0
-        sleep 0.25
-    done
-}
+# `night_light_daylight`, `night_light_wait` and the rest of KWin's Night
+# Light live in kwin.sh: doctor asks the same question, and one copy of it is
+# one answer.
 
 # Whether the colour scheme on the desktop right now is a dark one, by the
 # luminance of the window background -- the same question `Scheme.resolveMode`

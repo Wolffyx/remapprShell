@@ -391,4 +391,37 @@ check "L&F key removed (was unset)" "$(kreadconfig6 --file kdeglobals --group KD
 # The gate: byte-identical, not merely equivalent.
 check_unchanged "every config file byte-identical after revert" "$before_sums" "$(kde_sums)"
 
+
+# Night Light switched off is an answer, and it used to be waited on: every
+# `theme status` and `theme variant` on a machine without a schedule spent five
+# seconds asking again for one. Only silence is worth the wait. The session is
+# a stand-in here -- a busctl that answers from a variable -- so it is the one
+# place this suite lets a script believe there is a session at all.
+echo "== Night Light off is an answer, not a wait =="
+NL_BIN="$SANDBOX/night-light"; mkdir -p "$NL_BIN"
+cat > "$NL_BIN/busctl" <<'STUB'
+#!/usr/bin/env bash
+b() { printf '{"type":"b","data":%s}\n' "$@"; }
+case "$NL_STATE" in
+    off)   b true false true ;;
+    day)   b true true true ;;
+    night) b true true false ;;
+    *)     exit 1 ;;
+esac
+STUB
+chmod +x "$NL_BIN/busctl"
+# "<answer>:<whether it took under a second>", from the lib itself.
+night_light() {
+    ( export NL_STATE=$1 PATH="$NL_BIN:$PATH"
+      unset "$NO_SESSION_VAR"
+      source "$REPO_ROOT/scripts/lib/kwin.sh"
+      t0=$(date +%s%N); a=$(night_light_wait 2); t1=$(date +%s%N)
+      printf '%s:%s' "${a:-none}" "$([ $(( (t1 - t0) / 1000000 )) -lt 900 ] && echo quick || echo waited)" )
+}
+check "daylight"                   "$(night_light day)"     "true:quick"
+check "night"                      "$(night_light night)"   "false:quick"
+check "switched off, at once"      "$(night_light off)"     "none:quick"
+check "no answer is waited for"    "$(night_light silent)"  "none:waited"
+check "and no session asks nobody" "$(export NL_STATE=day PATH="$NL_BIN:$PATH"; source "$REPO_ROOT/scripts/lib/kwin.sh"; night_light_daylight; echo ":$?")" ":0"
+
 harness_done
