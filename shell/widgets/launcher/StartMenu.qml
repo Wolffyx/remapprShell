@@ -408,6 +408,38 @@ Item {
         }
     }
 
+    // A button on the two-pane menu's rail: in the accent while its view is
+    // the one showing. Choosing one clears the search, which would otherwise
+    // be showing instead of the view chosen.
+    component RailButton: Rectangle {
+        id: railButton
+
+        property string glyph: ""
+        property bool current: false
+        property real glyphSize: railButton.current ? 24 : 22
+        signal chosen
+
+        width: 48
+        height: 48
+        radius: Theme.radiusOf(16)
+        color: railButton.current ? Theme.acc : railHover.hovered ? Theme.s3 : "transparent"
+
+        Glyph {
+            anchors.centerIn: parent
+            name: railButton.glyph
+            size: railButton.glyphSize
+            color: railButton.current ? Theme.accFg : Theme.mut
+        }
+
+        HoverHandler { id: railHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler {
+            onTapped: {
+                search.text = "";
+                railButton.chosen();
+            }
+        }
+    }
+
     Loader {
         anchors.fill: parent
         sourceComponent: menu.layout === "grid" ? gridLayout : menu.layout === "list" ? listLayout : twoPaneLayout
@@ -447,58 +479,27 @@ Item {
                     Repeater {
                         model: Apps.categories
 
-                        Rectangle {
-                            id: railButton
+                        RailButton {
+                            id: category
                             required property var modelData
-                            readonly property bool current: (railButton.modelData.id === "all" && menu.view === "home")
-                                                            || menu.view === railButton.modelData.id
-
-                            width: 48
-                            height: 48
-                            radius: Theme.radiusOf(16)
-                            color: railButton.current ? Theme.acc : railHover.hovered ? Theme.s3 : "transparent"
-
-                            Glyph {
-                                anchors.centerIn: parent
-                                name: railButton.modelData.glyph
-                                size: railButton.current ? 24 : 22
-                                color: railButton.current ? Theme.accFg : Theme.mut
-                            }
-
-                            HoverHandler { id: railHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler {
-                                onTapped: {
-                                    search.text = "";
-                                    menu.view = railButton.modelData.id === "all" ? "home" : railButton.modelData.id;
-                                }
-                            }
+                            glyph: category.modelData.glyph
+                            current: (category.modelData.id === "all" && menu.view === "home")
+                                     || menu.view === category.modelData.id
+                            onChosen: menu.view = category.modelData.id === "all" ? "home" : category.modelData.id
                         }
                     }
                 }
 
-                Rectangle {
+                // Recent files, at the foot of the rail. Its glyph stays the
+                // one size, current or not, as it always has.
+                RailButton {
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 14
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 48
-                    height: 48
-                    radius: Theme.radiusOf(16)
-                    color: menu.view === "recent" ? Theme.acc : historyHover.hovered ? Theme.s3 : "transparent"
-
-                    Glyph {
-                        anchors.centerIn: parent
-                        name: "history"
-                        size: 22
-                        color: menu.view === "recent" ? Theme.accFg : Theme.mut
-                    }
-
-                    HoverHandler { id: historyHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler {
-                        onTapped: {
-                            search.text = "";
-                            menu.view = "recent";
-                        }
-                    }
+                    glyph: "history"
+                    glyphSize: 22
+                    current: menu.view === "recent"
+                    onChosen: menu.view = "recent"
                 }
             }
 

@@ -117,6 +117,78 @@ BarWidget {
         }
     }
 
+    // A notification as a row the pointer can open. The history's entries open
+    // what they are about, the same as a live popup does -- the file named,
+    // or the application that sent it -- and are tinted under the pointer
+    // while a click would do that. What the row shows is written inside it.
+    component NoteRow: Item {
+        id: noteRow
+
+        required property var entry
+        // Where the tint's edge sits from the row's: out past it when
+        // negative.
+        property real tintInset: 0
+
+        readonly property string picture: NotificationWatch.pictureOf(noteRow.entry)
+        readonly property bool openable: NotificationWatch.openable(noteRow.entry)
+        readonly property bool hovered: rowHover.hovered
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: noteRow.tintInset
+            radius: Theme.radiusOf(12)
+            visible: rowHover.hovered && noteRow.openable
+            color: Theme.alpha(Theme.fg, 0.06)
+        }
+
+        HoverHandler {
+            id: rowHover
+            cursorShape: noteRow.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
+        }
+
+        TapHandler {
+            enabled: noteRow.openable
+            onTapped: {
+                NotificationWatch.open(noteRow.entry);
+                root.closePopout();
+            }
+        }
+    }
+
+    // What a notification is about, when that is a picture: a screenshot is
+    // unrecognisable as a file name and obvious as a thumbnail. It takes no
+    // room when there is none, or when it will not load.
+    component NotePicture: Item {
+        id: pic
+
+        required property string source
+        property int pictureHeight: 120
+        property size sourceSize: Qt.size(760, 360)
+
+        width: parent ? parent.width : 0
+        height: visible ? pic.pictureHeight + 8 : 0
+        visible: pic.source.length > 0 && shot.status !== Image.Error
+
+        Rectangle {
+            y: 8
+            width: parent.width
+            height: pic.pictureHeight
+            radius: Theme.radiusOf(12)
+            color: Theme.s2
+            clip: true
+
+            Image {
+                id: shot
+                anchors.fill: parent
+                source: pic.source
+                sourceSize: pic.sourceSize
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+            }
+        }
+    }
+
     // One application's notifications: the latest on a card, the rest
     // stacked behind it until it is opened out.
     component GroupCard: Item {
@@ -218,29 +290,20 @@ BarWidget {
                         comparisonMode: ObjectComparison.Identity
                     }
 
-                    // One notification in the card. An Item rather than a bare
-                    // Column: a click has to land on the whole row -- the space
-                    // beside the text included -- and a Column is only as wide
-                    // as what is in it once the handler is asked.
-                    Item {
+                    // One notification in the card. A row around a Column rather
+                    // than a bare Column: a click has to land on the whole row
+                    // -- the space beside the text included -- and a Column is
+                    // only as wide as what is in it once the handler is asked.
+                    NoteRow {
                         id: note
 
                         required property var modelData
                         required property int index
 
-                        readonly property string picture: NotificationWatch.pictureOf(note.modelData)
-                        readonly property bool openable: NotificationWatch.openable(note.modelData)
-
+                        entry: note.modelData
+                        tintInset: -6
                         width: body.width
                         height: lines.implicitHeight + 10
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: -6
-                            radius: Theme.radiusOf(12)
-                            visible: noteHover.hovered && note.openable
-                            color: Theme.alpha(Theme.fg, 0.06)
-                        }
 
                         Column {
                             id: lines
@@ -279,49 +342,7 @@ BarWidget {
                                 color: Theme.mut
                             }
 
-                            // What it is about, when that is a picture: a
-                            // screenshot is unrecognisable as a file name and
-                            // obvious as a thumbnail.
-                            Item {
-                                width: parent.width
-                                height: visible ? 128 : 0
-                                visible: note.picture.length > 0 && shot.status !== Image.Error
-
-                                Rectangle {
-                                    y: 8
-                                    width: parent.width
-                                    height: 120
-                                    radius: Theme.radiusOf(12)
-                                    color: Theme.s2
-                                    clip: true
-
-                                    Image {
-                                        id: shot
-                                        anchors.fill: parent
-                                        source: note.picture
-                                        sourceSize: Qt.size(760, 360)
-                                        fillMode: Image.PreserveAspectCrop
-                                        asynchronous: true
-                                        cache: false
-                                    }
-                                }
-                            }
-                        }
-
-                        // The history's entries open what they are about, the
-                        // same as a live popup does: the file named, or the
-                        // application that sent it.
-                        HoverHandler {
-                            id: noteHover
-                            cursorShape: note.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        }
-
-                        TapHandler {
-                            enabled: note.openable
-                            onTapped: {
-                                NotificationWatch.open(note.modelData);
-                                root.closePopout();
-                            }
+                            NotePicture { source: note.picture }
                         }
                     }
                 }
@@ -511,25 +532,16 @@ BarWidget {
                                     comparisonMode: ObjectComparison.Identity
                                 }
 
-                                Item {
+                                NoteRow {
                                     id: line
 
                                     required property var modelData
                                     required property int index
 
-                                    readonly property string picture: NotificationWatch.pictureOf(line.modelData)
-                                    readonly property bool openable: NotificationWatch.openable(line.modelData)
-
+                                    entry: line.modelData
+                                    tintInset: 2
                                     width: bucket.width
                                     height: lineBody.implicitHeight + 24
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        anchors.margins: 2
-                                        radius: Theme.radiusOf(12)
-                                        visible: lineHover.hovered && line.openable
-                                        color: Theme.alpha(Theme.fg, 0.06)
-                                    }
 
                                     NoteIcon {
                                         y: 13
@@ -580,30 +592,11 @@ BarWidget {
                                         }
 
                                         // The picture it is about, as in
-                                        // the grouped view.
-                                        Item {
-                                            width: parent.width
-                                            height: visible ? 108 : 0
-                                            visible: line.picture.length > 0 && streamShot.status !== Image.Error
-
-                                            Rectangle {
-                                                y: 8
-                                                width: parent.width
-                                                height: 100
-                                                radius: Theme.radiusOf(12)
-                                                color: Theme.s2
-                                                clip: true
-
-                                                Image {
-                                                    id: streamShot
-                                                    anchors.fill: parent
-                                                    source: line.picture
-                                                    sourceSize: Qt.size(760, 300)
-                                                    fillMode: Image.PreserveAspectCrop
-                                                    asynchronous: true
-                                                    cache: false
-                                                }
-                                            }
+                                        // the grouped view, a little lower.
+                                        NotePicture {
+                                            source: line.picture
+                                            pictureHeight: 100
+                                            sourceSize: Qt.size(760, 300)
                                         }
                                     }
 
@@ -615,24 +608,11 @@ BarWidget {
                                         visible: line.index < bucket.day.entries.length - 1
                                     }
 
-                                    HoverHandler {
-                                        id: lineHover
-                                        cursorShape: line.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    }
-
-                                    TapHandler {
-                                        enabled: line.openable
-                                        onTapped: {
-                                            NotificationWatch.open(line.modelData);
-                                            root.closePopout();
-                                        }
-                                    }
-
                                     IconButton {
                                         anchors.right: parent.right
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 4
-                                        visible: root.askable && lineHover.hovered
+                                        visible: root.askable && line.hovered
                                         size: 30
                                         glyph: "help"
                                         iconName: "help-hint"
