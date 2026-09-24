@@ -78,6 +78,20 @@ Item {
         return root.shotWidth(window) + 2 * root.pad;
     }
 
+    // A card's window: the one at its place, which is where it is once the
+    // list has settled, as long as the uuid agrees -- and found by uuid while
+    // the list is still moving under it. The cards are repeated over the
+    // uuids (see below), so this is how each reads what it shows.
+    function windowFor(index, uuid) {
+        const at = root.windows[index];
+        return at?.uuid === uuid ? at : (root.windows.find(w => w.uuid === uuid) ?? root.noWindow);
+    }
+
+    // What a card on its way out reads, for the moment between its window
+    // leaving the list and the card going.
+    readonly property var noWindow: ({ uuid: "", title: "", appId: "", active: false, minimized: false,
+                                       desktops: [], output: "", width: 0, height: 0 })
+
     // The widest row, so the Flow wraps after `perRow` cards and not earlier.
     readonly property int rowsWidth: {
         let widest = 0;
@@ -208,17 +222,25 @@ Item {
             visible: root.windows.length > 0
 
             Repeater {
-                model: root.windows
+                // Over the windows' uuids, not the windows. The list is made
+                // afresh on every push from the window daemon, and a Repeater
+                // over it built every card again each time -- and the live
+                // picture in each, a screencast stream restarted for a title
+                // changing anywhere. Over the uuids a card lives as long as
+                // its window, and reads it through windowFor.
+                model: ScriptModel { values: root.windows.map(w => w.uuid ?? "") }
 
                 Rectangle {
                     id: cell
 
-                    required property var modelData
+                    // The window's uuid, and its place among the cards.
+                    required property string modelData
                     required property int index
+                    readonly property var window: root.windowFor(cell.index, cell.modelData)
 
-                    readonly property string where: root.place(cell.modelData)
+                    readonly property string where: root.place(cell.window)
 
-                    width: root.cardWidth(cell.modelData)
+                    width: root.cardWidth(cell.window)
                     height: root.pad + root.titleHeight + root.pad + root.shotHeight + root.pad
                     radius: Theme.radiusOf(12)
                     // Every card has a surface of its own, resting: without one
@@ -227,7 +249,7 @@ Item {
                     // things rather than one application's windows. The focused
                     // window is the accent's container, as its taskbar button
                     // is.
-                    color: cell.modelData.active ? Theme.accC
+                    color: cell.window.active ? Theme.accC
                          : cellPointer.hovered ? Theme.s2
                                                : Theme.alpha(Theme.foreground, 0.05)
                     Behavior on color { ColorAnimation { duration: Theme.durationFast } }
@@ -255,23 +277,23 @@ Item {
                         // The title, and where the window is when that is worth
                         // saying, dimmer after it.
                         text: {
-                            const title = WindowEvents.label(cell.modelData) || (root.item?.appName ?? "");
+                            const title = WindowEvents.label(cell.window) || (root.item?.appName ?? "");
                             const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
                             return cell.where.length > 0
                                 ? `${esc(title)} <font color="${Theme.foregroundInactive}">· ${esc(cell.where)}</font>`
                                 : esc(title);
                         }
-                        color: cell.modelData.active ? Theme.accCFg
-                             : cell.modelData.minimized ? Theme.foregroundInactive : Theme.foreground
+                        color: cell.window.active ? Theme.accCFg
+                             : cell.window.minimized ? Theme.foregroundInactive : Theme.foreground
                         font.pixelSize: 12
-                        font.italic: cell.modelData.minimized
+                        font.italic: cell.window.minimized
                     }
 
                     CloseButton {
                         id: close
                         x: cell.width - width - root.pad
                         y: root.pad
-                        uuid: cell.modelData.uuid ?? ""
+                        uuid: cell.window.uuid ?? ""
                         shown: cellPointer.hovered
                     }
 
@@ -283,17 +305,17 @@ Item {
                         y: root.pad + root.titleHeight + root.pad
                         width: cell.width - 2 * root.pad
                         height: root.shotHeight
-                        windowId: cell.modelData.uuid ?? ""
+                        windowId: cell.window.uuid ?? ""
                         iconName: root.item?.iconName ?? ""
                         iconFile: root.item?.iconFile ?? ""
                         iconScale: 0.4
-                        sourceAspect: WindowEvents.aspectOf(cell.modelData)
+                        sourceAspect: WindowEvents.aspectOf(cell.window)
                         // A picture is a screencast stream, and one per window
                         // is one per window. Eight is more than anybody picks
                         // from at a glance; past that the cards are icons,
                         // which is what a thumbnail falls back to anyway.
                         live: cell.index < 8
-                        opacity: cell.modelData.minimized ? 0.55 : 1
+                        opacity: cell.window.minimized ? 0.55 : 1
                     }
 
                     HoverHandler { id: cellPointer; cursorShape: Qt.PointingHandCursor }
@@ -301,7 +323,7 @@ Item {
                         // The whole card, not the picture: a target the size of
                         // the thing it stands for.
                         onTapped: {
-                            WindowsService.activate(cell.modelData.uuid);
+                            WindowsService.activate(cell.window.uuid);
                             root.picked();
                         }
                     }
@@ -310,7 +332,7 @@ Item {
                         // it does on Windows' previews. The card stays, as it
                         // does for the close button, and goes with the last.
                         acceptedButtons: Qt.MiddleButton
-                        onTapped: WindowsService.close(cell.modelData.uuid)
+                        onTapped: WindowsService.close(cell.window.uuid)
                     }
                 }
             }

@@ -23,6 +23,7 @@ pragma ComponentBehavior: Bound
 // here moves or rearranges a window.
 
 import QtQuick
+import Quickshell
 import qs.domain.config
 import qs.domain.desktops
 import qs.domain.theme
@@ -106,6 +107,20 @@ BarWidget {
     readonly property var items: WindowEvents.arrangeTasks(root.running, root.pinned,
                                                            id => WindowsService.launcherFor(id))
 
+    // A button's item: the one at its place, which is where it is once the
+    // list has settled, as long as the key agrees -- and found by key while
+    // the list is still moving under it. The buttons are repeated over the
+    // keys (see below), so this is how each reads what it shows.
+    function itemFor(index, key) {
+        const at = root.items[index];
+        return at?.key === key ? at : (root.items.find(i => i.key === key) ?? root.noItem);
+    }
+
+    // What a button on its way out reads, for the moment between its key
+    // leaving the list and the button going.
+    readonly property var noItem: ({ key: "", appName: "", windows: [], active: false, attention: false,
+                                     attentionSince: 0, iconName: "", iconFile: "" })
+
     // As tall as the design's buttons at this thickness. With titles a
     // button is as wide as its title needs, up to `maxWidth`; without, it is
     // the icon and its padding.
@@ -180,7 +195,28 @@ BarWidget {
     // Reaching the card means taking the pointer off the button, so a card
     // that read `hoveredIndex` emptied itself on the way there and could never
     // be clicked -- which is exactly what "the popup disappears" was.
-    property var previewItem: null
+    //
+    // Kept as the button's key, and its item looked up afresh from `items`.
+    // The card used to hold the item itself, which was a snapshot: a window
+    // closed from the card stayed on it, and the first movement of the
+    // pointer after any change to the window list handed it a new object,
+    // which rebuilt every card and restarted every live picture. Still
+    // writable: dev/preview/popout.qml points the card at a group by setting
+    // it.
+    property string previewKey: ""
+    property var previewItem: root.items.find(i => i.key === root.previewKey) ?? null
+
+    // Its group gone -- the last of its windows closed, from the card or
+    // anywhere else -- the card goes with it, rather than staying up empty.
+    // Asked of `items` rather than of `previewItem` going null: clearing the
+    // key from inside that property's own change is a binding loop.
+    onItemsChanged: {
+        if (root.previewKey.length > 0 && root.popoutMode !== "menu"
+                && !root.items.some(i => i.key === root.previewKey)) {
+            root.previewKey = "";
+            root.popoutVisible = false;
+        }
+    }
 
     // And the card stays up while the pointer crosses the gap to it. Leaving
     // the button starts a short countdown rather than closing; entering the
@@ -194,7 +230,7 @@ BarWidget {
             if (root.popoutMode === "menu" || root.pointerInPopout || root.hoveredIndex >= 0)
                 return;
             root.popoutVisible = false;
-            root.previewItem = null;
+            root.previewKey = "";
         }
     }
 
@@ -234,7 +270,7 @@ BarWidget {
             return;
         if (root.hoveredIndex >= 0) {
             root.cancelClose();
-            root.previewItem = root.items[root.hoveredIndex];
+            root.previewKey = root.items[root.hoveredIndex]?.key ?? "";
             root.popoutVisible = true;
             root.requestPopout("tasks", root.centreOf(root.hoveredIndex));
         } else {
@@ -259,7 +295,7 @@ BarWidget {
         if (!root.popoutVisible) {
             root.popoutMode = "preview";
             root.menuItem = null;
-            root.previewItem = null;
+            root.previewKey = "";
             root.pointerInPopout = false;
             root.cancelClose();
         }
@@ -314,23 +350,32 @@ BarWidget {
 
         Repeater {
             id: buttons
-            model: root.items
+
+            // Over the keys, not the items. `items` is made afresh on every
+            // push from the window daemon -- any window's title changing is
+            // one -- and a Repeater over it built every button again each
+            // time, each with its timer and its animation. Over the keys a
+            // button lives as long as its application or window is on the
+            // list, and reads its item through itemFor.
+            model: ScriptModel { values: root.items.map(i => i.key) }
 
             Rectangle {
                 id: button
 
-                required property var modelData
+                // The button's key, and its place on the taskbar.
+                required property string modelData
                 required property int index
+                readonly property var item: root.itemFor(button.index, button.modelData)
 
-                readonly property bool isActive: button.modelData.active === true
+                readonly property bool isActive: button.item.active === true
                 // A group is dimmed only when every window in it is minimised:
                 // one visible window means the application is on screen. A
                 // pinned application with no windows is not minimised, just
                 // not running.
                 readonly property bool isMinimized: button.windowCount > 0
-                                                    && button.modelData.windows.every(w => w.minimized)
+                                                    && button.item.windows.every(w => w.minimized)
                 readonly property bool isHovered: button.index === root.hoveredIndex
-                readonly property int windowCount: button.modelData.windows.length
+                readonly property int windowCount: button.item.windows.length
 
                 width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
                                       : root.drawnIconOnly
@@ -358,14 +403,15 @@ BarWidget {
                 // is activated, and the tint goes with it.
                 //
                 // The moment the request began is kept by WindowsService, not
-                // here: any change to the window list rebuilds every button,
-                // and a flash timed from the button would start over each
-                // time some other window changed its title.
-                readonly property bool wantsAttention: button.modelData.attention === true && !button.isActive
+                // here: a button is made again whenever its window leaves the
+                // list and comes back -- to another desktop and back, or the
+                // grouping switched -- and a flash timed from the button would
+                // start over each time.
+                readonly property bool wantsAttention: button.item.attention === true && !button.isActive
                 property bool flashing: false
 
                 function startFlash() {
-                    const left = root.flashMs - (Date.now() - (button.modelData.attentionSince ?? 0));
+                    const left = root.flashMs - (Date.now() - (button.item.attentionSince ?? 0));
                     button.flashing = button.wantsAttention && left > 0;
                     if (button.flashing) {
                         flashStop.interval = left;
@@ -429,8 +475,8 @@ BarWidget {
                         PanelIcon {
                             anchors.fill: parent
                             implicitSize: root.drawnIcon
-                            iconName: button.modelData.iconName
-                            iconFile: button.modelData.iconFile
+                            iconName: button.item.iconName
+                            iconFile: button.item.iconFile
                         }
                     }
 
@@ -440,9 +486,9 @@ BarWidget {
                         visible: root.titlesFit
                         width: Math.min(title.implicitWidth, root.titleRoom)
                         elide: Text.ElideRight
-                        text: button.modelData.windows.length === 1
-                            ? WindowEvents.label(button.modelData.windows[0])
-                            : button.modelData.appName
+                        text: button.item.windows.length === 1
+                            ? WindowEvents.label(button.item.windows[0])
+                            : button.item.appName
                     }
                 }
 
