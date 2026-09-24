@@ -24,7 +24,8 @@ done
 cp "$HERE/harness.qml" "$root/preview.qml"
 [ -d "$HERE/stubs" ] && cp "$HERE/stubs/"*.qml "$root/features/panel/"
 # Attached layer-shell properties have nothing to attach to on a FloatingWindow.
-sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/WidgetSlot.qml"
+# They are the popout's, which WidgetSlot opens and SlotPopout draws.
+sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/SlotPopout.qml"
 # Full-screen layer surfaces become plain Items (PanelWindow has no offscreen
 # backend); the drawing inside them is untouched.
 for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root"/features/desktop/*.qml "$root"/features/switchers/*.qml; do
