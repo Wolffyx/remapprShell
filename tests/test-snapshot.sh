@@ -169,4 +169,19 @@ kept=$(ls -1 "$(snapshot_root)" | sed -E 's/^[0-9]{8}-[0-9]{6}-//' | paste -sd' 
 check "keep=2 prunes on create"    "$kept" "k1 k3 k4"
 rm -f "$CONFIG_DIR/profiles/default/shell.json"
 
+# `restore --list` kept a listing of its own, which had fallen behind: no
+# sizes, no locks.
+echo "== one listing =="
+check "restore --list is snapshot list" "$("$REPO_ROOT/scripts/restore.sh" --list 2>&1)" \
+                                        "$("$REPO_ROOT/scripts/snapshot.sh" list 2>&1)"
+
+# Pruning walked the names word by word, so a label with a space in it was
+# looked for in pieces and never removed.
+echo "== a name with spaces is pruned whole =="
+rm -rf "$(snapshot_root)"
+for l in a "b c" "d e" f; do cli "$l"; done
+snapshot_prune 1 >/dev/null 2>&1
+check "the oldest and the newest are left" \
+      "$(snapshot_names | sed -E 's/^[0-9]{8}-[0-9]{6}-//' | paste -sd'|')" "a|f"
+
 harness_done

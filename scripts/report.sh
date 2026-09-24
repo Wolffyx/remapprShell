@@ -28,8 +28,8 @@ source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/renderers.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
+source "$REPO_ROOT/scripts/lib/reports.sh"
 
-REPORT_DIR="$STATE_DIR/diagnostics"
 JOURNAL_LINES=${JOURNAL_LINES:-200}
 
 # --- the four parts --------------------------------------------------------
@@ -70,7 +70,7 @@ part_crash() {
     }
 
     crash_text "$crash" | redact_text > "$dir/crash.txt"
-    printf 'crash:  %s\n' "$(basename "$crash")" >> "$dir/error.txt"
+    printf '%s\n' "$(report_crash_line "$(basename "$crash")")" >> "$dir/error.txt"
 }
 
 part_environment() {
@@ -151,10 +151,7 @@ case "$cmd" in
         # reports written in the same one -- a widget failing and the unit dying
         # right after it, exactly when reports matter -- would otherwise land in
         # the same directory, and the second would overwrite the first.
-        base="$REPORT_DIR/$(date +%Y%m%d-%H%M%S)"
-        dir=$base
-        n=2
-        while [ -e "$dir" ]; do dir="$base-$n"; n=$((n + 1)); done
+        dir=$(unique_path "$REPORT_DIR/$(date +%Y%m%d-%H%M%S)")
         mkdir -p "$dir" || die "cannot write to $REPORT_DIR"
 
         part_error       "$dir" "$REASON" "$QML_FILE"
@@ -188,7 +185,7 @@ case "$cmd" in
     show)
         name=${args[0]:-}
         if [ -z "$name" ]; then
-            name=$(ls -1 "$REPORT_DIR" 2>/dev/null | sort | tail -1)
+            name=$(report_newest)
             [ -n "$name" ] || die "no reports yet"
         fi
         dir="$REPORT_DIR/$(basename "$name")"

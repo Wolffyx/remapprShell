@@ -33,11 +33,11 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
+source "$REPO_ROOT/scripts/lib/reports.sh"
 
 # Read once: the provider checks ask for the same few settings over and over.
 config_load
 
-REPORT_DIR="$STATE_DIR/diagnostics"
 CONSENT_FILE="$STATE_DIR/ai-consent.json"
 PROVIDERS=(clipboard claude-code ollama custom)
 
@@ -105,16 +105,7 @@ list_providers() {
 
 # --- the bundle --------------------------------------------------------------
 
-newest_report() { ls -1 "$REPORT_DIR" 2>/dev/null | sort | tail -1; }
-
-# The newest bundle already written about one crash dump, if any.
-crash_report_for() {
-    local id=$1 d
-    while IFS= read -r d; do
-        [ -f "$d/crash.txt" ] || continue
-        grep -qxF "crash:  $id" "$d/error.txt" 2>/dev/null && printf '%s' "$d"
-    done < <(ls -1d "$REPORT_DIR"/*/ 2>/dev/null | sort) | tail -1
-}
+# REPORT_DIR, report_newest and report_for_crash are lib/reports.sh's.
 
 create_report() {
     "$REPO_ROOT/scripts/report.sh" create --reason "$1" 2>/dev/null | tail -1
@@ -131,10 +122,10 @@ gather_report() {
     if [ -n "$REPORT_NAME" ]; then
         DIR="$REPORT_DIR/$(basename "$REPORT_NAME")"
         [ -d "$DIR" ] || die "no such report: $REPORT_NAME"
-    elif [ "$FRESH" = yes ] || [ -z "$(newest_report)" ]; then
+    elif [ "$FRESH" = yes ] || [ -z "$(report_newest)" ]; then
         DIR=$(create_report "${REASON:-asked from the command line}")
     else
-        DIR="$REPORT_DIR/$(newest_report)"
+        DIR="$REPORT_DIR/$(report_newest)"
     fi
     [ -d "$DIR" ] || die "could not write a report"
     # A report that was gathered for a particular question keeps it.
@@ -174,7 +165,7 @@ gather_crash() {
     # One report per crash, not one per question about it. A dump does not
     # change, so asking twice should not fill the directory with copies of the
     # same bundle -- and `--show` is a thing people run more than once.
-    DIR=$(crash_report_for "$id")
+    DIR=$(report_for_crash "$id")
     if [ -z "$DIR" ]; then
         DIR=$("$REPO_ROOT/scripts/report.sh" create --reason "crash $id" --crash "$id" 2>/dev/null | tail -1)
     fi

@@ -791,10 +791,11 @@ fi
 
 section "diagnostic reports"
 
-reports="$STATE_DIR/diagnostics"
-report_count=$(ls -1 "$reports" 2>/dev/null | wc -l)
+source "$REPO_ROOT/scripts/lib/reports.sh"
+
+report_count=$(ls -1 "$REPORT_DIR" 2>/dev/null | wc -l)
 if [ "$report_count" -gt 0 ]; then
-    ok "$report_count report(s) in $reports"
+    ok "$report_count report(s) in $REPORT_DIR"
     fix "read the newest: $ALIAS report show"
     fix "nothing in them has been sent anywhere; they are local files"
 else
@@ -826,9 +827,9 @@ else
     fix "quickshell catches these itself and restarts, so systemd never reports a failure"
     fix "read it:       $ALIAS crash show"
     fix "ask about it:  $ALIAS ask --crash"
-    reported=$(grep -rlxF "crash:  $newest" "$STATE_DIR/diagnostics"/*/error.txt 2>/dev/null | head -1)
+    reported=$(report_for_crash "$newest")
     if [ -n "$reported" ]; then
-        ok "the newest crash has a report: $(basename "$(dirname "$reported")")"
+        ok "the newest crash has a report: $(basename "$reported")"
     else
         warn "no report written for the newest crash"
         fix "the shell writes one when it comes back; this dump predates that, or the shell has not restarted since"
