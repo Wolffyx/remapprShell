@@ -18,8 +18,6 @@ kwriteconfig6 --file plasmarc   --group Theme   --key name        "user-theme"
 kwriteconfig6 --file kwinrc     --group Windows --key Unrelated   "keepme"
 kwriteconfig6 --file kwinrc     --group TabBox  --key LayoutName  "thumbnail_grid"
 
-before=$(mktemp -d)
-cp -a "$XDG_CONFIG_HOME/." "$before/"
 before_sums=$(kde_sums)
 
 # Stand-ins for the session and for anything that installs a package: both
@@ -389,5 +387,4 @@ check "L&F key removed (was unset)" "$(kreadconfig6 --file kdeglobals --group KD
 # The gate: byte-identical, not merely equivalent.
 check_unchanged "every config file byte-identical after revert" "$before_sums" "$(kde_sums)"
 
-rm -rf "$before"
 harness_done
