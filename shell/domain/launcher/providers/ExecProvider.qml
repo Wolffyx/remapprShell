@@ -1,5 +1,5 @@
-// Any launcher that is its own process: rofi, fuzzel, walker, or a command the
-// user supplies.
+// A launcher that is its own process: the command the user supplies
+// (`launcher.command`) -- rofi, fuzzel, wofi, walker, whatever they run.
 //
 // These are layer-shell clients that position and dismiss themselves, so this
 // only starts them. A query is passed by substituting %q in the command, which

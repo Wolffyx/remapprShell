@@ -534,8 +534,6 @@
                         "kickoff",
                         "builtin",
                         "krunner",
-                        "fuzzel",
-                        "rofi",
                         "custom"
                     ],
                     "default": "builtin",
@@ -549,8 +547,6 @@
                         "krunner",
                         "builtin",
                         "kickoff",
-                        "fuzzel",
-                        "rofi",
                         "custom"
                     ],
                     "default": "builtin",

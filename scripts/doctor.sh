@@ -975,8 +975,6 @@ esac
 section "optional components"
 
 for pair in "union:a Qt style, selectable as the widget style" \
-            "fuzzel:an alternative launcher" \
-            "rofi:an alternative launcher" \
             "claude:the claude-code AI provider" \
             "ollama:the ollama AI provider" \
             "wl-copy:the clipboard AI provider"; do

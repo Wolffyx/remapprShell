@@ -143,8 +143,8 @@ What opens when you press the start button, and what opens when you search.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `fuzzel`, `rofi`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
-| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `fuzzel`, `rofi`, `custom` | `builtin` | KRunner is Plasma's own search. |
+| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
+| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `custom` | `builtin` | KRunner is Plasma's own search. |
 | `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
 | `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
 | `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
