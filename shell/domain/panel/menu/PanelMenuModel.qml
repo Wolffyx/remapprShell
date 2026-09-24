@@ -11,6 +11,7 @@ pragma Singleton
 // menu, which is gone the moment a row is chosen (runCtl says what that cost).
 
 import QtQuick
+import Quickshell
 import qs.platform.system
 import qs.domain.config
 import qs.domain.launcher.apps
