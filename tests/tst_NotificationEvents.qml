@@ -203,5 +203,21 @@ TestCase {
         compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf"] }), "");
         compare(NotificationEvents.pictureOf({ urls: [] }), "");
         compare(NotificationEvents.pictureOf(null), "");
+        // The popups' test of a picture: the extension, whatever its case,
+        // and never a query string.
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf", "file:///home/a/P.JPEG"] }),
+                "file:///home/a/P.JPEG");
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/x.pdf?name=y.png"] }), "");
+    }
+
+    // A sender that writes x-kde-urls as one string rather than a list, and
+    // as a bare path: still one file:// URL in the history.
+    function test_a_single_path_is_one_url() {
+        const line = JSON.stringify({
+            type: "method_call", interface: "org.freedesktop.Notifications", member: "Notify",
+            payload: { data: ["Downloads", 0, "", "Done", "", [],
+                              { "x-kde-urls": { type: "s", data: "/home/a/file.zip" } }, -1] }
+        });
+        compare(NotificationEvents.parse(line, 1000).urls, ["file:///home/a/file.zip"]);
     }
 }

@@ -131,6 +131,29 @@ TestCase {
         compare(Popups.urlsOf(undefined), []);
     }
 
+    // The same hint as busctl hands it to the history: the hint wrapped as
+    // { type, data }, and an array of variants wrapped element by element.
+    // One rule reads both, so the history and the popup cannot disagree.
+    function test_urls_read_through_the_bus_wrapping() {
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "as", data: ["file:///home/a/shot.png"] } }),
+                ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "s", data: "/home/a/shot.png" } }),
+                ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "av", data: [{ type: "s", data: "/home/a/x.pdf" },
+                                                                   { type: "s", data: "https://example.com/" }] } }),
+                ["file:///home/a/x.pdf"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "as", data: [] } }), []);
+        compare(Popups.urlsOf({ "x-kde-urls": [null, "", "  /home/a/y.png  "] }), ["file:///home/a/y.png"]);
+    }
+
+    function test_unwrapped_leaves_plain_values_alone() {
+        compare(Popups.unwrapped({ type: "s", data: "x" }), "x");
+        compare(Popups.unwrapped("x"), "x");
+        compare(Popups.unwrapped(["x"]), ["x"]);
+        compare(Popups.unwrapped(null), null);
+        compare(Popups.unwrapped(undefined), undefined);
+    }
+
     function test_a_picture_is_a_file_that_looks_like_one() {
         compare(Popups.pictureOf({ "x-kde-urls": ["file:///home/a/Screenshot.png"] }), "file:///home/a/Screenshot.png");
         compare(Popups.pictureOf({ "image-path": "/home/a/photo.JPG" }), "file:///home/a/photo.JPG");
