@@ -549,11 +549,7 @@ Item {
                             from: 1
                             to: 100
                             value: BrightnessStatus.level * 100
-                            onMoved: v => {
-                                for (const d of BrightnessStatus.displays)
-                                    BrightnessStatus.setBrightness(d.name, Math.max(StatusIcons.brightnessFloor(d.max),
-                                                                                    Math.round(v * d.max / 100)));
-                            }
+                            onMoved: v => BrightnessStatus.setAllPercent(v)
                         }
 
                         IconButton {
@@ -1032,13 +1028,19 @@ Item {
                 width: parent.width
                 spacing: 10
 
+                // Keyed by name, as the brightness widget's are: every step
+                // of a drag replaces the list of displays, and a Repeater over
+                // the list itself rebuilt the row -- and the slider -- being
+                // dragged.
                 Repeater {
-                    model: BrightnessStatus.displays
+                    model: JSON.parse(BrightnessStatus.displayNames)
 
                     Column {
-                        id: display
+                        id: screen
 
-                        required property var modelData
+                        required property string modelData
+                        readonly property var display: BrightnessStatus.displayNamed(screen.modelData)
+                                                       ?? { label: "", brightness: 0, max: 1 }
 
                         width: parent.width
                         spacing: 2
@@ -1051,7 +1053,7 @@ Item {
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: display.modelData.label || display.modelData.name
+                            text: screen.display.label || screen.modelData
                             font.pixelSize: 12
                             color: Theme.mut
                             leftPadding: 4
@@ -1064,7 +1066,7 @@ Item {
                             IconButton {
                                 id: displayIcon
                                 anchors.verticalCenter: parent.verticalCenter
-                                glyph: StatusIcons.brightnessGlyph((display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max))
+                                glyph: StatusIcons.brightnessGlyph((screen.display.brightness ?? 0) / Math.max(1, screen.display.max))
                             }
 
                             NumberSlider {
@@ -1073,10 +1075,8 @@ Item {
                                 live: true
                                 from: 1
                                 to: 100
-                                value: 100 * (display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max)
-                                onMoved: v => BrightnessStatus.setBrightness(display.modelData.name,
-                                    Math.max(StatusIcons.brightnessFloor(display.modelData.max),
-                                             Math.round(v * display.modelData.max / 100)))
+                                value: 100 * (screen.display.brightness ?? 0) / Math.max(1, screen.display.max)
+                                onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
                             }
                         }
                     }

@@ -76,7 +76,7 @@ BarWidget {
                         id: screen
 
                         required property string modelData
-                        readonly property var display: BrightnessStatus.displays.find(d => d.name === screen.modelData)
+                        readonly property var display: BrightnessStatus.displayNamed(screen.modelData)
                                                        ?? { label: "", brightness: 0, max: 1 }
 
                         width: body.width
@@ -108,9 +108,7 @@ BarWidget {
                                 from: 1
                                 to: 100
                                 value: screen.display.brightness / screen.display.max * 100
-                                onMoved: v => BrightnessStatus.setBrightness(screen.modelData,
-                                    Math.max(StatusIcons.brightnessFloor(screen.display.max),
-                                             Math.round(v * screen.display.max / 100)))
+                                onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
                             }
                         }
                     }
