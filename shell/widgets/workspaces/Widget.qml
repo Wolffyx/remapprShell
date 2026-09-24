@@ -71,24 +71,10 @@ BarWidget {
         const name = d.name && d.name.length > 0 ? d.name : `Desktop ${root.numberOf(d)}`;
         return `${name}\n${n === 0 ? "No windows" : n === 1 ? "1 window" : `${n} windows`}`;
     }
-    tooltipCentre: {
-        const p = pills.itemAt(root.hoveredIndex);
-        return p ? (root.barVertical ? p.y + p.height / 2 : p.x + p.width / 2) : -1;
-    }
+    tooltipCentre: root.centreAlong(pills, root.hoveredIndex, root.barVertical)
 
     function handleHover(position, horizontal) {
-        root.hoveredIndex = -1;
-        for (let i = 0; i < pills.count; i++) {
-            const p = pills.itemAt(i);
-            if (!p)
-                continue;
-            const start = root.barVertical ? p.y : p.x;
-            const size = root.barVertical ? p.height : p.width;
-            if (position >= start - row.spacing / 2 && position < start + size + row.spacing / 2) {
-                root.hoveredIndex = i;
-                return;
-            }
-        }
+        root.hoveredIndex = root.indexAlong(pills, position, row.spacing, root.barVertical);
     }
 
     onDismissPopout: root.hoveredIndex = -1

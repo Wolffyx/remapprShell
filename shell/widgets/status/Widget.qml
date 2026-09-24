@@ -79,30 +79,16 @@ BarWidget {
     property int hoveredIndex: -1
 
     tooltip: root.hoveredIndex >= 0 ? root.tipFor(root.parts[root.hoveredIndex]?.id ?? "") : "Network, sound and battery"
-    tooltipCentre: {
-        const g = glyphs.itemAt(root.hoveredIndex);
-        if (!g)
-            return -1;
-        return root.barVertical ? layout.y + g.y + g.height / 2 : layout.x + g.x + g.width / 2;
-    }
+    tooltipCentre: root.centreAlong(glyphs, root.hoveredIndex, root.barVertical, root.barVertical ? layout.y : layout.x)
 
     wantsHover: true
     wantsWheel: true
 
+    // The glyphs sit in the middle of the widget, so they are measured from
+    // where their grid starts.
     function handleHover(position, horizontal) {
-        const p = position - (root.barVertical ? layout.y : layout.x);
-        root.hoveredIndex = -1;
-        for (let i = 0; i < glyphs.count; i++) {
-            const g = glyphs.itemAt(i);
-            if (!g)
-                continue;
-            const start = root.barVertical ? g.y : g.x;
-            const length = root.barVertical ? g.height : g.width;
-            if (p >= start - layout.spacing / 2 && p < start + length + layout.spacing / 2) {
-                root.hoveredIndex = i;
-                return;
-            }
-        }
+        root.hoveredIndex = root.indexAlong(glyphs, position, layout.spacing, root.barVertical,
+                                            root.barVertical ? layout.y : layout.x);
     }
 
     onDismissPopout: root.hoveredIndex = -1

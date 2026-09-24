@@ -157,6 +157,40 @@ Item {
     function handleWheel(delta) {}
     function handleActivate(button) {}
 
+    // ---- for a widget made of several things ----------------------------
+    //
+    // The panel tells a widget where the pointer is along it, and a widget of
+    // several parts -- the task buttons, the desktops, the status glyphs --
+    // has to turn that into which part. They differ in width, so it is found
+    // by where each one actually is rather than by dividing the position.
+
+    // Which of `repeater`'s items is at `position` along the panel, or -1.
+    // Each one's reach runs half of `spacing` out either side, so a gap
+    // belongs to the parts beside it rather than to nothing. `origin` is
+    // where their positioner starts inside the widget, measured the same way.
+    function indexAlong(repeater, position, spacing, vertical, origin) {
+        const p = position - (origin ?? 0);
+        for (let i = 0; i < repeater.count; i++) {
+            const item = repeater.itemAt(i);
+            if (!item)
+                continue;
+            const start = vertical ? item.y : item.x;
+            const length = vertical ? item.height : item.width;
+            if (p >= start - spacing / 2 && p < start + length + spacing / 2)
+                return i;
+        }
+        return -1;
+    }
+
+    // The middle of item `index`, along the panel from the widget's start --
+    // what `tooltipCentre` and requestPopout want -- or -1 without one.
+    function centreAlong(repeater, index, vertical, origin) {
+        const item = repeater.itemAt(index);
+        if (!item)
+            return -1;
+        return (origin ?? 0) + (vertical ? item.y + item.height / 2 : item.x + item.width / 2);
+    }
+
     // ---- signals to the host -------------------------------------------
 
     signal requestPopout(string name, real centre)

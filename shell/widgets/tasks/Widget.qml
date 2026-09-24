@@ -159,20 +159,15 @@ BarWidget {
     readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
 
     // Buttons differ in width once they carry titles, so the one under the
-    // pointer is found by where each actually is rather than by dividing the
-    // position by one width.
+    // pointer is found by where each actually is (BarWidget.indexAlong)
+    // rather than by dividing the position by one width. The taskbar runs
+    // along the panel only.
     function indexAt(position) {
-        for (let i = 0; i < buttons.count; i++) {
-            const b = buttons.itemAt(i);
-            if (b && position >= b.x - root.spacing / 2 && position < b.x + b.width + root.spacing / 2)
-                return i;
-        }
-        return -1;
+        return root.indexAlong(buttons, position, root.spacing, false);
     }
 
     function centreOf(index) {
-        const b = buttons.itemAt(index);
-        return b ? b.x + b.width / 2 : 0;
+        return Math.max(0, root.centreAlong(buttons, index, false));
     }
 
     // The preview's cards carry their own inner margin, so the card around
