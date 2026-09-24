@@ -112,7 +112,8 @@ Provider {
     }
 
     // The windowed menu is a process of its own, and opening it again
-    // replaces the last one rather than stacking a second window.
+    // replaces the last one rather than stacking a second window. In a scope
+    // of its own, like everything the shell opens (see Launch).
     readonly property Process _call: Process {}
 
     // Placement is not ours to control, and a menu appearing on the far side of
@@ -127,8 +128,10 @@ Provider {
         }
         root._call.running = false;
         if (root.mode === "windowed") {
-            root._call.command = ["plasmawindowed", "org.kde.plasma.kickoff"];
-            root._call.running = true;
+            Launch.scoped(["plasmawindowed", "org.kde.plasma.kickoff"], "org.kde.plasmawindowed", argv => {
+                root._call.command = argv;
+                root._call.running = true;
+            });
         } else {
             Dbus.send("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "activateLauncherMenu");
         }

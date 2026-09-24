@@ -7,10 +7,10 @@ pragma Singleton
 // menu draws them and the settings page edits them -- and a second reading of
 // the configuration in the page is what drifts from the one in the menu.
 //
-// Nothing here runs anything. It says what the rows are; the menu acts.
+// It says what the rows are, and runs what they run -- here rather than in the
+// menu, which is gone the moment a row is chosen (runCtl says what that cost).
 
 import QtQuick
-import Quickshell
 import qs.platform.system
 import qs.domain.config
 import qs.domain.windows
@@ -96,14 +96,17 @@ QtObject {
     }
 
     // Run one of them. Detached, so a script that keeps running is not tied to
-    // the menu that started it -- the menu closes the moment it is chosen.
+    // the menu that started it -- the menu closes the moment it is chosen --
+    // and in a scope of its own, so it is not tied to the shell either: these
+    // start applications as often as scripts (see Launch). The scope is named
+    // after the program the line starts with.
     // Through `sh -c` because these are command lines people write, with pipes
     // and arguments and `$HOME` in them, not argv arrays.
     function runEntry(command): void {
         const line = String(command ?? "").trim();
         if (line.length === 0)
             return;
-        Quickshell.execDetached(["sh", "-c", line]);
+        Launch.command(["sh", "-c", line], line.split(/\s+/)[0].split("/").pop());
     }
 
     // One of the shell's own actions, through the CLI: `rmpr` is the one

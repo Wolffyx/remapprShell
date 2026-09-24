@@ -15,10 +15,10 @@ pragma Singleton
 // gets nothing when it does not.
 
 import QtQuick
-import Quickshell
 import Quickshell.Services.SystemTray
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.notifications.events
 import qs.domain.notifications.popups
@@ -70,7 +70,7 @@ QtObject {
     function go(target) {
         switch (target?.kind) {
         case "url":
-            Quickshell.execDetached(["xdg-open", target.value]);
+            Launch.open(target.value);
             return true;
         case "devices":
             root.openDevices();

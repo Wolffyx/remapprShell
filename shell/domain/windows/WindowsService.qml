@@ -19,6 +19,7 @@ import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.windows.events
 
 QtObject {
@@ -301,18 +302,18 @@ QtObject {
             root.activateGroup({ windows: mine });
             return;
         }
-        if (entry)
-            entry.execute();
+        Launch.entry(entry);
     }
 
     // Starts the application -- or one of its own actions, "New Incognito
-    // Window" and the like -- the way a launcher would.
+    // Window" and the like -- the way a launcher would: in a scope of its own,
+    // so the shell restarting does not end it (see Launch).
     function launch(id, action) {
         if (action) {
-            action.execute();
+            Launch.action(action, root.entryById(id));
             return;
         }
-        root.entryById(id)?.execute();
+        Launch.entry(root.entryById(id));
     }
 
     // The active window, minimised, by KWin's own "Window Minimize" action --

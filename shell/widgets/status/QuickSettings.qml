@@ -20,6 +20,7 @@ import qs.domain.notifications
 import qs.domain.session
 import qs.domain.theme
 import qs.platform.kde
+import qs.platform.system
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -630,7 +631,7 @@ Item {
                     glyph: "settings"
                     iconName: "preferences-system"
                     onActivated: {
-                        Quickshell.execDetached(["systemsettings"]);
+                        Launch.command(["systemsettings"], "systemsettings");
                         qs.close();
                     }
                 }

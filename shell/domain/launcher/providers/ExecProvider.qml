@@ -9,6 +9,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.launcher
 
 Provider {
@@ -34,14 +35,20 @@ Provider {
         }
     }
 
+    // A launcher starts applications as its own children, so it runs in a
+    // scope of its own and they are in it with it -- not in the shell's
+    // service, where a restart of the shell would end them (see Launch).
+    // Through a Process still, so opening it again replaces the last one.
     readonly property Process _run: Process {}
 
     function _start(query) {
         if (root.command.length === 0)
             return;
         root._run.running = false;
-        root._run.command = root.command.map(a => a === "%q" ? (query ?? "") : a);
-        root._run.running = true;
+        Launch.scoped(root.command.map(a => a === "%q" ? (query ?? "") : a), "", argv => {
+            root._run.command = argv;
+            root._run.running = true;
+        });
     }
 
     function open(mode) { root._start(""); }
