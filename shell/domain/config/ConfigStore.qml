@@ -46,11 +46,25 @@ QtObject {
     // The configuration as it applies to one output. Everything drawn per
     // screen reads through this rather than `merged`, so a per-monitor override
     // reaches the thing it describes.
+    //
+    // Looked up rather than merged on the spot: a panel reads a dozen values
+    // per output through valueFor(), and each of those used to merge the whole
+    // configuration again. `_screens` merges once per output per change.
     function forScreen(name) {
-        const overlay = root.monitorData[name];
-        if (!overlay)
-            return root.merged;
-        return Obj.deepMerge(root.merged, overlay);
+        const screens = root._screens;
+        return Object.prototype.hasOwnProperty.call(screens, name) ? screens[name] : root.merged;
+    }
+
+    // Output name -> `merged` with that output's overrides on top, for every
+    // output that has any.
+    readonly property var _screens: {
+        const out = {};
+        for (const name of Object.keys(root.monitorData)) {
+            const overlay = root.monitorData[name];
+            if (overlay)
+                out[name] = Obj.deepMerge(root.merged, overlay);
+        }
+        return out;
     }
 
     function valueFor(name, path, fallback) {
