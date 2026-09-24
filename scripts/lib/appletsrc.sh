@@ -71,24 +71,43 @@ appletsrc_wallpaper() {
     ' "$src"
 }
 
-# The applet a widget maps to under the Plasma renderer, or nothing if it has
-# no mapping. The manifest is the source of truth for support: a widget with no
-# `renderers.plasma` block is one this renderer genuinely cannot draw, and
+# The enabled entries, in config order, with what the Plasma renderer makes of
+# each: "zone<US>id<US>applet<US>inTray<US>hasConfig", one per line, the
+# fields split by the unit separator (\x1f) -- a tab would do, except that
+# `read` runs two of them together and an entry with no applet would lose its
+# column.
+#
+# The applet is the one the widget's manifest maps it to, or nothing: the
+# manifest is the source of truth for support, and a widget with no
+# `renderers.plasma` block is one this renderer genuinely cannot draw --
 # substituting something approximate would be a worse answer than saying so.
-appletsrc_applet_for() {
-    local index=$1 id=$2
-    jq -r --arg id "$id" \
-        '.widgets[] | select(.id == $id) | .renderers.plasma.applet // empty' "$index"
+# inTray is whether Plasma's system tray shows that applet by itself
+# (`renderers.plasma.inSystemTray`); hasConfig, whether the manifest declares
+# settings for it.
+#
+# One jq for the lot. Each of these used to be its own jq per entry -- per
+# entry per zone, some of them -- which for a panel of a dozen widgets was
+# some fifty runs to write one file.
+appletsrc_entries() {   # <effective-config.json> <widget-index.json>
+    jq -r --slurpfile index "$2" '
+        ([$index[0].widgets[]? | {key: (.id | tostring), value: (.renderers.plasma // {})}] | from_entries) as $plasma
+        | .bar.entries[]? | select(.enabled != false)
+        | (.id | tostring) as $id
+        | ($plasma[$id] // {}) as $p
+        | [(.zone // "" | tostring), $id, ($p.applet // "" | tostring),
+           (($p.inSystemTray // false) | tostring == "true" | tostring),
+           ($p.config // {} | length > 0 | tostring)]
+        | join("\u001f")' "$1"
 }
 
 # Enabled entries, in config order, that this renderer cannot draw.
 appletsrc_unsupported() {
     local index=$1 config=$2
-    local id
-    while IFS= read -r id; do
+    local zone id applet tray has_config
+    while IFS=$'\x1f' read -r zone id applet tray has_config; do
         [ -n "$id" ] || continue
-        [ -n "$(appletsrc_applet_for "$index" "$id")" ] || printf '%s\n' "$id"
-    done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
+        [ -n "$applet" ] || printf '%s\n' "$id"
+    done < <(appletsrc_entries "$config" "$index")
 }
 
 # Whether a widget's applet is one Plasma's system tray shows by itself.
@@ -98,31 +117,31 @@ appletsrc_unsupported() {
 # Our own renderer draws each of those as a widget of its own, because our tray
 # is only the StatusNotifierItems -- so a panel described with both `tray` and
 # `volume` means one volume icon to us and would mean two to Plasma. The
-# manifest says which applets these are (`renderers.plasma.inSystemTray`).
-appletsrc_in_tray() {
-    local index=$1 id=$2
-    [ "$(jq -r --arg id "$id" \
-        '.widgets[] | select(.id == $id) | .renderers.plasma.inSystemTray // false' "$index")" = "true" ]
-}
+# manifest says which applets these are (`renderers.plasma.inSystemTray`), and
+# appletsrc_entries reads it.
 
 # Whether the enabled entries include Plasma's system tray.
 appletsrc_has_tray() {
-    local index=$1 config=$2 id
-    while IFS= read -r id; do
-        [ "$(appletsrc_applet_for "$index" "$id")" = "org.kde.plasma.systemtray" ] && return 0
-    done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
+    local index=$1 config=$2 zone id applet tray has_config
+    while IFS=$'\x1f' read -r zone id applet tray has_config; do
+        [ "$applet" = "org.kde.plasma.systemtray" ] && return 0
+    done < <(appletsrc_entries "$config" "$index")
     return 1
 }
 
 # Enabled entries, in config order, left out because the tray already shows
 # them. Nothing when there is no tray: then each stands on the panel alone.
 appletsrc_folded_into_tray() {
-    local index=$1 config=$2 id
-    appletsrc_has_tray "$index" "$config" || return 0
-    while IFS= read -r id; do
-        [ -n "$id" ] || continue
-        appletsrc_in_tray "$index" "$id" && printf '%s\n' "$id"
-    done < <(jq -r '[.bar.entries[]? | select(.enabled != false)] | .[].id' "$config")
+    local index=$1 config=$2 zone id applet tray has_config
+    local -a folded=()
+    local has=no
+    while IFS=$'\x1f' read -r zone id applet tray has_config; do
+        [ "$applet" = "org.kde.plasma.systemtray" ] && has=yes
+        [ -n "$id" ] && [ "$tray" = true ] && folded+=("$id")
+    done < <(appletsrc_entries "$config" "$index")
+    [ "$has" = yes ] || return 0
+    [ "${#folded[@]}" -gt 0 ] && printf '%s\n' "${folded[@]}"
+    return 0
 }
 
 # Writes the `[Configuration]` groups a widget's manifest declares for its
@@ -131,21 +150,18 @@ appletsrc_folded_into_tray() {
 # ("HH:mm" onto a boolean 24-hour flag) silently produces a panel that does not
 # match the configuration it claims to come from. The compatibility matrix
 # tells the truth instead.
+#
+# Every group in one jq, in the order they were always written: groups by
+# name, and each group's keys as the manifest has them.
 _appletsrc_applet_config() {
     local index=$1 id=$2 panel=$3 applet=$4 out=$5
-    local groups
-    groups=$(jq -r --arg id "$id" \
-        '.widgets[] | select(.id == $id) | .renderers.plasma.config // {} | keys[]' "$index")
-
-    local group
-    while IFS= read -r group; do
-        [ -n "$group" ] || continue
-        printf '\n[Containments][%s][Applets][%s][Configuration][%s]\n' "$panel" "$applet" "$group" >> "$out"
-        jq -r --arg id "$id" --arg g "$group" \
-            '.widgets[] | select(.id == $id) | .renderers.plasma.config[$g]
-             | to_entries[] | "\(.key)=\(.value | if type == "boolean" then tostring else . end)"' \
-            "$index" >> "$out"
-    done <<< "$groups"
+    jq -r --arg id "$id" --arg panel "$panel" --arg applet "$applet" '
+        .widgets[] | select(.id == $id) | .renderers.plasma.config // {}
+        | . as $groups | keys[] | select(tostring | length > 0) as $g
+        | "\n[Containments][\($panel)][Applets][\($applet)][Configuration][\($g)]",
+          ($groups[$g] | to_entries[]
+           | "\(.key)=\(.value | if type == "boolean" then tostring else . end)")' \
+        "$index" >> "$out"
 }
 
 _appletsrc_spacer() {
@@ -219,27 +235,25 @@ appletsrc_generate() {
     # panel expresses "these hug the left edge, this one is centred".
     local -a order=()
     local next=$APPLETSRC_APPLET_BASE
-    local -a middle_ids right_ids left_ids
+    local -a left_rows=() middle_rows=() right_rows=()
+    local row zone id applet in_tray has_config tray=no
 
-    _zone_ids() {
-        local zone=$1
-        jq -r --arg z "$zone" \
-            '[.bar.entries[]? | select(.enabled != false) | select(.zone == $z)] | .[].id' "$config"
-    }
-
-    mapfile -t left_ids   < <(_zone_ids left)
-    mapfile -t middle_ids < <(_zone_ids middle)
-    mapfile -t right_ids  < <(_zone_ids right)
-
-    local tray=no
-    appletsrc_has_tray "$index" "$config" && tray=yes
+    while IFS= read -r row; do
+        IFS=$'\x1f' read -r zone id applet in_tray has_config <<< "$row"
+        [ "$applet" = "org.kde.plasma.systemtray" ] && tray=yes
+        case "$zone" in
+            left)   left_rows+=("$row") ;;
+            middle) middle_rows+=("$row") ;;
+            right)  right_rows+=("$row") ;;
+        esac
+    done < <(appletsrc_entries "$config" "$index")
 
     _emit_zone() {
-        local -n ids=$1
-        local id applet
-        for id in "${ids[@]}"; do
+        local -n rows=$1
+        local row zone id applet in_tray has_config
+        for row in "${rows[@]}"; do
+            IFS=$'\x1f' read -r zone id applet in_tray has_config <<< "$row"
             [ -n "$id" ] || continue
-            applet=$(appletsrc_applet_for "$index" "$id")
             if [ -z "$applet" ]; then
                 # Reported by the caller before anything is written; skipped
                 # here so a widget with no Plasma equivalent leaves a gap
@@ -247,7 +261,7 @@ appletsrc_generate() {
                 log_debug "appletsrc: '$id' has no Plasma applet, left out"
                 continue
             fi
-            if [ "$tray" = yes ] && appletsrc_in_tray "$index" "$id"; then
+            if [ "$tray" = yes ] && [ "$in_tray" = true ]; then
                 log_debug "appletsrc: '$id' is shown by the system tray, not added beside it"
                 continue
             fi
@@ -256,26 +270,31 @@ appletsrc_generate() {
                 printf 'immutability=0\n'
                 printf 'plugin=%s\n' "$applet"
             } >> "$out"
-            _appletsrc_applet_config "$index" "$id" "$APPLETSRC_PANEL_ID" "$next" "$out"
+            [ "$has_config" = true ] \
+                && _appletsrc_applet_config "$index" "$id" "$APPLETSRC_PANEL_ID" "$next" "$out"
             order+=("$next")
             next=$((next + 1))
         done
     }
 
-    _emit_zone left_ids
+    _emit_zone left_rows
 
     # Two expanding spacers are what centre the middle zone on the panel
     # rather than on whatever space the other zones left over. With no middle
-    # zone one spacer is enough to push the right zone to its edge.
-    if [ "${#middle_ids[@]}" -gt 0 ] && [ -n "${middle_ids[0]:-}" ]; then
+    # zone one spacer is enough to push the right zone to its edge. A zone
+    # counts when its first entry names something.
+    local first_middle="" first_right=""
+    [ "${#middle_rows[@]}" -gt 0 ] && IFS=$'\x1f' read -r _ first_middle _ <<< "${middle_rows[0]}"
+    [ "${#right_rows[@]}" -gt 0 ] && IFS=$'\x1f' read -r _ first_right _ <<< "${right_rows[0]}"
+    if [ -n "$first_middle" ]; then
         _appletsrc_spacer "$APPLETSRC_PANEL_ID" "$next" "$out"; order+=("$next"); next=$((next + 1))
-        _emit_zone middle_ids
+        _emit_zone middle_rows
         _appletsrc_spacer "$APPLETSRC_PANEL_ID" "$next" "$out"; order+=("$next"); next=$((next + 1))
-    elif [ "${#right_ids[@]}" -gt 0 ] && [ -n "${right_ids[0]:-}" ]; then
+    elif [ -n "$first_right" ]; then
         _appletsrc_spacer "$APPLETSRC_PANEL_ID" "$next" "$out"; order+=("$next"); next=$((next + 1))
     fi
 
-    _emit_zone right_ids
+    _emit_zone right_rows
 
     {
         printf '\n[Containments][%s][General]\n' "$APPLETSRC_PANEL_ID"

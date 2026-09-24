@@ -393,19 +393,13 @@ rehost_services() {
 
 # --- reporting -------------------------------------------------------------
 
-compat_report() {
-    local target=$1 config index unsupported folded
-    config=$(mktemp); effective_config > "$config"
+compat_report() {   # <target> <effective config file>
+    local target=$1 config=$2 index unsupported folded
+    [ "$target" = "plasma" ] || return 0
     index=$(widget_index)
-
-    if [ "$target" != "plasma" ]; then
-        rm -f "$config"
-        return 0
-    fi
 
     unsupported=$(appletsrc_unsupported "$index" "$config")
     folded=$(appletsrc_folded_into_tray "$index" "$config")
-    rm -f "$config"
 
     # Not a loss, so not a warning: the same icons, drawn by Plasma's tray.
     if [ -n "$folded" ]; then
@@ -500,8 +494,15 @@ case "$cmd" in
         target=${args[0]:-}
         [ -n "$target" ] || die "usage: $ALIAS renderer set <$(renderer_ids | paste -sd'|')>"
         target=$(renderer_normalize "$target")
+
+        # The configuration, merged once for everything below: the report, the
+        # generated layouts and the panel's geometry all read this one file.
+        config=$(mktemp)
+        trap 'rm -f "$config"' EXIT
+        effective_config > "$config"
+
         # The one being left, read before anything writes the new one.
-        previous=$(configured_renderer)
+        previous=$(renderer_normalize "$(jq -r '.panel.renderer // "quickshell"' "$config")")
 
         valid=0
         while read -r r; do [ "$r" = "$target" ] && valid=1; done < <(renderer_ids)
@@ -530,11 +531,10 @@ case "$cmd" in
 
         # Told before anything is written, and named individually. "Some
         # widgets may not work" is not information a person can act on.
-        compat_report "$target"
+        compat_report "$target" "$config"
 
         if [ "$DRY_RUN" = 1 ]; then
-            tmp=$(mktemp); config=$(mktemp)
-            effective_config > "$config"
+            tmp=$(mktemp)
             appletsrc_generate "$tmp" "$config" "$(widget_index)" "$target" \
                 "$(appletsrc_wallpaper "$(appletsrc_path "$(live_shell_package)")")" \
                 || die "generation failed"
@@ -542,7 +542,7 @@ case "$cmd" in
             appletsrc_validate "$tmp" "$expect" || die "the generated layout does not validate"
             log_step "this is what would be installed at $(appletsrc_path "$pkg"):"
             cat "$tmp"
-            rm -f "$tmp" "$config"
+            rm -f "$tmp"
             exit 0
         fi
 
@@ -565,7 +565,6 @@ case "$cmd" in
         # Both layouts are regenerated, not only the target's. The one we are
         # switching away from must not keep a panel it is no longer allowed to
         # draw, or switching back and forth would accumulate panels.
-        config=$(mktemp); effective_config > "$config"
         index=$(widget_index)
         failed=0
 
@@ -590,15 +589,13 @@ case "$cmd" in
         done
 
         if [ "$failed" = 1 ]; then
-            rm -f "$config"
             log_error "the applet layout could not be generated; nothing was activated"
             log_info "  the previous layouts are in $BACKUP_DIR"
             exit 1
         fi
 
-        thickness=$(jq -r '.panel.thickness // 40' "$config")
-        position=$(jq -r '.panel.position // "bottom"' "$config")
-        rm -f "$config"
+        IFS=$'\x1f' read -r thickness position \
+            < <(jq -r '"\(.panel.thickness // 40)\u001f\(.panel.position // "bottom")"' "$config")
 
         if ! apply_shell_package "$pkg"; then
             log_error "the switch did not take; rolling back"
@@ -683,7 +680,8 @@ case "$cmd" in
 
     revert)
         leaving=""
-        renderer_is_foreign "$(configured_renderer)" && leaving=$(renderer_config_name "$(configured_renderer)")
+        current=$(configured_renderer)
+        renderer_is_foreign "$current" && leaving=$(renderer_config_name "$current")
         stop_foreign "" "$leaving"
         kconfig_revert backend
         # plasmashell adds its own keys to our panel view's group while the
