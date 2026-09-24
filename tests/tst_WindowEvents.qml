@@ -165,7 +165,7 @@ TestCase {
     // names no icon in the theme, so where it is drawn it is the theme's
     // generic one.
     function test_a_class_with_no_entry_gets_the_ordinary_rule() {
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam_app_1407200");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "client_app_1234" })), "client_app_1234");
         compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Some_Game_42" })), "some_game_42");
     }
 
@@ -286,9 +286,9 @@ TestCase {
     // windows in its pinned place.
     function test_pinned_first_then_the_rest() {
         const items = WindowEvents.arrangeTasks(
-            [group("konsole"), group("org.kde.dolphin"), group("class:steam_app_1")],
+            [group("konsole"), group("org.kde.dolphin"), group("class:client_app_1")],
             ["org.kde.dolphin", "google-chrome"], launcher);
-        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:steam_app_1");
+        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:client_app_1");
         compare(items[1].windows.length, 0);
     }
 
@@ -312,7 +312,7 @@ TestCase {
 
     function test_app_id_of_an_item() {
         compare(WindowEvents.appIdOf({ key: "org.kde.dolphin" }), "org.kde.dolphin");
-        compare(WindowEvents.appIdOf({ key: "class:steam_app_1" }), "");
+        compare(WindowEvents.appIdOf({ key: "class:client_app_1" }), "");
         compare(WindowEvents.appIdOf({ key: "uuid", appKey: "konsole" }), "konsole");
         compare(WindowEvents.appIdOf(null), "");
     }
@@ -336,7 +336,7 @@ TestCase {
         compare(WindowEvents.tintHue("a"), 97 / 360);
         // (97 * 31 + 98) % 360 = 225.
         compare(WindowEvents.tintHue("ab"), 225 / 360);
-        for (const id of ["", "x", "org.kde.konsole", "steam_app_1245620", "a".repeat(500)]) {
+        for (const id of ["", "x", "org.kde.konsole", "client_app_5678", "a".repeat(500)]) {
             const hue = WindowEvents.tintHue(id);
             verify(hue >= 0 && hue < 1, `${id}: ${hue}`);
         }
@@ -344,8 +344,8 @@ TestCase {
 
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
-        // Lower-cased, which is what turns "Google-chrome" into an icon that
+        // Lower-cased, which is what turns "Example-Viewer" into an icon that
         // actually exists in the theme.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Google-chrome" })), "google-chrome");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Example-Viewer" })), "example-viewer");
     }
 }
