@@ -8,11 +8,13 @@ pragma ComponentBehavior: Bound
 // belongs to a widget is written under `widgets.<id>.`, so this page is a
 // second way to reach settings the Widgets page also shows rather than a
 // second set of settings.
+//
+// The two cards with state of their own -- the right-click menu, and each
+// monitor's own settings -- are files of their own beside this one, named
+// after the page.
 
 import QtQuick
-import Quickshell
 import qs.domain.config
-import qs.domain.panel.menu
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -30,51 +32,6 @@ Column {
     readonly property var positionLabels: ["Top", "Bottom", "Left", "Right"]
     readonly property var styleValues: ["full", "floating", "islands"]
     readonly property var styleLabels: ["Full width", "Floating bar", "Islands"]
-
-    // The right-click menu. What the monitor row can be set to is what is
-    // installed -- PanelMenuModel is the one place that knows -- plus the two
-    // answers that are not an application: follow what is installed, or no row.
-    readonly property string monitorSetting: ConfigStore.value("panel.menu.systemMonitor", "auto")
-    readonly property var monitorChoices: {
-        const installed = PanelMenuModel.installedMonitors;
-        const out = [{ id: "auto", label: installed.length > 0 ? `Automatic (${installed[0].name})` : "Automatic" }];
-        for (const m of installed)
-            out.push({ id: m.id, label: m.name });
-        out.push({ id: "none", label: "Do not show the row" });
-        // A monitor named in the profile that is no longer installed would
-        // otherwise leave the dropdown showing the first choice while the
-        // setting said something else -- so it is offered, and named as gone.
-        if (out.findIndex(c => c.id === root.monitorSetting) < 0)
-            out.push({ id: root.monitorSetting, label: `${root.monitorSetting} (not installed)` });
-        return out;
-    }
-
-    // The raw list as written, not PanelMenuModel's normalised view: a half
-    // finished entry must stay on the page to be finished, and normalising
-    // would drop it the moment the name was typed and the command was not.
-    readonly property var customEntries: {
-        const raw = ConfigStore.value("panel.menu.entries", []);
-        return Array.isArray(raw) ? raw : [];
-    }
-
-    function writeEntries(list): void {
-        ConfigStore.set("panel.menu.entries", list);
-    }
-
-    function updateEntry(index, patch): void {
-        const list = root.customEntries.map(e => Object.assign({}, e));
-        if (index < 0 || index >= list.length)
-            return;
-        root.writeEntries(list.map((e, i) => i === index ? Object.assign(e, patch) : e));
-    }
-
-    function removeEntry(index): void {
-        root.writeEntries(root.customEntries.filter((e, i) => i !== index));
-    }
-
-    function addEntry(): void {
-        root.writeEntries(root.customEntries.concat([{ label: "", command: "", glyph: "terminal" }]));
-    }
 
     spacing: 14
 
@@ -292,101 +249,8 @@ Column {
         }
     }
 
-    Card {
-        id: menuCard
+    TaskbarMenuCard {
         width: root.width
-
-        SectionLabel { text: "Right-click menu" }
-
-        Hint {
-            text: "The menu a right click on empty panel opens. Its first rows -- settings, widgets, reloading -- are fixed; the monitor it offers and anything below it are yours."
-        }
-
-        SettingRow {
-            label: "System monitor"
-            description: root.monitorChoices.length > 1
-                ? "Which one the System monitor row opens. Only what is installed is offered."
-                : "No system monitor is installed, so the row is left off the menu."
-            controlWidth: 190
-            enabled: root.monitorChoices.length > 1
-            overridden: ConfigStore.isOverridden("panel.menu.systemMonitor")
-            onResetRequested: ConfigStore.set("panel.menu.systemMonitor", "auto")
-
-            Select {
-                implicitWidth: 190
-                values: root.monitorChoices.map(c => c.label)
-                currentIndex: Math.max(0, root.monitorChoices.findIndex(c => c.id === root.monitorSetting))
-                onPicked: label => {
-                    const choice = root.monitorChoices.find(c => c.label === label);
-                    if (choice)
-                        ConfigStore.set("panel.menu.systemMonitor", choice.id);
-                }
-            }
-        }
-
-        SectionLabel { text: "Your own entries" }
-
-        Hint {
-            text: "Each row runs a command line, the way a terminal would -- pipes, arguments and $HOME all work. It is run detached, so a script that keeps going is not stopped when the menu closes. A row with no name or no command is not drawn."
-        }
-
-        Repeater {
-            model: root.customEntries
-
-            // One entry: what it is called, what it runs, and a way to remove
-            // it. Written back on losing focus or on Enter, never per
-            // keystroke -- see TextInputRow.
-            Column {
-                id: entryRow
-
-                required property var modelData
-                required property int index
-
-                // The card's inner width: `root.width - 32` was four pixels
-                // wider than the card has room for, and the remove button
-                // hung over its edge.
-                width: menuCard.contentWidth
-                spacing: 6
-
-                Row {
-                    width: parent.width
-                    spacing: 8
-
-                    TextInputRow {
-                        id: labelField
-                        width: parent.width - commandField.width - removeButton.width - parent.spacing * 2
-                        text: String(entryRow.modelData.label ?? "")
-                        placeholderText: "Name"
-                        onCommitted: value => root.updateEntry(entryRow.index, { label: value })
-                    }
-
-                    TextInputRow {
-                        id: commandField
-                        width: Math.round((parent.width - removeButton.width - parent.spacing * 2) * 0.55)
-                        text: String(entryRow.modelData.command ?? "")
-                        placeholderText: "Command"
-                        onCommitted: value => root.updateEntry(entryRow.index, { command: value })
-                    }
-
-                    IconButton {
-                        id: removeButton
-                        anchors.verticalCenter: parent.verticalCenter
-                        glyph: "delete"
-                        iconName: "edit-delete"
-                        tooltip: "Remove this entry"
-                        color: Theme.error
-                        onActivated: root.removeEntry(entryRow.index)
-                    }
-                }
-            }
-        }
-
-        TextButton {
-            glyph: "add"
-            iconName: "list-add"
-            text: "Add an entry"
-            onActivated: root.addEntry()
-        }
     }
 
     Card {
@@ -406,111 +270,11 @@ Column {
         }
     }
 
-    Card {
+    TaskbarDisplaysCard {
         width: root.width
-
-        SectionLabel { text: "Displays" }
-
-        Hint {
-            text: Quickshell.screens.length > 1
-                ? "Each monitor draws its own panel. Where it sits, how it is drawn, whether it hides and its size can differ per monitor; the widgets are shared."
-                : "One monitor. With a second one connected, each draws its own panel and can keep its own position, style, hiding and size."
-        }
-
-        Repeater {
-            model: Quickshell.screens
-
-            Column {
-                id: screenBlock
-
-                required property var modelData
-
-                readonly property string name: screenBlock.modelData.name
-                // Every key the panel reads per screen (PanelModel.*For) that
-                // this block offers. Setting one back to the shared value
-                // drops the override rather than freezing a copy of it.
-                readonly property var ownKeys: ["panel.position", "panel.thickness", "panel.style",
-                                                 "panel.autoHide", "panel.iconSize"]
-                readonly property bool overridden: screenBlock.ownKeys.some(
-                    k => ConfigStore.isOverriddenForScreen(screenBlock.name, k))
-
-                function useShared() {
-                    for (const k of screenBlock.ownKeys)
-                        ConfigStore.setForScreen(screenBlock.name, k, ConfigStore.value(k, undefined));
-                }
-
-                width: parent.width
-                spacing: 8
-
-                Item {
-                    width: parent.width
-                    height: 24
-
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: `${screenBlock.name} · ${screenBlock.modelData.width}×${screenBlock.modelData.height}`
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                    }
-
-                    PanelText {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: screenBlock.overridden
-                        text: "its own"
-                        font.pixelSize: 12
-                        color: Theme.acc
-                    }
-                }
-
-                ConfigSegmented {
-                    width: parent.width
-                    values: root.positionValues
-                    labels: root.positionLabels
-                    screen: screenBlock.name
-                    path: "panel.position"
-                }
-
-                ConfigSliderRow {
-                    label: "Thickness on this monitor"
-                    from: 28
-                    to: 96
-                    stepSize: 2
-                    screen: screenBlock.name
-                    path: "panel.thickness"
-                }
-
-                ConfigSegmented {
-                    width: parent.width
-                    values: root.styleValues
-                    labels: root.styleLabels
-                    screen: screenBlock.name
-                    path: "panel.style"
-                }
-
-                ConfigSliderRow {
-                    label: "Tray icon size on this monitor"
-                    from: 15
-                    to: 26
-                    screen: screenBlock.name
-                    path: "panel.iconSize"
-                }
-
-                ConfigToggleRow {
-                    width: parent.width
-                    label: "Hide until pointed at, on this monitor"
-                    screen: screenBlock.name
-                    path: "panel.autoHide"
-                }
-
-                TextButton {
-                    visible: screenBlock.overridden
-                    glyph: "sync"
-                    iconName: "edit-undo"
-                    text: "Use the shared settings"
-                    onActivated: screenBlock.useShared()
-                }
-            }
-        }
+        positionValues: root.positionValues
+        positionLabels: root.positionLabels
+        styleValues: root.styleValues
+        styleLabels: root.styleLabels
     }
 }
