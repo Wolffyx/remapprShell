@@ -20,17 +20,14 @@
 
 HARNESS_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
-# harness_init [--cache] [--no-home]
+# harness_init [--no-home]
 #
-#   --cache     XDG_CACHE_HOME inside the sandbox too, for a suite reading a
-#               cache (crash dumps live in one)
 #   --no-home   a sandbox but the caller's own HOME, for a suite that only
 #               renders a file and names real paths without touching them
 harness_init() {
-    local home=1 cache=0
+    local home=1
     while [ $# -gt 0 ]; do
         case "$1" in
-            --cache)   cache=1 ;;
             --no-home) home=0 ;;
             *) echo "harness_init: unknown option: $1" >&2; exit 2 ;;
         esac
@@ -50,11 +47,11 @@ harness_init() {
         export XDG_CONFIG_HOME="$HOME/.config"
         export XDG_DATA_HOME="$HOME/.local/share"
         export XDG_STATE_HOME="$HOME/.local/state"
-        mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-        if [ "$cache" = 1 ]; then
-            export XDG_CACHE_HOME="$HOME/.cache"
-            mkdir -p "$XDG_CACHE_HOME"
-        fi
+        # The cache too, for every suite and not only the one that reads
+        # crash dumps from it: a caller with XDG_CACHE_HOME set would
+        # otherwise have test-theme's kbuildsycoca6 rebuild their real one.
+        export XDG_CACHE_HOME="$HOME/.cache"
+        mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
     fi
 
     source "$HARNESS_ROOT/scripts/lib/log.sh"

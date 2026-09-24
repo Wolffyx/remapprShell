@@ -10,7 +10,7 @@ set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/tests/lib/harness.sh"
-harness_init --cache
+harness_init
 
 CRASHES="$XDG_CACHE_HOME/quickshell/crashes"
 
