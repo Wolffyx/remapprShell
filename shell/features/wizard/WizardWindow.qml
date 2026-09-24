@@ -30,7 +30,6 @@ import qs.core
 import qs.domain.config
 import qs.domain.theme
 import qs.ui.primitives
-import qs.ui.controls
 
 FloatingWindow {
     id: root
@@ -214,193 +213,64 @@ FloatingWindow {
             font.pixelSize: 20
         }
 
-        // ---- 0: welcome
-        Column {
+        // One file per step, beside this one. Each draws its question from the
+        // answers handed in and says what was picked through a signal: the
+        // answers stay here, where Finish writes them, and a step never
+        // reaches into the window.
+        WizardWelcomeStep {
             visible: root.step === 0
             width: parent.width
-            spacing: 8
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: `${Branding.displayName} draws a panel and rethemes Plasma's own components. It does not replace your notifications, lock screen, wallpaper or task switcher -- Plasma already has those, and they keep working.`
-            }
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "Nothing is written until the last step, and everything here can be changed afterwards in settings."
-            }
         }
 
-        // ---- 1: panel
-        Column {
+        WizardPanelStep {
             visible: root.step === 1
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Position"
-                Select {
-                    values: ["bottom", "top", "left", "right"]
-                    currentIndex: Math.max(0, ["bottom", "top", "left", "right"].indexOf(root.position))
-                    onPicked: value => root.position = value
-                }
-            }
-
-            SettingRow {
-                width: parent.width
-                label: "Thickness"
-                NumberSlider {
-                    width: parent.width
-                    from: 20
-                    to: 96
-                    stepSize: 2
-                    value: root.thickness
-                    onMoved: value => root.thickness = Math.round(value)
-                }
-            }
+            position: root.position
+            thickness: root.thickness
+            onPositionPicked: value => root.position = value
+            onThicknessMoved: value => root.thickness = value
         }
 
-        // ---- 2: preset
-        Column {
+        WizardPresetStep {
             visible: root.step === 2
             width: parent.width
-            spacing: 6
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "A layout replaces your current configuration. Your existing one is kept, and 'preset apply' can be undone from the Layouts page."
-            }
-
-            SettingRow {
-                width: parent.width
-                label: "Layout"
-                Select {
-                    values: ["keep what I have"].concat(root.presets)
-                    currentIndex: 0
-                    onPicked: value => root.preset = (value === "keep what I have" ? "" : value)
-                }
-            }
+            presets: root.presets
+            onPresetPicked: value => root.preset = value
         }
 
-        // ---- 3: launcher
-        Column {
+        WizardLauncherStep {
             visible: root.step === 3
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Application menu"
-                description: "Kickoff is Plasma's own menu. The built-in one is ours. Either can be changed later."
-                Select {
-                    values: ["auto", "kickoff", "builtin", "krunner"]
-                    currentIndex: Math.max(0, ["auto", "kickoff", "builtin", "krunner"].indexOf(root.launcher))
-                    onPicked: value => root.launcher = value
-                }
-            }
+            launcher: root.launcher
+            onLauncherPicked: value => root.launcher = value
         }
 
-        // ---- 4: renderer
-        Column {
+        WizardRendererStep {
             visible: root.step === 4
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Drawn by"
-                description: "Plasma's panel is drawn from this same configuration, but with stock applets only."
-                Select {
-                    values: ["quickshell", "plasma"]
-                    currentIndex: root.renderer === "plasma" ? 1 : 0
-                    onPicked: value => root.renderer = value
-                }
-            }
-
-            PanelText {
-                visible: root.renderer !== "quickshell"
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "This one changes KDE's own settings. A restore point is taken first, and it is put back automatically if the switch does not work."
-            }
+            renderer: root.renderer
+            onRendererPicked: value => root.renderer = value
         }
 
-        // ---- 5: AI assist
-        Column {
+        WizardAiStep {
             visible: root.step === 5
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "AI assist"
-                description: "Hands a redacted diagnostic report to an assistant, on request. Nothing leaves this machine without showing you exactly what would go."
-                Select {
-                    values: ["off"].concat(root.aiProviders)
-                    currentIndex: Math.max(0, ["off"].concat(root.aiProviders).indexOf(root.ai))
-                    onPicked: value => root.ai = value
-                }
-            }
-
-            // Under the choice it explains. It was drawn a step later, under
-            // the theme's switches, where it answered a question nobody had
-            // just been asked.
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: root.aiProviders.length === 0
-                    ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
-                    : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
-            }
+            ai: root.ai
+            aiProviders: root.aiProviders
+            onAiPicked: value => root.ai = value
         }
 
-        // ---- 6: what the theme changes
-        Column {
+        WizardThemeStep {
             visible: root.step === 6
             width: parent.width
-            spacing: 6
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: `Choosing ${Branding.displayName}'s theme can retheme KDE itself, so applications match the shell rather than only the panel. Every key is recorded, and \`${Branding.shortName} theme revert\` puts all of it back.`
-            }
-
-            ToggleRow {
-                label: "Theme the whole desktop"
-                description: "Off confines the theme to what this shell draws."
-                checked: root.themeDesktop
-                onToggled: value => root.themeDesktop = value
-            }
-
-            Column {
-                width: parent.width
-                opacity: root.themeDesktop ? 1 : 0.45
-                enabled: root.themeDesktop
-
-                Repeater {
-                    model: root.themeParts
-
-                    delegate: ToggleRow {
-                        required property var modelData
-                        label: modelData.label
-                        description: modelData.sub
-                        checked: root.themeWanted[modelData.key] !== false
-                        onToggled: value => {
-                            const next = Object.assign({}, root.themeWanted);
-                            next[modelData.key] = value;
-                            root.themeWanted = next;
-                        }
-                    }
-                }
+            themeDesktop: root.themeDesktop
+            themeParts: root.themeParts
+            themeWanted: root.themeWanted
+            onThemeDesktopToggled: value => root.themeDesktop = value
+            onPartToggled: (key, value) => {
+                const next = Object.assign({}, root.themeWanted);
+                next[key] = value;
+                root.themeWanted = next;
             }
         }
 
