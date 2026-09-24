@@ -36,16 +36,13 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 
 # How long `try` leaves the lock screen up. The greeter covers every screen
 # and takes the keyboard, test or not, so a lock screen that cannot unlock
 # would trap its own test; this is what ends it.
 TRY_SECONDS_VAR="${ENV_PREFIX}_LOCKSCREEN_TRY_SECONDS"
 TRY_SECONDS=${!TRY_SECONDS_VAR:-90}
-
-live_shell_package() {
-    kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop' 2>/dev/null
-}
 
 is_ours() {
     local p

@@ -228,7 +228,7 @@ fi
 
 section "known hazards"
 
-shell_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop')
+shell_pkg=$(live_shell_package)
 if [ "$shell_pkg" = "org.kde.plasma.desktop" ] \
    || [ -d "$XDG_DATA_HOME/plasma/shells/$shell_pkg" ] \
    || [ -d "/usr/share/plasma/shells/$shell_pkg" ]; then
@@ -244,12 +244,9 @@ fi
 # the configuration and what is on screen have come apart.
 configured_renderer=$(renderer_normalize "$(config_get '.panel.renderer' quickshell)")
 
-case "$configured_renderer" in
-    plasma)     expected_pkg="$PLASMA_SHELL_PACKAGE_ID" ;;
-    none)       expected_pkg="org.kde.plasma.desktop" ;;
-    unknown)    expected_pkg="$shell_pkg" ;;
-    *)          expected_pkg="$SHELL_PACKAGE_ID" ;;
-esac
+# A value no renderer answers to is read as ours, as it always has been here.
+expected_pkg=$(package_for "$configured_renderer")
+[ -n "$expected_pkg" ] || expected_pkg=$SHELL_PACKAGE_ID
 
 if [ "$shell_pkg" = "$expected_pkg" ]; then
     ok "renderer '$configured_renderer' matches plasmashell's package"
@@ -783,7 +780,7 @@ else
     else
         warn "ours is on, but Plasma's greeter was not found to check it with"
     fi
-    live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default org.kde.plasma.desktop)
+    live_pkg=$(live_shell_package)
     case " ${LOCKSCREEN_PACKAGES[*]} " in
         *" $live_pkg "*) ;;
         *) warn "plasmashell is on $live_pkg, so its lock screen is drawn rather than ours" ;;
@@ -891,7 +888,7 @@ section "Plasma services"
 # plasmashell. Where there is no Plasma tray -- our own renderer -- they exist
 # only because the shell hosts them, and with no owner at all a notification
 # is not queued or shown anywhere: it is dropped.
-live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null)
+live_pkg=$(live_shell_package '')
 notif_server=$(jq -r '.notifications.server // "plasma"' <<< "$merged_cfg" 2>/dev/null)
 for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
     name=${pair%%:*}; what=${pair#*:}

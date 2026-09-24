@@ -52,22 +52,8 @@ effective_config() {
 
 configured_renderer() { renderer_normalize "$(effective_config | jq -r '.panel.renderer // "quickshell"')"; }
 
-live_shell_package() {
-    kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop'
-}
-
-package_for() {
-    case "$1" in
-        plasma)             printf '%s' "$PLASMA_SHELL_PACKAGE_ID" ;;
-        quickshell)         printf '%s' "$SHELL_PACKAGE_ID" ;;
-        none)               printf 'org.kde.plasma.desktop' ;;
-        # Process-level only: another Quickshell shell draws its own bar from
-        # its own code, and none of ours is involved. Ours stays the shell
-        # package so the desktop keeps the containment it already has, with no
-        # Plasma panel on it.
-        "$RENDERER_FOREIGN_PREFIX"*) printf '%s' "$SHELL_PACKAGE_ID" ;;
-    esac
-}
+# live_shell_package and package_for are lib/renderers.sh's: doctor, the report
+# and the lock screen ask the same two questions.
 
 # Will anything of ours actually draw a panel?
 #

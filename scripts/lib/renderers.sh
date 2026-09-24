@@ -75,6 +75,29 @@ renderer_normalize() {
 
 renderer_is_foreign() { [[ "$1" == "$RENDERER_FOREIGN_PREFIX"?* ]]; }
 
+# The shell package plasmashell is on, as plasmashellrc has it: the stock one
+# when it names none -- or whatever the caller would rather show for that,
+# since a report or a check may want to say it was never set.
+live_shell_package() {   # [answer when unset]
+    kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage \
+        --default "${1-org.kde.plasma.desktop}" 2>/dev/null
+}
+
+# The shell package a renderer puts plasmashell on. Nothing for a renderer
+# that is not one.
+package_for() {
+    case "$1" in
+        plasma)             printf '%s' "$PLASMA_SHELL_PACKAGE_ID" ;;
+        quickshell)         printf '%s' "$SHELL_PACKAGE_ID" ;;
+        none)               printf 'org.kde.plasma.desktop' ;;
+        # Process-level only: another Quickshell shell draws its own bar from
+        # its own code, and none of ours is involved. Ours stays the shell
+        # package so the desktop keeps the containment it already has, with no
+        # Plasma panel on it.
+        "$RENDERER_FOREIGN_PREFIX"*) printf '%s' "$SHELL_PACKAGE_ID" ;;
+    esac
+}
+
 # The configuration a foreign renderer runs, and where it lives.
 renderer_config_name() { printf '%s' "${1#"$RENDERER_FOREIGN_PREFIX"}"; }
 renderer_config_dir()  { quickshell_configs | awk -F'\t' -v n="$1" '$1 == n { print $2; exit }'; }
