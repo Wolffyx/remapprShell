@@ -82,7 +82,9 @@ src = re.sub(r'^INTERFACE = .*$', f'INTERFACE = "{name}.Windows"', src, flags=re
 open(path, 'w').write(src)
 PY
 
-python3 "$DAEMON" & DAEMON_PID=$!
+# Without a display: this copy has no business sweeping the X11 windows of
+# whoever is running the tests, and the icons are checked on their own below.
+env -u DISPLAY python3 "$DAEMON" & DAEMON_PID=$!
 for _ in $(seq 1 40); do
     busctl --user --json=short call "$TEST_NAME" /Windows "$TEST_NAME.Windows" List >/dev/null 2>&1 && break
     sleep 0.25
@@ -119,6 +121,23 @@ check "an empty payload is refused" "$(list | jq -r 'length')" "1"
 # But an empty list is a legitimate answer: every window really can be closed.
 call Update s '[]' >/dev/null
 check "no windows is accepted"      "$(list)" "[]"
+
+# The same, end to end through the daemon, for a process of this test's own:
+# what the shell is sent for a window matches what /proc says, and the
+# environment's other variables are not in it.
+MOUNTED="$SANDBOX/mounted-app"
+mkdir -p "$MOUNTED"
+printf '[Desktop Entry]\nType=Application\nName=Mounted Example\nIcon=mounted\n' > "$MOUNTED/example.desktop"
+env -i PATH="$PATH" APPDIR="$MOUNTED" PRIVATE_THING=do-not-send sleep 300 &
+SLEEPER=$!
+harness_on_exit 'kill "$SLEEPER" 2>/dev/null'
+call Update s "[{\"uuid\":\"p\",\"title\":\"Proc\",\"appId\":\"example.nothing\",\"pid\":$SLEEPER}]" >/dev/null
+check "the window carries its command line"   "$(list | jq -r '.[0].cmdline')" "sleep 300"
+check "and its process's name"                "$(list | jq -r '.[0].processName')" "sleep"
+check "and which of its words are programs"   "$(list | jq -c '.[0].executables')" '["sleep"]'
+check "and the desktop file its environment names" "$(list | jq -r '.[0].desktopHint.name')" "Mounted Example"
+check "and nothing else of the environment"   "$(list | grep -c do-not-send)" "0"
+call Update s '[]' >/dev/null
 
 # The signal is what the shell actually follows.
 #
@@ -218,13 +237,13 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
 
-# A game's window carries whatever icon its engine set, and under Proton that
-# is the generic rectangle Windows gives a window with none -- which is what
-# the panel drew for World of Tanks. Steam has the real one on disk, in a
-# directory of artwork where the *icon* is the one file named for its hash.
-echo "== a Steam game's icon comes from Steam =="
+# Where the icons are written. A copy of what a window holds is worth keeping
+# only while the window can be, so they go to the session's runtime
+# directory, which logout empties -- not the state directory, where they
+# outlived every session. The directories are the user's alone.
+echo "== window icons live in the session's runtime directory =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
-import sys, os
+import sys, os, io, stat, tempfile, contextlib
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
@@ -233,25 +252,7 @@ for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
-
-steam = os.path.join(sandbox, "steam")
-lib = os.path.join(steam, "appcache", "librarycache", "1407200")
-os.makedirs(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db"), exist_ok=True)
-icon = os.path.join(lib, "3ba3158e913a637a1fbe033db4f88fccc52f1ff4.jpg")
-for name in ("library_hero.jpg", "logo.png", "header.jpg", "library_600x900.jpg"):
-    open(os.path.join(lib, name), "w").close()
-open(icon, "w").close()
-# The artwork also sits in hash-named *directories*, which are not the icon.
-open(os.path.join(lib, "4227fb8f00f8ae8db7f3bcdd76eb2fb8593eb6db", "library_header.jpg"), "w").close()
-
-class Steamy(mod["WindowIcons"]):
-    STEAM_DIRS = (steam,)
-    def __init__(self):
-        self._cache, self._misses, self._available = {}, {}, False
-        self.looks = 0
-    def _x11_window_for(self, pid):
-        self.looks += 1
-        return None
+icon_dir = mod["icon_dir"]
 
 fails = 0
 def check(name, got, want):
@@ -260,33 +261,173 @@ def check(name, got, want):
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
     fails += 0 if ok else 1
 
-check("the hash-named file is the icon", Steamy._steam_icon("steam_app_1407200"), icon)
-check("the artwork beside it is not",    os.path.basename(Steamy._steam_icon("steam_app_1407200")), os.path.basename(icon))
-check("a game Steam has nothing for",    Steamy._steam_icon("steam_app_4"), None)
-check("an ordinary application",         Steamy._steam_icon("org.kde.dolphin"), None)
-check("steam itself is not an app id",   Steamy._steam_icon("steam"), None)
+def mode(path):
+    return oct(stat.S_IMODE(os.stat(path).st_mode))
 
-# It is found without a display, and without touching the window at all.
-probe = Steamy()
-check("found with no X11 lookup",        (probe.path_for("steam_app_1407200", 1), probe.looks), (icon, 0))
-# An icon Steam writes later is still picked up: the cheap check is not budgeted.
-probe = Steamy()
-probe.path_for("steam_app_4", 1)
-late = os.path.join(steam, "appcache", "librarycache", "4")
-os.makedirs(late, exist_ok=True)
-late_icon = os.path.join(late, "a" * 40 + ".png")
-open(late_icon, "w").close()
-check("an icon written later is found",  probe.path_for("steam_app_4", 1), late_icon)
+run = os.path.join(sandbox, "run")
+os.makedirs(run, mode=0o700)
+os.environ["XDG_RUNTIME_DIR"] = run
+found = icon_dir()
+check("under the runtime directory",       found, os.path.join(run, "t", "window-icons"))
+check("private all the way down",          [mode(os.path.join(run, "t")), mode(found)], ["0o700", "0o700"])
+check("the same one when asked again",     icon_dir(), found)
+check("nothing in the state directory",    os.path.exists(os.path.join(os.environ["XDG_STATE_HOME"], "t")), False)
+
+# No runtime directory, or one that cannot be written: a directory of the
+# daemon's own in the temporary one, made once rather than once an icon.
+tmp = os.path.join(sandbox, "tmp")
+os.makedirs(tmp)
+tempfile.tempdir = tmp
+del os.environ["XDG_RUNTIME_DIR"]
+said = io.StringIO()
+with contextlib.redirect_stderr(said):
+    fallback = icon_dir()
+    again = icon_dir()
+check("without one, a private directory",  (os.path.dirname(fallback), mode(fallback)), (tmp, "0o700"))
+check("made once, not once an icon",       again, fallback)
+check("and it says where",                 fallback in said.getvalue(), True)
+os.environ["XDG_RUNTIME_DIR"] = os.path.join(sandbox, "not-a-directory")
+open(os.environ["XDG_RUNTIME_DIR"], "w").close()
+with contextlib.redirect_stderr(io.StringIO()):
+    check("an unusable one falls back too", icon_dir(), fallback)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
+
+# What Plasma reads about the process behind a window, for the shell to match
+# it by when the window itself matches no application: the command line and
+# the name KProcessList makes of it, and of the environment two variables and
+# nothing else. Read from a /proc made up here, so every case is one the test
+# decides.
+echo "== what Plasma reads about a window's process =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os, json
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+Processes = mod["Processes"]
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+root = os.path.join(sandbox, "procfacts")
+proc = os.path.join(root, "proc")
+def write(path, data, mode=0o644):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb" if isinstance(data, bytes) else "w") as handle:
+        handle.write(data)
+    os.chmod(path, mode)
+    return path
+def process(pid, comm="example", cmdline=b"", environ=b""):
+    write(os.path.join(proc, str(pid), "stat"), f"{pid} ({comm}) S 1 1 1 0 -1")
+    write(os.path.join(proc, str(pid), "cmdline"), cmdline)
+    write(os.path.join(proc, str(pid), "environ"), environ)
+
+# The command line, as KProcessList gives it.
+process(101, cmdline=b"/opt/example/bin/example-viewer\0--open\0some file.txt\0")
+check("NULs are spaces",                 Processes.command(101, proc),
+      ("/opt/example/bin/example-viewer --open some file.txt", "example-viewer"))
+process(102, cmdline=b"C:\\Programs\\Example App\\app.exe\0" + b"\0" * 40)
+check("the padding a program leaves is trimmed, and a name with no slash is whole",
+      Processes.command(102, proc), ("C:\\Programs\\Example App\\app.exe", "C:\\Programs\\Example App\\app.exe"))
+process(103, comm="kernel-thing")
+check("no arguments: the kernel's name for it", Processes.command(103, proc), ("kernel-thing", "kernel-thing"))
+check("a process that cannot be read gives nothing", (Processes.command(999, proc), Processes.read(999, proc)), (None, {}))
+process(104, cmdline=b"x" * 5000)
+check("a command line is cut where no Exec line reaches", len(Processes.read(104, proc, path="")["cmdline"]), 4096)
+
+# The words of it that are programs on PATH -- QStandardPaths' rules, not
+# shutil.which's: a relative path is looked for on PATH too.
+bindir = os.path.join(root, "bin")
+write(os.path.join(bindir, "example-tool"), "#!/bin/sh\n", 0o755)
+write(os.path.join(bindir, "not-a-program"), "", 0o644)
+write(os.path.join(bindir, "sub", "tool"), "#!/bin/sh\n", 0o755)
+absolute = write(os.path.join(root, "elsewhere", "example-run"), "#!/bin/sh\n", 0o755)
+line = f"example-tool not-a-program sub/tool {absolute} --flag example-tool"
+check("the programs among the words, once each", Processes.executables(line, bindir),
+      ["example-tool", "sub/tool", absolute])
+check("only the first sixteen words are looked at",
+      Processes.executables(" ".join(["w"] * 16 + ["example-tool"]), bindir), [])
+
+# The environment: two variables, the first one there deciding, and nothing
+# else of it kept.
+data = os.path.join(root, "data")
+os.environ["XDG_DATA_HOME"] = data
+os.environ["LANG"] = "de_DE.UTF-8"
+hinted = write(os.path.join(data, "applications", "sub", "example-hinted.desktop"),
+               "[Desktop Entry]\nType=Application\nName=Hinted\nName[de]=Angedeutet\nIcon=example-hinted\n"
+               "[Desktop Action New]\nName=New Window\n")
+process(105, environ=b"HOME=/somewhere\0PRIVATE_THING=secret\0"
+                     b"BAMF_DESKTOP_FILE_HINT=" + hinted.encode() + b"\0APPDIR=/nowhere\0")
+hint = Processes.desktop_hint(105, proc)
+check("a desktop file hint, with its id among the installed ones",
+      (hint["variable"], hint["path"], hint["id"]), ("BAMF_DESKTOP_FILE_HINT", hinted, "sub-example-hinted"))
+check("its name in the session's language, not an action's", hint["name"], "Angedeutet")
+check("nothing else of the environment", "secret" in json.dumps(Processes.read(105, proc)), False)
+
+appdir = os.path.join(root, "mounted")
+write(os.path.join(appdir, "Zeta.desktop"), "[Desktop Entry]\nName=Zeta\n")
+write(os.path.join(appdir, "alpha.desktop"), "[Desktop Entry]\nName=Alpha\nIcon=alpha-icon.svg\n")
+write(os.path.join(appdir, "alpha-icon.svg"), "<svg/>")
+write(os.path.join(appdir, "alpha-icon.png"), b"png")
+process(106, environ=b"APPDIR=" + appdir.encode() + b"\0")
+hint = Processes.desktop_hint(106, proc)
+check("a mounted application: its first desktop file by name, whatever the case",
+      (hint["variable"], hint["name"], hint["id"]), ("APPDIR", "Alpha", ""))
+check("and the icon beside it, a PNG first", hint["iconFile"], os.path.join(appdir, "alpha-icon.png"))
+empty = os.path.join(root, "empty")
+os.makedirs(empty)
+process(107, environ=b"APPDIR=" + empty.encode() + b"\0BAMF_DESKTOP_FILE_HINT=" + hinted.encode() + b"\0")
+check("the first variable decides even when it names nothing", Processes.desktop_hint(107, proc), None)
+process(108, environ=b"APPDIR=" + appdir.encode() + b"\0")
+os.chmod(os.path.join(proc, "108", "environ"), 0)
+check("an environment that cannot be read gives nothing", Processes.desktop_hint(108, proc), None)
+
+# An app id that is a desktop file's path, as it is or without the suffix.
+named = write(os.path.join(root, "files", "example-named.desktop"), "[Desktop Entry]\nName=Named\nIcon=/an/icon.png\n")
+app_id_file = mod["app_id_file"]
+check("an app id that is a desktop file's path",
+      (app_id_file({"desktopFile": named})["name"], app_id_file({"desktopFile": named})["iconFile"]), ("Named", ""))
+check("or is one without the suffix", app_id_file({"desktopFile": "", "appId": named[:-8]})["path"], named)
+check("but not a name, nor a path to nothing",
+      (app_id_file({"appId": "example-named"}), app_id_file({"appId": "/no/such/thing"})), (None, None))
+
+# Kept per process while it has a window, and not after.
+class Counting(Processes):
+    reads = 0
+    @staticmethod
+    def read(pid, proc="/proc", path=None):
+        Counting.reads += 1
+        return {"cmdline": str(pid)}
+kept = Counting()
+for pid in (5, 5, 6, 5):
+    kept.facts_for(pid)
+check("read once for each process", Counting.reads, 2)
+kept.forget_all_but({6})
+kept.facts_for(5)
+check("and again once it had gone", Counting.reads, 3)
+check("no process, nothing read", (kept.facts_for(0), kept.facts_for(None), Counting.reads), ({}, {}, 3))
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+20)); else fail=$((fail+1)); fi
 
 # A lookup that found nothing is a fact about the moment, not about the
-# application: `_NET_WM_ICON` is set a little after the window is mapped, so a
+# window: `_NET_WM_ICON` is set a little after the window is mapped, so a
 # window asked the instant it appears often has no icon yet. Keeping that
 # answer for the life of the daemon is what "some icons are missing until I
 # restart the shell" was -- the restart forgot, and that was the whole fix.
-echo "== a missing icon is looked at again, a few times =="
+# A hit is kept only until KWin says the icon changed: a program that set its
+# own icon over its toolkit's first one was otherwise drawn with the first.
+echo "== a window's icon is looked at again when it may have changed =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
@@ -303,13 +444,14 @@ class Probe(mod["WindowIcons"]):
     MISS_RETRY_SECONDS = 0.0        # the waiting is not what is under test
 
     def __init__(self, script):
-        self._cache, self._misses, self._available = {}, {}, True
+        self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
+        self._clients, self._available = None, True
         self.script, self.looks = list(script), 0
 
-    def _x11_window_for(self, pid):
+    def _x11_window_for(self, uuid, window):
         return "0x1"
 
-    def _extract(self, window, app_id):
+    def _extract(self, window):
         self.looks += 1
         return self.script.pop(0) if self.script else None
 
@@ -320,31 +462,131 @@ def check(name, got, want):
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
     fails += 0 if ok else 1
 
-icon = os.path.join(sandbox, "late.png")
-open(icon, "w").close()
+def icon(name):
+    path = os.path.join(sandbox, name)
+    open(path, "w").close()
+    return path
 
-# Late, as Electron and Proton are: nothing twice, then an icon.
-p = Probe([None, None, icon])
-check("nothing on the first look",  p.path_for("late", 1), None)
-check("nothing on the second",      p.path_for("late", 1), None)
-check("and the icon on the third",  p.path_for("late", 1), icon)
+def window(uuid="w", serial=0):
+    return {"uuid": uuid, "pid": 1, "iconSerial": serial}
+
+# Late, as a toolkit often is: nothing twice, then an icon.
+late = icon("late.png")
+p = Probe([None, None, late])
+check("nothing on the first look",  p.path_for(window()), None)
+check("nothing on the second",      p.path_for(window()), None)
+check("and the icon on the third",  p.path_for(window()), late)
 check("three looks, not one",       p.looks, 3)
-check("then it stops looking",      (p.path_for("late", 1), p.looks), (icon, 3))
+check("then it stops looking",      (p.path_for(window()), p.looks), (late, 3))
 
-# A window that really has no icon must not cost a display sweep for ever.
+# The program set its own icon over the first: KWin says so, and it is read
+# again however good the copy already kept looked.
+first, own = icon("first.png"), icon("own.png")
+p = Probe([first, own])
+p.path_for(window(serial=0))
+check("an icon KWin says changed is read again", (p.path_for(window(serial=1)), p.looks), (own, 2))
+check("and kept until it changes again",         (p.path_for(window(serial=1)), p.looks), (own, 2))
+
+# A window that really has no icon must not cost a display sweep for ever --
+# until KWin says it has one after all.
 p = Probe([])
 for _ in range(20):
-    p.path_for("never", 1)
-check("a real miss gives up",       p.looks, Probe.MISS_ATTEMPTS)
+    p.path_for(window("never"))
+check("a real miss gives up",           p.looks, Probe.MISS_ATTEMPTS)
+p.path_for(window("never", serial=1))
+check("until KWin announces a change",  p.looks, Probe.MISS_ATTEMPTS + 1)
 
 # The path is cached, not the picture, and a path can stop being true.
-p = Probe([icon])
-p.path_for("gone", 1)
-os.unlink(icon)
-check("a path that went away is read again", (p.path_for("gone", 1), p.looks), (None, 2))
+gone = icon("gone.png")
+p = Probe([gone])
+p.path_for(window("gone"))
+os.unlink(gone)
+check("a path that went away is read again", (p.path_for(window("gone")), p.looks), (None, 2))
+
+# Per window, not per application: the second window of a program is asked
+# for its own icon rather than handed the first one's.
+one, two = icon("one.png"), icon("two.png")
+p = Probe([one, two])
+check("each window has its own",   [p.path_for(window("a")), p.path_for(window("b"))], [one, two])
+check("a window with no process is not looked for",
+      (p.path_for({"uuid": "x"}), p.path_for({"uuid": "y", "pid": 0}), p.looks), (None, None, 2))
+
+# Kept while the window is there, and not after: a window that went takes its
+# file with it -- but only a file this copy of the daemon wrote.
+mine, foreign = icon("mine.png"), icon("foreign.png")
+p = Probe([])
+p._written.add(mine)
+p._icons.update({"went": (0, mine), "stays": (0, one), "stranger": (0, foreign)})
+p._x11.update({"went": "0x5", "stays": "0x6"})
+p.forget_all_but({"stays"})
+check("a window that went takes its icon with it",   os.path.exists(mine), False)
+check("and what was found out about it",             ("went" in p._x11, "went" in p._icons), (False, False))
+check("a window still there keeps its own",          (p._icons.get("stays"), p._x11.get("stays")), ((0, one), "0x6"))
+check("a file this copy did not write is left alone", os.path.exists(foreign), True)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+16)); else fail=$((fail+1)); fi
+
+# Which X11 window a window is. KWin names no X11 window to a script, so the
+# daemon finds it among the display's managed windows -- and "the first window
+# of this process" was the wrong answer for a process with several: a helper
+# window's stock icon stood for the application's own. The class must agree,
+# and the title decides between windows that share it.
+echo "== a window's icon comes from that window =="
+python3 - "$REPO_ROOT" <<'PYTEST'
+import sys, os
+repo = sys.argv[1]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+pick, parse = mod["WindowIcons"].pick_client, mod["WindowIcons"].client
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+# One process with a helper window listed first and two windows of its own,
+# and another process.
+clients = [
+    {"id": "0xa1", "pid": 7, "instance": "helper",  "class": "Example.Viewer", "name": "Default"},
+    {"id": "0xa2", "pid": 7, "instance": "viewer",  "class": "Example.Viewer", "name": "Main"},
+    {"id": "0xa3", "pid": 7, "instance": "viewer",  "class": "Example.Viewer", "name": "Second"},
+    {"id": "0xa4", "pid": 7, "instance": "tool",    "class": "Example.Tool",   "name": "Tool"},
+    {"id": "0xb1", "pid": 8, "instance": "other",   "class": "Other",          "name": "Other"},
+]
+def window(**over):
+    w = {"pid": 7, "appId": "example.viewer", "resourceName": "viewer", "title": "Somewhere"}
+    w.update(over)
+    return w
+
+check("not the process's first window",           pick(window(), clients, set()), "0xa2")
+check("the one with this title",                  pick(window(title="Second"), clients, set()), "0xa3")
+check("a title KWin numbered finds its window",   pick(window(title="Second <2>"), clients, set()), "0xa3")
+check("not one another window already is",        pick(window(title="Second"), clients, {"0xa3"}), "0xa2")
+check("the class decides, not the process",       pick(window(appId="example.tool", resourceName="tool"), clients, set()), "0xa4")
+check("no window of that class, no icon",         pick(window(appId="example.missing"), clients, set()), None)
+check("another process's window is not this one", pick(window(pid=9, appId="other", resourceName="other"), clients, set()), None)
+check("without an instance name the class will do",
+      pick({"pid": 8, "appId": "other", "title": ""}, clients, set()), "0xb1")
+
+# What xprop says about a window, read back.
+props = ('_NET_WM_PID(CARDINAL) = 4242\n'
+         'WM_CLASS(STRING) = "inst", "Klass"\n'
+         '_NET_WM_NAME(UTF8_STRING) = "A \\"quoted\\" title"\n')
+check("xprop's answer read",   parse("0x1", props),
+      {"id": "0x1", "pid": 4242, "instance": "inst", "class": "Klass", "name": 'A "quoted" title'})
+check("a window with none of it", parse("0x2", "_NET_WM_PID:  not found.\n"),
+      {"id": "0x2", "pid": 0, "instance": "", "class": "", "name": ""})
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 # The shortcuts the daemon owns. Two things can be checked without a session:
 # that a key string becomes the integer kglobalaccel wants -- the same numbers
@@ -429,9 +671,9 @@ PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
 # Both run on the thread that answers D-Bus, so both are about time. Finding
-# which window a process owns is an xprop per window on the display, and it
-# was done again for every window in an update that had no icon yet; and the
-# icon's pixels were reordered one at a time in Python.
+# the display's windows is an xprop per window on it, and it was done again
+# for every window in an update that had no icon yet; and the icon's pixels
+# were reordered one at a time in Python.
 echo "== the daemon's icon work, once an update and not pixel by pixel =="
 python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
@@ -453,24 +695,29 @@ def check(name, got, want):
 
 class Counting(mod["WindowIcons"]):
     def __init__(self):
-        self._cache, self._misses, self._available = {}, {}, True
-        self._windows_by_pid, self.sweeps, self.asked = None, 0, []
-    def _x11_windows_by_pid(self):
+        self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
+        self._clients, self._available = None, True
+        self.sweeps, self.asked = 0, []
+    def _x11_clients(self):
         self.sweeps += 1
-        return {1: "0x1", 2: "0x2"}
-    def _extract(self, window, app_id):
+        return [{"id": "0x1", "pid": 1, "instance": "", "class": "a", "name": ""},
+                {"id": "0x2", "pid": 2, "instance": "", "class": "b", "name": ""}]
+    def _extract(self, window):
         self.asked.append(window)
         return None
 
 icons = Counting()
 icons.new_update()
-for app, pid in (("a", 1), ("b", 2), ("c", 3)):
-    icons.path_for(app, pid)
+for uuid, app, pid in (("u1", "a", 1), ("u2", "b", 2), ("u3", "c", 3)):
+    icons.path_for({"uuid": uuid, "appId": app, "pid": pid})
 check("one sweep for a whole update", icons.sweeps, 1)
 check("and every window found in it", icons.asked, ["0x1", "0x2"])
 icons.new_update()
-icons.path_for("d", 1)
+icons.path_for({"uuid": "u4", "appId": "c", "pid": 3})
 check("the next update sweeps again", icons.sweeps, 2)
+icons.new_update()
+icons.path_for({"uuid": "u1", "appId": "a", "pid": 1, "iconSerial": 1})
+check("a window found once is not looked for again", (icons.sweeps, icons.asked[-1]), (2, "0x1"))
 
 try:
     from PIL import Image
@@ -486,14 +733,24 @@ class FakeSubprocess:
     def run(*_args, **_kwargs):
         return Run()
 mod["subprocess"] = FakeSubprocess
-mod["ICON_CACHE"] = os.path.join(sandbox, "icons")
-path = mod["WindowIcons"]._extract(icons, "0x1", "some.app")
+run = os.path.join(sandbox, "run-pixels")
+os.makedirs(run, mode=0o700)
+os.environ["XDG_RUNTIME_DIR"] = run
+extract = mod["WindowIcons"]._extract
+path = extract(icons, "0x1")
 image = Image.open(path)
+check("written to the runtime directory", os.path.dirname(path), os.path.join(run, "t", "window-icons"))
+check("named for the window",     os.path.basename(path).startswith("0x1-"), True)
 check("the icon is its size",     image.size, (2, 1))
 check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0))],
                                   [(0, 0, 255, 255), (0, 0, 0, 0x81)])
+# The shell keeps a picture for as long as its URL is the same: a new icon on
+# the same window must be a new file, and the same one read again need not be.
+check("the same icon is the same file", extract(icons, "0x1"), path)
+Run.stdout = "_NET_WM_ICON(CARDINAL) = 1, 1, 4278190335"
+check("a new icon is a new file",       extract(icons, "0x1") != path, True)
 sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+5)); else fail=$((fail+1)); fi
+if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 harness_done

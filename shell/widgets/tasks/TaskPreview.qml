@@ -38,10 +38,6 @@ Item {
     // application that is not running.
     property var windows: []
 
-    // The pointer is on the card. The taskbar uses this to decide whether to
-    // start closing it.
-    property bool pointerInside: false
-
     // A window was chosen, so the card has done its job.
     signal picked
 
@@ -129,14 +125,6 @@ Item {
             parts.push(window.output);
 
         return parts.join(" · ");
-    }
-
-    // The pointer being on the card is what keeps the card. Declared here
-    // rather than on each cell so the gaps between them count as being on it
-    // too.
-    HoverHandler {
-        id: cardHover
-        onHoveredChanged: root.pointerInside = cardHover.hovered
     }
 
     // Closing a window from its own card: a round button at the end of the

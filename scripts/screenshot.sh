@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-# Take a screenshot with whatever this machine already has.
+# Take a screenshot through the desktop portal.
 #
-#   status [--json]     which tool would be used, and for what
-#   region              choose a rectangle and capture it
-#   screen              the whole desktop
-#   window              the active window
+#   status [--json]     whether a portal answers, and what each mode does
+#   region              the portal's chooser, to pick an area
+#   screen              the whole desktop, with no chooser
+#   window              the portal's chooser, to pick a window
 #
-# Nothing here draws a region selector or writes a PNG of its own: this is a
-# chooser. Plasma ships Spectacle and Spectacle is what a KDE user expects --
-# its selector, its save location, its notification, its "Open with". So when
-# Spectacle is installed it is what runs, and this script is a shortcut target
-# that happens to know how to call it.
+# The capture is `org.freedesktop.portal.Screenshot`'s, answered by whatever
+# backend this desktop installs: nothing here names a program, draws a
+# selector or writes the picture. `screen` asks for a capture with no
+# questions. `region` and `window` ask for the portal's own chooser, and the
+# portal decides what it offers -- whether a window can be picked there, and
+# how an area is drawn, is its UI and not ours. So those two are one request,
+# kept as two actions so a key bound to either goes on working.
 #
-# grim and slurp are the fallback, for a machine without Spectacle: the
-# capture is saved under the pictures directory, copied to the clipboard, and
-# announced with a notification carrying the file, so the popup shows the
-# picture the same way Spectacle's does.
+# What happens after the capture is ours: the file is put under the pictures
+# directory, copied to the clipboard, and announced with a notification
+# carrying the file, so the popup shows the picture.
 #
-# Why a shell action at all, when Spectacle has global shortcuts of its own:
-# binding a key to *this* means one key works on a machine with Spectacle and
-# on one without, and the settings window lists it beside the shell's own
-# actions rather than sending people to System Settings.
+# Why a shell action at all, when a desktop has screenshot keys of its own:
+# binding a key to *this* means one key works on any desktop with a portal,
+# and the settings window lists it beside the shell's own actions rather than
+# sending people to System Settings.
+#
+# The portal is part of the running desktop, so with the no-session switch
+# set nothing is asked of it: `status` says so and a capture is refused.
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -29,37 +33,32 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 
 MODES=(region screen window)
 
-# The tool this machine would use, or "" when it has none.
-screenshot_tool() {
-    if command -v spectacle >/dev/null 2>&1; then
-        printf 'spectacle'
-    elif command -v grim >/dev/null 2>&1; then
-        printf 'grim'
-    fi
+# One connection subscribes, calls and waits: see the helper for why that
+# cannot be a `gdbus call`.
+PORTAL_HELPER="$REPO_ROOT/scripts/lib/portal-screenshot.py"
+
+# How long a capture may take to answer. With a chooser on screen that is a
+# person deciding, and they are given time; with none it is the portal alone.
+TIMEOUT_CHOOSER=300
+TIMEOUT_DIRECT=30
+
+# The Screenshot interface's version when a portal answers; nothing when none
+# does, or when there is no session to ask.
+portal_version() {
+    session_available || return 1
+    python3 "$PORTAL_HELPER" --check 2>/dev/null
 }
 
-# What a tool can actually do. grim alone cannot choose a rectangle (that is
-# slurp) and knows nothing about windows, so a mode it cannot serve is said
-# so rather than silently capturing the whole screen instead.
-tool_can() {   # <tool> <mode>
-    case "$1:$2" in
-        spectacle:*) return 0 ;;
-        grim:screen) return 0 ;;
-        grim:region) command -v slurp >/dev/null 2>&1 ;;
-        grim:window) command -v slurp >/dev/null 2>&1 ;;
-        *) return 1 ;;
+mode_note() {   # <mode>
+    case "$1" in
+        region) printf "the portal's chooser: you pick the area there" ;;
+        window) printf "the portal's chooser: pick the window there, if it offers one" ;;
+        *)      printf '' ;;
     esac
 }
 
-tool_note() {   # <tool> <mode>
-    case "$1:$2" in
-        grim:window) printf 'grim cannot pick a window; you choose the area' ;;
-        *) printf '' ;;
-    esac
-}
-
-# Where a capture goes when we are the one saving it. xdg-user-dir knows the
-# localised name of the pictures directory; without it, Pictures.
+# Where a capture goes. xdg-user-dir knows the localised name of the pictures
+# directory; without it, Pictures.
 pictures_dir() {
     local dir=""
     command -v xdg-user-dir >/dev/null 2>&1 && dir=$(xdg-user-dir PICTURES 2>/dev/null)
@@ -80,32 +79,41 @@ notify_saved() {   # <file>
         "Screenshot saved" "$1" 2>/dev/null || true
 }
 
-capture_spectacle() {   # <mode>
-    local flag
-    case "$1" in
-        region) flag=--region ;;
-        screen) flag=--fullscreen ;;
-        window) flag=--activewindow ;;
-    esac
-    # --background: capture and exit rather than opening the editor. Spectacle
-    # saves where its own settings say and posts its own notification, which
-    # is the point of deferring to it.
-    exec spectacle "$flag" --background
-}
+capture() {   # <mode>
+    local chooser=() timeout=$TIMEOUT_CHOOSER src rc dir file name ext stamp n
+    session_available || die "no session: the desktop portal was not asked for a screenshot"
+    if [ "$1" = screen ]; then timeout=$TIMEOUT_DIRECT; else chooser=(--interactive); fi
 
-capture_grim() {   # <mode>
-    local dir file geom
+    src=$(python3 "$PORTAL_HELPER" "${chooser[@]}" --timeout "$timeout"); rc=$?
+    case "$rc" in
+        0) ;;
+        1) exit 0 ;;   # closed in the portal's chooser: not a failure
+        3) die "no desktop portal answers Screenshot -- this desktop's portal backend provides it" ;;
+        4) die "the desktop portal did not answer in ${timeout}s" ;;
+        *) die "the desktop portal could not take the screenshot" ;;
+    esac
+    [ -f "$src" ] || die "the desktop portal named a file that is not there: $src"
+
+    # Where the portal writes is the portal's business -- a temporary file for
+    # one backend, the pictures directory for another -- so the file is moved
+    # to where ours have always gone. Copied instead when it cannot be moved,
+    # which leaves the portal's copy where the portal put it.
     dir=$(pictures_dir)
     mkdir -p "$dir" || die "could not write to $dir"
-    file="$dir/Screenshot_$(date +%Y%m%d_%H%M%S).png"
-
-    if [ "$1" = screen ]; then
-        grim "$file" || die "grim failed"
-    else
-        geom=$(slurp 2>/dev/null) || exit 0   # cancelled: not a failure
-        [ -n "$geom" ] || exit 0
-        grim -g "$geom" "$file" || die "grim failed"
-    fi
+    case "$src" in
+        "$dir"/*) file=$src ;;
+        *)
+            name=$(basename -- "$src")
+            case "$name" in *.*) ext=${name##*.} ;; *) ext=png ;; esac
+            # Named to the second, so a second capture within it is numbered
+            # rather than written over the first.
+            stamp=$(date +%Y%m%d_%H%M%S)
+            file="$dir/Screenshot_$stamp.$ext"; n=2
+            while [ -e "$file" ]; do file="$dir/Screenshot_$stamp-$n.$ext"; n=$((n + 1)); done
+            mv -f -- "$src" "$file" 2>/dev/null || cp -- "$src" "$file" \
+                || die "could not save the screenshot to $file"
+            ;;
+    esac
 
     command -v wl-copy >/dev/null 2>&1 && wl-copy --type image/png < "$file" 2>/dev/null &
     notify_saved "$file"
@@ -117,40 +125,37 @@ cmd=${1:-status}
 
 case "$cmd" in
     status)
-        tool=$(screenshot_tool)
+        version=$(portal_version) || version=""
         if [ "${1:-}" = "--json" ]; then
             modes=$(for m in "${MODES[@]}"; do
                 jq -cn --arg mode "$m" \
-                       --argjson ok "$(tool_can "${tool:-none}" "$m" && echo true || echo false)" \
-                       --arg note "$(tool_note "${tool:-none}" "$m")" \
+                       --argjson ok "$([ -n "$version" ] && echo true || echo false)" \
+                       --arg note "$(mode_note "$m")" \
                        '{mode: $mode, supported: $ok, note: $note}'
             done | jq -sc '.')
-            jq -n --arg tool "$tool" --argjson modes "$modes" '{tool: $tool, modes: $modes}'
+            jq -n --arg tool "${version:+portal}" --arg version "$version" \
+                  --argjson session "$(session_available && echo true || echo false)" \
+                  --argjson modes "$modes" \
+                  '{tool: $tool, version: ($version | tonumber? // null), session: $session, modes: $modes}'
             exit 0
         fi
-        if [ -z "$tool" ]; then
-            log_warn "no screenshot tool found -- install spectacle (or grim and slurp)"
+        if ! session_available; then
+            log_warn "no session: the desktop portal was not asked"
             exit 1
         fi
-        printf 'tool: %s\n\n' "$tool"
+        if [ -z "$version" ]; then
+            log_warn "no desktop portal answers Screenshot -- this desktop's portal backend provides it"
+            exit 1
+        fi
+        printf 'desktop portal: Screenshot, version %s\n\n' "$version"
         for m in "${MODES[@]}"; do
-            if tool_can "$tool" "$m"; then
-                note=$(tool_note "$tool" "$m")
-                printf '  %-8s yes%s\n' "$m" "${note:+  -- $note}"
-            else
-                printf '  %-8s no\n' "$m"
-            fi
+            note=$(mode_note "$m")
+            printf '  %-8s yes%s\n' "$m" "${note:+  -- $note}"
         done
         ;;
 
     region|screen|window)
-        tool=$(screenshot_tool)
-        [ -n "$tool" ] || die "no screenshot tool found -- install spectacle (or grim and slurp)"
-        tool_can "$tool" "$cmd" || die "$tool cannot capture a $cmd on this machine"
-        case "$tool" in
-            spectacle) capture_spectacle "$cmd" ;;
-            grim)      capture_grim "$cmd" ;;
-        esac
+        capture "$cmd"
         ;;
 
     *) die "unknown command: $cmd (one of: status ${MODES[*]})" ;;

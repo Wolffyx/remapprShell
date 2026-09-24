@@ -28,8 +28,8 @@ default.
 - **Real window previews.** The taskbar's hover card, the desktop overview and this
   shell's own Alt+Tab draw live pictures of the windows, through KWin's screencast
   protocol.
-- **Pluggable launcher and search.** Kickoff, KRunner, a built-in launcher, rofi, fuzzel or
-  a custom command, chosen at runtime.
+- **Pluggable launcher and search.** Kickoff, KRunner, a built-in launcher, or any launcher
+  of your own (rofi, fuzzel, wofi...) as a custom command, chosen at runtime.
 - **Configurable everywhere.** A sparse JSON config with live reload, layered as
   defaults → profile → per-monitor, plus an in-shell settings GUI generated from the
   schema — so a new setting is a schema entry, not a page.
@@ -57,9 +57,9 @@ tiles it draws is a setting.
 ![The start menu](docs/images/launcher.png)
 
 The built-in start menu: pinned applications, recent files, what is playing, what the
-machine is doing, and a search that also runs actions. It is one of six launchers the
-shell can open — Kickoff, KRunner, rofi, fuzzel or a command of your own are the others,
-chosen at runtime.
+machine is doing, and a search that also runs actions. It is one of four launchers the
+shell can open — Kickoff, KRunner or a command of your own are the others, chosen at
+runtime.
 
 ![Alt+Tab](docs/images/switcher.png)
 

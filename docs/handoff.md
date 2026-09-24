@@ -3,8 +3,10 @@
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
 sessions, and added to since -- most recently on **2026-09-24**, a cleanup
 of the whole tree for duplicated and wasteful code that found a dozen bugs in
-the copies (read "The cleanup of 2026-09-24" first: it says what now has one
-home, and what needs checking on the real desktop). Before that, the
+the copies, and that afternoon three things that came out of using it:
+applications in scopes of their own, no other application named in the code,
+and a taskbar preview that hangs from its button (read "The afternoon of
+2026-09-24" first, then "The cleanup of 2026-09-24"). Before that, the
 **evening of 2026-09-23**
 (twelve lock screens, a reworked taskbar preview, and the global shortcuts
 moved into the shell's configuration: read "The evening of 2026-09-23" and
@@ -202,11 +204,14 @@ uses. Pointing that at kglobalaccel would delete the whole class.
 declare defaults had drifted sixteen ways; `scripts/lint-defaults.sh` fails on
 any disagreement, in `make lint` and in CI.
 
-**Since the cleanup of 2026-09-24**, before anything below: `make link` and
-`rmpr windows restart` (the daemon is a rendered copy), then the checks
-listed under "Needs the real desktop" in that entry. `make lint` and `make
-test` are clean; `dev` is **not pushed** -- the three commits of 2026-09-23's
-evening and the cleanup's 99 are local.
+**Since 2026-09-24**, before anything below: the cleanup is merged and pushed
+(PR #4, which came in as a merge commit -- the first in this history). The
+afternoon's work is its own PR; once merged, `make link` and `rmpr windows
+restart` (the daemon is a rendered copy), then the checks under "Needs the
+real desktop" in both of that day's entries. **Never restart the shell's
+unit without looking inside it first** (`systemd-cgls --user-unit
+<slug>.service`): until the afternoon's PR is running, an application
+started from the panel lives there and dies with it.
 
 **What to pick up first, 2026-09-24.** Nothing is half-written; `make lint`,
 `make test` and `rmpr doctor` are all clean, and `dev` is pushed.
@@ -292,6 +297,96 @@ evening and the cleanup's 99 are local.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The afternoon of 2026-09-24: applications of their own, no other names, a preview that hangs
+
+**Why the first one.** Reloading the shell after the cleanup merged --
+`systemctl --user restart` -- took World of Tanks and Steam with it. An
+application started from the panel was the shell's child, so it lived in
+`<slug>.service`, and `KillMode=control-group` stops everything in the unit:
+`winedevice.exe` outlived the SIGTERM and was killed five seconds later. A
+crash does the same, since `Restart=on-failure` restarts an emptied unit.
+Every application the shell starts now goes through
+`qs.platform.system.Launch` (`entry`, `action`, `command`, `open`, `scoped`)
+into `systemd-run --user --scope --slice=app.slice`, named
+`app-<slug>-<app id>-<random>.scope` as systemd's convention for launched
+applications has it (`shell/core/AppScope.qml`, pure, tested). The first
+launch tries a scope with `true`; where none can be made -- no user manager,
+`make run` by hand -- applications start as children, as before, and it says
+so once. `scripts/lint-launch.sh` fails on any `.execute(`, `xdg-open`,
+`systemsettings` or applet window started anywhere else; the deliberate
+exception is the Plasma services the shell hosts (`PlasmaServices`), which
+are the shell's and stay in its unit. The CLI's own launches (`ask`'s
+terminal) are scoped the same way.
+
+**No other application named in the code**, at the user's request. Gone:
+Steam's icon lookup in the window daemon (a game shows the icon its own
+window sets, as it does in Plasma's panel -- see the next paragraph), the
+`steam` icon rule in `WindowEvents`, Spectacle's row on the key sheet,
+Dolphin for device notifications (the default file manager opens the home
+folder now: the notification comes before anything is mounted), `ask`'s list
+of terminals (KDE's configured terminal, then `xdg-terminal-exec`, then
+`$TERMINAL` -- **none is set on this machine**, so asking about a
+notification fails with a message until one is chosen in System Settings →
+Default Applications), the fuzzel and rofi launcher providers (config
+schema **2** migrates a profile that picked one to the custom command), the
+`caelestia` renderer alias, and the system monitor list (found by the
+freedesktop `Monitor` category now). **Screenshots go through the desktop
+portal** (`scripts/lib/portal-screenshot.py`, one D-Bus connection for the
+request and its answer, since a request dies with the connection that made
+it); `screen` is taken at once, `region` and `window` open the portal's own
+chooser. The window icons that are still read from `_NET_WM_ICON` are
+written under `$XDG_RUNTIME_DIR/<slug>/window-icons` now, gone at logout; the
+old `~/.local/state/<slug>/window-icons` can be deleted by hand. **KDE
+Plasma's own parts** -- KWin, kglobalaccel, the look-and-feel and lock-screen
+packages, and the optional KRunner, Kickoff, Klipper/plasmawindowed and
+System Settings links -- are still named: whether the optional ones go was
+asked and is the user's to answer. Prose that explains how other programs
+behave (Chrome and Electron asking GTK for dark mode, say) was kept.
+
+**Windows are matched to applications the way Plasma's own panel does it**
+(`qs.domain.windows.events.AppMatch`, following libtaskmanager's
+`serviceFromMetadata` step for step: StartupWMClass, a .desktop path, the
+entry id, the entry's Name, the process's `BAMF_DESKTOP_FILE_HINT`/`APPDIR`,
+its command line against Exec). Plasma has no application-specific rule
+either; what it cannot match it draws with **the window's own icon**. So does
+this shell now, read from *that* window (same process, same WM_CLASS, same
+title) and kept per window under the runtime directory, read again when KWin
+says the icon changed. **The grey rectangle was a stale cache, not the
+game**: World of Tanks' window carries its shield (32x32, checked on the live
+display), and the old per-application cache in `~/.local/state/<slug>/
+window-icons` held Wine's stock window icon, read before the game set its own
+on 2026-09-23 and kept ever since. An unmatched window is named by its title.
+KWin 6.7 gives scripts no X11 window id, which is why the window is found by
+process, class and title rather than by id.
+
+**The taskbar preview hangs from its button.** An opt-in on `BarWidget`
+(`popoutTail`, `popoutTailWidth`, `popoutHovered`), taken only by the task
+preview: the card's edge curves down into a neck on the hovered button,
+drawn with the card's own border by `PopoutOutline`, from pure geometry in
+`qs.domain.panel.Tail` (tested). The popout's window reaches down to the
+panel, so crossing from button to card never leaves the popout and the
+close countdown does not start. `dev/preview/inplace.qml` draws a popout
+where it really opens, over its panel, on any edge.
+
+**Two things this session did to the live desktop, both put right.** A
+preview of a branch whose schema was a version ahead *migrated the live
+profile* on reading it, and the running shell, a version behind, refused to
+save anything ("schemaVersion 2 is newer than this build supports");
+`schemaVersion` was set back to 1 by hand. Every preview also wrote the
+running shell's `widget-health.json`. `dev/preview/preview.sh` now points
+Branding's profile and state at copies inside each run's root, and a check
+before and after a render set shows nothing under the real config or state
+changes. **After this PR merges the profiles become version 2**, and an older
+build will refuse them.
+
+**Needs the real desktop:** start something from the start menu, the
+taskbar, a pinned app, the panel menu, a notification and quick settings,
+and see it under `systemctl --user list-units 'app-*'` and still running
+after a shell restart; press each screenshot key once; start a game and see its own icon and
+title on the taskbar (after `make link`, `rmpr windows restart` and a reload
+of the KWin script, whose window list carries new fields); hover the taskbar and cross to the card -- KWin's blur behind
+the neck and the crossing itself are the two things no render shows.
 
 ### The cleanup of 2026-09-24: duplicates, waste, and what they were hiding
 
@@ -567,9 +662,12 @@ script has to be able to reach the daemon before the shell exists. So:
 * `doctor` compares the running process against the file it was installed
   from and says so when they differ, because nothing else will.
 
-**A Steam game's icon comes from Steam now.** `steam_app_1407200` (World of
-Tanks) drew a grey rectangle because that is genuinely what its window
-publishes as `_NET_WM_ICON` -- under Proton, a window with no icon gets the
+**A Steam game's icon comes from Steam now.** *(Corrected 2026-09-24: wrong,
+and the Steam lookup is gone -- the window publishes the game's shield; the
+grey rectangle was Wine's stock icon, read before the game set its own and
+then kept by a per-application cache. See the afternoon of 2026-09-24.)*
+`steam_app_1407200` (World of Tanks) drew a grey rectangle because that is
+genuinely what its window publishes as `_NET_WM_ICON` -- under Proton, a window with no icon gets the
 Windows default and the cache stored it faithfully. Steam has had the real one
 all along, in `appcache/librarycache/<appid>/`, where the artwork is named for
 what it is (`library_hero.jpg`, `logo.png`, `header.jpg`) and **the icon is
@@ -590,7 +688,8 @@ either is "fixed" again:
   means *only* those. `TrayLayout.split` says so in its own comments, the
   settings page reads the same function, and `tray list` over IPC shows all
   ten items present. Settings -> Tray icons is where it changes.
-- **The WoT window's icon really is a grey rectangle.** `steam_app_1407200`
+- **The WoT window's icon really is a grey rectangle.** *(It is not -- see
+  the correction above.)* `steam_app_1407200`
   publishes a generic window pixmap as its `_NET_WM_ICON`, and the cache
   stored what it was given, faithfully. Nothing to fix in this shell; giving
   Steam applications their library icon would be new work, not a repair.

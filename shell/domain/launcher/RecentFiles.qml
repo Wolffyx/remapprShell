@@ -7,6 +7,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.platform.system
 import qs.domain.launcher.apps
 
 QtObject {
@@ -14,9 +15,10 @@ QtObject {
 
     property var files: []
 
+    // With whatever opens it, in a scope of its own: see Launch.
     function open(file) {
         if (file?.uri)
-            Quickshell.execDetached(["xdg-open", file.uri]);
+            Launch.open(file.uri);
     }
 
     readonly property FileView _view: FileView {

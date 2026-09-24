@@ -15,6 +15,12 @@ guessing.
 | [`shell/features/panel/EdgeWindow.qml`](../shell/features/panel/EdgeWindow.qml) | the window. A layer surface beside the panel, on any of the four edges. Shared with tooltips. |
 | [`shell/domain/panel/Placement.qml`](../shell/domain/panel/Placement.qml) | the arithmetic. Where the window goes and where the card sits inside it. Pure functions, tested in [`tests/tst_Placement.qml`](../tests/tst_Placement.qml). |
 
+And for a popout that hangs from its widget (see [A tail](#a-tail)),
+[`shell/domain/panel/Tail.qml`](../shell/domain/panel/Tail.qml) -- the neck's
+arithmetic, tested in [`tests/tst_Tail.qml`](../tests/tst_Tail.qml) -- and
+[`shell/features/panel/PopoutOutline.qml`](../shell/features/panel/PopoutOutline.qml),
+which draws it.
+
 One more decides *when* a popout closes:
 [`shell/features/panel/model/PanelModel.qml`](../shell/features/panel/model/PanelModel.qml)
 holds the one open popout, and the surface that catches a click outside it
@@ -32,10 +38,17 @@ popoutAlign: "centre"                  // or "start": the card's near edge on th
 popoutWidth: -1                        // the card's width; -1 takes it from the contents
 popoutPadding: 20                      // how far in from the card's edge the contents sit
 popoutRadius: -1                       // -1 follows theme.rounding, and should
+popoutTail: false                      // hang from the widget by a neck; see "A tail"
+popoutTailWidth: -1                    // the neck where it meets the panel; -1 is tileSize
 popoutGrabsFocus: false                // true only if it must be typed into
 popoutClosesOnOutsideClick: true       // false for one that follows the pointer
 function closePopout() { }             // how the panel asks this widget to put it away
 ```
+
+And one the panel sets: `popoutHovered`, whether the pointer is on the
+popout -- the whole card, border and padding included, and the neck. A popout
+that closes when the pointer leaves it reads this, not a HoverHandler in its
+own contents, which stop short of both.
 
 Two of these have sharp edges.
 
@@ -99,7 +112,8 @@ covers all four edges:
 - **away** -- out from the screen's edge; y on a bottom panel
 
 ```
-away(extent, gap, shadowMargin)          how far out the window starts
+away(extent, gap, shadowMargin, room)    how far out the window starts
+reach(gap, shadowMargin)                 how far what is drawn sits clear of the panel
 along(align, slotStart, centre, size,    where it starts along the panel
       extent, shadowMargin, edgeMargin)
 shift(...)                               how far the card moves inside the window
@@ -117,6 +131,48 @@ aligned to a button 12 px from the corner, with a shadow wanting 29, would open
 `slotStart` is taken when the window is shown, never bound: `mapToItem` is a
 function call, so a binding on it is evaluated once -- before the zone has laid
 the slot out -- and every popout on the panel opened at the screen's left edge.
+
+## A tail
+
+A popout that is about one thing on the panel -- the taskbar's hover preview
+is the one that asks -- can hang from it: `popoutTail: true`. The card's edge
+facing the panel flows through two concave curves into a neck, which crosses
+the gap and meets the panel's edge on the point the widget named with
+`requestPopout`. Card and button read as one shape, and the strip of
+wallpaper between them is gone.
+
+- **The window reaches the panel.** `EdgeWindow.tail` makes the room on the
+  panel's side the whole gap (`reach`) rather than the shadow's margin, and
+  `Placement.away` takes that room: the window starts at the panel's edge and
+  the card lands exactly where it would have without a tail. Never over the
+  panel -- the neck ends at its edge, and the panel's own hairline closes it.
+- **One outline.** The card's own background and border are switched off and
+  `PopoutOutline` draws card and neck as one `Shape`: one fill, and one border
+  that runs round the card and down both sides of the neck, open across the
+  neck's foot. A neck laid over the card instead doubles the translucent tint
+  where they meet and leaves the card's border across it as a seam.
+- **It lands on the button, not the card's middle.** A card pushed back on
+  screen at the end of the panel is not centred on its button, so the neck is
+  placed from the button's position on the screen. Near a corner the corner
+  and the curve give way together, down to a neck that continues the card's
+  side. `Tail.neck` has the rules.
+- **It follows the pointer.** Once the popout is up, the neck's landing point
+  animates (`theme.animationMs`) from one button to the next; while it is
+  still arriving it goes straight there.
+- **It takes the pointer.** The input region is the card and the neck -- the
+  ellipses the curves are quarters of cut out of the neck's rectangle
+  (`NeckRegion`) -- and the blur behind is the same shape. So a pointer going
+  straight up from the button crosses the neck and never leaves the popout:
+  `popoutHovered` stays true, and the task list's close countdown never
+  starts. Crossing the gap beside the neck is what the countdown is for.
+- **A shadow is the card's.** `RectangularShadow` cannot take the neck's
+  shape, and the neck needs none: it stands on the panel. The card's shadow
+  falls under it, and through its translucency only faintly.
+
+Only the taskbar's preview has one. A card that stands for the whole widget
+-- quick settings, a calendar, a menu -- has no one point to hang from; its
+widget would also have to name its middle with `requestPopout`, which most
+never do (their popout is centred on the slot's leading edge).
 
 ## Closing
 
@@ -149,6 +205,27 @@ layer surface into a plain `Item`. Do not conclude from a preview that a
 blur, a mask, a layer or a shadow is right.
 
 `PREVIEW_RUNTIME='{"theme.rounding":28}'` overrides configuration for the run.
+
+A preview reads a copy of the profile and keeps its state in its own
+temporary root: it never writes the running shell's files.
+
+To see a popout **where it opens** -- the screen, the panel along an edge,
+the widget and its popout's window beside it, placed by the real arithmetic --
+use `inplace.qml`:
+
+```bash
+PREVIEW_DEMO=1 PREVIEW_WIDGET=tasks PREVIEW_EDGE=bottom PREVIEW_BAR=floating \
+    dev/preview/preview.sh dev/preview/inplace.qml out.png 1280 720 light 3000
+```
+
+It takes `PREVIEW_ZONE`, `PREVIEW_ALONE`, `PREVIEW_BUTTON` (which taskbar
+button the pointer rests on), `PREVIEW_MOVE` and `PREVIEW_MOVE_MS` (a second
+button to move on to, and when to take the picture after -- the neck on its
+way), `PREVIEW_TAIL=1` (a neck on any widget, for a side panel, which the
+taskbar does not run along) and `PREVIEW_POPOUT` (also save the popout's
+window alone -- the thing to compare before and after a change). The popout is its own window offscreen too, so it is photographed
+and laid over the panel. Shadows are shader effects and do not render in the
+offscreen harness at all.
 
 ### On the real screen
 

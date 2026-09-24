@@ -213,6 +213,7 @@ Provider {
     function windowItem(window, appName) {
         return { kind: "window", uuid: window.uuid, name: window.title || appName,
                  icon: WindowsService.iconFor(window),
+                 iconFile: WindowsService.iconFileFor(window),
                  description: appName };
     }
 
@@ -379,11 +380,11 @@ Provider {
         if (!app)
             return;
         Log.info("launcher", `launching ${app.id}`);
-        // Before the launch, not after: `execute()` is the last thing that
+        // Before the launch, not after: the launch is the last thing that
         // happens to this provider before the window closes, and a history
         // written after it was written by a component being torn down.
         Frecency.record("app", app.id);
-        app.execute();
+        Launch.entry(app);
         root.close();
     }
 

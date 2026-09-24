@@ -34,15 +34,39 @@ function isTaskbarWindow(window) {
         && window.deleted !== true;
 }
 
+// How many times KWin has said each window's icon changed, by uuid.
+//
+// The icon itself cannot be sent: it is a QIcon, and nothing in it survives
+// the trip to JSON. What can be sent is that it changed, which is what the
+// daemon needs to know to read it again -- a program often sets its own icon
+// a moment after its window appears, over whatever its toolkit put there
+// first, and a copy taken in between would otherwise be kept for the life of
+// the window. Plasma's own task list redraws on this same signal.
+const iconSerials = new Map();
+
+function uuidOf(window) {
+    return String(window.internalId).replace(/[{}]/g, "");
+}
+
 function describe(window) {
+    const uuid = uuidOf(window);
     return {
-        uuid: String(window.internalId).replace(/[{}]/g, ""),
+        uuid: uuid,
         title: window.caption || "",
         appId: window.resourceClass || "",
         desktopFile: window.desktopFileName || "",
-        // Only used to find the window's own icon, for the windows that have
-        // no application to match against.
+        // The other half of an X11 window's class -- the instance name -- and
+        // for a Wayland window the name of the program's executable. Plasma's
+        // task manager matches desktop entries' StartupWMClass against this
+        // before anything else, so the shell does too; the daemon tells one
+        // X11 window of a process from another by it.
+        resourceName: window.resourceName || "",
+        // The process: what the daemon reads the command line and two
+        // environment variables of, for the windows that match no
+        // application by themselves, and whose X11 windows it looks through
+        // for this one's own icon.
         pid: window.pid || 0,
+        iconSerial: iconSerials.get(uuid) || 0,
         minimized: window.minimized === true,
         active: window.active === true,
         // A message arrived, a dialog wants an answer: the window asked for
@@ -95,6 +119,16 @@ function watch(window) {
     window.skipTaskbarChanged.connect(publish);
     window.demandsAttentionChanged.connect(publish);
     window.outputChanged.connect(publish);
+    // What the application is matched by can change after the window
+    // appears -- a desktop file named late, a class set again -- and Plasma
+    // matches such a window again when it does.
+    window.windowClassChanged.connect(publish);
+    window.desktopFileNameChanged.connect(publish);
+    window.iconChanged.connect(() => {
+        const uuid = uuidOf(window);
+        iconSerials.set(uuid, (iconSerials.get(uuid) || 0) + 1);
+        publish();
+    });
 }
 
 workspace.windowList().forEach(watch);
@@ -103,7 +137,11 @@ workspace.windowAdded.connect(window => {
     watch(window);
     publish();
 });
-workspace.windowRemoved.connect(publish);
+workspace.windowRemoved.connect(window => {
+    if (window)
+        iconSerials.delete(uuidOf(window));
+    publish();
+});
 workspace.windowActivated.connect(publish);
 
 // The daemon starts empty, and the shell may have been running for hours

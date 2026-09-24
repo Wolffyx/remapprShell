@@ -64,15 +64,6 @@ renderer_ids() {
     printf '%s\n' none
 }
 
-# What a profile may still say from before discovery: `caelestia` meant its
-# Quickshell configuration.
-renderer_normalize() {
-    case "$1" in
-        caelestia) printf '%scaelestia' "$RENDERER_FOREIGN_PREFIX" ;;
-        *)         printf '%s' "$1" ;;
-    esac
-}
-
 renderer_is_foreign() { [[ "$1" == "$RENDERER_FOREIGN_PREFIX"?* ]]; }
 
 # The shell package plasmashell is on, as plasmashellrc has it: the stock one

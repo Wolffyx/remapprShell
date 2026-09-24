@@ -21,6 +21,6 @@ switcher	Window switcher	switcher show
 switcher-reverse	Window switcher (backwards)	switcher show --reverse
 overview	Desktops	switcher overview
 overview-reverse	Desktops (backwards)	switcher overview --reverse
-screenshot	Screenshot of a region	screenshot region
+screenshot	Screenshot, choosing an area	screenshot region
 screenshot-screen	Screenshot of the screen	screenshot screen
-screenshot-window	Screenshot of the active window	screenshot window
+screenshot-window	Screenshot, choosing a window	screenshot window

@@ -39,6 +39,17 @@ PanelWindow {
     // "start". See Placement.
     property string align: "centre"
 
+    // Whether what is drawn hangs from the slot by a neck across the gap,
+    // rather than standing clear of the panel (Tail; `popoutTail` on the
+    // widget). The window then reaches all the way to the panel's edge: the
+    // room on that side is the whole distance to the card, `reach`, rather
+    // than the shadow's margin. The card itself lands where it always does.
+    property bool tail: false
+
+    // How far what is drawn sits clear of the panel's edge.
+    readonly property int reach: Placement.reach(win.gap, win.shadowMargin)
+    readonly property int padNear: win.tail ? win.reach : win.shadowMargin
+
     // Along the panel the room is lopsided wherever the window has been pushed
     // back on screen: the card keeps its place over the widget and the shadow
     // gives up the room it could not have had anyway. See Placement.shift.
@@ -54,14 +65,15 @@ PanelWindow {
     // facing the panel, to stop the window reaching back over it; that cut the
     // shadow off square along the bottom, which is what "the bottom-left
     // corner is straight, not round" was. The gap carries that job now --
-    // Placement.away.
-    readonly property int padH: 2 * win.shadowMargin
-    readonly property int padV: 2 * win.shadowMargin
+    // Placement.away. The one exception is a window with a tail, which needs
+    // the whole gap on the panel's side for the neck (`padNear`).
+    readonly property int padH: win.horizontal ? 2 * win.shadowMargin : win.shadowMargin + win.padNear
+    readonly property int padV: win.horizontal ? win.shadowMargin + win.padNear : 2 * win.shadowMargin
 
-    readonly property int padTop: win.horizontal ? win.shadowMargin : win.padLead
-    readonly property int padBottom: win.horizontal ? win.shadowMargin : win.padTrail
-    readonly property int padLeft: win.horizontal ? win.padLead : win.shadowMargin
-    readonly property int padRight: win.horizontal ? win.padTrail : win.shadowMargin
+    readonly property int padTop: win.horizontal ? (win.edge === "top" ? win.padNear : win.shadowMargin) : win.padLead
+    readonly property int padBottom: win.horizontal ? (win.edge === "bottom" ? win.padNear : win.shadowMargin) : win.padTrail
+    readonly property int padLeft: win.horizontal ? win.padLead : (win.edge === "left" ? win.padNear : win.shadowMargin)
+    readonly property int padRight: win.horizontal ? win.padTrail : (win.edge === "right" ? win.padNear : win.shadowMargin)
 
     readonly property string edge: win.bar?.position ?? "bottom"
     readonly property bool horizontal: win.edge === "top" || win.edge === "bottom"
@@ -87,6 +99,13 @@ PanelWindow {
         win.horizontal ? (win.screen?.width ?? 0) : (win.screen?.height ?? 0),
         win.shadowMargin, win.edgeMargin)
 
+    // Where the window actually is along the panel, in whole pixels. The
+    // margin below takes `along` and rounds it -- margins are whole pixels,
+    // and a value type rounds where a plain int property would truncate -- so
+    // this is that same number, for anything drawn to line up with the screen
+    // rather than with the window (WidgetSlot's tail).
+    readonly property int placedAlong: Math.round(win.along)
+
     readonly property int alongShift: Placement.shift(
         win.align, win.slotStart, win.centre,
         win.horizontal ? win.implicitWidth : win.implicitHeight,
@@ -94,7 +113,7 @@ PanelWindow {
         win.shadowMargin, win.edgeMargin)
 
     readonly property real away: Placement.away(
-        win.bar?.extent ?? win.bar?.thickness ?? 0, win.gap, win.shadowMargin)
+        win.bar?.extent ?? win.bar?.thickness ?? 0, win.gap, win.shadowMargin, win.padNear)
 
     // Where it went, for whoever is working out why a window is somewhere
     // unexpected -- which is how the placement bug above was found. Called

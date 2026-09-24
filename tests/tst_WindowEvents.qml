@@ -107,6 +107,35 @@ TestCase {
         compare(nonsense[0].desktops.length, 0);
     }
 
+    // What a window's application is matched by beyond its app id (see
+    // AppMatch), and what the daemon read about its process and the desktop
+    // files named by it. From a script or a daemon too old to send them they
+    // are empty rather than undefined, which only means fewer steps can match.
+    function test_what_a_window_is_matched_by_survives_the_parse() {
+        const w = WindowEvents.parseList(JSON.stringify([windowJson({
+            resourceName: "example-inst",
+            pid: 4242,
+            cmdline: "/usr/bin/example-prog --x",
+            processName: "example-prog",
+            executables: ["/usr/bin/example-prog"],
+            desktopHint: { variable: "APPDIR", path: "/m/x.desktop", name: "X", icon: "x", iconFile: "/m/x.png", extra: 1 },
+            appIdFile: { name: "a file with no path names nothing" },
+            iconPath: "/run/icons/0x1-abc.png"
+        })]))[0];
+        compare([w.resourceName, w.pid, w.cmdline, w.processName], ["example-inst", 4242, "/usr/bin/example-prog --x", "example-prog"]);
+        compare(w.executables, ["/usr/bin/example-prog"]);
+        compare(w.desktopHint, { variable: "APPDIR", path: "/m/x.desktop", id: "", name: "X", icon: "x", iconFile: "/m/x.png" });
+        compare(w.appIdFile, null);
+        compare(w.iconPath, "/run/icons/0x1-abc.png");
+
+        const old = WindowEvents.parseList(JSON.stringify([windowJson()]))[0];
+        compare([old.resourceName, old.pid, old.cmdline, old.processName, old.executables.length, old.desktopHint, old.appIdFile],
+                ["", 0, "", "", 0, null, null]);
+
+        const odd = WindowEvents.parseList(JSON.stringify([windowJson({ pid: "12", executables: "prog", desktopHint: "x" })]))[0];
+        compare([odd.pid, odd.executables.length, odd.desktopHint], [0, 0, null]);
+    }
+
     function test_parses_the_signal_wrapper() {
         const list = WindowEvents.parseSignal(signalLine(JSON.stringify([windowJson()])));
         compare(list.length, 1);
@@ -130,12 +159,14 @@ TestCase {
         compare(WindowEvents.label(null), "");
     }
 
-    // Steam games have no desktop entry: the class is the numeric app id, so
-    // nothing can match and the fallback is all there is.
-    function test_steam_games_get_steams_icon() {
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam");
-        // But an application that merely mentions steam is not one.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steamworks-tool" })), "steamworks-tool");
+    // A window whose class no desktop entry names -- a game started by its
+    // store's client, whose class is the client's own made-up id -- gets the
+    // rule every other window gets, and no other program's icon. The class
+    // names no icon in the theme, so where it is drawn it is the theme's
+    // generic one.
+    function test_a_class_with_no_entry_gets_the_ordinary_rule() {
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "client_app_1234" })), "client_app_1234");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Some_Game_42" })), "some_game_42");
     }
 
     // Grouping is the one part of what KDE's task manager does that needs no
@@ -255,9 +286,9 @@ TestCase {
     // windows in its pinned place.
     function test_pinned_first_then_the_rest() {
         const items = WindowEvents.arrangeTasks(
-            [group("konsole"), group("org.kde.dolphin"), group("class:steam_app_1")],
+            [group("konsole"), group("org.kde.dolphin"), group("class:client_app_1")],
             ["org.kde.dolphin", "google-chrome"], launcher);
-        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:steam_app_1");
+        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:client_app_1");
         compare(items[1].windows.length, 0);
     }
 
@@ -281,7 +312,7 @@ TestCase {
 
     function test_app_id_of_an_item() {
         compare(WindowEvents.appIdOf({ key: "org.kde.dolphin" }), "org.kde.dolphin");
-        compare(WindowEvents.appIdOf({ key: "class:steam_app_1" }), "");
+        compare(WindowEvents.appIdOf({ key: "class:client_app_1" }), "");
         compare(WindowEvents.appIdOf({ key: "uuid", appKey: "konsole" }), "konsole");
         compare(WindowEvents.appIdOf(null), "");
     }
@@ -305,7 +336,7 @@ TestCase {
         compare(WindowEvents.tintHue("a"), 97 / 360);
         // (97 * 31 + 98) % 360 = 225.
         compare(WindowEvents.tintHue("ab"), 225 / 360);
-        for (const id of ["", "x", "org.kde.konsole", "steam_app_1245620", "a".repeat(500)]) {
+        for (const id of ["", "x", "org.kde.konsole", "client_app_5678", "a".repeat(500)]) {
             const hue = WindowEvents.tintHue(id);
             verify(hue >= 0 && hue < 1, `${id}: ${hue}`);
         }
@@ -313,8 +344,8 @@ TestCase {
 
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
-        // Lower-cased, which is what turns "Google-chrome" into an icon that
+        // Lower-cased, which is what turns "Example-Viewer" into an icon that
         // actually exists in the theme.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Google-chrome" })), "google-chrome");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Example-Viewer" })), "example-viewer");
     }
 }

@@ -45,9 +45,23 @@ QtObject {
             output: String(entry.output ?? ""),
             // KWin's stacking position, higher on top; -1 when not sent.
             stacking: typeof entry.stacking === "number" ? entry.stacking : -1,
-            // A PNG the daemon lifted out of the window itself, for windows
-            // that match no installed application. Empty for the rest.
+            // A PNG the daemon lifted out of the window itself -- the icon it
+            // carries, drawn when its application has none to offer (see
+            // AppMatch.icon). Empty for a window with no X11 icon to copy.
             iconPath: String(entry.iconPath ?? ""),
+            // What AppMatch finds the window's application by, beyond its app
+            // id: the instance half of an X11 class (a Wayland window's
+            // executable), and what the daemon read about the process and
+            // the desktop files named by it. All empty from a script or a
+            // daemon older than the fields, which only means fewer steps
+            // can match.
+            resourceName: String(entry.resourceName ?? ""),
+            pid: typeof entry.pid === "number" ? entry.pid : 0,
+            cmdline: String(entry.cmdline ?? ""),
+            processName: String(entry.processName ?? ""),
+            executables: Array.isArray(entry.executables) ? entry.executables.map(w => String(w)) : [],
+            desktopHint: root._desktopFile(entry.desktopHint),
+            appIdFile: root._desktopFile(entry.appIdFile),
             // The virtual desktops it is on, as KWin's uuids. An empty list is
             // KWin's "on all of them", and so is a script too old to send the
             // field -- which is why anything filtering on this must treat
@@ -62,6 +76,21 @@ QtObject {
             // anything using it needs a sensible aspect of its own.
             width: typeof entry.width === "number" ? entry.width : 0,
             height: typeof entry.height === "number" ? entry.height : 0
+        };
+    }
+
+    // A desktop file the daemon read, as {variable, path, id, name, icon,
+    // iconFile}, or null. Without a path it names nothing.
+    function _desktopFile(value) {
+        if (!value || typeof value !== "object" || String(value.path ?? "").length === 0)
+            return null;
+        return {
+            variable: String(value.variable ?? ""),
+            path: String(value.path),
+            id: String(value.id ?? ""),
+            name: String(value.name ?? ""),
+            icon: String(value.icon ?? ""),
+            iconFile: String(value.iconFile ?? "")
         };
     }
 
@@ -236,21 +265,17 @@ QtObject {
         return window.title.length > 0 ? window.title : window.appId;
     }
 
-    // The icon name to try when no installed application matched the window.
+    // The icon name to try when neither the window's application nor the
+    // window itself has an icon to draw (see AppMatch.icon).
     //
     // A desktop file id is the reliable one; the resource class is the
-    // fallback, and lower-casing it is what turns "Google-chrome" into an icon
-    // that exists.
+    // fallback, and lower-casing it is what turns "Example-Viewer" into an
+    // icon that exists. The same rule for every window, whoever started it: a class
+    // that names no icon in the theme gets the theme's generic application
+    // icon where it is drawn, not another program's.
     function iconName(window) {
         if (!window)
             return "";
-
-        // A game launched through Steam has no desktop entry of its own -- its
-        // class is the numeric app id -- so nothing above can have matched and
-        // the only honest answer is Steam's icon rather than a blank square.
-        if (/^steam_app_\d+$/.test(window.appId))
-            return "steam";
-
         if (window.desktopFile.length > 0)
             return window.desktopFile;
         return window.appId.toLowerCase();

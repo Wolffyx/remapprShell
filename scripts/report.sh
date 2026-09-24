@@ -79,7 +79,7 @@ part_environment() {
         printf '%-18s %s\n' "$DISPLAY_NAME" "$VERSION"
         printf '%-18s %s\n' "schema" "$(jq -r '.schemaVersion // "?"' "$DATA_DIR/config/defaults/shell.json" 2>/dev/null || echo '?')"
         printf '%-18s %s\n' "profile" "$(active_profile)"
-        printf '%-18s %s\n' "renderer" "$(renderer_normalize "$(config_get '.panel.renderer' quickshell)")"
+        printf '%-18s %s\n' "renderer" "$(config_get '.panel.renderer' quickshell)"
         printf '%-18s %s\n' "shell package" "$(live_shell_package '<unset>')"
         printf '%-18s %s\n' "desktop" "${XDG_CURRENT_DESKTOP:-unset}"
         printf '%-18s %s\n' "session" "${XDG_SESSION_TYPE:-unset}"

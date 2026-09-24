@@ -7,47 +7,39 @@ pragma Singleton
 // menu draws them and the settings page edits them -- and a second reading of
 // the configuration in the page is what drifts from the one in the menu.
 //
-// Nothing here runs anything. It says what the rows are; the menu acts.
+// It says what the rows are, and runs what they run -- here rather than in the
+// menu, which is gone the moment a row is chosen (runCtl says what that cost).
 
 import QtQuick
 import Quickshell
 import qs.platform.system
 import qs.domain.config
+import qs.domain.launcher.apps
 import qs.domain.windows
 
 QtObject {
     id: root
 
-    // The monitors worth offering, best first. `auto` walks this and takes the
-    // first that is installed, which on a Plasma desktop is Plasma's own.
+    // Plasma's own system monitor, offered first where it is installed, and
+    // so what `auto` opens on a Plasma desktop. Named, because it files
+    // itself under System alone and no category finds it.
     //
-    // These are desktop entry ids -- the .desktop basename. Plasma's is
-    // `org.kde.plasma-systemmonitor`, with a hyphen; written with a dot it
-    // matches nothing, which is how the row came to be hidden on every machine
-    // that had the application.
-    readonly property var monitorCandidates: [
-        "org.kde.plasma-systemmonitor",
-        "org.kde.ksysguard",
-        "io.missioncenter.MissionCenter",
-        "gnome-system-monitor",
-        "org.gnome.SystemMonitor",
-        "xfce4-taskmanager",
-        "btop",
-        "htop"
-    ]
+    // A desktop entry id -- the .desktop basename -- with a hyphen: written
+    // with a dot it matches nothing, which is how the row came to be hidden
+    // on every machine that had the application.
+    readonly property string plasmaMonitor: "org.kde.plasma-systemmonitor"
 
-    // Those of them this machine actually has, as `{ id, name }`. The settings
-    // page offers exactly this: a monitor that is not installed is not a
-    // choice, so it cannot be chosen and then silently do nothing.
-    readonly property var installedMonitors: {
-        const found = [];
-        for (const id of root.monitorCandidates) {
-            const entry = WindowsService.entryById(id);
-            if (entry)
-                found.push({ id: String(entry.id), name: entry.name || String(entry.id) });
-        }
-        return found;
-    }
+    // The monitors worth offering, best first: Plasma's, then whatever the
+    // installed desktop entries say is a system monitor. `auto` takes the
+    // first. No other program is named: the entries say what they are.
+    readonly property var _monitors: Apps.monitors(DesktopEntries.applications.values, [root.plasmaMonitor])
+
+    // The same, as `{ id, name }`. The settings page offers exactly this: a
+    // monitor that is not installed is not a choice, so it cannot be chosen
+    // and then silently do nothing.
+    readonly property var installedMonitors: root._monitors.map(entry => ({
+        id: String(entry.id), name: entry.name || String(entry.id)
+    }))
 
     readonly property string monitorSetting: String(ConfigStore.value("panel.menu.systemMonitor", "auto"))
 
@@ -60,12 +52,7 @@ QtObject {
             return null;
         if (want !== "auto")
             return WindowsService.entryById(want);
-        for (const id of root.monitorCandidates) {
-            const entry = WindowsService.entryById(id);
-            if (entry)
-                return entry;
-        }
-        return null;
+        return root._monitors[0] ?? null;
     }
 
     // The rows someone has added, normalised: a label, a command, and an icon.
@@ -96,14 +83,17 @@ QtObject {
     }
 
     // Run one of them. Detached, so a script that keeps running is not tied to
-    // the menu that started it -- the menu closes the moment it is chosen.
+    // the menu that started it -- the menu closes the moment it is chosen --
+    // and in a scope of its own, so it is not tied to the shell either: these
+    // start applications as often as scripts (see Launch). The scope is named
+    // after the program the line starts with.
     // Through `sh -c` because these are command lines people write, with pipes
     // and arguments and `$HOME` in them, not argv arrays.
     function runEntry(command): void {
         const line = String(command ?? "").trim();
         if (line.length === 0)
             return;
-        Quickshell.execDetached(["sh", "-c", line]);
+        Launch.command(["sh", "-c", line], line.split(/\s+/)[0].split("/").pop());
     }
 
     // One of the shell's own actions, through the CLI: `rmpr` is the one

@@ -15,10 +15,10 @@ pragma Singleton
 // gets nothing when it does not.
 
 import QtQuick
-import Quickshell
 import Quickshell.Services.SystemTray
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.notifications.events
 import qs.domain.notifications.popups
@@ -70,7 +70,7 @@ QtObject {
     function go(target) {
         switch (target?.kind) {
         case "url":
-            Quickshell.execDetached(["xdg-open", target.value]);
+            Launch.open(target.value);
             return true;
         case "devices":
             root.openDevices();
@@ -89,6 +89,12 @@ QtObject {
     // notifier this shell hosts under its own renderer. Where it is not
     // hosted -- Plasma's tray has it inside, and has no icon of its own to
     // activate -- the file manager, which lists removable devices too.
+    //
+    // Whichever file manager this desktop opens a folder with, not one named
+    // here: it was Dolphin by name until 2026-09-24, which opened nothing on
+    // a desktop without it. At the home folder, because Plasma's
+    // `deviceAdded` names no device and no mount point -- it is sent before
+    // anything is mounted -- so home is the one place known to be there.
     readonly property string deviceNotifierId: "plasmawindowed_org.kde.plasma.devicenotifier"
 
     function openDevices() {
@@ -98,7 +104,7 @@ QtObject {
             return;
         }
         Log.info("notifications", "no device notifier in the tray; opening the file manager instead");
-        WindowsService.open("org.kde.dolphin");
+        Launch.open(Paths.fileUrl(Env.string("HOME")));
     }
 
     // The picture an entry is about, for the centre to draw. The rule is

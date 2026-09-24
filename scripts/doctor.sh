@@ -254,7 +254,7 @@ fi
 # The headline failure mode of having two renderers: both drawing at once.
 # Counted rather than assumed, because the case that matters is the one where
 # the configuration and what is on screen have come apart.
-configured_renderer=$(renderer_normalize "$(config_get '.panel.renderer' quickshell)")
+configured_renderer=$(config_get '.panel.renderer' quickshell)
 
 # A value no renderer answers to is read as ours, as it always has been here.
 expected_pkg=$(package_for "$configured_renderer")
@@ -975,8 +975,6 @@ esac
 section "optional components"
 
 for pair in "union:a Qt style, selectable as the widget style" \
-            "fuzzel:an alternative launcher" \
-            "rofi:an alternative launcher" \
             "claude:the claude-code AI provider" \
             "ollama:the ollama AI provider" \
             "wl-copy:the clipboard AI provider"; do

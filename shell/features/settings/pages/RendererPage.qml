@@ -128,8 +128,8 @@ CardGrid {
 
                 required property var modelData
 
-                // The CLI's answer once there is one: it reads a profile that
-                // still says `caelestia` as the configuration it meant.
+                // The CLI's answer once there is one: it reads the profile
+                // the same way a switch would.
                 readonly property bool active: root.discovered.length > 0
                                                ? option.modelData.current === true
                                                : option.modelData.id === root.current

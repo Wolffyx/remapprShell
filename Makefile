@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help setup link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults docs brand test clean plugin plugin-clean
+.PHONY: help setup link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults lint-launch docs brand test clean plugin plugin-clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -44,7 +44,7 @@ restart: ## Restart the installed systemd user unit
 log: ## Follow the shell's journal
 	@journalctl --user -u $(UNIT) -f
 
-lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults ## Run every lint
+lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch ## Run every lint
 
 lint-slug: ## Fail if the project name is hardcoded anywhere
 	@scripts/lint-slug.sh
@@ -66,6 +66,9 @@ lint-docs: ## Fail if the configuration reference is out of date
 
 lint-tests: ## Fail if a QML test imports a module needing a running shell
 	@scripts/lint-tests.sh
+
+lint-launch: ## Fail if the shell starts an application anywhere but through Launch
+	@scripts/lint-launch.sh
 
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh

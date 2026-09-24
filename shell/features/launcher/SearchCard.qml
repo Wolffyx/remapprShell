@@ -178,6 +178,9 @@ Rectangle {
                             // rather than of its kind.
                             visible: String(row.modelData.icon ?? "").length > 0
                             iconName: row.modelData.icon ?? ""
+                            // A window's icon can be a file rather than a
+                            // name -- the one it carries itself.
+                            iconFile: row.modelData.iconFile ?? ""
                         }
 
                         Glyph {

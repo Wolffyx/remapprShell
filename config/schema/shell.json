@@ -217,7 +217,7 @@
                     "type": "string",
                     "default": "auto",
                     "label": "System monitor",
-                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
+                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
                 },
                 "panel.menu.entries": {
                     "type": "list",
@@ -534,8 +534,6 @@
                         "kickoff",
                         "builtin",
                         "krunner",
-                        "fuzzel",
-                        "rofi",
                         "custom"
                     ],
                     "default": "builtin",
@@ -549,8 +547,6 @@
                         "krunner",
                         "builtin",
                         "kickoff",
-                        "fuzzel",
-                        "rofi",
                         "custom"
                     ],
                     "default": "builtin",
@@ -893,7 +889,7 @@
                 "shortcuts.screenshot": {
                     "type": "string",
                     "default": "",
-                    "label": "Screenshot of a region",
+                    "label": "Screenshot, choosing an area",
                     "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
                 },
                 "shortcuts.screenshot-screen": {
@@ -905,7 +901,7 @@
                 "shortcuts.screenshot-window": {
                     "type": "string",
                     "default": "",
-                    "label": "Screenshot of the active window",
+                    "label": "Screenshot, choosing a window",
                     "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
                 }
             }
@@ -976,7 +972,7 @@
                     "type": "string",
                     "default": "quickshell",
                     "label": "Drawn by",
-                    "description": "Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
+                    "description": "Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Another shell's configuration is always written with the `quickshell:` in front: a bare name is not a renderer, and is not guessed at. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`."
                 }
             }
         },

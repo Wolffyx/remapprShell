@@ -71,7 +71,7 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.iconSize` | a number, 15 to 26 | `18` | The size of the tray's and the status icons, in pixels. |
 | `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |
 | `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
-| `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
+| `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
 | `panel.menu.entries` | a list | `[]` | Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes. |
 
 ### Widgets
@@ -143,8 +143,8 @@ What opens when you press the start button, and what opens when you search.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `fuzzel`, `rofi`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
-| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `fuzzel`, `rofi`, `custom` | `builtin` | KRunner is Plasma's own search. |
+| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
+| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `custom` | `builtin` | KRunner is Plasma's own search. |
 | `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
 | `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
 | `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
@@ -250,7 +250,7 @@ What draws the panel. Only one of these can draw at a time, and switching is a r
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `panel.renderer` | text | `quickshell` | Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
+| `panel.renderer` | text | `quickshell` | Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Another shell's configuration is always written with the `quickshell:` in front: a bare name is not a renderer, and is not guessed at. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
 
 ### Layouts
 

@@ -88,6 +88,22 @@ QtObject {
         return chosen;
     }
 
+    // The system monitors installed, best first. Found the way the everyday
+    // picks are, by what the desktop entries say they are -- the menu
+    // specification's `Monitor` category -- rather than from a list of
+    // programs somebody once knew about. A window comes before a program
+    // that runs in a terminal, then the alphabet decides. `named` are ids put
+    // ahead of the rest when they are installed, whatever their categories.
+    function monitors(apps, named) {
+        const shown = (apps ?? []).filter(a => a && !a.noDisplay);
+        const first = root.resolvePinned(shown, named);
+        const rest = shown
+            .filter(a => first.indexOf(a) < 0 && root._cats(a).indexOf("Monitor") >= 0)
+            .sort((a, b) => (a.runInTerminal === true) - (b.runInTerminal === true)
+                            || String(a.name).localeCompare(String(b.name)));
+        return first.concat(rest);
+    }
+
     // [{ letter, apps }], A to Z, anything not starting with a letter under
     // "#" at the end.
     function byLetter(apps) {

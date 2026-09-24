@@ -179,6 +179,17 @@ BarWidget {
     readonly property int menuWidth: 262
     popoutWidth: root.popoutMode === "menu" ? root.menuWidth : -1
 
+    // The preview hangs from its button: the card flows into a neck that
+    // meets the panel on the button and follows the pointer from one button
+    // to the next. Floating a gap above the row, it was a card near the
+    // buttons rather than one of them -- and the gap was the one stretch of
+    // the way to it that was not the card. The neck is three quarters of the
+    // button's tile where it lands, so it narrows onto the button like a
+    // drop rather than plugging into it at full width. The menu is a menu,
+    // and stands clear as the others do.
+    popoutTail: root.popoutMode !== "menu"
+    popoutTailWidth: Math.round(root.drawnIconOnly * 0.75)
+
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
     // handler per button.
@@ -227,7 +238,20 @@ BarWidget {
     // the button starts a short countdown rather than closing; entering the
     // card stops it. Windows and Plasma both do this, and without it a hover
     // preview can only ever be looked at.
+    //
+    // "The card" is the panel's word for it (popoutHovered): the whole card
+    // and the neck it hangs by. The preview's own contents stop short of the
+    // card's padding and know nothing of the neck, so watching them started
+    // the countdown on the very way to the card.
     property bool pointerInPopout: false
+
+    onPopoutHoveredChanged: {
+        root.pointerInPopout = root.popoutHovered;
+        if (root.popoutHovered)
+            root.cancelClose();
+        else if (root.popoutVisible)
+            root.beginClose();
+    }
 
     readonly property Timer _closeDelay: Timer {
         interval: 280
@@ -607,14 +631,6 @@ BarWidget {
             showHeader: root.previewHeader
             showScreen: root.previewScreen
             windows: item?.windows ?? []
-
-            onPointerInsideChanged: {
-                root.pointerInPopout = pointerInside;
-                if (pointerInside)
-                    root.cancelClose();
-                else
-                    root.beginClose();
-            }
 
             onPicked: root.popoutVisible = false
         }

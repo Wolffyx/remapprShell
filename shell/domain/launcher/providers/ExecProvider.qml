@@ -1,5 +1,5 @@
-// Any launcher that is its own process: rofi, fuzzel, walker, or a command the
-// user supplies.
+// A launcher that is its own process: the command the user supplies
+// (`launcher.command`) -- rofi, fuzzel, wofi, walker, whatever they run.
 //
 // These are layer-shell clients that position and dismiss themselves, so this
 // only starts them. A query is passed by substituting %q in the command, which
@@ -9,6 +9,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.launcher
 
 Provider {
@@ -34,14 +35,20 @@ Provider {
         }
     }
 
+    // A launcher starts applications as its own children, so it runs in a
+    // scope of its own and they are in it with it -- not in the shell's
+    // service, where a restart of the shell would end them (see Launch).
+    // Through a Process still, so opening it again replaces the last one.
     readonly property Process _run: Process {}
 
     function _start(query) {
         if (root.command.length === 0)
             return;
         root._run.running = false;
-        root._run.command = root.command.map(a => a === "%q" ? (query ?? "") : a);
-        root._run.running = true;
+        Launch.scoped(root.command.map(a => a === "%q" ? (query ?? "") : a), "", argv => {
+            root._run.command = argv;
+            root._run.running = true;
+        });
     }
 
     function open(mode) { root._start(""); }

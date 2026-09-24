@@ -69,6 +69,28 @@ TestCase {
         compare(rows[0].label, "Settings");
     }
 
+    // An application's own shortcut is not on the sheet, however it is bound;
+    // the same action as the shell's own is.
+    function test_an_applications_own_keys_are_left_to_it() {
+        const text = "[services][org.example.grabber.desktop]\n"
+            + "RectangularRegionScreenShot=Meta+Shift+S,Meta+Shift+S,Capture a region\n"
+            + "\n[testshell]\n"
+            + "screenshot=Print,none,Screenshot of a region\n";
+        const rows = KeyMap.sections(KeyMap.parse(text), "testshell")[0].rows;
+        compare(rows.map(r => r.label), ["Screenshot of a region"]);
+        compare(rows[0].keys, ["Print"]);
+    }
+
+    // What the fixed rows read from: Plasma's own components, nothing else.
+    // The shell's own keys come from shellRows, by the slug.
+    function test_the_fixed_rows_are_plasmas_own() {
+        const plasma = ["plasmashell", "kwin", "ksmserver", "services][org.kde.krunner.desktop"];
+        for (const section of KeyMap.wanted) {
+            for (const [group, action] of section.rows)
+                verify(plasma.indexOf(group) >= 0, `${group} / ${action}`);
+        }
+    }
+
     function test_an_empty_file_has_nothing() {
         compare(KeyMap.sections(KeyMap.parse(""), "testshell").length, 0);
     }
