@@ -88,10 +88,14 @@ _harness_exit() {
 
 # harness_done: the summary line and the exit status, as the last line of a
 # suite. Non-zero when anything failed, which is all scripts/test.sh reads.
+# It ends the suite, pass or fail: a suite that stops early -- a tool it
+# needs is missing -- calls it where it stops, and returning from it there
+# ran every check after the SKIP, against the missing tool.
 harness_done() {
     echo
     if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
     printf 'OK: %d passed\n' "$pass"
+    exit 0
 }
 
 # --- checks -----------------------------------------------------------------
