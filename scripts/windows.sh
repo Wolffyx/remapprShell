@@ -48,18 +48,8 @@ source "$REPO_ROOT/scripts/lib/kwin.sh"
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_SCRIPT_ID"
 
-kwin_script() {
-    session_available || return 1
-    qdbus6 org.kde.KWin /Scripting "org.kde.kwin.Scripting.$1" "${@:2}" 2>/dev/null
-}
-
 install_script() {
-    mkdir -p "$SCRIPT_DEST/contents/code"
-    render_template "$SCRIPT_SRC/metadata.json.in" "$SCRIPT_DEST/metadata.json" \
-        || { log_error "could not render the script metadata"; return 1; }
-    render_template "$SCRIPT_SRC/contents/code/main.js.in" "$SCRIPT_DEST/contents/code/main.js" \
-        || { log_error "could not render the script"; return 1; }
-    chmod 644 "$SCRIPT_DEST/metadata.json" "$SCRIPT_DEST/contents/code/main.js"
+    kwin_script_render "$SCRIPT_SRC" "$SCRIPT_DEST" "the script" || return 1
     log_step "installed $SCRIPT_DEST"
 }
 
@@ -80,25 +70,15 @@ case "$cmd" in
             exit 0
         fi
 
-        # Unloaded first, because KWin ignores loading a script it already has
-        # -- so without this, re-running `enable` after changing the script
-        # silently keeps running the old one, which is a confusing thing to
-        # debug.
-        kwin_script unloadScript "$KWIN_SCRIPT_ID" >/dev/null
-        kwin_script loadScript "$SCRIPT_DEST/contents/code/main.js" "$KWIN_SCRIPT_ID" >/dev/null
-        kwin_script start >/dev/null
-
-        if [ "$(kwin_script isScriptLoaded "$KWIN_SCRIPT_ID")" = "true" ]; then
-            log_step "the window list is running"
-        else
-            log_warn "KWin did not report the script as loaded"
-            log_info "  it is enabled in kwinrc and will load at the next login"
-            log_info "  see why: journalctl --user -u plasma-kwin_wayland.service -n 30"
-        fi
+        # Reloaded rather than loaded: re-running `enable` after changing the
+        # script must run the new one (kwin_script_reload says why).
+        kwin_script_reload "$KWIN_SCRIPT_ID" "$SCRIPT_DEST/contents/code/main.js"
+        kwin_script_check_loaded "$KWIN_SCRIPT_ID" "the script" \
+            && log_step "the window list is running"
         ;;
 
     disable)
-        kwin_script unloadScript "$KWIN_SCRIPT_ID" >/dev/null
+        kwin_scripting unloadScript "$KWIN_SCRIPT_ID" >/dev/null
         kconfig_revert windows
         if [ -d "$SCRIPT_DEST" ]; then
             rm -rf "$SCRIPT_DEST"
@@ -112,8 +92,8 @@ case "$cmd" in
 
     status)
         printf 'script:    %s\n' "$([ -d "$SCRIPT_DEST" ] && echo "installed ($SCRIPT_DEST)" || echo "not installed")"
-        printf 'in kwinrc: %s\n' "$(kreadconfig6 --file kwinrc --group Plugins --key "${KWIN_SCRIPT_ID}Enabled" --default '<unset>')"
-        printf 'loaded:    %s\n' "$(kwin_script isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo 'unknown')"
+        printf 'in kwinrc: %s\n' "$(kwin_plugin_state "$KWIN_SCRIPT_ID" '<unset>')"
+        printf 'loaded:    %s\n' "$(kwin_scripting isScriptLoaded "$KWIN_SCRIPT_ID" || echo 'unknown')"
         printf 'daemon:    %s\n' "$(busctl --user --json=short list 2>/dev/null | grep -c "$DBUS_NAME" >/dev/null && echo 'on the bus' || echo 'not running (it starts when something calls it)')"
         printf 'windows:   %s\n' "$("$0" show 2>/dev/null | wc -l)"
         ;;
@@ -154,11 +134,9 @@ case "$cmd" in
         esac
         session_available || die "no session to read the pointer in"
 
-        name="${KWIN_SCRIPT_ID}-pointer"
-        file=$(mktemp --suffix=.js "${XDG_RUNTIME_DIR:-/tmp}/${KWIN_SCRIPT_ID}-pointer.XXXXXX") \
-            || die "could not write the script"
-        trap 'rm -f "$file"' EXIT
-        cat > "$file" <<JS
+        # Long enough for the call to leave KWin, short enough not to be felt
+        # on a key press.
+        kwin_script_oneshot "${KWIN_SCRIPT_ID}-pointer" 0.2 <<JS || exit 1
 const pos = workspace.cursorPos;
 let output = "";
 for (const screen of workspace.screens) {
@@ -171,14 +149,6 @@ for (const screen of workspace.screens) {
 callDBus("$DBUS_NAME", "/Pointer", "$DBUS_NAME.Pointer", "At",
          "$action", Math.round(pos.x), Math.round(pos.y), output);
 JS
-        kwin_script unloadScript "$name" >/dev/null
-        kwin_script loadScript "$file" "$name" >/dev/null || die "KWin did not load the script"
-        kwin_script start >/dev/null
-        # Long enough for the call to leave KWin, short enough not to be felt
-        # on a key press. The script is taken away again either way: a loaded
-        # script that has already run is a name in KWin's list and nothing more.
-        sleep 0.2
-        kwin_script unloadScript "$name" >/dev/null
         ;;
 
     close)
@@ -192,11 +162,7 @@ JS
             || die "not a window id: '$uuid'"
         session_available || die "no session to close a window in"
 
-        name="${KWIN_SCRIPT_ID}-close-$uuid"
-        file=$(mktemp --suffix=.js "${XDG_RUNTIME_DIR:-/tmp}/${KWIN_SCRIPT_ID}-close.XXXXXX") \
-            || die "could not write the script"
-        trap 'rm -f "$file"' EXIT
-        cat > "$file" <<JS
+        kwin_script_oneshot "${KWIN_SCRIPT_ID}-close-$uuid" 0.3 <<JS || exit 1
 const id = "$uuid";
 for (const w of workspace.windowList()) {
     if (String(w.internalId).replace(/[{}]/g, "") === id) {
@@ -205,12 +171,6 @@ for (const w of workspace.windowList()) {
     }
 }
 JS
-        kwin_script unloadScript "$name" >/dev/null
-        kwin_script loadScript "$file" "$name" >/dev/null || die "KWin did not load the script"
-        kwin_script start >/dev/null
-        # Let it run before it is taken away again.
-        sleep 0.3
-        kwin_script unloadScript "$name" >/dev/null
         ;;
 
 

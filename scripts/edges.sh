@@ -276,34 +276,17 @@ shell_install() {
     local raw js
     raw=$(shell_bindings_raw)
     js=$(shell_bindings_js "$raw")
-
-    mkdir -p "$EDGES_SCRIPT_DEST/contents/code"
-    EDGE_BINDINGS=$js render_template "$EDGES_SCRIPT_SRC/metadata.json.in" \
-        "$EDGES_SCRIPT_DEST/metadata.json" \
-        || { log_error "could not render the edge script metadata"; return 1; }
-    EDGE_BINDINGS=$js render_template "$EDGES_SCRIPT_SRC/contents/code/main.js.in" \
-        "$EDGES_SCRIPT_DEST/contents/code/main.js" \
-        || { log_error "could not render the edge script"; return 1; }
-    chmod 644 "$EDGES_SCRIPT_DEST/metadata.json" "$EDGES_SCRIPT_DEST/contents/code/main.js"
-}
-
-edges_script() {
-    session_available || return 1
-    qdbus6 org.kde.KWin /Scripting "org.kde.kwin.Scripting.$1" "${@:2}" 2>/dev/null
+    EDGE_BINDINGS=$js kwin_script_render "$EDGES_SCRIPT_SRC" "$EDGES_SCRIPT_DEST" "the edge script"
 }
 
 shell_reload() {
     session_available || { log_info "not loading it now: no session"; return 0; }
-    # Unloaded first: KWin ignores loading a script it already has, so without
-    # this a re-render keeps running the old bindings -- the same trap the
-    # window list documents.
-    edges_script unloadScript "$KWIN_EDGES_SCRIPT_ID" >/dev/null
-    edges_script loadScript "$EDGES_SCRIPT_DEST/contents/code/main.js" "$KWIN_EDGES_SCRIPT_ID" >/dev/null
-    edges_script start >/dev/null
+    # Reloaded, not loaded: a re-render must not keep running the old bindings.
+    kwin_script_reload "$KWIN_EDGES_SCRIPT_ID" "$EDGES_SCRIPT_DEST/contents/code/main.js"
 }
 
 shell_remove() {
-    edges_script unloadScript "$KWIN_EDGES_SCRIPT_ID" >/dev/null
+    kwin_scripting unloadScript "$KWIN_EDGES_SCRIPT_ID" >/dev/null
     [ -d "$EDGES_SCRIPT_DEST" ] || return 0
     rm -rf "$EDGES_SCRIPT_DEST"
     log_step "removed $EDGES_SCRIPT_DEST"
@@ -432,8 +415,8 @@ case "$cmd" in
                 done
             fi
             echo
-            if [ "$(kreadconfig6 --file kwinrc --group Plugins --key "${KWIN_EDGES_SCRIPT_ID}Enabled" --default false)" = true ]; then
-                if [ "$(edges_script isScriptLoaded "$KWIN_EDGES_SCRIPT_ID")" = "true" ]; then
+            if kwin_plugin_enabled "$KWIN_EDGES_SCRIPT_ID"; then
+                if kwin_script_loaded "$KWIN_EDGES_SCRIPT_ID"; then
                     echo "the edge script is enabled and loaded"
                 else
                     echo "the edge script is enabled but KWin has not loaded it"
@@ -478,13 +461,8 @@ case "$cmd" in
 
         shell_install || die "nothing was loaded"
         shell_reload
-        if [ "$(edges_script isScriptLoaded "$KWIN_EDGES_SCRIPT_ID")" = "true" ]; then
-            log_step "$edge -> $action"
-        else
-            log_warn "KWin did not report the edge script as loaded"
-            log_info "  it is enabled in kwinrc and will load at the next login"
-            log_info "  see why: journalctl --user -u plasma-kwin_wayland.service -n 30"
-        fi
+        kwin_script_check_loaded "$KWIN_EDGES_SCRIPT_ID" "the edge script" \
+            && log_step "$edge -> $action"
         ;;
 
     # The sidebar draws down one side (sidebar.position) and is opened by an

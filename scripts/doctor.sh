@@ -393,7 +393,7 @@ profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | j
 [ -n "$profile_entries" ] || profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
     "$defaults_file" 2>/dev/null || echo "")
 
-script_loaded=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo unknown)
+script_loaded=$(kwin_scripting isScriptLoaded "$KWIN_SCRIPT_ID" || echo unknown)
 daemon_answers=no
 busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List >/dev/null 2>&1 && daemon_answers=yes
 
