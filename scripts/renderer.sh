@@ -50,7 +50,7 @@ effective_config() {
     config_merged
 }
 
-configured_renderer() { renderer_normalize "$(effective_config | jq -r '.panel.renderer // "quickshell"')"; }
+configured_renderer() { effective_config | jq -r '.panel.renderer // "quickshell"'; }
 
 # live_shell_package and package_for are lib/renderers.sh's: doctor, the report
 # and the lock screen ask the same two questions.
@@ -493,7 +493,6 @@ case "$cmd" in
     set)
         target=${args[0]:-}
         [ -n "$target" ] || die "usage: $ALIAS renderer set <$(renderer_ids | paste -sd'|')>"
-        target=$(renderer_normalize "$target")
 
         # The configuration, merged once for everything below: the report, the
         # generated layouts and the panel's geometry all read this one file.
@@ -502,7 +501,7 @@ case "$cmd" in
         effective_config > "$config"
 
         # The one being left, read before anything writes the new one.
-        previous=$(renderer_normalize "$(jq -r '.panel.renderer // "quickshell"' "$config")")
+        previous=$(jq -r '.panel.renderer // "quickshell"' "$config")
 
         valid=0
         while read -r r; do [ "$r" = "$target" ] && valid=1; done < <(renderer_ids)

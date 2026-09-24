@@ -294,14 +294,19 @@ check "our package, holding no panel" "$(kreadconfig6 --file plasmashellrc --gro
 check "no panel containments"        "$(our_panels)" "0"
 check "listed as in use"             "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .id')" "quickshell:barshell"
 
-# A profile from before discovery says `caelestia`, which meant its Quickshell
-# configuration. Gone from the machine, it is still what is configured.
-jq '.panel.renderer = "caelestia"' "$profile" > "$profile.new" && mv "$profile.new" "$profile"
-check "the old name is read as the config" "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .id')" "quickshell:caelestia"
+# A configuration that is configured but gone from the machine is still what
+# is configured, and is listed as gone until it is back.
+jq '.panel.renderer = "quickshell:goneshell"' "$profile" > "$profile.new" && mv "$profile.new" "$profile"
+check "a missing config is still current" "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .id')" "quickshell:goneshell"
 check "and shown as gone"            "$(rmpr_renderer list --json | jq -r '.[] | select(.current) | .absent')" "true"
-mkdir -p "$qs_user/caelestia" && touch "$qs_user/caelestia/shell.qml"
+mkdir -p "$qs_user/goneshell" && touch "$qs_user/goneshell/shell.qml"
 check "until it is back"             "$(rmpr_renderer list --json | jq -r '[.[] | select(.current)] | length, (.[0].absent // false)' | paste -sd' ')" "1 false"
-rm -rf "$qs_user"/{fooshell,notashell,caelestia,"$(basename "$QS_CONFIG_DIR")"} "$SANDBOX/etc"
+
+# A bare name is not a renderer: no configuration is guessed from it, not
+# even one that exists. It is written quickshell:<config>.
+out=$(rmpr_renderer set fooshell --yes 2>&1)
+check "a bare config name is refused" "$?:$(printf '%s' "$out" | grep -c 'unknown renderer: fooshell')" "1:1"
+rm -rf "$qs_user"/{fooshell,notashell,goneshell,"$(basename "$QS_CONFIG_DIR")"} "$SANDBOX/etc"
 
 echo "== revert =="
 rmpr_renderer revert >/dev/null 2>&1 || { echo "revert failed" >&2; exit 1; }
