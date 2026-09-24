@@ -662,9 +662,12 @@ script has to be able to reach the daemon before the shell exists. So:
 * `doctor` compares the running process against the file it was installed
   from and says so when they differ, because nothing else will.
 
-**A Steam game's icon comes from Steam now.** `steam_app_1407200` (World of
-Tanks) drew a grey rectangle because that is genuinely what its window
-publishes as `_NET_WM_ICON` -- under Proton, a window with no icon gets the
+**A Steam game's icon comes from Steam now.** *(Corrected 2026-09-24: wrong,
+and the Steam lookup is gone -- the window publishes the game's shield; the
+grey rectangle was Wine's stock icon, read before the game set its own and
+then kept by a per-application cache. See the afternoon of 2026-09-24.)*
+`steam_app_1407200` (World of Tanks) drew a grey rectangle because that is
+genuinely what its window publishes as `_NET_WM_ICON` -- under Proton, a window with no icon gets the
 Windows default and the cache stored it faithfully. Steam has had the real one
 all along, in `appcache/librarycache/<appid>/`, where the artwork is named for
 what it is (`library_hero.jpg`, `logo.png`, `header.jpg`) and **the icon is
@@ -685,7 +688,8 @@ either is "fixed" again:
   means *only* those. `TrayLayout.split` says so in its own comments, the
   settings page reads the same function, and `tray list` over IPC shows all
   ten items present. Settings -> Tray icons is where it changes.
-- **The WoT window's icon really is a grey rectangle.** `steam_app_1407200`
+- **The WoT window's icon really is a grey rectangle.** *(It is not -- see
+  the correction above.)* `steam_app_1407200`
   publishes a generic window pixmap as its `_NET_WM_ICON`, and the cache
   stored what it was given, faithfully. Nothing to fix in this shell; giving
   Steam applications their library icon would be new work, not a repair.
