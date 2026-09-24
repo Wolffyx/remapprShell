@@ -75,10 +75,8 @@ QtObject {
     // defaults: an override exists to differ from what this profile already
     // says, and recording a value equal to it would freeze it.
     function setForScreen(name, path, value) {
-        if (!root.writable) {
-            root.writeBlocked(root.lastError);
+        if (!root.writable)
             return false;
-        }
         const current = Obj.get(root.merged, path, undefined);
         const overlay = root.monitorData[name] ?? {};
         const next = Obj.deepEqual(value, current) ? Obj.unset(overlay, path)
@@ -86,15 +84,12 @@ QtObject {
         root.monitorData = Object.assign({}, root.monitorData, { [name]: next });
         root._monitorWrites[name] = true;
         root._monitorTimer.restart();
-        root.changed();
         return true;
     }
 
     function isOverriddenForScreen(name, path) {
         return Obj.has(root.monitorData[name] ?? {}, path);
     }
-
-    readonly property bool defaultsLoaded: Object.keys(root.defaults).length > 0
 
     // Whether anybody has ever set anything here. `schemaVersion` is written
     // by the shell itself when it seeds a profile, so a profile carrying only
@@ -126,17 +121,10 @@ QtObject {
     property bool writable: true
     property string lastError: ""
 
-    signal changed
-    signal writeBlocked(string reason)
-
     // ---- reading ------------------------------------------------------
 
     function value(path, fallback) {
         return Obj.get(root.merged, path, fallback);
-    }
-
-    function defaultValue(path, fallback) {
-        return Obj.get(root.defaults, path, fallback);
     }
 
     // True when the user has overridden this path, i.e. it is present in the
@@ -151,7 +139,6 @@ QtObject {
     // shipped default, the key is removed instead of written.
     function set(path, value) {
         if (!root.writable) {
-            root.writeBlocked(root.lastError);
             Log.warn("config", `refusing to write ${path}: ${root.lastError}`);
             return false;
         }
@@ -168,10 +155,8 @@ QtObject {
     }
 
     function reset(path) {
-        if (!root.writable) {
-            root.writeBlocked(root.lastError);
+        if (!root.writable)
             return false;
-        }
         root.profileData = Obj.unset(root.profileData, path);
         root._drop(path);
         root._scheduleWrite();
@@ -247,7 +232,6 @@ QtObject {
     }
 
     function _scheduleWrite() {
-        root.changed();
         root._writeTimer.restart();
     }
 
@@ -353,7 +337,6 @@ QtObject {
             root.lastError = "";
             root._scheduleWrite();   // persist the migrated shape
             root.profileLoaded = true;
-            root.changed();
             return;
         }
 
@@ -363,19 +346,6 @@ QtObject {
         root.lastError = "";
         Log.info("config", `profile loaded (${Object.keys(data).length} top-level override(s))`);
         root.profileLoaded = true;
-        root.changed();
-    }
-
-    // The active profile is recorded in its own small file. Keeping it out of
-    // shell.json means switching profiles is one atomic write that cannot
-    // damage the configuration it is switching away from.
-    function switchProfile(name) {
-        if (!name || name === root.profile)
-            return;
-        Fs.ensureDir(Paths.configDir);
-        root._stateView.setText(JSON.stringify({ profile: name }, null, 4) + "\n");
-        root.profile = name;
-        Log.info("config", `switched to profile '${name}'`);
     }
 
     readonly property FileView _stateView: FileView {
@@ -409,7 +379,6 @@ QtObject {
             try {
                 root.defaults = JSON.parse(text());
                 Log.info("config", `defaults loaded from ${path}`);
-                root.changed();
             } catch (e) {
                 // Shipped defaults failing to parse is a packaging bug, not a
                 // user error, so it is loud.
@@ -452,7 +421,6 @@ QtObject {
                 root.writable = true;
                 Fs.ensureDir(Paths.profileDir(root.profile));
                 root._seedTimer.restart();
-                root.changed();
             } else {
                 // Unreadable is an answer too: the defaults are what there is,
                 // and waiting for a file that cannot be read would leave the
