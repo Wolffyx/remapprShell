@@ -98,7 +98,12 @@ PanelWindow {
         required property string glyph
         property bool foldable: true
         property alias content: inner.data
-        default property alias extra: more.data
+
+        // What an open card adds, as a component rather than as children:
+        // the month grid, the forecast and the rest are built when the card
+        // opens and destroyed when it folds. Each card's is a Column, spaced
+        // as the card's own rows are.
+        property Component extra: null
 
         readonly property bool open: box.foldable ? win.isOpen(box.cardId) : true
 
@@ -161,15 +166,24 @@ PanelWindow {
 
             // Built only while it is open, and destroyed when it folds: the
             // month grid and the forecast are not worth keeping alive behind
-            // a closed card.
-            Column {
+            // a closed card. It used to say so over children that were only
+            // hidden -- a folded day card still ran the forecast lookup for
+            // every day of the month.
+            Item {
                 id: more
                 width: parent.width
-                spacing: 12
                 visible: box.open
+                implicitHeight: extraLoader.implicitHeight
                 height: box.open ? implicitHeight : 0
                 clip: true
                 Behavior on height { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
+
+                Loader {
+                    id: extraLoader
+                    width: parent.width
+                    active: box.open
+                    sourceComponent: box.extra
+                }
             }
         }
     }
@@ -379,88 +393,92 @@ PanelWindow {
                 }
             ]
 
-            Item {
-                visible: (win.player?.lengthSupported ?? false) && (win.player?.length ?? 0) > 0
-                width: parent.width
-                height: 30
+            extra: Column {
+                spacing: 12
 
-                Rectangle {
-                    id: track
-                    y: 6
+                Item {
+                    visible: (win.player?.lengthSupported ?? false) && (win.player?.length ?? 0) > 0
                     width: parent.width
-                    height: 4
-                    radius: 2
-                    color: Theme.alpha(Theme.fg, 0.12)
+                    height: 30
 
                     Rectangle {
-                        width: parent.width * Math.max(0, Math.min(1, (win.player?.position ?? 0) / Math.max(1, win.player?.length ?? 1)))
-                        height: parent.height
-                        radius: parent.radius
+                        id: track
+                        y: 6
+                        width: parent.width
+                        height: 4
+                        radius: 2
+                        color: Theme.alpha(Theme.fg, 0.12)
+
+                        Rectangle {
+                            width: parent.width * Math.max(0, Math.min(1, (win.player?.position ?? 0) / Math.max(1, win.player?.length ?? 1)))
+                            height: parent.height
+                            radius: parent.radius
+                            color: Theme.acc
+                        }
+
+                        TapHandler {
+                            onTapped: point => MediaStatus.seek((win.player?.length ?? 0) * point.position.x / track.width)
+                        }
+                    }
+
+                    PanelText {
+                        y: 14
+                        text: StatusIcons.trackTime(win.player?.position ?? 0)
+                        font.family: Theme.monoFamily
+                        font.pixelSize: 11
+                        color: Theme.mut
+                    }
+
+                    PanelText {
+                        y: 14
+                        anchors.right: parent.right
+                        text: StatusIcons.trackTime(win.player?.length ?? 0)
+                        font.family: Theme.monoFamily
+                        font.pixelSize: 11
+                        color: Theme.mut
+                    }
+                }
+
+                Row {
+                    visible: MediaStatus.present
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 14
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: win.player?.shuffleSupported ?? false
+                        glyph: "shuffle"
+                        color: (win.player?.shuffle ?? false) ? Theme.acc : Theme.fg
+                        onActivated: win.player.shuffle = !win.player.shuffle
+                    }
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        glyph: "skip_previous"
+                        onActivated: MediaStatus.previous()
+                    }
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        size: 48
+                        glyph: MediaStatus.playing ? "pause_circle" : "play_circle"
                         color: Theme.acc
+                        onActivated: MediaStatus.toggle()
                     }
-
-                    TapHandler {
-                        onTapped: point => MediaStatus.seek((win.player?.length ?? 0) * point.position.x / track.width)
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        glyph: "skip_next"
+                        onActivated: MediaStatus.next()
                     }
-                }
-
-                PanelText {
-                    y: 14
-                    text: StatusIcons.trackTime(win.player?.position ?? 0)
-                    font.family: Theme.monoFamily
-                    font.pixelSize: 11
-                    color: Theme.mut
-                }
-
-                PanelText {
-                    y: 14
-                    anchors.right: parent.right
-                    text: StatusIcons.trackTime(win.player?.length ?? 0)
-                    font.family: Theme.monoFamily
-                    font.pixelSize: 11
-                    color: Theme.mut
-                }
-            }
-
-            Row {
-                visible: MediaStatus.present
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 14
-
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: win.player?.shuffleSupported ?? false
-                    glyph: "shuffle"
-                    color: (win.player?.shuffle ?? false) ? Theme.acc : Theme.fg
-                    onActivated: win.player.shuffle = !win.player.shuffle
-                }
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    glyph: "skip_previous"
-                    onActivated: MediaStatus.previous()
-                }
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    size: 48
-                    glyph: MediaStatus.playing ? "pause_circle" : "play_circle"
-                    color: Theme.acc
-                    onActivated: MediaStatus.toggle()
-                }
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    glyph: "skip_next"
-                    onActivated: MediaStatus.next()
-                }
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: win.player?.loopSupported ?? false
-                    glyph: (win.player?.loopState ?? MprisLoopState.None) === MprisLoopState.Track ? "repeat_one" : "repeat"
-                    color: (win.player?.loopState ?? MprisLoopState.None) !== MprisLoopState.None ? Theme.acc : Theme.fg
-                    onActivated: {
-                        const s = win.player.loopState;
-                        win.player.loopState = s === MprisLoopState.None ? MprisLoopState.Playlist
-                                             : s === MprisLoopState.Playlist ? MprisLoopState.Track
-                                             : MprisLoopState.None;
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: win.player?.loopSupported ?? false
+                        glyph: (win.player?.loopState ?? MprisLoopState.None) === MprisLoopState.Track ? "repeat_one" : "repeat"
+                        color: (win.player?.loopState ?? MprisLoopState.None) !== MprisLoopState.None ? Theme.acc : Theme.fg
+                        onActivated: {
+                            const s = win.player.loopState;
+                            win.player.loopState = s === MprisLoopState.None ? MprisLoopState.Playlist
+                                                 : s === MprisLoopState.Playlist ? MprisLoopState.Track
+                                                 : MprisLoopState.None;
+                        }
                     }
                 }
             }
@@ -505,53 +523,57 @@ PanelWindow {
                 }
             ]
 
-            MonthGrid {
-                id: month
-                width: parent.width
-                now: win.clock.date
-                cellHeight: 34
-                dayDiameter: 30
-                dayFontSize: 13
-                selected: dayCard.picked
-                // The forecast, on the days there is one for: five days out,
-                // which is all Open-Meteo is asked for.
-                badgeFor: cell => {
-                    const d = Forecast.dayAt(WeatherStatus.days, new Date(cell.year, cell.month, cell.day).getTime());
-                    return d ? Forecast.describe(d.code, true).glyph : "";
-                }
-                onPicked: cell => dayCard.picked = new Date(cell.year, cell.month, cell.day)
-            }
+            extra: Column {
+                spacing: 12
 
-            // What the chosen day's weather is, when it is one the forecast
-            // reaches. Nothing at all for a day in April.
-            Row {
-                visible: dayCard.chosen !== null
-                width: parent.width
-                spacing: 10
-
-                Glyph {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: dayCard.chosen ? Forecast.describe(dayCard.chosen.code, true).glyph : ""
-                    size: 22
-                    color: Theme.acc
+                MonthGrid {
+                    id: month
+                    width: parent.width
+                    now: win.clock.date
+                    cellHeight: 34
+                    dayDiameter: 30
+                    dayFontSize: 13
+                    selected: dayCard.picked
+                    // The forecast, on the days there is one for: five days out,
+                    // which is all Open-Meteo is asked for.
+                    badgeFor: cell => {
+                        const d = Forecast.dayAt(WeatherStatus.days, new Date(cell.year, cell.month, cell.day).getTime());
+                        return d ? Forecast.describe(d.code, true).glyph : "";
+                    }
+                    onPicked: cell => dayCard.picked = new Date(cell.year, cell.month, cell.day)
                 }
 
-                PanelText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: dayCard.chosen
-                        ? `${dayCard.picked.toLocaleDateString(Qt.locale(), "ddd d MMM")} · ${Forecast.describe(dayCard.chosen.code, true).label}`
-                        : ""
-                    font.pixelSize: 12
-                    color: Theme.mut
-                }
+                // What the chosen day's weather is, when it is one the forecast
+                // reaches. Nothing at all for a day in April.
+                Row {
+                    visible: dayCard.chosen !== null
+                    width: parent.width
+                    spacing: 10
 
-                PanelText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: dayCard.chosen
-                        ? `${Forecast.degrees(dayCard.chosen.high, WeatherStatus.temperatureUnit)} / ${Forecast.degrees(dayCard.chosen.low, "")}`
-                        : ""
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
+                    Glyph {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: dayCard.chosen ? Forecast.describe(dayCard.chosen.code, true).glyph : ""
+                        size: 22
+                        color: Theme.acc
+                    }
+
+                    PanelText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: dayCard.chosen
+                            ? `${dayCard.picked.toLocaleDateString(Qt.locale(), "ddd d MMM")} · ${Forecast.describe(dayCard.chosen.code, true).label}`
+                            : ""
+                        font.pixelSize: 12
+                        color: Theme.mut
+                    }
+
+                    PanelText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: dayCard.chosen
+                            ? `${Forecast.degrees(dayCard.chosen.high, WeatherStatus.temperatureUnit)} / ${Forecast.degrees(dayCard.chosen.low, "")}`
+                            : ""
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                    }
                 }
             }
         }
@@ -613,114 +635,118 @@ PanelWindow {
                 }
             ]
 
-            Row {
-                visible: WeatherStatus.ready
-                width: parent.width
-                spacing: 16
-
-                PanelText {
-                    text: WeatherStatus.current
-                        ? `Feels ${Forecast.degrees(WeatherStatus.current.feelsLike, WeatherStatus.temperatureUnit)}` : ""
-                    font.pixelSize: 12
-                    color: Theme.mut
-                }
-                PanelText {
-                    text: WeatherStatus.current ? `Humidity ${Math.round(WeatherStatus.current.humidity)}%` : ""
-                    font.pixelSize: 12
-                    color: Theme.mut
-                }
-                PanelText {
-                    text: WeatherStatus.current
-                        ? `Wind ${Math.round(WeatherStatus.current.wind)} ${WeatherStatus.forecast?.windUnit ?? ""}` : ""
-                    font.pixelSize: 12
-                    color: Theme.mut
-                }
-            }
-
-            // The next hours, across.
-            Flickable {
-                visible: WeatherStatus.ready
-                width: parent.width
-                height: 76
-                contentWidth: hours.implicitWidth
-                flickableDirection: Flickable.HorizontalFlick
-                clip: true
+            extra: Column {
+                spacing: 12
 
                 Row {
-                    id: hours
-                    spacing: 4
+                    visible: WeatherStatus.ready
+                    width: parent.width
+                    spacing: 16
+
+                    PanelText {
+                        text: WeatherStatus.current
+                            ? `Feels ${Forecast.degrees(WeatherStatus.current.feelsLike, WeatherStatus.temperatureUnit)}` : ""
+                        font.pixelSize: 12
+                        color: Theme.mut
+                    }
+                    PanelText {
+                        text: WeatherStatus.current ? `Humidity ${Math.round(WeatherStatus.current.humidity)}%` : ""
+                        font.pixelSize: 12
+                        color: Theme.mut
+                    }
+                    PanelText {
+                        text: WeatherStatus.current
+                            ? `Wind ${Math.round(WeatherStatus.current.wind)} ${WeatherStatus.forecast?.windUnit ?? ""}` : ""
+                        font.pixelSize: 12
+                        color: Theme.mut
+                    }
+                }
+
+                // The next hours, across.
+                Flickable {
+                    visible: WeatherStatus.ready
+                    width: parent.width
+                    height: 76
+                    contentWidth: hours.implicitWidth
+                    flickableDirection: Flickable.HorizontalFlick
+                    clip: true
+
+                    Row {
+                        id: hours
+                        spacing: 4
+
+                        Repeater {
+                            model: WeatherStatus.hours.slice(0, 12)
+
+                            Moment {
+                                required property var modelData
+                                when: Qt.formatDateTime(new Date(modelData.when), "HH:mm")
+                                glyph: Forecast.describe(modelData.code, modelData.isDay).glyph
+                                value: Forecast.degrees(modelData.temperature, "°")
+                                second: modelData.rain > 0 ? `${Math.round(modelData.rain)}%` : ""
+                            }
+                        }
+                    }
+                }
+
+                // And the days.
+                Column {
+                    visible: WeatherStatus.ready
+                    width: parent.width
+                    spacing: 8
 
                     Repeater {
-                        model: WeatherStatus.hours.slice(0, 12)
+                        model: WeatherStatus.days.slice(0, 5)
 
-                        Moment {
+                        Item {
+                            id: line
                             required property var modelData
-                            when: Qt.formatDateTime(new Date(modelData.when), "HH:mm")
-                            glyph: Forecast.describe(modelData.code, modelData.isDay).glyph
-                            value: Forecast.degrees(modelData.temperature, "°")
-                            second: modelData.rain > 0 ? `${Math.round(modelData.rain)}%` : ""
+                            width: parent.width
+                            height: 20
+
+                            PanelText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 70
+                                text: Forecast.dayName(line.modelData.when, win.clock.date.getTime(), Qt.locale())
+                                font.pixelSize: 12
+                                color: Theme.mut
+                            }
+
+                            Glyph {
+                                x: 74
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: Forecast.describe(line.modelData.code, true).glyph
+                                size: 16
+                                color: Theme.acc
+                            }
+
+                            PanelText {
+                                x: 100
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: line.modelData.rain > 0
+                                text: `${Math.round(line.modelData.rain)}%`
+                                font.pixelSize: 11
+                                color: Theme.mut
+                            }
+
+                            PanelText {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: `${Forecast.degrees(line.modelData.high, "°")} / ${Forecast.degrees(line.modelData.low, "°")}`
+                                font.pixelSize: 12
+                            }
                         }
                     }
                 }
-            }
 
-            // And the days.
-            Column {
-                visible: WeatherStatus.ready
-                width: parent.width
-                spacing: 8
-
-                Repeater {
-                    model: WeatherStatus.days.slice(0, 5)
-
-                    Item {
-                        id: line
-                        required property var modelData
-                        width: parent.width
-                        height: 20
-
-                        PanelText {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 70
-                            text: Forecast.dayName(line.modelData.when, win.clock.date.getTime(), Qt.locale())
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-
-                        Glyph {
-                            x: 74
-                            anchors.verticalCenter: parent.verticalCenter
-                            name: Forecast.describe(line.modelData.code, true).glyph
-                            size: 16
-                            color: Theme.acc
-                        }
-
-                        PanelText {
-                            x: 100
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: line.modelData.rain > 0
-                            text: `${Math.round(line.modelData.rain)}%`
-                            font.pixelSize: 11
-                            color: Theme.mut
-                        }
-
-                        PanelText {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: `${Forecast.degrees(line.modelData.high, "°")} / ${Forecast.degrees(line.modelData.low, "°")}`
-                            font.pixelSize: 12
-                        }
-                    }
+                PanelText {
+                    visible: WeatherStatus.ready
+                    width: parent.width
+                    text: WeatherStatus.fetchedAt > 0
+                        ? `Open-Meteo · ${Qt.formatDateTime(new Date(WeatherStatus.fetchedAt), "HH:mm")}` : ""
+                    font.pixelSize: 10
+                    color: Theme.mut
                 }
-            }
-
-            PanelText {
-                visible: WeatherStatus.ready
-                width: parent.width
-                text: WeatherStatus.fetchedAt > 0
-                    ? `Open-Meteo · ${Qt.formatDateTime(new Date(WeatherStatus.fetchedAt), "HH:mm")}` : ""
-                font.pixelSize: 10
-                color: Theme.mut
             }
         }
     }
@@ -747,25 +773,29 @@ PanelWindow {
                 }
             ]
 
-            Meter {
-                visible: SystemStats.gpu >= 0
-                label: SystemStats.gpuTemp > 0 ? `GPU · ${SystemStats.gpuTemp} °C` : "GPU"
-                value: `${Math.round(Math.max(0, SystemStats.gpu) * 100)}%`
-                fraction: Math.max(0, SystemStats.gpu)
-            }
+            extra: Column {
+                spacing: 12
 
-            Meter {
-                label: "Network"
-                value: `${Stats.bytes(SystemStats.netRate)}/s`
-                // A gigabit's worth is the whole bar.
-                fraction: SystemStats.netRate / (125 * 1024 * 1024)
-            }
+                Meter {
+                    visible: SystemStats.gpu >= 0
+                    label: SystemStats.gpuTemp > 0 ? `GPU · ${SystemStats.gpuTemp} °C` : "GPU"
+                    value: `${Math.round(Math.max(0, SystemStats.gpu) * 100)}%`
+                    fraction: Math.max(0, SystemStats.gpu)
+                }
 
-            PanelText {
-                width: parent.width
-                text: Session.uptime.length > 0 ? `Up ${Session.uptime}` : ""
-                font.pixelSize: 11
-                color: Theme.mut
+                Meter {
+                    label: "Network"
+                    value: `${Stats.bytes(SystemStats.netRate)}/s`
+                    // A gigabit's worth is the whole bar.
+                    fraction: SystemStats.netRate / (125 * 1024 * 1024)
+                }
+
+                PanelText {
+                    width: parent.width
+                    text: Session.uptime.length > 0 ? `Up ${Session.uptime}` : ""
+                    font.pixelSize: 11
+                    color: Theme.mut
+                }
             }
         }
     }
@@ -845,12 +875,16 @@ PanelWindow {
                 }
             ]
 
-            TextButton {
-                visible: NotificationWatch.entries.length > 0
-                glyph: "clear_all"
-                iconName: "edit-clear-history"
-                text: "Clear"
-                onActivated: NotificationWatch.clear()
+            extra: Column {
+                spacing: 12
+
+                TextButton {
+                    visible: NotificationWatch.entries.length > 0
+                    glyph: "clear_all"
+                    iconName: "edit-clear-history"
+                    text: "Clear"
+                    onActivated: NotificationWatch.clear()
+                }
             }
         }
     }
