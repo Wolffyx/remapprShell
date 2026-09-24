@@ -121,12 +121,21 @@ lockscreen_package() {   # <dest dir> <lockscreen dir>
 # the lock screen with the real authenticator while a bug woke its prompt
 # with nobody there. So now nothing in a check can reach PAM, and the stand-in
 # reports that bug instead of paying for it.
-lockscreen_probe_package() {   # <dest dir> <lockscreen dir>
+#
+# The probe -- the LockScreen.qml the greeter loads, holding the stand-in and
+# the lock screen under test -- is the one below unless another is given:
+# dev/preview/lock.sh gives one that takes a picture.
+lockscreen_probe_package() {   # <dest dir> <lockscreen dir> [probe QML]
     local dir="$1/contents/lockscreen"
     lockscreen_package "$1" "$2" || return 1
     mv "$dir/LockScreen.qml" "$dir/LockScreenUnderTest.qml" || return 1
     printf 'LockScreenUnderTest 1.0 LockScreenUnderTest.qml\n' >> "$dir/qmldir"
-    cat > "$dir/LockScreen.qml" <<'QML'
+    if [ $# -ge 3 ]; then
+        printf '%s\n' "$3" > "$dir/LockScreen.qml"
+        return
+    fi
+    {
+        cat <<'QML'
 // Written by `lockscreen check`; never installed. See lockscreen_probe_package.
 // qmllint disable unqualified
 import QtQuick
@@ -135,23 +144,9 @@ Item {
     id: probe
     property bool viewVisible: false
 
-    QtObject {
-        id: stand
-        property int state: 0
-        property bool hadPrompt: false
-        property string prompt: ""
-        property string promptForSecret: ""
-        property string infoMessage: ""
-        property string errorMessage: ""
-        property int authenticatorTypes: 0
-        signal succeeded()
-        signal failed(int kind, var source)
-        signal noninteractiveError(int kind, var source)
-        function startAuthenticating() { console.warn("lock screen: started authenticating with nobody there"); }
-        function stopAuthenticating() {}
-        function respond(response) { console.warn("lock screen: sent a password with nobody there"); }
-        function cancel() {}
-    }
+QML
+        lockscreen_stand_qml "lock screen"
+        cat <<'QML'
 
     LockScreenUnderTest {
         id: under
@@ -168,6 +163,32 @@ Item {
             console.warn("lock screen: this greeter lacks", lacks.join(", "));
     }
 }
+QML
+    } > "$dir/LockScreen.qml"
+}
+
+# The stand-in for the greeter's authenticator, as QML for a probe to hold:
+# everything the lock screen asks of the real one, answered by nothing, and
+# a complaint -- led by <who> -- for the two calls that would have reached PAM.
+lockscreen_stand_qml() {   # <who>
+    cat <<QML
+    QtObject {
+        id: stand
+        property int state: 0
+        property bool hadPrompt: false
+        property string prompt: ""
+        property string promptForSecret: ""
+        property string infoMessage: ""
+        property string errorMessage: ""
+        property int authenticatorTypes: 0
+        signal succeeded()
+        signal failed(int kind, var source)
+        signal noninteractiveError(int kind, var source)
+        function startAuthenticating() { console.warn("$1: started authenticating with nobody there"); }
+        function stopAuthenticating() {}
+        function respond(response) { console.warn("$1: sent a password with nobody there"); }
+        function cancel() {}
+    }
 QML
 }
 
