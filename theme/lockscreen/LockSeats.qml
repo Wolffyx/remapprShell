@@ -299,6 +299,7 @@ LockStyle {
                 visible: media.hasPlayer && seats.ui.setting("showMediaControls", true)
                 chromeless: true
                 textColor: "#cdc6be"
+                unit: seats.unit
             }
 
             LockActions {

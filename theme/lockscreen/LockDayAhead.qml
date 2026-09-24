@@ -34,7 +34,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.mpris as Mpris
@@ -797,9 +796,12 @@ LockStyle {
             width: board.width - x - day.px(80)
             spacing: day.px(18)
 
-            // What is playing, as the design's card: art, track, artist, and
-            // the one button. Drawn here rather than by MediaCard, whose
-            // second line is white on every ground.
+            // What is playing, as the design's card: art, track, artist and
+            // album, and the one button. Drawn here rather than by MediaCard
+            // because it is another card -- one round button rather than
+            // three, the album, art that waits on the accent's gradient --
+            // and MediaCard taking all of that would be parameters only this
+            // style sets. The rounded art is LockPicture, as the faces are.
             Repeater {
                 model: day.ui.setting("showMediaControls", true) ? LockKeys.players : null
 
@@ -839,34 +841,14 @@ LockStyle {
                         }
                     }
 
-                    Image {
+                    LockPicture {
                         id: art
 
                         anchors.fill: artBack
-                        visible: false
+                        radius: artBack.radius
                         asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
                         source: player.model.artUrl ?? ""
                         sourceSize: Qt.size(artBack.width * 2, artBack.height * 2)
-                    }
-
-                    Rectangle {
-                        id: artMask
-
-                        anchors.fill: artBack
-                        radius: artBack.radius
-                        visible: false
-                        layer.enabled: true
-                    }
-
-                    MultiEffect {
-                        anchors.fill: artBack
-                        source: art
-                        visible: art.status === Image.Ready
-                        maskEnabled: true
-                        maskSource: artMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin: 1.0
                     }
 
                     Column {

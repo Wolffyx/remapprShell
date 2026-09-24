@@ -12,6 +12,7 @@ LockStyle 1.0 LockStyle.qml
 LockPrompt 1.0 LockPrompt.qml
 LockClock 1.0 LockClock.qml
 LockFace 1.0 LockFace.qml
+LockPicture 1.0 LockPicture.qml
 LockMessage 1.0 LockMessage.qml
 LockActions 1.0 LockActions.qml
 LockStatus 1.0 LockStatus.qml

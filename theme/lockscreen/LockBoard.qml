@@ -186,6 +186,7 @@ LockStyle {
                     anchors.margins: Math.round(14 * board.unit)
                     chromeless: true
                     textColor: board.ink
+                    unit: board.unit
                 }
             }
 

@@ -93,6 +93,7 @@ LockStyle {
             width: Math.round(392 * glass.unit)
             visible: media.hasPlayer && glass.ui.setting("showMediaControls", true) && glass.ui.unlock.shown
             textColor: glass.ui.fg
+            unit: glass.unit
         }
 
         Column {

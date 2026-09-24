@@ -247,5 +247,6 @@ LockStyle {
         width: Math.round(392 * editorial.unit)
         visible: media.hasPlayer && editorial.ui.setting("showMediaControls", true) && editorial.ui.unlock.shown
         textColor: "#ffffff"
+        unit: editorial.unit
     }
 }

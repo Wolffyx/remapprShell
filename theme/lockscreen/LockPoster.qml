@@ -164,6 +164,7 @@ LockStyle {
                     width: Math.round(300 * poster.unit)
                     chromeless: true
                     textColor: poster.ink
+                    unit: poster.unit
                 }
             }
 

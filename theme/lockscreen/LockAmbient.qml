@@ -67,6 +67,7 @@ LockStyle {
             width: Math.round(392 * ambient.unit)
             chromeless: true
             textColor: ambient.ink
+            unit: ambient.unit
         }
     }
 
