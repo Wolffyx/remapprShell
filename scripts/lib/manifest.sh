@@ -21,6 +21,7 @@ dir|shell|$QS_CONFIG_DIR
 dir|config|$DATA_DIR/config
 template|bin/session.sh.in|$BIN_DIR/$SESSION_BIN
 template|bin/ctl.sh.in|$BIN_DIR/$CTL_BIN
+package|bin/windowsd|$DATA_DIR/lib/windowsd
 template|bin/windowsd.py.in|$BIN_DIR/$WINDOWSD_BIN
 template|share/dbus/windows.service.in|$DBUS_SERVICES_DIR/$DBUS_NAME.service
 symlink|$CTL_BIN|$BIN_DIR/$ALIAS

@@ -118,12 +118,12 @@ rm -f "$FAKEBIN/quickshell"
 # Both switcher keys are held rather than tapped, so the daemon has to run
 # something when each is released -- or the fix above reaches only Alt+Tab.
 echo "== the daemon runs a release =="
-check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
+check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
+check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
 # The actions themselves are one list, which the daemon is rendered from.
 check "the overview has a key"    "$(grep -c "^overview$(printf '\t')Desktops$(printf '\t')" "$REPO_ROOT/scripts/lib/shortcut-actions.tsv")" "1"
-check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
 
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"

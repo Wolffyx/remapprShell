@@ -13,9 +13,11 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/tests/lib/harness.sh"
 harness_init
-source "$REPO_ROOT/scripts/lib/render.sh"
+source "$REPO_ROOT/tests/lib/windowsd.sh"
 DAEMON_PID=""
 harness_on_exit '[ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null'
+
+refused() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); harness_done; }
 
 # KWin's own window behaviour: kwinrc keys, written through the ledger. What
 # matters is that a bad value never reaches kwinrc, that a write is recorded
@@ -55,7 +57,7 @@ check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ]
 
 command -v busctl >/dev/null 2>&1 || { echo "  SKIP  busctl not available"; exit 0; }
 [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || { echo "  SKIP  no session bus"; exit 0; }
-python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo "  SKIP  python-gobject not installed"; exit 0; }
+windowsd_require
 
 # A name of its own: the installed daemon may be running on this bus, and two
 # daemons answering one name is the thing the daemon itself refuses to do.
@@ -67,19 +69,29 @@ python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo " 
 # braces: the no-session variable as well, set by the harness for every suite
 # and honoured by the daemon too.
 TEST_NAME="com.remappr.ShellTest$$"
-DAEMON="$SANDBOX/windowsd"
-render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
+
+# The script and its package, where an install in this HOME would put them:
+# the daemon started below is one that finds its modules the way the
+# installed one does.
+windowsd_install || refused "the daemon could not be rendered as an install renders it"
+DAEMON=$WINDOWSD_DAEMON
+
 # BUS_NAME and INTERFACE by name, and nothing else. SHORTCUT_OWNER keeps the
 # shell's own name, because BUS_NAME differing from it is the guard: a sed
 # over every quoted "$DBUS_NAME" renamed both, and left this copy believing
 # it owned the keys, with only the no-session variable standing in the way.
-python3 - "$DAEMON" "$TEST_NAME" <<'PY'
+# Each is found exactly once, or nothing starts: a rename that matched
+# nothing would start this copy under the shell's own name.
+python3 - "$WINDOWSD_PACKAGE" "$TEST_NAME" <<'PY' || refused "the daemon could not be given a name of its own"
 import re, sys
-path, name = sys.argv[1], sys.argv[2]
-src = open(path).read()
-src = re.sub(r'^BUS_NAME = .*$', f'BUS_NAME = "{name}"', src, flags=re.M)
-src = re.sub(r'^INTERFACE = .*$', f'INTERFACE = "{name}.Windows"', src, flags=re.M)
-open(path, 'w').write(src)
+package, name = sys.argv[1], sys.argv[2]
+for module, pattern, line in (("brand.py", r'^BUS_NAME = .*$', f'BUS_NAME = "{name}"'),
+                              ("windowlist.py", r'^INTERFACE = .*$', f'INTERFACE = "{name}.Windows"')):
+    path = f"{package}/{module}"
+    src, found = re.subn(pattern, line, open(path).read(), flags=re.M)
+    if found != 1:
+        sys.exit(f"{module}: {pattern} matched {found} times")
+    open(path, 'w').write(src)
 PY
 
 # Without a display: this copy has no business sweeping the X11 windows of
@@ -192,74 +204,46 @@ check "no id is refused"                      "$status" "1"
 out=$(nosession close 1f46c057-675a-4d51-99e5-17aafdfb5b06); status=$?
 check "no session, nothing closed"            "$status:$(printf '%s' "$out" | grep -c 'no session')" "1:1"
 
-# The blocks below read the daemon's source rather than a rendered copy, so
-# they put in the placeholders that are not names: the tables it shares with
-# lib/accel.sh, worked out the way an install renders them.
-render_tables; export ACCEL_KEYCODES SHORTCUT_ACTIONS
+# The blocks below import the package rather than run the daemon, rendered
+# under example names -- see tests/lib/windowsd.sh.
+windowsd_example
 
 # Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
 # from another application, holds several sizes one after another, and a
 # malformed one must yield nothing rather than an exception in the daemon
 # everything else depends on.
 echo "== icons taken from the windows themselves =="
-python3 - "$REPO_ROOT" <<'PYTEST'
-import sys, importlib.util, re, os
-repo = sys.argv[1]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-largest = mod["WindowIcons"]._largest
+windowsd_python <<'PYTEST'
+from windowsd.icons import WindowIcons
+largest = WindowIcons._largest
 
 def case(name, values, expect):
     got = largest(values)
-    ok = (got is None and expect is None) or (got is not None and (got[0], got[1]) == expect)
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}")
-    return ok
+    check(name, None if got is None else (got[0], got[1]), expect)
 
-fails = 0
 # One 2x2 icon.
-fails += not case("reads a single size", [2, 2] + [0] * 4, (2, 2))
+case("reads a single size", [2, 2] + [0] * 4, (2, 2))
 # Two sizes: the bigger one wins, because it is the one worth drawing.
-fails += not case("prefers the larger size", [2, 2] + [0] * 4 + [4, 4] + [0] * 16, (4, 4))
+case("prefers the larger size", [2, 2] + [0] * 4 + [4, 4] + [0] * 16, (4, 4))
 # Absurd dimensions and truncated data are what a malformed property looks like.
-fails += not case("refuses absurd dimensions", [99999, 99999, 1], None)
-fails += not case("refuses truncated data", [4, 4, 1, 2, 3], None)
-fails += not case("refuses nothing at all", [], None)
-fails += not case("refuses a zero size", [0, 0], None)
+case("refuses absurd dimensions", [99999, 99999, 1], None)
+case("refuses truncated data", [4, 4, 1, 2, 3], None)
+case("refuses nothing at all", [], None)
+case("refuses a zero size", [0, 0], None)
 # A size beyond what a panel would draw is skipped, but a usable one after it
 # is still found.
-fails += not case("skips a size too large to draw", [512, 1] + [0] * 512 + [8, 1] + [0] * 8, (8, 1))
-sys.exit(1 if fails else 0)
+case("skips a size too large to draw", [512, 1] + [0] * 512 + [8, 1] + [0] * 8, (8, 1))
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
 
 # Where the icons are written. A copy of what a window holds is worth keeping
 # only while the window can be, so they go to the session's runtime
 # directory, which logout empties -- not the state directory, where they
 # outlived every session. The directories are the user's alone.
 echo "== window icons live in the session's runtime directory =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+windowsd_python "$SANDBOX" <<'PYTEST'
 import sys, os, io, stat, tempfile, contextlib
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-icon_dir = mod["icon_dir"]
-
-fails = 0
-def check(name, got, want):
-    global fails
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-    fails += 0 if ok else 1
+from windowsd.icons import icon_dir
+sandbox = sys.argv[1]
 
 def mode(path):
     return oct(stat.S_IMODE(os.stat(path).st_mode))
@@ -290,9 +274,7 @@ os.environ["XDG_RUNTIME_DIR"] = os.path.join(sandbox, "not-a-directory")
 open(os.environ["XDG_RUNTIME_DIR"], "w").close()
 with contextlib.redirect_stderr(io.StringIO()):
     check("an unusable one falls back too", icon_dir(), fallback)
-sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
 
 # What Plasma reads about the process behind a window, for the shell to match
 # it by when the window itself matches no application: the command line and
@@ -300,24 +282,11 @@ if [ $? -eq 0 ]; then pass=$((pass+8)); else fail=$((fail+1)); fi
 # nothing else. Read from a /proc made up here, so every case is one the test
 # decides.
 echo "== what Plasma reads about a window's process =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+windowsd_python "$SANDBOX" <<'PYTEST'
 import sys, os, json
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-Processes = mod["Processes"]
-
-fails = 0
-def check(name, got, want):
-    global fails
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-    fails += 0 if ok else 1
+from windowsd.desktop_files import app_id_file
+from windowsd.processes import Processes
+sandbox = sys.argv[1]
 
 root = os.path.join(sandbox, "procfacts")
 proc = os.path.join(root, "proc")
@@ -394,7 +363,6 @@ check("an environment that cannot be read gives nothing", Processes.desktop_hint
 
 # An app id that is a desktop file's path, as it is or without the suffix.
 named = write(os.path.join(root, "files", "example-named.desktop"), "[Desktop Entry]\nName=Named\nIcon=/an/icon.png\n")
-app_id_file = mod["app_id_file"]
 check("an app id that is a desktop file's path",
       (app_id_file({"desktopFile": named})["name"], app_id_file({"desktopFile": named})["iconFile"]), ("Named", ""))
 check("or is one without the suffix", app_id_file({"desktopFile": "", "appId": named[:-8]})["path"], named)
@@ -416,9 +384,7 @@ kept.forget_all_but({6})
 kept.facts_for(5)
 check("and again once it had gone", Counting.reads, 3)
 check("no process, nothing read", (kept.facts_for(0), kept.facts_for(None), Counting.reads), ({}, {}, 3))
-sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+20)); else fail=$((fail+1)); fi
 
 # A lookup that found nothing is a fact about the moment, not about the
 # window: `_NET_WM_ICON` is set a little after the window is mapped, so a
@@ -428,18 +394,14 @@ if [ $? -eq 0 ]; then pass=$((pass+20)); else fail=$((fail+1)); fi
 # A hit is kept only until KWin says the icon changed: a program that set its
 # own icon over its toolkit's first one was otherwise drawn with the first.
 echo "== a window's icon is looked at again when it may have changed =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+windowsd_python "$SANDBOX" <<'PYTEST'
 import sys, os, json
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
+from windowsd.gio import GLib
+from windowsd.icons import WindowIcons
+from windowsd.windowlist import WindowList
+sandbox = sys.argv[1]
 
-class Probe(mod["WindowIcons"]):
+class Probe(WindowIcons):
     """The real path_for, with the display replaced by a script of answers."""
     MISS_DELAYS = (0.0,) * 6        # the waiting is not what is under test
 
@@ -454,13 +416,6 @@ class Probe(mod["WindowIcons"]):
     def _extract(self, window):
         self.looks += 1
         return self.script.pop(0) if self.script else None
-
-fails = 0
-def check(name, got, want):
-    global fails
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-    fails += 0 if ok else 1
 
 def icon(name):
     path = os.path.join(sandbox, name)
@@ -499,7 +454,7 @@ check("until KWin announces a change",  p.looks, len(Probe.MISS_DELAYS) + 1)
 # A miss is looked at again on a clock, soon: the first retry is a tenth of a
 # second away, not three seconds and KWin's next event (2026-09-24).
 class Timed(Probe):
-    MISS_DELAYS = mod["WindowIcons"].MISS_DELAYS
+    MISS_DELAYS = WindowIcons.MISS_DELAYS
 p = Timed([])
 check("nothing to wait for before a miss", p.next_look(), None)
 p.path_for(window("late"))
@@ -511,14 +466,14 @@ check("and a window with its icon asks for nothing", p.next_look(), None)
 
 # The window list sends itself again when a late icon turns up, with nothing
 # else having happened on screen.
-wl = mod["WindowList"]()
+wl = WindowList()
 wl._icons = Probe([None, late])
 wl.update(json.dumps([{"uuid": "slow", "pid": 1, "iconSerial": 0, "title": "t"}]))
 check("the first list goes without the icon", "iconPath" in json.loads(wl._json)[0], False)
 wl._relook()
 check("the next look sends it with the icon", json.loads(wl._json)[0].get("iconPath"), late)
 if wl._relook_id:
-    mod["GLib"].source_remove(wl._relook_id)
+    GLib.source_remove(wl._relook_id)
 
 # The path is cached, not the picture, and a path can stop being true.
 gone = icon("gone.png")
@@ -547,9 +502,7 @@ check("a window that went takes its icon with it",   os.path.exists(mine), False
 check("and what was found out about it",             ("went" in p._x11, "went" in p._icons), (False, False))
 check("a window still there keeps its own",          (p._icons.get("stays"), p._x11.get("stays")), ((0, one), "0x6"))
 check("a file this copy did not write is left alone", os.path.exists(foreign), True)
-sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+16)); else fail=$((fail+1)); fi
 
 # Which X11 window a window is. KWin names no X11 window to a script, so the
 # daemon finds it among the display's managed windows -- and "the first window
@@ -557,24 +510,9 @@ if [ $? -eq 0 ]; then pass=$((pass+16)); else fail=$((fail+1)); fi
 # window's stock icon stood for the application's own. The class must agree,
 # and the title decides between windows that share it.
 echo "== a window's icon comes from that window =="
-python3 - "$REPO_ROOT" <<'PYTEST'
-import sys, os
-repo = sys.argv[1]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-pick, parse = mod["WindowIcons"].pick_client, mod["WindowIcons"].client
-
-fails = 0
-def check(name, got, want):
-    global fails
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-    fails += 0 if ok else 1
+windowsd_python <<'PYTEST'
+from windowsd.icons import WindowIcons
+pick, parse = WindowIcons.pick_client, WindowIcons.client
 
 # One process with a helper window listed first and two windows of its own,
 # and another process.
@@ -608,9 +546,7 @@ check("xprop's answer read",   parse("0x1", props),
       {"id": "0x1", "pid": 4242, "instance": "inst", "class": "Klass", "name": 'A "quoted" title'})
 check("a window with none of it", parse("0x2", "_NET_WM_PID:  not found.\n"),
       {"id": "0x2", "pid": 0, "instance": "", "class": "", "name": ""})
-sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 # The shortcuts the daemon owns. Two things can be checked without a session:
 # that a key string becomes the integer kglobalaccel wants -- the same numbers
@@ -618,25 +554,11 @@ if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 # running server -- and that the component's group is read out of the file the
 # way kglobalaccel writes it.
 echo "== the shortcuts the daemon owns =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+windowsd_python "$SANDBOX" <<'PYTEST'
 import sys, os
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-keycode, shortcuts = mod["keycode"], mod["GlobalShortcuts"]
-
-fails = 0
-def case(name, got, want):
-    global fails
-    ok = got == want
-    fails += not ok
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+from windowsd import brand, shortcuts
+from windowsd.keys import keycode
+sandbox = sys.argv[1]
 
 for name, spec, want in [
     ("Print", "Print", 16777225),
@@ -655,7 +577,7 @@ for name, spec, want in [
     ("Meta+Slash, spelled out", "Meta+Slash", 268435503),
     ("Meta+Shift+S", "Meta+Shift+S", 301989971),
 ]:
-    case(name, keycode(spec), want)
+    check(name, keycode(spec), want)
 
 # The file as kglobalaccel keeps it: a component's group, three fields, a tab
 # between two keys written as a literal backslash-t.
@@ -671,53 +593,38 @@ open(config, "w").write(
     "switcher=Alt+Tab\\tMeta+F1,none,Window switcher\n"
     "nosuchaction=Meta+Z,none,Unknown\n"
 )
-found = shortcuts.bindings()
-case("reads our group only", found.get("launcher"), ["Meta"])
-case("an unbound action is empty", found.get("search"), [])
-case("two keys on one action", found.get("switcher"), ["Alt+Tab", "Meta+F1"])
-case("an action we do not know is ignored", "nosuchaction" in found, False)
+found = shortcuts.GlobalShortcuts.bindings()
+check("reads our group only", found.get("launcher"), ["Meta"])
+check("an unbound action is empty", found.get("search"), [])
+check("two keys on one action", found.get("switcher"), ["Alt+Tab", "Meta+F1"])
+check("an action we do not know is ignored", "nosuchaction" in found, False)
 
 # Ownership: only the daemon holding the shell's own bus name claims the
 # shell's keys. A second copy that did would take them off the first, on the
 # live session, which is what the test suite itself once did.
-wanted = mod["shortcuts_wanted"]
-os.environ.pop(mod["NO_SESSION_VAR"], None)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
-case("the daemon that owns the name claims them", wanted(), True)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"] + "Test1234"
-case("a copy under another name claims nothing", wanted(), False)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
-os.environ[mod["NO_SESSION_VAR"]] = "1"
-case("and neither does one with no session", wanted(), False)
-
-sys.exit(1 if fails else 0)
+wanted = shortcuts.shortcuts_wanted
+os.environ.pop(shortcuts.NO_SESSION_VAR, None)
+brand.BUS_NAME = shortcuts.SHORTCUT_OWNER
+check("the daemon that owns the name claims them", wanted(), True)
+brand.BUS_NAME = shortcuts.SHORTCUT_OWNER + "Test1234"
+check("a copy under another name claims nothing", wanted(), False)
+brand.BUS_NAME = shortcuts.SHORTCUT_OWNER
+os.environ[shortcuts.NO_SESSION_VAR] = "1"
+check("and neither does one with no session", wanted(), False)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
 # Both run on the thread that answers D-Bus, so both are about time. Finding
 # the display's windows is an xprop per window on it, and it was done again
 # for every window in an update that had no icon yet; and the icon's pixels
 # were reordered one at a time in Python.
 echo "== the daemon's icon work, once an update and not pixel by pixel =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+windowsd_python "$SANDBOX" <<'PYTEST'
 import sys, os
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
-             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
+import windowsd.icons
+from windowsd.icons import WindowIcons
+sandbox = sys.argv[1]
 
-fails = 0
-def check(name, got, want):
-    global fails
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-    fails += 0 if ok else 1
-
-class Counting(mod["WindowIcons"]):
+class Counting(WindowIcons):
     def __init__(self):
         self._x11, self._icons, self._misses, self._written = {}, {}, {}, set()
         self._clients, self._available = None, True
@@ -747,7 +654,7 @@ try:
     from PIL import Image
 except ImportError:
     print("  SKIP  Pillow is not installed; the pixels were not checked")
-    sys.exit(1 if fails else 0)
+    sys.exit(0)
 
 # Two pixels, as xprop prints the property: opaque blue, and black at 0x81.
 class Run:
@@ -756,11 +663,11 @@ class FakeSubprocess:
     @staticmethod
     def run(*_args, **_kwargs):
         return Run()
-mod["subprocess"] = FakeSubprocess
+windowsd.icons.subprocess = FakeSubprocess
 run = os.path.join(sandbox, "run-pixels")
 os.makedirs(run, mode=0o700)
 os.environ["XDG_RUNTIME_DIR"] = run
-extract = mod["WindowIcons"]._extract
+extract = WindowIcons._extract
 path = extract(icons, "0x1")
 image = Image.open(path)
 check("written to the runtime directory", os.path.dirname(path), os.path.join(run, "t", "window-icons"))
@@ -773,8 +680,6 @@ check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0)
 check("the same icon is the same file", extract(icons, "0x1"), path)
 Run.stdout = "_NET_WM_ICON(CARDINAL) = 1, 1, 4278190335"
 check("a new icon is a new file",       extract(icons, "0x1") != path, True)
-sys.exit(1 if fails else 0)
 PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+10)); else fail=$((fail+1)); fi
 
 harness_done

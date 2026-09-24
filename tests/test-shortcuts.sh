@@ -175,7 +175,7 @@ check "every action, in one write"   "$(jq -r '[.shortcuts[] | select(. == "")] 
 echo "== the daemon binds every key the CLI accepts =="
 if python3 -c "import gi; gi.require_version('Gio', '2.0')" 2>/dev/null; then
     source "$REPO_ROOT/scripts/lib/render.sh"
-    render_template "$REPO_ROOT/bin/windowsd.py.in" "$SANDBOX/windowsd.py"
+    render_package "$REPO_ROOT/bin/windowsd" "$SANDBOX/lib/windowsd"
     specs="$SANDBOX/key-specs"
     {
         while IFS=$'\t' read -r name code; do
@@ -186,14 +186,13 @@ if python3 -c "import gi; gi.require_version('Gio', '2.0')" 2>/dev/null; then
     } | while IFS= read -r spec; do
         printf '%s\t%s\n' "$spec" "$(accel_keycode "$spec" || echo none)"
     done > "$specs"
-    agree=$(python3 - "$SANDBOX/windowsd.py" "$specs" <<'PY'
+    agree=$(PYTHONPATH="$SANDBOX/lib" python3 - "$specs" <<'PY'
 import sys
-mod = {}
-exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
+from windowsd.keys import keycode
 bad = []
-for line in open(sys.argv[2], encoding="utf-8"):
+for line in open(sys.argv[1], encoding="utf-8"):
     spec, want = line.rstrip("\n").split("\t")
-    got = mod["keycode"](spec)
+    got = keycode(spec)
     if ("none" if got is None else str(got)) != want:
         bad.append(f"{spec!r}: the CLI says {want}, the daemon {got}")
 print("\n".join(bad) or "agree")
@@ -206,11 +205,9 @@ PY
 
     # And the actions: the daemon registers, names and runs exactly the ones
     # the CLI binds, in the same order, under the same names.
-    daemon_actions=$(python3 - "$SANDBOX/windowsd.py" <<'PY'
-import sys
-mod = {}
-exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
-for action, (label, command) in mod["SHORTCUT_ACTIONS"].items():
+    daemon_actions=$(PYTHONPATH="$SANDBOX/lib" python3 - <<'PY'
+from windowsd.shortcuts import SHORTCUT_ACTIONS
+for action, (label, command) in SHORTCUT_ACTIONS.items():
     print(f"{action}\t{label}\t{' '.join(command[1:])}")
 PY
 )
