@@ -258,29 +258,12 @@ _BARE_MODIFIERS = {
     "alt": 0x01000023,
 }
 
-_NAMED_KEYS = {
-    "space": 32, "tab": 0x01000001, "backtab": 0x01000002,
-    "return": 0x01000004, "enter": 0x01000004,
-    "escape": 0x01000000, "esc": 0x01000000,
-    "backspace": 0x01000003, "delete": 0x01000007, "del": 0x01000007,
-    "insert": 0x01000006, "ins": 0x01000006,
-    "home": 0x01000010, "end": 0x01000011,
-    "pgup": 0x01000016, "pageup": 0x01000016,
-    "pgdown": 0x01000017, "pagedown": 0x01000017,
-    "left": 0x01000012, "up": 0x01000013, "right": 0x01000014, "down": 0x01000015,
-    "print": 0x01000009, "sysreq": 0x01000009, "menu": 0x01000055,
-    "comma": 44, "period": 46, "slash": 47, "semicolon": 59,
-    "equal": 61, "minus": 45, "plus": 43,
-}
-
-# The same keys written as themselves. kglobalshortcutsrc holds what Qt's
-# QKeySequence prints, and for these that is the character -- "Meta+/", not
-# "Meta+Slash". Leaving them out is what made `shortcuts set keys "Meta+/"`
-# report success and bind nothing.
-_PUNCTUATION = {
-    "/": 47, ",": 44, ".": 46, ";": 59, "=": 61, "-": 45, "+": 43,
-    "[": 91, "]": 93, "\\": 92, "'": 39, "`": 96, "*": 42, "\u00a7": 0xA7,
-}
+# Qt::Key values for every named key and punctuation mark, by name: the table
+# scripts/lib/accel.sh reads, scripts/lib/keycodes.tsv, rendered in here at
+# install. Each side used to keep its own copy and they disagreed -- the CLI
+# accepted "Volume Up" and this refused it, so the key was written to the file
+# and never grabbed. Looked up without regard to case, like the modifiers.
+_KEYCODES = {name.lower(): code for name, code in @ACCEL_KEYCODES@.items()}
 
 
 def keycode(spec):
@@ -289,6 +272,13 @@ def keycode(spec):
     Anything this table does not know returns None rather than a guess: a
     wrong integer is a key bound to something the user never asked for.
     """
+    # The plus key itself: "Meta++" split on "+" is a modifier and nothing,
+    # which made it bare Meta here while the CLI bound Meta and Plus.
+    if spec == "+":
+        spec = "Plus"
+    elif spec.endswith("++"):
+        spec = spec[:-1] + "Plus"
+
     parts = [p.strip() for p in spec.split("+") if p.strip()]
     if len(parts) == 1 and parts[0].lower() in _BARE_MODIFIERS:
         return _BARE_MODIFIERS[parts[0].lower()]
@@ -307,10 +297,8 @@ def keycode(spec):
     base = bases[0]
 
     low = base.lower()
-    if low in _NAMED_KEYS:
-        return total | _NAMED_KEYS[low]
-    if base in _PUNCTUATION:
-        return total | _PUNCTUATION[base]
+    if low in _KEYCODES:
+        return total | _KEYCODES[low]
     if len(base) == 1 and base.isalnum():
         return total | ord(base.upper())
     match = re.fullmatch(r"[Ff]([1-9]|1[0-9]|2[0-5])", base)

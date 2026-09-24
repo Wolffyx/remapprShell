@@ -166,4 +166,44 @@ check "the session daemon is told"   "$(grep -c 'busctl .*Shortcuts Reload' "$CA
 check "and kglobalaccel restarted"   "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
 check "revert stops enforcing them"  "$(configured search)" ""
 
+# The CLI checks a key before writing it and the session daemon registers what
+# was written, and each used to keep a table of its own. They disagreed: the
+# CLI took "Volume Up" and "Search", wrote them, and the daemon that owns the
+# component refused them, so the key grabbed nothing. One table now -- every
+# name in it, alone and under modifiers, must be the same integer to both.
+echo "== the daemon binds every key the CLI accepts =="
+if python3 -c "import gi; gi.require_version('Gio', '2.0')" 2>/dev/null; then
+    source "$REPO_ROOT/scripts/lib/render.sh"
+    render_template "$REPO_ROOT/bin/windowsd.py.in" "$SANDBOX/windowsd.py"
+    specs="$SANDBOX/key-specs"
+    {
+        while IFS=$'\t' read -r name code; do
+            [[ $code =~ ^[0-9]+$ ]] || continue
+            printf '%s\n' "$name" "Meta+$name" "Ctrl+Alt+Shift+$name"
+        done < "$REPO_ROOT/scripts/lib/keycodes.tsv"
+        printf '%s\n' Q q 7 F1 F12 F25 F26 Meta Ctrl Alt Shift Super Meta++ + Meta+Banana Hyper+Q ''
+    } | while IFS= read -r spec; do
+        printf '%s\t%s\n' "$spec" "$(accel_keycode "$spec" || echo none)"
+    done > "$specs"
+    agree=$(python3 - "$SANDBOX/windowsd.py" "$specs" <<'PY'
+import sys
+mod = {}
+exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
+bad = []
+for line in open(sys.argv[2], encoding="utf-8"):
+    spec, want = line.rstrip("\n").split("\t")
+    got = mod["keycode"](spec)
+    if ("none" if got is None else str(got)) != want:
+        bad.append(f"{spec!r}: the CLI says {want}, the daemon {got}")
+print("\n".join(bad) or "agree")
+PY
+)
+    check "every key, to both"          "$agree" "agree"
+    check "and there were keys to ask"  "$(( $(wc -l < "$specs") > 200 ))" "1"
+    check "Volume Up, to the CLI"       "$(accel_keycode 'Volume Up')" "16777330"
+    check "the section sign, too"       "$(accel_keycode 'Meta+§')" "268435623"
+else
+    echo "  SKIP  python-gobject not installed; the daemon's side was not checked"
+fi
+
 harness_done

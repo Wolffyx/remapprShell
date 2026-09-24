@@ -1,0 +1,97 @@
+# Qt::Key values for every key a shortcut here can name that is not a letter, a
+# digit or a function key -- those are computed, being ASCII and a run.
+#
+# One table for both sides of a binding. scripts/lib/accel.sh reads it to check
+# and push a key; bin/windowsd.py.in has it rendered in, to register the same
+# key with kglobalaccel. The two used to keep a copy each, and the copies
+# disagreed: `shortcuts set search "Volume Up"` was accepted, written, and then
+# refused by the daemon that owns the component, so the key grabbed nothing.
+#
+# The name, a tab, the integer. Names are as kglobalshortcutsrc spells them,
+# which is what QKeySequence prints (PortableText): the character for a
+# punctuation key -- "Meta+/", never "Meta+Slash" -- and the words for a named
+# one. The spelled-out forms are kept too, because people type them. Only what
+# a person is likely to bind: an unknown name fails the conversion, which is
+# the safe answer, rather than binding a wrong key.
+#
+# The plus key is `Plus`. "Meta++" split on "+" is a modifier and nothing, so
+# both readers turn a trailing "+" into this name before looking it up.
+Space	32
+Tab	16777217
+Backtab	16777218
+Return	16777220
+Enter	16777220
+Escape	16777216
+Esc	16777216
+Backspace	16777219
+Delete	16777223
+Del	16777223
+Insert	16777222
+Ins	16777222
+Home	16777232
+End	16777233
+PgUp	16777238
+PageUp	16777238
+PgDown	16777239
+PageDown	16777239
+Left	16777234
+Up	16777235
+Right	16777236
+Down	16777237
+Print	16777225
+SysReq	16777225
+Menu	16777301
+Comma	44
+Period	46
+Slash	47
+Semicolon	59
+Equal	61
+Minus	45
+Plus	43
+# The same keys as the file actually spells them. A key this table did not
+# know used to be reported as bound and grabbed nothing.
+/	47
+,	44
+.	46
+;	59
+=	61
+-	45
+[	91
+]	93
+\	92
+'	39
+`	96
+*	42
+~	126
+§	167
+# The named keys Plasma's own defaults use, as Qt spells and encodes them.
+# KRunner's first key is "Search"; when this table did not know it, taking
+# Meta+Space from KRunner could not be pushed to the running session, KRunner
+# kept the key until the next login, and our search got nothing -- with only a
+# line of warning to say so.
+Search	16777362
+Volume Down	16777328
+Volume Mute	16777329
+Volume Up	16777330
+Media Play	16777344
+Media Stop	16777345
+Media Previous	16777346
+Media Next	16777347
+Media Pause	16777349
+Media Rewind	16777413
+Media Fast Forward	16777474
+Launch (C)	16777390
+Monitor Brightness Up	16777394
+Monitor Brightness Down	16777395
+Keyboard Light On/Off	16777396
+Keyboard Brightness Up	16777397
+Keyboard Brightness Down	16777398
+Power Off	16777399
+Screensaver	16777402
+Battery	16777470
+Hibernate	16777480
+Power Down	16777483
+Microphone Mute	16777491
+Microphone Volume Up	16777501
+Microphone Volume Down	16777502
+Sleep	16908292

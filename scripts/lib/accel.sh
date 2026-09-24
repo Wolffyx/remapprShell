@@ -197,106 +197,47 @@ _ACCEL_MOD_Ctrl=67108864       # 0x04000000
 _ACCEL_MOD_Alt=134217728       # 0x08000000
 _ACCEL_MOD_Shift=33554432      # 0x02000000
 
-# Qt::Key values for everything that is not a letter or a digit, which are
-# their ASCII codes. Only what a person is likely to bind: an unknown name
-# makes the conversion fail, and the caller falls back to the restart.
+# Qt::Key values for everything that is not a letter, a digit or a function
+# key, read once from the table the session daemon is rendered with -- see
+# keycodes.tsv for why there is one. An unknown name makes the conversion fail,
+# and the caller falls back to the restart.
+ACCEL_KEYCODES_FILE="$REPO_ROOT/scripts/lib/keycodes.tsv"
+declare -gA _ACCEL_KEYCODES=()
+_accel_load_keycodes() {
+    local name code
+    while IFS=$'\t' read -r name code; do
+        # Comments and blank lines have no number after a tab.
+        [[ $code =~ ^[0-9]+$ ]] && [ -n "$name" ] || continue
+        _ACCEL_KEYCODES[$name]=$code
+    done < "$ACCEL_KEYCODES_FILE"
+}
+_accel_load_keycodes
+
 _accel_base_code() {
     local k=$1
     case "$k" in
-        [A-Za-z])  printf '%d' "'$(printf '%s' "$k" | tr '[:lower:]' '[:upper:]')" ; return 0 ;;
+        [A-Za-z])  printf '%d' "'${k^^}" ; return 0 ;;
         [0-9])     printf '%d' "'$k" ; return 0 ;;
         F[1-9]|F1[0-9]|F2[0-5]) printf '%d' $(( 16777264 + ${k#F} - 1 )) ; return 0 ;;
     esac
-    case "$k" in
-        Space)        printf '32' ;;
-        Tab)          printf '16777217' ;;
-        Backtab)      printf '16777218' ;;
-        Return|Enter) printf '16777220' ;;
-        Escape|Esc)   printf '16777216' ;;
-        Backspace)    printf '16777219' ;;
-        Delete|Del)   printf '16777223' ;;
-        Insert|Ins)   printf '16777222' ;;
-        Home)         printf '16777232' ;;
-        End)          printf '16777233' ;;
-        PgUp|PageUp)  printf '16777238' ;;
-        PgDown|PageDown) printf '16777239' ;;
-        Left)         printf '16777234' ;;
-        Up)           printf '16777235' ;;
-        Right)        printf '16777236' ;;
-        Down)         printf '16777237' ;;
-        Print|SysReq) printf '16777225' ;;
-        Menu)         printf '16777301' ;;
-        Comma)        printf '44' ;;
-        Period)       printf '46' ;;
-        Slash)        printf '47' ;;
-        Semicolon)    printf '59' ;;
-        Equal)        printf '61' ;;
-        Minus)        printf '45' ;;
-        Plus)         printf '43' ;;
-        # The same keys as the file actually spells them. QKeySequence prints
-        # the character, so kglobalshortcutsrc holds "Meta+/" and never
-        # "Meta+Slash" -- and a key this table did not know used to be
-        # reported as bound and grabbed nothing.
-        /)            printf '47' ;;
-        ,)            printf '44' ;;
-        .)            printf '46' ;;
-        ';')          printf '59' ;;
-        =)            printf '61' ;;
-        -)            printf '45' ;;
-        '[')          printf '91' ;;
-        ']')          printf '93' ;;
-        '\\')         printf '92' ;;
-        "'")          printf '39' ;;
-        '`')          printf '96' ;;
-        '*')          printf '42' ;;
-        '~')          printf '126' ;;
-        # The named keys Plasma's own defaults use, as Qt spells and encodes
-        # them (QKeySequence, PortableText). KRunner's first key is "Search";
-        # when this table did not know it, taking Meta+Space from KRunner
-        # could not be pushed to the running session, KRunner kept the key
-        # until the next login, and our search got nothing -- with only a
-        # line of warning to say so.
-        Search)                     printf '16777362' ;;
-        'Volume Down')              printf '16777328' ;;
-        'Volume Mute')              printf '16777329' ;;
-        'Volume Up')                printf '16777330' ;;
-        'Media Play')               printf '16777344' ;;
-        'Media Stop')               printf '16777345' ;;
-        'Media Previous')           printf '16777346' ;;
-        'Media Next')               printf '16777347' ;;
-        'Media Pause')              printf '16777349' ;;
-        'Media Rewind')             printf '16777413' ;;
-        'Media Fast Forward')       printf '16777474' ;;
-        'Launch (C)')               printf '16777390' ;;
-        'Monitor Brightness Up')    printf '16777394' ;;
-        'Monitor Brightness Down')  printf '16777395' ;;
-        'Keyboard Light On/Off')    printf '16777396' ;;
-        'Keyboard Brightness Up')   printf '16777397' ;;
-        'Keyboard Brightness Down') printf '16777398' ;;
-        'Power Off')                printf '16777399' ;;
-        Screensaver)                printf '16777402' ;;
-        Battery)                    printf '16777470' ;;
-        Hibernate)                  printf '16777480' ;;
-        'Power Down')               printf '16777483' ;;
-        'Microphone Mute')          printf '16777491' ;;
-        'Microphone Volume Up')     printf '16777501' ;;
-        'Microphone Volume Down')   printf '16777502' ;;
-        Sleep)                      printf '16908292' ;;
-        *) return 1 ;;
-    esac
+    [ -n "$k" ] && [ -n "${_ACCEL_KEYCODES[$k]:-}" ] || return 1
+    printf '%s' "${_ACCEL_KEYCODES[$k]}"
 }
 
 # accel_keycode <key>   -- "Meta+Shift+Print" -> one integer, Qt's encoding.
 # Fails on anything it does not know rather than guessing a wrong key.
 accel_keycode() {
     local spec=$1 part total=0 base="" bases=0 mod
+    local -a parts=()
     # The plus key itself: "Meta++" split on "+" is a modifier and nothing.
     case "$spec" in
         +)   spec=Plus ;;
         *++) spec=${spec%+}Plus ;;
     esac
-    local IFS='+'
-    for part in $spec; do
+    # Split by `read`, not by an unquoted expansion: that one globbed as well,
+    # so "Meta+*" became the files in the current directory and was refused.
+    IFS='+' read -ra parts <<< "$spec"
+    for part in "${parts[@]}"; do
         [ -n "$part" ] || continue
         case "$part" in
             Meta|Super|Win) mod=$_ACCEL_MOD_Meta ;;
