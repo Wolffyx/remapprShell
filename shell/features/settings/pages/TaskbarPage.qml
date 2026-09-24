@@ -287,6 +287,7 @@ Column {
     }
 
     Card {
+        id: menuCard
         width: root.width
 
         SectionLabel { text: "Right-click menu" }
@@ -335,7 +336,10 @@ Column {
                 required property var modelData
                 required property int index
 
-                width: root.width - 32
+                // The card's inner width: `root.width - 32` was four pixels
+                // wider than the card has room for, and the remove button
+                // hung over its edge.
+                width: menuCard.contentWidth
                 spacing: 6
 
                 Row {

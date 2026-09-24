@@ -98,6 +98,7 @@ Column {
     }
 
     Card {
+        id: keysCard
         width: root.width
 
         SectionLabel { text: "Global shortcuts" }
@@ -119,7 +120,10 @@ Column {
                 readonly property bool active: root.capturing === row.modelData.id
                 readonly property string shortcut: String(row.modelData.shortcut ?? "")
 
-                width: root.width - 32
+                // The card's inner width, not `root.width - 32`, which was
+                // four pixels more than it has and put the clear button over
+                // the card's edge.
+                width: keysCard.contentWidth
                 implicitHeight: 42
 
                 PanelText {
