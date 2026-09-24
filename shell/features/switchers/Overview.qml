@@ -14,9 +14,10 @@ pragma ComponentBehavior: Bound
 //
 // Held, like the window switcher: another press of the key steps to the next
 // desktop, and letting the key go switches to it -- which is why this is a
-// layer surface with exclusive keyboard focus. What it cannot do is show a
-// picture of each window; KWin gives those to its own layouts only. So a
-// window is its application's icon over a tint of its own, as the design
+// layer surface with exclusive keyboard focus. A window is drawn as itself
+// where KWin gives a picture -- the card under the selection, with the
+// compiled screencast module installed (see WindowThumbnail) -- and as its
+// application's icon over a tint of its own everywhere else, as the design
 // draws it.
 
 import QtQuick
@@ -78,17 +79,31 @@ PanelWindow {
             win.deskIndex = win.desks.length - 1;
     }
 
-    function windowsOn(deskId) {
-        if (!deskId)
-            return [];
-        const all = WindowsService.windows ?? [];
-        return all.filter(w => {
+    // Every desktop's windows, most recent first, worked out for all of them
+    // at once. The strip shows each desktop's, and asking one desktop at a
+    // time filtered and sorted every window once per desktop -- all over
+    // again whenever any window changed.
+    readonly property var windowsByDesk: {
+        const out = {};
+        for (const d of win.desks)
+            if (d?.id)
+                out[d.id] = [];
+        const ids = Object.keys(out);
+        for (const w of WindowsService.windows ?? []) {
             if (!win.showMinimised && w?.minimized)
-                return false;
+                continue;
             const on = w?.desktops ?? [];
             // An empty list is KWin's "on all desktops".
-            return on.length === 0 || on.indexOf(deskId) >= 0;
-        }).sort((a, b) => (b.stacking ?? -1) - (a.stacking ?? -1));
+            for (const id of on.length === 0 ? ids : on)
+                out[id]?.push(w);
+        }
+        for (const id of ids)
+            out[id].sort((a, b) => (b.stacking ?? -1) - (a.stacking ?? -1));
+        return out;
+    }
+
+    function windowsOn(deskId) {
+        return deskId ? (win.windowsByDesk[deskId] ?? []) : [];
     }
 
     readonly property var deskWindows: win.windowsOn(win.desk?.id ?? "")
@@ -399,31 +414,18 @@ PanelWindow {
                         model: win.hints
 
                         Row {
+                            id: hint
                             required property var modelData
                             spacing: 6
 
-                            Rectangle {
+                            KeyCap {
                                 anchors.verticalCenter: parent.verticalCenter
-                                height: 22
-                                width: hintKey.implicitWidth + 18
-                                radius: 8
-                                color: Theme.s2
-                                border.width: 1
-                                border.color: Theme.out
-
-                                PanelText {
-                                    id: hintKey
-                                    anchors.centerIn: parent
-                                    text: modelData.kbd
-                                    font.pixelSize: 12
-                                    font.weight: Font.Medium
-                                    color: Theme.fg
-                                }
+                                text: hint.modelData.kbd
                             }
 
                             PanelText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.meaning
+                                text: hint.modelData.meaning
                                 font.pixelSize: 12
                                 color: Theme.mut
                             }
@@ -495,6 +497,7 @@ PanelWindow {
                         ]
 
                         Rectangle {
+                            id: pill
                             required property string modelData
 
                             height: 34
@@ -507,7 +510,7 @@ PanelWindow {
                             PanelText {
                                 id: pillText
                                 anchors.centerIn: parent
-                                text: modelData
+                                text: pill.modelData
                                 font.pixelSize: 14
                                 color: Theme.fg
                             }
@@ -581,13 +584,8 @@ PanelWindow {
                             // A colour per application, as the switcher's
                             // cards use, so the same program looks the same in
                             // both.
-                            readonly property color tint: {
-                                const s = String(card.modelData?.appId ?? "");
-                                let h = 0;
-                                for (let i = 0; i < s.length; i++)
-                                    h = (h * 31 + s.charCodeAt(i)) % 360;
-                                return Qt.hsla(h / 360, 0.34, Theme.dark ? 0.38 : 0.62, 1);
-                            }
+                            readonly property color tint: Qt.hsla(WindowEvents.tintHue(card.modelData?.appId),
+                                                                  0.34, Theme.dark ? 0.38 : 0.62, 1)
 
                             Rectangle {
                                 id: preview
@@ -841,6 +839,7 @@ PanelWindow {
                                         model: deskCard.deskWins.slice(0, 3)
 
                                         Rectangle {
+                                            id: glance
                                             required property var modelData
 
                                             // Sized against the preview, not
@@ -858,8 +857,8 @@ PanelWindow {
                                             PanelIcon {
                                                 anchors.centerIn: parent
                                                 implicitSize: 19
-                                                iconName: WindowsService.iconFor(modelData)
-                                                iconFile: WindowsService.iconFileFor(modelData)
+                                                iconName: WindowsService.iconFor(glance.modelData)
+                                                iconFile: WindowsService.iconFileFor(glance.modelData)
                                             }
                                         }
                                     }
