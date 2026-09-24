@@ -17,7 +17,8 @@ CALLS="$SANDBOX/session-calls"
 fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 
 sw() { "$REPO_ROOT/scripts/switcher.sh" "$@" >/dev/null 2>&1; }
-js() { "$REPO_ROOT/scripts/switcher.sh" status --json 2>/dev/null | jq -r "$1"; }
+status() { "$REPO_ROOT/scripts/switcher.sh" status --json 2>/dev/null; }
+js() { status | jq -r "$1"; }
 sc() { kread kglobalshortcutsrc "$1" "$2"; }
 T=$'\t'
 
@@ -40,13 +41,15 @@ kwriteconfig6 --file kglobalshortcutsrc --group services --group foo.desktop --k
 before=$(sha256sum < "$XDG_CONFIG_HOME/kglobalshortcutsrc")
 
 echo "== status =="
-check "unset layout reads as KWin's default" "$(js .layout)" "thumbnail_grid"
-check "layouts from every data directory"    "$(js '[.layouts[].id] | sort | join(",")')" "big_icons,mine,thumbnail_grid"
-check "the user's copy wins a duplicate"     "$(js '.layouts[] | select(.id == "big_icons") | .name')" "My Large Icons"
-check "Alt+Tab held by caelestia"            "$(js '.keys[0].holders | map(.group + ":" + .name) | join(",")')" "caelestia-shell:Open window switcher"
-check "and not by KWin"                      "$(js .keys[0].kwin)" "false"
-check "Meta+Tab held twice, second in a list" "$(js '.keys[1].holders | map(.group) | join(",")')" "caelestia-shell,services/foo.desktop"
-check "not customised"                       "$(js .customised)" "false"
+# One read for the checks against one state: each read is a third of a second.
+s=$(status)
+check "unset layout reads as KWin's default" "$(jq -r .layout <<<"$s")" "thumbnail_grid"
+check "layouts from every data directory"    "$(jq -r '[.layouts[].id] | sort | join(",")' <<<"$s")" "big_icons,mine,thumbnail_grid"
+check "the user's copy wins a duplicate"     "$(jq -r '.layouts[] | select(.id == "big_icons") | .name' <<<"$s")" "My Large Icons"
+check "Alt+Tab held by caelestia"            "$(jq -r '.keys[0].holders | map(.group + ":" + .name) | join(",")' <<<"$s")" "caelestia-shell:Open window switcher"
+check "and not by KWin"                      "$(jq -r .keys[0].kwin <<<"$s")" "false"
+check "Meta+Tab held twice, second in a list" "$(jq -r '.keys[1].holders | map(.group) | join(",")' <<<"$s")" "caelestia-shell,services/foo.desktop"
+check "not customised"                       "$(jq -r .customised <<<"$s")" "false"
 
 echo "== layout =="
 sw layout mine

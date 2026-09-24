@@ -14,7 +14,8 @@ fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 
 edges() { "$REPO_ROOT/scripts/edges.sh" "$@" >/dev/null 2>&1; }
 key() { kread kwinrc "$1" "$2"; }
-js() { "$REPO_ROOT/scripts/edges.sh" status --json 2>/dev/null | jq -r "$1"; }
+status() { "$REPO_ROOT/scripts/edges.sh" status --json 2>/dev/null; }
+js() { status | jq -r "$1"; }
 
 # A user who has already configured an edge themselves. Their choice must
 # survive everything below and come back on revert.
@@ -45,13 +46,15 @@ check "an unchanged key is not written" "$(key ElectricBorders BottomLeft)" "<un
 check "nothing writes desktopgrid"      "$(key Effect-desktopgrid BorderActivate)" "<unset>"
 
 echo "== status --json =="
-check "top-left reads as window view"   "$(js .edges.TopLeft)" "windowview"
-check "top-right reads as grid"         "$(js .edges.TopRight)" "grid"
-check "bottom-right reads as a border"  "$(js .edges.BottomRight)" "showdesktop"
-check "untouched edge reads as none"    "$(js .edges.Bottom)" "none"
-check "triggers on"                     "$(js .triggers)" "true"
-check "customised"                      "$(js .customised)" "true"
-check "every action is offered"         "$(js '.actions | length')" "11"
+# One read for the checks against one state: each read is a third of a second.
+s=$(status)
+check "top-left reads as window view"   "$(jq -r .edges.TopLeft <<<"$s")" "windowview"
+check "top-right reads as grid"         "$(jq -r .edges.TopRight <<<"$s")" "grid"
+check "bottom-right reads as a border"  "$(jq -r .edges.BottomRight <<<"$s")" "showdesktop"
+check "untouched edge reads as none"    "$(jq -r .edges.Bottom <<<"$s")" "none"
+check "triggers on"                     "$(jq -r .triggers <<<"$s")" "true"
+check "customised"                      "$(jq -r .customised <<<"$s")" "true"
+check "every action is offered"         "$(jq -r '.actions | length' <<<"$s")" "11"
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
 check "a tiling script is named"        "$(js '.tilingScripts | join(",")')" "krohnkite"
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled --delete
