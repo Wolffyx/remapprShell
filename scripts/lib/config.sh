@@ -116,3 +116,63 @@ _config_write() {   # <jq filter, given $v> <--arg|--argjson> <value>
     if [ -n "${CONFIG_MERGED:-}" ]; then config_load; fi
     return 0
 }
+
+# config_migration_steps <Migrations.qml>   -- the schema versions the shell
+# can migrate a profile *to*, one per line.
+#
+# Migrations live in the shell, as the keys of `steps` in
+# shell/domain/config/Migrations.qml -- `2: obj => ...` -- because the shell is
+# the only thing that reads the schema. An update has to know one exists for
+# every step between a profile and the shipped defaults before it restarts
+# the shell into refusing that profile; it used to look for files under
+# config/migrations/ that nothing ever loaded, so the first real migration
+# would have made every update roll itself back.
+#
+# Read, not guessed at line by line: the keys at the top level of that object
+# literal, stepping over what is nested inside a step, strings and comments --
+# a step's own body can hold an object with numbers for keys, and the file's
+# comments show the form with an example.
+config_migration_steps() {
+    awk '
+        { src = src $0 "\n" }
+        END {
+            i = index(src, "property var steps:")
+            if (!i) exit 1
+            j = index(substr(src, i), "{")
+            if (!j) exit 1
+            p = i + j; n = length(src); depth = 0; key_next = 1
+            while (p <= n) {
+                c = substr(src, p, 1)
+                two = substr(src, p, 2)
+                if (two == "//") { q = index(substr(src, p), "\n"); p += q ? q : n; continue }
+                if (two == "/*") { q = index(substr(src, p + 2), "*/"); p += q ? q + 3 : n; continue }
+                if (c == "\"" || c == "\047" || c == "`") {
+                    text = ""; p++
+                    while (p <= n && substr(src, p, 1) != c) {
+                        if (substr(src, p, 1) == "\\") { text = text substr(src, p, 2); p += 2; continue }
+                        text = text substr(src, p, 1); p++
+                    }
+                    p++
+                    if (depth == 0 && key_next && text ~ /^[0-9]+$/ && _colon_at(p)) print text + 0
+                    key_next = 0
+                    continue
+                }
+                if (c == "(" || c == "{" || c == "[") { depth++; key_next = 0; p++; continue }
+                if (c == ")" || c == "}" || c == "]") { if (depth == 0) exit 0; depth--; p++; continue }
+                if (depth == 0 && c == ",") { key_next = 1; p++; continue }
+                if (depth == 0 && key_next && c ~ /[0-9]/) {
+                    text = ""
+                    while (substr(src, p, 1) ~ /[0-9]/) { text = text substr(src, p, 1); p++ }
+                    if (_colon_at(p)) print text + 0
+                    key_next = 0
+                    continue
+                }
+                if (c !~ /[ \t\n]/) key_next = 0
+                p++
+            }
+        }
+        function _colon_at(at) {
+            while (substr(src, at, 1) ~ /[ \t\n]/) at++
+            return substr(src, at, 1) == ":"
+        }' "$1"
+}

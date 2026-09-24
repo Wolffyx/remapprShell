@@ -80,4 +80,34 @@ check "until a write loads again"  "$(config_get '.panel.thickness' 0)" "46"
 check "and the rest is still there" "$(config_get '.panel.renderer' none)" "quickshell"
 unset CONFIG_MERGED
 
+# An update checks that the new version can migrate the profile before it
+# restarts the shell into it. It used to look for config/migrations/NNN-*.js,
+# which nothing loads: the migrations are the keys of `steps` in the shell's
+# Migrations.qml, so the first real one would have rolled every update back.
+echo "== the migrations an update looks for are the shell's =="
+qml="$SANDBOX/Migrations.qml"
+cat > "$qml" <<'QML'
+QtObject {
+    // Keyed by the version being migrated *to*.
+    //   9: obj => Obj.set(obj, "panel.thickness", ...)
+    readonly property var steps: ({
+        2: obj => Obj.set(obj, "panel.thickness", 40),
+        "3": obj => {
+            const nested = { 7: "a step's own object", "8": 1 };
+            return "4: in a string" ? obj : nested;
+        },
+        /* 5: commented out */
+        6 : function (obj) { return obj }
+    })
+    readonly property var other: ({ 11: 1 })
+}
+QML
+check "the steps, and nothing inside them" "$(config_migration_steps "$qml" | paste -sd' ')" "2 3 6"
+printf 'QtObject {\n    readonly property var steps: ({})\n}\n' > "$qml"
+check "none is none"                       "$(config_migration_steps "$qml")" ""
+real="$REPO_ROOT/shell/domain/config/Migrations.qml"
+current=$(sed -n 's/.*readonly property int currentVersion: *\([0-9]*\).*/\1/p' "$real")
+want=$(seq 2 "${current:-1}" | paste -sd' ')
+check "the shell has a step to every version it knows" "$(config_migration_steps "$real" | paste -sd' ')" "$want"
+
 harness_done

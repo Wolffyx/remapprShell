@@ -198,15 +198,18 @@ new_version=$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo "0.0.0")
 
 # Configuration migrations run inside the shell when it next reads the profile,
 # because that is the only place that knows the schema. What matters here is
-# that a migration exists for the jump, so the shell is not asked to make one up.
+# that a migration exists for the jump, so the shell is not asked to make one up
+# -- asked of the migrations the new version actually carries, the steps in its
+# Migrations.qml (config_migration_steps says how they are read).
 shipped_version=$(jq -r '.schemaVersion // 1' "$REPO_ROOT/config/defaults/shell.json" 2>/dev/null || echo 1)
 current_version=$(jq -r '.schemaVersion // 1' "$profile" 2>/dev/null || echo "$shipped_version")
 
 if [ "$current_version" -lt "$shipped_version" ]; then
     log_step "configuration schema $current_version -> $shipped_version"
+    steps=$(config_migration_steps "$REPO_ROOT/shell/domain/config/Migrations.qml")
     v=$((current_version + 1))
     while [ "$v" -le "$shipped_version" ]; do
-        if ! ls "$REPO_ROOT"/config/migrations/"$(printf '%03d' "$v")"-*.js >/dev/null 2>&1; then
+        if ! grep -qx -- "$v" <<< "$steps"; then
             log_error "no migration for schema version $v"
             log_error "the shell would refuse to load this configuration"
             "$0" --rollback
