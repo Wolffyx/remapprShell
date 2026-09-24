@@ -199,16 +199,28 @@ BarWidget {
     property string previewKey: ""
     property var previewItem: root.items.find(i => i.key === root.previewKey) ?? null
 
-    // Its group gone -- the last of its windows closed, from the card or
-    // anywhere else -- the card goes with it, rather than staying up empty.
-    // Asked of `items` rather than of `previewItem` going null: clearing the
-    // key from inside that property's own change is a binding loop.
+    // Its last window closed -- from the card or anywhere else -- the card
+    // goes with it, rather than staying up empty. For most applications the
+    // group goes too; a pinned one stays on the taskbar with no windows, and
+    // its card turned into "Pinned -- click to start it" under the pointer
+    // that had just closed it (2026-09-24). A card that opened on a pinned
+    // application with nothing running is a different thing, and stays.
+    // Asked of `items` rather than of `previewItem`: clearing the key from
+    // inside that property's own change is a binding loop.
+    property int _previewWindows: 0
+
+    onPreviewKeyChanged: root._previewWindows = root.items.find(i => i.key === root.previewKey)?.windows.length ?? 0
+
     onItemsChanged: {
-        if (root.previewKey.length > 0 && root.popoutMode !== "menu"
-                && !root.items.some(i => i.key === root.previewKey)) {
+        if (root.previewKey.length === 0 || root.popoutMode === "menu")
+            return;
+        const shown = root.items.find(i => i.key === root.previewKey)?.windows.length ?? -1;
+        if (shown < 0 || (shown === 0 && root._previewWindows > 0)) {
             root.previewKey = "";
             root.popoutVisible = false;
+            return;
         }
+        root._previewWindows = shown;
     }
 
     // And the card stays up while the pointer crosses the gap to it. Leaving
