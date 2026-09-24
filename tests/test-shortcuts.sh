@@ -123,7 +123,7 @@ sc clear keys >/dev/null
 echo "== the screenshot action =="
 sc set screenshot 'Meta+Shift+S' >/dev/null
 check "region capture bound"  "$(binding screenshot)" "Meta+Shift+S,none,Screenshot of a region"
-check "the script chooses a tool" \
+check "the script lists its three modes" \
       "$("$REPO_ROOT/scripts/screenshot.sh" status --json 2>/dev/null | jq -r '.modes | length')" "3"
 check "an unknown mode is refused" \
       "$("$REPO_ROOT/scripts/screenshot.sh" nonsense >/dev/null 2>&1 && echo ran || echo refused)" "refused"
