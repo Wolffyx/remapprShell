@@ -21,6 +21,23 @@
 
 ACCEL_FILE=kglobalshortcutsrc
 
+# This project's own actions, in order, and what each is called: every key it
+# can bind and every screen edge of its own can run. Read once from
+# shortcut-actions.tsv, which the session daemon has rendered in too -- so the
+# CLI, the edges, doctor and the daemon agree about what exists.
+ACCEL_ACTIONS_FILE="$REPO_ROOT/scripts/lib/shortcut-actions.tsv"
+ACCEL_ACTIONS=()
+declare -gA ACCEL_ACTION_LABEL=()
+_accel_load_actions() {
+    local id label args
+    while IFS=$'\t' read -r id label args; do
+        case "$id" in ''|'#'*) continue ;; esac
+        ACCEL_ACTIONS+=("$id")
+        ACCEL_ACTION_LABEL[$id]=$label
+    done < "$ACCEL_ACTIONS_FILE"
+}
+_accel_load_actions
+
 # accel_holders <key>
 #
 # Every action bound to exactly that key, one per line:

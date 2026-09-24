@@ -78,6 +78,8 @@ config_get() {
 
 # config_set <jq path> <json>           -- one setting, into the active profile
 # config_set_string <jq path> <text>    -- the same, for a value that is text
+# config_merge <jq path> <json object>  -- keys added to an object, the rest of
+#                                          it kept: many settings in one write
 #
 # Sparse: the profile holds what the user changed, not a materialised copy of
 # today's defaults, so only the one path is written and everything else in the
@@ -94,20 +96,21 @@ config_get() {
 # 0 written; 1 the write failed; 2 nothing written, because the profile does
 # not parse. What to say about a 2 is the caller's -- some refuse outright,
 # some carry on and say the setting was not kept -- so none is said here.
-config_set()        { _config_write "$1" --argjson "$2"; }
-config_set_string() { _config_write "$1" --arg "$2"; }
+config_set()        { _config_write "$1 = \$v" --argjson "$2"; }
+config_set_string() { _config_write "$1 = \$v" --arg "$2"; }
+config_merge()      { _config_write "$1 = (($1 // {}) + \$v)" --argjson "$2"; }
 
-_config_write() {   # <path> <--arg|--argjson> <value>
-    local path=$1 how=$2 value=$3 file dir tmp
+_config_write() {   # <jq filter, given $v> <--arg|--argjson> <value>
+    local filter=$1 how=$2 value=$3 file dir tmp
     file=$(profile_file)
     dir=${file%/*}
     config_profile_broken && return 2
     mkdir -p "$dir" || return 1
     tmp=$(mktemp "$dir/.shell.json.XXXXXX") || return 1
     if [ -f "$file" ]; then
-        jq "$how" v "$value" "$path = \$v" "$file" > "$tmp"
+        jq "$how" v "$value" "$filter" "$file" > "$tmp"
     else
-        jq -n "$how" v "$value" "$path = \$v" > "$tmp"
+        jq -n "$how" v "$value" "$filter" > "$tmp"
     fi || { rm -f "$tmp"; return 1; }
     mv -f "$tmp" "$file" || { rm -f "$tmp"; return 1; }
     if [ -n "${CONFIG_MERGED:-}" ]; then config_load; fi

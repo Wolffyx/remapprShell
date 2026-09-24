@@ -176,21 +176,13 @@ CTL = "@BIN_DIR@/@CTL_BIN@"
 # The friendly name is what System Settings shows in its shortcut list, so it
 # is a sentence a person recognises rather than the id. The command is the one
 # the action's desktop file used to carry, unchanged.
+#
+# The list itself is scripts/lib/shortcut-actions.tsv, rendered in here at
+# install: the CLI that binds the keys and the edges that run the same actions
+# read that file too, and one list is one answer to what exists.
 SHORTCUT_ACTIONS = {
-    "launcher":  ("Application menu", [CTL, "launcher"]),
-    "search":    ("Search", [CTL, "search"]),
-    "settings":  ("Settings", [CTL, "settings"]),
-    "ask":       ("Ask about the last notification", [CTL, "ask", "--last-notification"]),
-    "clipboard": ("Clipboard history", [CTL, "clipboard"]),
-    "screenshot": ("Screenshot of a region", [CTL, "screenshot", "region"]),
-    "screenshot-screen": ("Screenshot of the screen", [CTL, "screenshot", "screen"]),
-    "screenshot-window": ("Screenshot of the active window", [CTL, "screenshot", "window"]),
-    "sidebar":   ("Sidebar", [CTL, "sidebar"]),
-    "keys":      ("Keyboard shortcuts", [CTL, "keys"]),
-    "switcher":  ("Window switcher", [CTL, "switcher", "show"]),
-    "switcher-reverse": ("Window switcher (backwards)", [CTL, "switcher", "show", "--reverse"]),
-    "overview":  ("Desktops", [CTL, "switcher", "overview"]),
-    "overview-reverse": ("Desktops (backwards)", [CTL, "switcher", "overview", "--reverse"]),
+    action: (label, [CTL, *args])
+    for action, (label, args) in @SHORTCUT_ACTIONS@.items()
 }
 
 # What letting go of a key runs, for the shortcuts that are *held* rather than

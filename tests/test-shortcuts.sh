@@ -165,6 +165,7 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&
 check "the session daemon is told"   "$(grep -c 'busctl .*Shortcuts Reload' "$CALLS")" "1"
 check "and kglobalaccel restarted"   "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
 check "revert stops enforcing them"  "$(configured search)" ""
+check "every action, in one write"   "$(jq -r '[.shortcuts[] | select(. == "")] | length' "$PROFILE")" "${#ACCEL_ACTIONS[@]}"
 
 # The CLI checks a key before writing it and the session daemon registers what
 # was written, and each used to keep a table of its own. They disagreed: the
@@ -202,6 +203,21 @@ PY
     check "and there were keys to ask"  "$(( $(wc -l < "$specs") > 200 ))" "1"
     check "Volume Up, to the CLI"       "$(accel_keycode 'Volume Up')" "16777330"
     check "the section sign, too"       "$(accel_keycode 'Meta+§')" "268435623"
+
+    # And the actions: the daemon registers, names and runs exactly the ones
+    # the CLI binds, in the same order, under the same names.
+    daemon_actions=$(python3 - "$SANDBOX/windowsd.py" <<'PY'
+import sys
+mod = {}
+exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
+for action, (label, command) in mod["SHORTCUT_ACTIONS"].items():
+    print(f"{action}\t{label}\t{' '.join(command[1:])}")
+PY
+)
+    check "the daemon has the CLI's actions" "$(printf '%s\n' "$daemon_actions" | cut -f1-2)" \
+          "$(for a in "${ACCEL_ACTIONS[@]}"; do printf '%s\t%s\n' "$a" "${ACCEL_ACTION_LABEL[$a]}"; done)"
+    check "and runs what they ran"      "$(printf '%s\n' "$daemon_actions" | awk -F'\t' '$1 == "switcher-reverse" { print $3 }')" \
+          "switcher show --reverse"
 else
     echo "  SKIP  python-gobject not installed; the daemon's side was not checked"
 fi

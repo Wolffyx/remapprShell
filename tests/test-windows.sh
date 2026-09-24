@@ -174,9 +174,9 @@ out=$(nosession close 1f46c057-675a-4d51-99e5-17aafdfb5b06); status=$?
 check "no session, nothing closed"            "$status:$(printf '%s' "$out" | grep -c 'no session')" "1:1"
 
 # The blocks below read the daemon's source rather than a rendered copy, so
-# they put in the one placeholder that is not a name: the table it shares with
-# lib/accel.sh, worked out the way an install renders it.
-render_tables; export ACCEL_KEYCODES
+# they put in the placeholders that are not names: the tables it shares with
+# lib/accel.sh, worked out the way an install renders them.
+render_tables; export ACCEL_KEYCODES SHORTCUT_ACTIONS
 
 # Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
 # from another application, holds several sizes one after another, and a
@@ -188,7 +188,8 @@ import sys, importlib.util, re, os
 repo = sys.argv[1]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"]}.items():
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -227,7 +228,8 @@ import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"]}.items():
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -290,7 +292,8 @@ import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"]}.items():
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -355,7 +358,8 @@ repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
              "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t",
-             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"]}.items():
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)

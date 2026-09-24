@@ -151,4 +151,15 @@ check "no call reached the session" "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/edges.sh" revert >/dev/null 2>&1
 check "with one, KWin is asked to reload" "$(grep -c reconfigure "$CALLS")" "1"
 
+# An edge runs the same actions a key does, and says so from the same list the
+# daemon that runs them is rendered from. It used to pick them out of the
+# daemon's source with sed.
+echo "== an edge offers every shortcut action =="
+listed=$("$REPO_ROOT/scripts/edges.sh" shell 2>/dev/null | sed -n 's/^actions: //p' | tr ' ' '\n' | grep . | paste -sd' ')
+check "the shortcut list, in order" "$listed" \
+      "$(grep -v '^#' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv" | cut -f1 | paste -sd' ')"
+edges shell Top screenshot-window
+check "and takes one of them"       "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Top:screenshot-window"
+edges revert
+
 harness_done

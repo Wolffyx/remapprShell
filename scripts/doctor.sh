@@ -333,13 +333,13 @@ fi
 # grabbed, and that is invisible from the file: the record is perfect. It is
 # the one failure this project spent a whole evening finding, so it is checked
 # by name.
-bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key launcher --default '' 2>/dev/null)
-for k in search settings ask clipboard sidebar keys switcher; do
+bound=""
+for k in "${ACCEL_ACTIONS[@]}"; do
     [ -n "$bound" ] && break
     bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$k" --default '' 2>/dev/null)
 done
 legacy=""
-for k in launcher search settings ask clipboard sidebar keys switcher; do
+for k in "${ACCEL_ACTIONS[@]}"; do
     v=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$k.desktop" --key _launch --default '' 2>/dev/null | cut -d, -f1)
     [ -n "$v" ] && [ "$v" != none ] && legacy="$legacy $k"
 done

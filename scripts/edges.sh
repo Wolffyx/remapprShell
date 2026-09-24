@@ -31,6 +31,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
+source "$REPO_ROOT/scripts/lib/accel.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
@@ -248,12 +249,9 @@ EDGES_SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID"
 EDGES_GROUP="Script-$KWIN_EDGES_SCRIPT_ID"
 
 # The actions an edge can run: the shortcut actions, which is the same list a
-# key can be bound to. Read from the daemon rather than repeated here, so the
-# two can never disagree about what exists.
-shell_actions() {
-    sed -n '/^SHORTCUT_ACTIONS = {/,/^}/p' "$REPO_ROOT/bin/windowsd.py.in" \
-        | sed -n 's/^    "\([a-z-]*\)":.*/\1/p'
-}
+# key can be bound to -- lib/accel.sh's, from the file the daemon that runs
+# them is rendered from, so the two can never disagree about what exists.
+shell_actions() { printf '%s\n' "${ACCEL_ACTIONS[@]}"; }
 
 shell_bindings_raw() {
     kreadconfig6 --file kwinrc --group "$EDGES_GROUP" --key Bindings --default ''
