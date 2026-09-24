@@ -380,13 +380,17 @@ Item {
     readonly property LockPower battery: power
 
     LockLockout {
+        id: lockout
         z: 4
         anchors.horizontalCenter: parent.horizontalCenter
         y: (ui.style?.toastY ?? -1) >= 0 ? ui.style.toastY
                                           : Math.round((power.critical ? 96 : 66) * ui.unit)
         unlock: ui.unlock
         unit: ui.unit
-        visible: counting && !ui.leaving
+        // Gone at once when the shutter lifts; otherwise it fades out as it
+        // faded in. Hidden on `counting`, it was hidden before the fade
+        // could play.
+        visible: !ui.leaving && lockout.opacity > 0
     }
 
     LockDim {
