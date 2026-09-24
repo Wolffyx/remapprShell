@@ -52,3 +52,11 @@ DayAheadTimeline 1.0 DayAheadTimeline.qml
 DayAheadPlayer 1.0 DayAheadPlayer.qml
 DayAheadLockCard 1.0 DayAheadLockCard.qml
 DayAheadPill 1.0 DayAheadPill.qml
+SecurePalette 1.0 SecurePalette.qml
+SecureLog 1.0 SecureLog.qml
+SecureAuthCard 1.0 SecureAuthCard.qml
+SecureTab 1.0 SecureTab.qml
+SecurePasswordPanel 1.0 SecurePasswordPanel.qml
+SecureKeyPanel 1.0 SecureKeyPanel.qml
+SecureRail 1.0 SecureRail.qml
+SecureStatusTiles 1.0 SecureStatusTiles.qml

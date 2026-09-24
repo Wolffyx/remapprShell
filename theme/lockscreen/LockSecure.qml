@@ -26,6 +26,10 @@
     the idle-policy reason for locking go for the same reason. Restart and
     power off go too: the greeter can sleep, hibernate and switch user, and
     those are the buttons.
+
+    This file is the left half and where the rest goes; the way in is
+    SecureAuthCard with its two panels, the rail is SecureRail, and the log
+    of this lock is SecureLog, which hears the authenticator for both.
 */
 pragma ComponentBehavior: Bound
 
@@ -37,111 +41,26 @@ LockStyle {
     id: secure
 
     // The design's slate, cooler than the other dark styles.
-    readonly property color ground: "#0e1012"
-    readonly property color railGround: "#121417"
-    readonly property color card: "#15181b"
-    readonly property color cardLine: "#262a2f"
-    readonly property color well: "#1f2327"
-    readonly property color ink: "#e9e5df"
-    readonly property color sub: "#a9b0b8"
-    readonly property color mut: "#8b939c"
-    readonly property color faint: "#7d858e"
-    readonly property color good: "#7fb98a"
-    readonly property color bad: "#e0786a"
-    readonly property color warn: "#e0c98a"
+    readonly property SecurePalette colours: SecurePalette {}
 
     blursWallpaper: false
     scrimsWallpaper: false
 
-    promptField: password
+    promptField: authCard.field
     promptBlock: authCard
-
-    // --- what the greeter says it has --------------------------------------
-
-    readonly property bool hasFingerprint: secure.ui.unlock.hasFingerprint
-    readonly property bool hasSmartcard: secure.ui.unlock.hasSmartcard
-    readonly property bool hasAlternative: secure.hasFingerprint || secure.hasSmartcard
-
-    // "key" or "password", as the tabs choose. The key comes first, as the
-    // design has it, whenever there is one.
-    property string chosen: "key"
-    readonly property bool keyMode: secure.hasAlternative && secure.chosen === "key"
-        && !secure.ui.unlock.unlockedWithoutPassword
-
-    readonly property string keyTitle: secure.hasSmartcard && secure.hasFingerprint ? "Key or fingerprint"
-        : secure.hasSmartcard ? "Security key" : "Fingerprint"
-    readonly property string keyGlyph: secure.hasSmartcard ? "usb" : "fingerprint"
-    readonly property string keyAsk: secure.hasSmartcard && secure.hasFingerprint
-        ? "Use your security key, or touch the fingerprint sensor"
-        : secure.hasSmartcard ? "Insert or touch your security key" : "Touch the fingerprint sensor"
 
     // --- the log of this lock ---------------------------------------------
 
-    // Set once pam_faillock has said something: only then is it known to be
-    // counting this account's failures.
-    property bool faillock: false
-    property var seenLines: []
-
-    ListModel {
-        id: log
+    readonly property SecureLog log: SecureLog {
+        ui: secure.ui
+        colours: secure.colours
     }
-
-    function stamp(d: date): string {
-        return Qt.formatTime(d, "HH:mm:ss");
-    }
-
-    function addLog(what: string, how: string, tint: color): void {
-        log.insert(0, { "t": secure.stamp(new Date()), "what": what, "how": how, "tint": String(tint) });
-        while (log.count > 6)
-            log.remove(log.count - 1);
-    }
-
-    Component.onCompleted: {
-        log.append({ "t": secure.stamp(secure.ui.lockedAt), "what": "Locked", "how": "this greeter started", "tint": String(secure.mut) });
-    }
-
-    Connections {
-        target: secure.ui.unlock
-
-        function onRejected() {
-            secure.addLog("Password refused", `attempt ${secure.ui.unlock.refusals} this lock`, secure.bad);
-        }
-
-        // Each new line PAM says, once. "Unlocking failed" is our own word
-        // for a refusal, which is logged above rather than twice.
-        function onMessageChanged() {
-            const lines = secure.ui.unlock.message ? secure.ui.unlock.message.split("\n") : [];
-            for (const line of lines) {
-                if (!line || secure.seenLines.includes(line) || line === "Unlocking failed")
-                    continue;
-                const lockout = secure.ui.unlock.lockoutIn(line) > 0;
-                if (lockout || /faillock/i.test(line))
-                    secure.faillock = true;
-                secure.addLog(line, lockout ? "pam_faillock" : "PAM", lockout ? secure.bad : secure.mut);
-            }
-            secure.seenLines = lines;
-        }
-
-        function onUnlockedWithoutPasswordChanged() {
-            if (secure.ui.unlock.unlockedWithoutPassword)
-                secure.addLog("Accepted without a password", "confirm to unlock", secure.good);
-        }
-
-        function onShownChanged() {
-            if (!secure.ui.unlock.shown && password.text.length === 0)
-                secure.chosen = "key";
-        }
-    }
-
-    // --- the machine -------------------------------------------------------
-
-    readonly property LockPower battery: secure.ui.battery
 
     // --- the ground --------------------------------------------------------
 
     Rectangle {
         anchors.fill: parent
-        color: secure.ground
+        color: secure.colours.ground
     }
 
     // The accent's glow behind the left half, as the design's radial.
@@ -200,7 +119,7 @@ LockStyle {
             font.pixelSize: secure.px(14)
             font.weight: Font.Medium
             font.letterSpacing: 0.12 * secure.px(14)
-            color: secure.ink
+            color: secure.colours.ink
         }
 
         Rectangle {
@@ -217,7 +136,7 @@ LockStyle {
                 textFormat: Text.PlainText
                 font.family: "JetBrains Mono"
                 font.pixelSize: secure.px(12)
-                color: secure.sub
+                color: secure.colours.sub
             }
         }
     }
@@ -249,7 +168,7 @@ LockStyle {
             timeWeight: Font.Medium
             timeSize: secure.px(104)
             format: secure.twelveHour ? "h:mm" : "HH:mm"
-            ink: secure.ink
+            ink: secure.colours.ink
         }
 
         FontMetrics { id: bigMetrics; font: clock.timeFont }
@@ -266,7 +185,7 @@ LockStyle {
             font.weight: Font.Medium
             font.pixelSize: secure.px(40)
             font.features: { "tnum": 1 }
-            color: secure.faint
+            color: secure.colours.faint
         }
 
         Text {
@@ -278,7 +197,7 @@ LockStyle {
             textFormat: Text.PlainText
             font.family: "JetBrains Mono"
             font.pixelSize: secure.px(17)
-            color: secure.sub
+            color: secure.colours.sub
         }
     }
 
@@ -286,319 +205,21 @@ LockStyle {
 
     readonly property int leftWidth: Math.max(secure.px(420), Math.min(secure.px(880), secure.width - rail.width - secure.px(192)))
 
-    component Tab: Rectangle {
-        id: tab
-
-        property string glyph: ""
-        property string label: ""
-        property bool active: false
-        signal chosen
-
-        width: tabRow.implicitWidth + secure.px(36)
-        height: secure.px(40)
-        radius: secure.px(10)
-        color: tab.active ? "#2a2f36" : (tabHover.hovered ? "#161a1e" : "transparent")
-
-        Row {
-            id: tabRow
-            anchors.centerIn: parent
-            spacing: secure.px(8)
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: tab.glyph
-                font.family: "Material Symbols Rounded"
-                font.pixelSize: secure.px(18)
-                color: tab.active ? "#ffffff" : secure.sub
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: tab.label
-                textFormat: Text.PlainText
-                font.family: "Rubik"
-                font.pixelSize: secure.px(14)
-                font.weight: Font.Medium
-                color: tab.active ? "#ffffff" : secure.sub
-            }
-        }
-
-        HoverHandler { id: tabHover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: tab.chosen() }
-        Accessible.role: Accessible.PageTab
-        Accessible.name: tab.label
-    }
-
-    Rectangle {
+    SecureAuthCard {
         id: authCard
 
         x: secure.px(96)
         y: secure.px(340)
         width: secure.leftWidth
-        height: cardBody.height + secure.px(68)
-        radius: secure.px(24)
-        color: secure.card
-        border.width: 1
-        border.color: secure.cardLine
+        ui: secure.ui
+        colours: secure.colours
+        unit: secure.unit
+        faillock: secure.log.faillock
+        twelveHour: secure.twelveHour
         opacity: secure.ui.unlock.shown ? 1 : 0
         enabled: secure.ui.unlock.shown
 
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
-
-        Column {
-            id: cardBody
-
-            x: secure.px(40)
-            y: secure.px(32)
-            width: parent.width - 2 * x
-            spacing: secure.px(34)
-
-            // Only when there is something besides the password to choose.
-            Rectangle {
-                visible: secure.hasAlternative && !secure.ui.unlock.unlockedWithoutPassword
-                width: tabs.implicitWidth + secure.px(10)
-                height: tabs.implicitHeight + secure.px(10)
-                radius: secure.px(14)
-                color: secure.ground
-
-                Row {
-                    id: tabs
-                    anchors.centerIn: parent
-                    spacing: secure.px(6)
-
-                    Tab {
-                        glyph: secure.hasSmartcard ? "key" : "fingerprint"
-                        label: secure.keyTitle
-                        active: secure.keyMode
-                        onChosen: {
-                            secure.chosen = "key";
-                            secure.ui.focusPassword();
-                        }
-                    }
-
-                    Tab {
-                        glyph: "password"
-                        label: "Password"
-                        active: !secure.keyMode
-                        onChosen: {
-                            secure.chosen = "password";
-                            secure.ui.focusPassword();
-                        }
-                    }
-                }
-            }
-
-            // The key panel sits over the password one rather than replacing
-            // it, so the field keeps the keyboard: the first key typed is the
-            // first character of the password, and switches to it.
-            Item {
-                width: parent.width
-                height: secure.keyMode ? keyPanel.height : pwPanel.height
-
-                Column {
-                    id: pwPanel
-
-                    width: parent.width
-                    spacing: 0
-                    opacity: secure.keyMode ? 0 : 1
-
-                    Row {
-                        spacing: secure.px(16)
-
-                        LockFace {
-                            width: secure.px(52)
-                            height: width
-                            image: secure.ui.userImage
-                            userName: secure.ui.userName
-                            ink: "#3d3a35"
-                            fill: "#c9c4d8"
-                            ring: "transparent"
-                            ringWidth: 0
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: secure.ui.userName
-                            textFormat: Text.PlainText
-                            font.family: "Rubik"
-                            font.pixelSize: secure.px(18)
-                            font.weight: Font.Medium
-                            color: secure.ink
-                        }
-                    }
-
-                    Item { width: 1; height: secure.px(24) }
-
-                    LockPrompt {
-                        id: password
-
-                        width: parent.width
-                        height: secure.px(60)
-                        unlock: secure.ui.unlock
-                        unit: secure.unit
-                        radius: secure.px(14)
-                        glyph: "password"
-                        ink: secure.ink
-                        dim: secure.sub
-                        accent: secure.ui.accent
-                        errorColor: secure.bad
-                        fieldColor: secure.ground
-                        // In key mode this panel is hidden, so the colour
-                        // the border has there -- the accent, since the
-                        // field keeps the keyboard -- is never seen.
-                        fieldBorder: password.stateBorder
-
-                        onTextChanged: {
-                            if (password.text.length > 0)
-                                secure.chosen = "password";
-                        }
-                    }
-
-                    Item { width: 1; height: secure.px(12) }
-
-                    LockMessage {
-                        width: parent.width
-                        unlock: secure.ui.unlock
-                        unit: secure.unit
-                        align: Text.AlignLeft
-                        ink: secure.sub
-                        warn: secure.warn
-                    }
-
-                    Text {
-                        readonly property var parts: [
-                            secure.ui.unlock.refusals > 0
-                                ? `${secure.ui.unlock.refusals} refused since ${Qt.formatTime(secure.ui.lockedAt, secure.twelveHour ? "h:mm AP" : "HH:mm")}`
-                                : "enter ⏎ to unlock",
-                            secure.faillock ? "failures on this account are counted by pam_faillock" : "",
-                        ].filter(p => p)
-
-                        topPadding: secure.px(8)
-                        width: parent.width
-                        text: parts.join(" · ")
-                        textFormat: Text.PlainText
-                        wrapMode: Text.Wrap
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: secure.px(13)
-                        color: secure.mut
-                    }
-                }
-
-                // Insert, touch, PIN: PAM's steps, said in PAM's words.
-                Item {
-                    id: keyPanel
-
-                    visible: secure.keyMode
-                    width: parent.width
-                    height: Math.max(ring.height, keyText.height)
-
-                    // Clicks here are not for the field hidden underneath.
-                    MouseArea {
-                        anchors.fill: parent
-                        onPressed: secure.ui.focusPassword()
-                    }
-
-                    Item {
-                        id: ring
-
-                        width: secure.px(148)
-                        height: width
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Shape {
-                            anchors.fill: parent
-
-                            ShapePath {
-                                strokeColor: "#3d434a"
-                                strokeWidth: Math.max(1, secure.px(2))
-                                strokeStyle: ShapePath.DashLine
-                                dashPattern: [3, 2.4]
-                                fillColor: "transparent"
-
-                                PathAngleArc {
-                                    centerX: ring.width / 2
-                                    centerY: ring.height / 2
-                                    radiusX: ring.width / 2 - secure.px(1)
-                                    radiusY: ring.height / 2 - secure.px(1)
-                                    startAngle: 0
-                                    sweepAngle: 360
-                                }
-                            }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: secure.keyGlyph
-                            font.family: "Material Symbols Rounded"
-                            font.pixelSize: secure.px(58)
-                            color: "#c9ced4"
-                        }
-                    }
-
-                    Column {
-                        id: keyText
-
-                        anchors.left: ring.right
-                        anchors.leftMargin: secure.px(36)
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: secure.px(8)
-
-                        Text {
-                            width: parent.width
-                            text: secure.keyAsk
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap
-                            font.family: "Rubik"
-                            font.pixelSize: secure.px(30)
-                            color: secure.ink
-                        }
-
-                        Text {
-                            width: parent.width
-                            text: secure.ui.unlock.message
-                                || "PAM is waiting for it alongside the password. What it says will appear here."
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap
-                            lineHeight: 1.3
-                            font.family: "Rubik"
-                            font.pixelSize: secure.px(16)
-                            color: secure.ui.unlock.message ? secure.ink : secure.sub
-                        }
-
-                        Item { width: 1; height: secure.px(14) }
-
-                        Rectangle {
-                            width: useText.implicitWidth + secure.px(44)
-                            height: secure.px(46)
-                            radius: secure.px(12)
-                            color: useHover.hovered ? "#2a2f36" : secure.well
-
-                            Text {
-                                id: useText
-                                anchors.centerIn: parent
-                                text: "Use password instead"
-                                textFormat: Text.PlainText
-                                font.family: "Rubik"
-                                font.pixelSize: secure.px(15)
-                                font.weight: Font.Medium
-                                color: secure.ink
-                            }
-
-                            HoverHandler { id: useHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler {
-                                onTapped: {
-                                    secure.chosen = "password";
-                                    secure.ui.focusPassword();
-                                }
-                            }
-                            Accessible.role: Accessible.Button
-                            Accessible.name: "Use password instead"
-                        }
-                    }
-                }
-            }
-        }
     }
 
     Text {
@@ -609,7 +230,7 @@ LockStyle {
         textFormat: Text.PlainText
         font.family: "JetBrains Mono"
         font.pixelSize: secure.px(15)
-        color: secure.mut
+        color: secure.colours.mut
 
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
     }
@@ -637,7 +258,7 @@ LockStyle {
                 text: secure.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 font.family: "Material Symbols Rounded"
                 font.pixelSize: secure.px(22)
-                color: oskHover.hovered ? secure.ink : secure.sub
+                color: oskHover.hovered ? secure.colours.ink : secure.colours.sub
             }
 
             Text {
@@ -646,7 +267,7 @@ LockStyle {
                 textFormat: Text.PlainText
                 font.family: "Rubik"
                 font.pixelSize: secure.px(14)
-                color: oskHover.hovered ? secure.ink : secure.sub
+                color: oskHover.hovered ? secure.colours.ink : secure.colours.sub
             }
 
             HoverHandler { id: oskHover; cursorShape: Qt.PointingHandCursor }
@@ -673,356 +294,15 @@ LockStyle {
 
     // --- the rail ----------------------------------------------------------
 
-    component Heading: Item {
-        id: heading
-
-        property string label: ""
-        property string aside: ""
-        property color asideColor: secure.sub
-
-        width: parent?.width ?? 0
-        height: headingText.implicitHeight
-
-        Text {
-            id: headingText
-            text: heading.label
-            textFormat: Text.PlainText
-            font.family: "JetBrains Mono"
-            font.pixelSize: secure.px(12)
-            font.letterSpacing: 0.14 * secure.px(12)
-            color: secure.mut
-        }
-
-        Text {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: heading.aside
-            textFormat: Text.PlainText
-            font.family: "Rubik"
-            font.pixelSize: secure.px(13)
-            color: heading.asideColor
-        }
-    }
-
-    component Way: Item {
-        id: way
-
-        property string glyph: ""
-        property string label: ""
-        property bool offered: false
-
-        width: parent?.width ?? 0
-        height: secure.px(44)
-
-        Text {
-            id: wayGlyph
-            anchors.verticalCenter: parent.verticalCenter
-            text: way.offered ? "check_circle" : "do_not_disturb_on"
-            font.family: "Material Symbols Rounded"
-            font.pixelSize: secure.px(20)
-            color: way.offered ? secure.good : "#5d646c"
-        }
-
-        Text {
-            anchors.left: wayGlyph.right
-            anchors.leftMargin: secure.px(12)
-            anchors.verticalCenter: parent.verticalCenter
-            text: way.label
-            textFormat: Text.PlainText
-            font.family: "Rubik"
-            font.pixelSize: secure.px(15)
-            color: way.offered ? secure.ink : secure.mut
-        }
-
-        Text {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: way.glyph
-            font.family: "Material Symbols Rounded"
-            font.pixelSize: secure.px(18)
-            color: secure.faint
-        }
-
-        Rectangle {
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 1
-            color: "#1d2126"
-        }
-    }
-
-    component Tile: Rectangle {
-        id: tile
-
-        property string glyph: ""
-        property string label: ""
-        property string detail: ""
-        property color tint: secure.ink
-
-        height: tileBody.implicitHeight + secure.px(28)
-        radius: secure.px(14)
-        color: "#181b1f"
-
-        Column {
-            id: tileBody
-
-            x: secure.px(16)
-            y: secure.px(14)
-            width: parent.width - 2 * x
-            spacing: secure.px(6)
-
-            Row {
-                spacing: secure.px(8)
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: tile.glyph
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: secure.px(18)
-                    color: tile.tint
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: tile.label
-                    textFormat: Text.PlainText
-                    font.family: "Rubik"
-                    font.pixelSize: secure.px(14)
-                    font.weight: Font.Medium
-                    color: tile.tint
-                }
-            }
-
-            Text {
-                width: parent.width
-                text: tile.detail
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                font.family: "JetBrains Mono"
-                font.pixelSize: secure.px(12.5)
-                color: secure.sub
-            }
-        }
-    }
-
-    Rectangle {
+    SecureRail {
         id: rail
 
         anchors.right: parent.right
         width: Math.max(secure.px(440), Math.min(secure.px(820), secure.width - secure.px(1100)))
         height: secure.height
-        color: secure.railGround
-
-        Rectangle {
-            width: 1
-            height: parent.height
-            color: "#20242a"
-        }
-
-        Column {
-            x: secure.px(64)
-            y: secure.px(60)
-            width: parent.width - 2 * x
-            spacing: secure.px(30)
-
-            // Where the design has device posture: the ways in, which the
-            // greeter does know.
-            Column {
-                width: parent.width
-                spacing: secure.px(12)
-
-                Heading {
-                    label: "AUTHENTICATION"
-                    aside: "offered by PAM here"
-                }
-
-                Column {
-                    width: parent.width
-
-                    Way {
-                        label: "Password"
-                        glyph: "password"
-                        offered: true
-                    }
-
-                    Way {
-                        label: "Security key or smartcard"
-                        glyph: "usb"
-                        offered: secure.hasSmartcard
-                    }
-
-                    Way {
-                        label: "Fingerprint"
-                        glyph: "fingerprint"
-                        offered: secure.hasFingerprint
-                    }
-                }
-            }
-
-            // Where the design has journald: this lock, as this greeter saw it.
-            Column {
-                width: parent.width
-                spacing: secure.px(12)
-
-                Heading {
-                    label: "THIS LOCK"
-                    aside: "since this lock · this greeter"
-                }
-
-                Column {
-                    width: parent.width
-
-                    Repeater {
-                        model: log
-
-                        Item {
-                            id: entry
-
-                            required property string t
-                            required property string what
-                            required property string how
-                            required property string tint
-
-                            width: parent.width
-                            height: secure.px(38)
-
-                            Rectangle {
-                                id: dot
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: secure.px(8)
-                                height: width
-                                radius: width / 2
-                                color: entry.tint
-                            }
-
-                            Text {
-                                id: when
-                                anchors.left: dot.right
-                                anchors.leftMargin: secure.px(14)
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: secure.px(72)
-                                text: entry.t
-                                textFormat: Text.PlainText
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: secure.px(13)
-                                color: secure.sub
-                            }
-
-                            Text {
-                                anchors.left: when.right
-                                anchors.leftMargin: secure.px(10)
-                                anchors.right: how.left
-                                anchors.rightMargin: secure.px(14)
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: entry.what
-                                textFormat: Text.PlainText
-                                elide: Text.ElideRight
-                                font.family: "Rubik"
-                                font.pixelSize: secure.px(15)
-                                color: secure.ink
-                            }
-
-                            Text {
-                                id: how
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: entry.how
-                                textFormat: Text.PlainText
-                                font.family: "Rubik"
-                                font.pixelSize: secure.px(13)
-                                color: secure.sub
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Where the design has VPN and Wi-Fi: the two things about this
-            // machine the greeter can read.
-            //
-            // Shown from what the tiles would say rather than from the tiles'
-            // own `visible`, which reads false for as long as this row is
-            // hidden -- so a row that asked its tiles stayed hidden for good
-            // once it had been, and the layouts arrive after the lock screen
-            // is up. On a machine with no battery the layout was never drawn.
-            Row {
-                id: machine
-
-                readonly property bool hasLayout: LockKeys.layoutName !== ""
-                readonly property bool hasBattery: secure.battery.present
-                readonly property int tiles: (machine.hasLayout ? 1 : 0) + (machine.hasBattery ? 1 : 0)
-                readonly property real tileWidth: (width - (tiles - 1) * spacing) / Math.max(1, tiles)
-
-                width: parent.width
-                spacing: secure.px(12)
-                visible: machine.tiles > 0
-
-                Tile {
-                    id: layoutTile
-
-                    visible: machine.hasLayout
-                    width: machine.tileWidth
-                    glyph: "keyboard"
-                    label: LockKeys.layouts.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
-                    detail: LockKeys.layoutName
-                    tint: LockKeys.otherLayout ? secure.warn : secure.ink
-
-                    HoverHandler {
-                        enabled: LockKeys.layouts.length > 1
-                        cursorShape: Qt.PointingHandCursor
-                    }
-                    TapHandler {
-                        enabled: LockKeys.layouts.length > 1 && secure.ui.unlock.shown
-                        onTapped: {
-                            LockKeys.nextLayout();
-                            secure.ui.focusPassword();
-                        }
-                    }
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Keyboard layout: " + LockKeys.layoutName
-                }
-
-                Tile {
-                    id: batteryTile
-
-                    visible: machine.hasBattery
-                    width: machine.tileWidth
-                    glyph: secure.battery.glyph
-                    label: `Battery · ${secure.battery.percent}%`
-                    tint: secure.battery.plugged ? secure.good : secure.ink
-                    detail: secure.battery.plugged ? "plugged in"
-                        : secure.battery.remainingMsec > 0 ? `on battery · ${LockText.duration(secure.battery.remainingMsec, true)} left`
-                        : "on battery"
-                }
-            }
-        }
-
-        // The design's "managed by IT" line, said of what this screen is.
-        Row {
-            x: secure.px(64)
-            width: parent.width - 2 * x
-            y: parent.height - height - secure.px(60)
-            spacing: secure.px(12)
-
-            Text {
-                id: policyGlyph
-                text: "policy"
-                font.family: "Material Symbols Rounded"
-                font.pixelSize: secure.px(18)
-                color: secure.mut
-            }
-
-            Text {
-                width: parent.width - policyGlyph.width - parent.spacing
-                text: "This list is kept by the lock screen for this lock only and ends with it. "
-                    + "Nothing here is written anywhere; PAM decides what is allowed and when."
-                textFormat: Text.PlainText
-                wrapMode: Text.Wrap
-                lineHeight: 1.3
-                font.family: "Rubik"
-                font.pixelSize: secure.px(13)
-                color: secure.mut
-            }
-        }
+        ui: secure.ui
+        colours: secure.colours
+        unit: secure.unit
+        entries: secure.log.entries
     }
 }
