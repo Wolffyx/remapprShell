@@ -159,18 +159,12 @@ case "$cmd" in
             log_warn "Alt+Tab can leave it on screen. KWin's is the default: $ALIAS switcher use plasma"
         fi
 
-        profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
-        mkdir -p "$(dirname "$profile")"
-        if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
-            die "$profile does not parse; fix it first"
-        fi
-        tmp=$(mktemp)
-        if [ -f "$profile" ]; then
-            jq --arg w "$who" '.switching = ((.switching // {}) + {windows: $w})' "$profile" > "$tmp" || die "could not write $profile"
-        else
-            jq -n --arg w "$who" '{switching: {windows: $w}}' > "$tmp" || die "could not write $profile"
-        fi
-        mv "$tmp" "$profile"
+        config_set_string '.switching.windows' "$who"
+        case $? in
+            0) ;;
+            2) die "$(profile_file) does not parse; fix it first" ;;
+            *) die "could not write $(profile_file)" ;;
+        esac
 
         if [ "$who" = shell ]; then
             # This project's own component, not a desktop file: only a
@@ -215,19 +209,12 @@ case "$cmd" in
             *) die "unknown: $who (plasma or shell)" ;;
         esac
 
-        profile="$CONFIG_DIR/profiles/$(config_active_profile)/shell.json"
-        mkdir -p "$(dirname "$profile")"
-        if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
-            die "$profile does not parse; fix it first"
-        fi
-        tmp=$(mktemp)
-        if [ -f "$profile" ]; then
-            jq --arg w "$who" '.switching = ((.switching // {}) + {desktops: $w})' "$profile" > "$tmp" \
-                || die "could not write $profile"
-        else
-            jq -n --arg w "$who" '{switching: {desktops: $w}}' > "$tmp" || die "could not write $profile"
-        fi
-        mv "$tmp" "$profile"
+        config_set_string '.switching.desktops' "$who"
+        case $? in
+            0) ;;
+            2) die "$(profile_file) does not parse; fix it first" ;;
+            *) die "could not write $(profile_file)" ;;
+        esac
 
         if [ "$who" = shell ]; then
             ACCEL_FRIENDLY_HINT="Desktops"

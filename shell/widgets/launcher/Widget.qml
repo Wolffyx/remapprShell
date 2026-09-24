@@ -6,7 +6,6 @@
 
 import QtQuick
 import qs.ui.primitives
-import qs.domain.theme
 import qs.domain.launcher
 
 BarWidget {
@@ -85,8 +84,8 @@ BarWidget {
     // panel.
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
-        vertical: !(root.bar?.horizontal ?? true)
+        thickness: root.barThickness
+        vertical: root.barVertical
         hovered: root.hovered
         active: LauncherService.active.visible
         accent: true

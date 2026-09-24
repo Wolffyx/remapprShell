@@ -70,8 +70,16 @@ case "$cmd" in
         # way and keeps it with the same call.
         keep_profile "before-$name"
 
+        # Written whole beside the profile, then renamed over it. The shell
+        # watches this file, and a redirect onto it truncates before it writes:
+        # a read in that window is a parse error, which the shell answers by
+        # keeping the configuration it already had -- the preset would seem
+        # not to apply. lib/config.sh writes a single setting the same way.
         schema=$(jq -r '.schemaVersion // 1' "$f" 2>/dev/null)
-        jq --argjson v "${schema:-1}" '.config + {schemaVersion: $v}' "$f" > "$target"
+        tmp=$(mktemp "$(dirname "$target")/.shell.json.XXXXXX") || die "could not write $target"
+        jq --argjson v "${schema:-1}" '.config + {schemaVersion: $v}' "$f" > "$tmp" \
+            || { rm -f "$tmp"; die "could not read the preset $f"; }
+        mv -f "$tmp" "$target" || { rm -f "$tmp"; die "could not write $target"; }
 
         log_step "applied preset '$name' to profile '$(active_profile)'"
         log_info "the shell picks it up immediately; no restart needed"

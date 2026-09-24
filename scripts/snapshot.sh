@@ -18,6 +18,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
 cmd=${1:-list}
@@ -51,13 +52,8 @@ case "$cmd" in
 
     remove)
         name=${1:?usage: $ALIAS snapshot remove <name>}
-        snapshot_list | grep -q "^$(basename "$name") " || true
         log_warn "about to permanently delete snapshot '$name'"
-        if [ "${2:-}" != "--yes" ]; then
-            printf 'continue? [y/N] ' >&2
-            read -r reply < /dev/tty || reply=""
-            case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
-        fi
+        [ "${2:-}" = "--yes" ] || confirm_or_die
         snapshot_remove "$name"
         ;;
 
@@ -72,11 +68,7 @@ case "$cmd" in
             shift
         done
         log_warn "about to permanently delete all but the newest $keep snapshot(s)"
-        if [ "${ASSUME_YES:-0}" != 1 ]; then
-            printf 'continue? [y/N] ' >&2
-            read -r reply < /dev/tty || reply=""
-            case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
-        fi
+        [ "${ASSUME_YES:-0}" = 1 ] || confirm_or_die
         snapshot_prune "$keep"
         ;;
 

@@ -35,6 +35,16 @@ Item {
     // two files it would take to break.
     required property var ui
 
+    // The frame's scale, and a length of the design at it. Every design is
+    // drawn at 1920x1080 and every style is laid out in the design's pixels,
+    // so each would otherwise declare these two for itself. The accessible
+    // and kiosk styles scale their type again, on top of this.
+    readonly property real unit: style.ui.unit
+
+    function px(v: real): int {
+        return Math.round(v * style.unit);
+    }
+
     // The password field this style built, for the frame to focus, shake and
     // keep above the on-screen keyboard. Typed, so that a style handing back
     // the wrong item is a warning here rather than a lock screen that cannot

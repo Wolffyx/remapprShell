@@ -29,7 +29,7 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         // It slides in from the right, so the glyph points the way it comes.
         glyph: "dock_to_left"

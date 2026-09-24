@@ -22,7 +22,6 @@ QtObject {
     // which belongs to the user.
     readonly property string stateDir: Branding.stateDir
     readonly property string widgetHealthFile: `${root.stateDir}/widget-health.json`
-    readonly property string diagnosticsDir: `${root.stateDir}/diagnostics`
 
     // What the launcher has been used to open, and when. State rather than
     // configuration: nobody would type it, and losing it costs a few days of

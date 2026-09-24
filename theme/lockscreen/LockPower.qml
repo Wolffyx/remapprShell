@@ -52,6 +52,23 @@ Item {
     readonly property bool present: power.override ? true : battery.hasInternalBatteries
     readonly property int percent: power.override ? power.override.percent : battery.percent
     readonly property bool plugged: power.override ? !!power.override.pluggedIn : battery.pluggedIn
+
+    // What the styles say about the battery, from this one model rather than
+    // one of their own each -- so a preview's stand-in reaches every style
+    // that draws a battery, not only this file. A stand-in has no time left
+    // to report, and charges whenever it is plugged in and not full.
+    readonly property double remainingMsec: power.override ? 0 : battery.remainingMsec
+    readonly property double smoothedRemainingMsec: power.override ? 0 : battery.smoothedRemainingMsec
+    readonly property bool charging: power.override ? power.plugged && power.percent < 100
+                                                     : battery.state === BatteryControlModel.Charging
+    readonly property bool full: power.override ? power.plugged && power.percent >= 100
+                                                 : battery.state === BatteryControlModel.FullyCharged
+    // Material Symbols' battery at this charge: none to six bars, full, or
+    // charging.
+    readonly property string glyph: power.plugged ? "battery_charging_full"
+        : power.percent >= 95 ? "battery_full"
+        : "battery_" + Math.max(0, Math.min(6, Math.floor(power.percent / 15))) + "_bar"
+
     readonly property int lowAt: Number(powerdevil.value("BatteryLowLevel", 10)) || 10
     readonly property int criticalAt: Number(powerdevil.value("BatteryCriticalLevel", 5)) || 5
 
@@ -106,12 +123,10 @@ Item {
     }
 
     function remaining(): string {
-        const ms = battery.remainingMsec;
+        const ms = power.remainingMsec;
         if (power.override || !ms || ms <= 0)
             return "";
-        const minutes = Math.round(ms / 60000);
-        return minutes < 60 ? "about " + minutes + " min left"
-                            : "about " + Math.floor(minutes / 60) + " h " + (minutes % 60) + " min left";
+        return "about " + LockText.duration(ms, false) + " left";
     }
 
     // --- critical: the edges redden ---------------------------------------

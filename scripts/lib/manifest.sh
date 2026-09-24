@@ -7,7 +7,8 @@
 #
 # Each entry is: KIND|SRC (repo-relative)|DEST (absolute)
 #   dir       a directory: symlinked whole in link mode, copied in copy mode
-#   template  a *.in file rendered through envsubst, always copied, made executable
+#   template  a *.in file rendered by lib/render.sh, always copied, made executable
+#   symlink   a link to SRC, which is a path relative to DEST's directory
 #
 # Requires brand.sh to have been sourced.
 
@@ -36,8 +37,5 @@ template|share/applications/wayland-interfaces.desktop.in|$APPLICATIONS_DIR/$SLU
 ENTRIES
 }
 
-# Variables a template may reference. Kept explicit so a typo in a template
-# fails loudly instead of silently rendering an empty string.
-MANIFEST_TEMPLATE_VARS='$SLUG $ALIAS $DISPLAY_NAME $APP_ID $DBUS_NAME $ENV_PREFIX
-$SHELL_PACKAGE_ID $VERSION $QS_CONFIG_DIR $CONFIG_DIR $DATA_DIR $STATE_DIR
-$BIN_DIR $SESSION_BIN $CTL_BIN $SYSTEMD_UNIT $SAFE_MODE_VAR $DEBUG_VAR'
+# What a template may reference is RENDER_VARS, in lib/render.sh, which fails
+# loudly on a placeholder it does not know.

@@ -27,26 +27,11 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/appletsrc.sh"
 source "$REPO_ROOT/scripts/lib/renderers.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 
 BACKUP_DIR="$STATE_DIR/renderer-backups"
 
 # --- what the shell is configured to do -----------------------------------
-
-active_profile() {
-    local state="$CONFIG_DIR/state.json"
-    [ -f "$state" ] && jq -r '.profile // "default"' "$state" 2>/dev/null || echo default
-}
-
-profile_file() { printf '%s/profiles/%s/shell.json' "$CONFIG_DIR" "$(active_profile)"; }
-
-defaults_file() {
-    # The installed copy first: that is what the running shell reads, and a
-    # renderer generated from a different description than the one on screen
-    # would be a confusing thing to debug.
-    local installed="$DATA_DIR/config/defaults/shell.json"
-    [ -f "$installed" ] && { printf '%s' "$installed"; return; }
-    printf '%s/config/defaults/shell.json' "$REPO_ROOT"
-}
 
 widget_index() {
     local installed="$QS_CONFIG_DIR/widgets/index.json"
@@ -55,38 +40,20 @@ widget_index() {
 }
 
 # Defaults plus the user's sparse delta, which is what the shell itself draws
-# from. Generating the Plasma panel from anything else would let the two
-# renderers disagree about what the panel contains.
+# from (lib/config.sh). Generating the Plasma panel from anything else would
+# let the two renderers disagree about what the panel contains -- and the
+# defaults are the installed copy first for the same reason: a renderer
+# generated from a different description than the one on screen would be a
+# confusing thing to debug.
 effective_config() {
-    local defaults profile
-    defaults=$(defaults_file)
-    profile=$(profile_file)
-    if [ -f "$profile" ] && jq -e . "$profile" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1]' "$defaults" "$profile"
-    else
-        [ -f "$profile" ] && log_warn "$profile does not parse; using the shipped defaults"
-        cat "$defaults"
-    fi
+    config_profile_broken && log_warn "$(profile_file) does not parse; using the shipped defaults"
+    config_merged
 }
 
 configured_renderer() { renderer_normalize "$(effective_config | jq -r '.panel.renderer // "quickshell"')"; }
 
-live_shell_package() {
-    kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop'
-}
-
-package_for() {
-    case "$1" in
-        plasma)             printf '%s' "$PLASMA_SHELL_PACKAGE_ID" ;;
-        quickshell)         printf '%s' "$SHELL_PACKAGE_ID" ;;
-        none)               printf 'org.kde.plasma.desktop' ;;
-        # Process-level only: another Quickshell shell draws its own bar from
-        # its own code, and none of ours is involved. Ours stays the shell
-        # package so the desktop keeps the containment it already has, with no
-        # Plasma panel on it.
-        "$RENDERER_FOREIGN_PREFIX"*) printf '%s' "$SHELL_PACKAGE_ID" ;;
-    esac
-}
+# live_shell_package and package_for are lib/renderers.sh's: doctor, the report
+# and the lock screen ask the same two questions.
 
 # Will anything of ours actually draw a panel?
 #
@@ -336,23 +303,14 @@ restart_plasmashell() {
 write_renderer_setting() {
     local target=$1 file
     file=$(profile_file)
-    mkdir -p "$(dirname "$file")"
-
-    if [ -f "$file" ] && ! jq -e . "$file" >/dev/null 2>&1; then
-        log_error "$file does not parse; refusing to write over it"
-        log_info "  fix it first: jq . $file"
-        return 1
-    fi
-
-    local tmp
-    tmp=$(mktemp)
-    if [ -f "$file" ]; then
-        jq --arg r "$target" '.panel = ((.panel // {}) + {renderer: $r})' "$file" > "$tmp" || return 1
-    else
-        jq -n --arg r "$target" '{panel: {renderer: $r}}' > "$tmp" || return 1
-    fi
-    mv "$tmp" "$file"
-    log_debug "set panel.renderer=$target in $file"
+    config_set_string '.panel.renderer' "$target"
+    case $? in
+        0) log_debug "set panel.renderer=$target in $file" ;;
+        2) log_error "$file does not parse; refusing to write over it"
+           log_info "  fix it first: jq . $file"
+           return 1 ;;
+        *) return 1 ;;
+    esac
 }
 
 # --- Plasma's tray-only services -------------------------------------------
@@ -370,11 +328,11 @@ write_renderer_setting() {
 stop_hosted_services() {
     session_available || return 0
     local pid name owner
-    pid=$(busctl --user status org.kde.plasmawindowed 2>/dev/null | sed -n 's/^PID=//p')
+    pid=$(bus_status_field org.kde.plasmawindowed PID)
     [ -n "$pid" ] || return 0
     local hosting=0 it id
     for name in org.freedesktop.Notifications org.kde.klipper; do
-        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        owner=$(bus_status_field "$name" PID)
         [ "$owner" = "$pid" ] && hosting=1
     done
     # The device notifier holds no bus name; its tray item, which only
@@ -401,10 +359,9 @@ stop_hosted_services() {
 # the switch. So it is asked to let go first, and given a moment to.
 release_shell_notifications() {
     session_available || return 0
-    ours() { busctl --user status org.freedesktop.Notifications 2>/dev/null \
-               | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; }
+    ours() { shell_holds_bus_name org.freedesktop.Notifications; }
     ours || return 0
-    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications release >/dev/null 2>&1 || true
+    quickshell ipc --path "$(shell_ipc_path)" call notifications release >/dev/null 2>&1 || true
     local i
     for i in 1 2 3 4 5 6 7 8 9 10; do
         ours || return 0
@@ -418,10 +375,10 @@ release_shell_notifications() {
 plasmashell_holds_tray_services() {
     session_available || return 1
     local shell name owner
-    shell=$(busctl --user status org.kde.plasmashell 2>/dev/null | sed -n 's/^PID=//p')
+    shell=$(bus_status_field org.kde.plasmashell PID)
     [ -n "$shell" ] || return 1
     for name in org.freedesktop.Notifications org.kde.klipper; do
-        owner=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^PID=//p')
+        owner=$(bus_status_field "$name" PID)
         [ "$owner" = "$shell" ] && return 0
     done
     return 1
@@ -431,24 +388,18 @@ plasmashell_holds_tray_services() {
 # again at once, rather than wait for a bus name to change hands.
 rehost_services() {
     session_available || return 0
-    quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call services rehost >/dev/null 2>&1 || true
+    quickshell ipc --path "$(shell_ipc_path)" call services rehost >/dev/null 2>&1 || true
 }
 
 # --- reporting -------------------------------------------------------------
 
-compat_report() {
-    local target=$1 config index unsupported folded
-    config=$(mktemp); effective_config > "$config"
+compat_report() {   # <target> <effective config file>
+    local target=$1 config=$2 index unsupported folded
+    [ "$target" = "plasma" ] || return 0
     index=$(widget_index)
-
-    if [ "$target" != "plasma" ]; then
-        rm -f "$config"
-        return 0
-    fi
 
     unsupported=$(appletsrc_unsupported "$index" "$config")
     folded=$(appletsrc_folded_into_tray "$index" "$config")
-    rm -f "$config"
 
     # Not a loss, so not a warning: the same icons, drawn by Plasma's tray.
     if [ -n "$folded" ]; then
@@ -543,8 +494,15 @@ case "$cmd" in
         target=${args[0]:-}
         [ -n "$target" ] || die "usage: $ALIAS renderer set <$(renderer_ids | paste -sd'|')>"
         target=$(renderer_normalize "$target")
+
+        # The configuration, merged once for everything below: the report, the
+        # generated layouts and the panel's geometry all read this one file.
+        config=$(mktemp)
+        trap 'rm -f "$config"' EXIT
+        effective_config > "$config"
+
         # The one being left, read before anything writes the new one.
-        previous=$(configured_renderer)
+        previous=$(renderer_normalize "$(jq -r '.panel.renderer // "quickshell"' "$config")")
 
         valid=0
         while read -r r; do [ "$r" = "$target" ] && valid=1; done < <(renderer_ids)
@@ -573,11 +531,10 @@ case "$cmd" in
 
         # Told before anything is written, and named individually. "Some
         # widgets may not work" is not information a person can act on.
-        compat_report "$target"
+        compat_report "$target" "$config"
 
         if [ "$DRY_RUN" = 1 ]; then
-            tmp=$(mktemp); config=$(mktemp)
-            effective_config > "$config"
+            tmp=$(mktemp)
             appletsrc_generate "$tmp" "$config" "$(widget_index)" "$target" \
                 "$(appletsrc_wallpaper "$(appletsrc_path "$(live_shell_package)")")" \
                 || die "generation failed"
@@ -585,7 +542,7 @@ case "$cmd" in
             appletsrc_validate "$tmp" "$expect" || die "the generated layout does not validate"
             log_step "this is what would be installed at $(appletsrc_path "$pkg"):"
             cat "$tmp"
-            rm -f "$tmp" "$config"
+            rm -f "$tmp"
             exit 0
         fi
 
@@ -608,7 +565,6 @@ case "$cmd" in
         # Both layouts are regenerated, not only the target's. The one we are
         # switching away from must not keep a panel it is no longer allowed to
         # draw, or switching back and forth would accumulate panels.
-        config=$(mktemp); effective_config > "$config"
         index=$(widget_index)
         failed=0
 
@@ -633,15 +589,13 @@ case "$cmd" in
         done
 
         if [ "$failed" = 1 ]; then
-            rm -f "$config"
             log_error "the applet layout could not be generated; nothing was activated"
             log_info "  the previous layouts are in $BACKUP_DIR"
             exit 1
         fi
 
-        thickness=$(jq -r '.panel.thickness // 40' "$config")
-        position=$(jq -r '.panel.position // "bottom"' "$config")
-        rm -f "$config"
+        IFS=$'\x1f' read -r thickness position \
+            < <(jq -r '"\(.panel.thickness // 40)\u001f\(.panel.position // "bottom")"' "$config")
 
         if ! apply_shell_package "$pkg"; then
             log_error "the switch did not take; rolling back"
@@ -726,7 +680,8 @@ case "$cmd" in
 
     revert)
         leaving=""
-        renderer_is_foreign "$(configured_renderer)" && leaving=$(renderer_config_name "$(configured_renderer)")
+        current=$(configured_renderer)
+        renderer_is_foreign "$current" && leaving=$(renderer_config_name "$current")
         stop_foreign "" "$leaving"
         kconfig_revert backend
         # plasmashell adds its own keys to our panel view's group while the

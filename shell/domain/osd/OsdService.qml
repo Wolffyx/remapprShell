@@ -27,8 +27,8 @@ pragma Singleton
 // silences it; the settings page says so, and so does `rmpr doctor`.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.kde
 import qs.domain.config
 import qs.domain.osd.events
 import qs.domain.status
@@ -201,21 +201,18 @@ QtObject {
     // the touchpad, caps lock. Where plasmashell does emit, a volume key
     // arrives twice -- once here, once from PipeWire -- and both carry the
     // same number, so the pill is redrawn identically rather than twice over.
-    readonly property Process _monitor: Process {
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", "type='signal',interface='org.kde.osdService'"]
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: "type='signal',interface='org.kde.osdService'"
         running: root.enabled
 
-        stdout: SplitParser {
-            onRead: line => {
-                const event = OsdEvents.parse(line);
-                if (event)
-                    root._show(event);
-            }
+        onRead: line => {
+            const event = OsdEvents.parse(line);
+            if (event)
+                root._show(event);
         }
 
-        onRunningChanged: {
-            if (running)
+        onListeningChanged: {
+            if (listening)
                 Log.info("osd", "listening for Plasma's OSD signals");
             else if (root.enabled)
                 Log.warn("osd", "the OSD listener stopped; nothing will be drawn");

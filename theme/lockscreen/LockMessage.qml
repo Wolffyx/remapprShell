@@ -14,8 +14,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.plasma.private.keyboardindicator as KeyboardIndicator
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 Column {
     id: message
@@ -33,25 +31,10 @@ Column {
 
     spacing: Math.round(10 * message.unit)
 
-    KeyboardIndicator.KeyState {
-        id: capsLock
-        key: Qt.Key_CapsLock
-    }
-
-    // A password typed on the wrong layout is refused as surely as a wrong
-    // one, and counts against the account the same. The first layout in the
-    // list is the one a person set up as theirs; any other is worth saying.
-    Layouts.KeyboardLayout {
-        id: layout
-    }
-
-    readonly property string otherLayout: layout.layoutsList.length > 1 && layout.layout > 0
-        ? (layout.layoutsList[layout.layout]?.longName ?? "") : ""
-
     Text {
         readonly property var parts: [
-            capsLock.locked ? "Caps Lock is on" : "",
-            message.otherLayout ? "Typing in " + message.otherLayout : "",
+            LockKeys.caps ? "Caps Lock is on" : "",
+            LockKeys.otherLayout && LockKeys.layoutName ? "Typing in " + LockKeys.layoutName : "",
             message.unlock.message,
         ].filter(p => p)
 
@@ -68,8 +51,8 @@ Column {
 
     Row {
         readonly property var ways: [
-            (message.unlock.alternatives & message.unlock.fingerprint) ? "fingerprint" : "",
-            (message.unlock.alternatives & message.unlock.smartcard) ? "badge" : "",
+            message.unlock.hasFingerprint ? "fingerprint" : "",
+            message.unlock.hasSmartcard ? "badge" : "",
         ].filter(w => w)
 
         x: message.align === Text.AlignHCenter ? (message.width - width) / 2 : 0

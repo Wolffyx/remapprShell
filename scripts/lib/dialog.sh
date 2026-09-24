@@ -31,6 +31,11 @@ _ui_var="${ENV_PREFIX}_UI"
 
 # Which front end to use. Decided once, then remembered: asking twice can give
 # two answers when a session starts between the calls.
+#
+# Remembered only if it is first asked outside `$(...)` -- every caller below
+# asks inside one, and a subshell's answer dies with it. So a script asks once
+# at its top level, after anything that forces a front end, and every question
+# after that reads the answer (setup.sh does).
 ui_backend() {
     [ -n "$DIALOG_UI" ] && { printf '%s' "$DIALOG_UI"; return; }
 

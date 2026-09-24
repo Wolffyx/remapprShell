@@ -46,11 +46,25 @@ QtObject {
     // The configuration as it applies to one output. Everything drawn per
     // screen reads through this rather than `merged`, so a per-monitor override
     // reaches the thing it describes.
+    //
+    // Looked up rather than merged on the spot: a panel reads a dozen values
+    // per output through valueFor(), and each of those used to merge the whole
+    // configuration again. `_screens` merges once per output per change.
     function forScreen(name) {
-        const overlay = root.monitorData[name];
-        if (!overlay)
-            return root.merged;
-        return Obj.deepMerge(root.merged, overlay);
+        const screens = root._screens;
+        return Object.prototype.hasOwnProperty.call(screens, name) ? screens[name] : root.merged;
+    }
+
+    // Output name -> `merged` with that output's overrides on top, for every
+    // output that has any.
+    readonly property var _screens: {
+        const out = {};
+        for (const name of Object.keys(root.monitorData)) {
+            const overlay = root.monitorData[name];
+            if (overlay)
+                out[name] = Obj.deepMerge(root.merged, overlay);
+        }
+        return out;
     }
 
     function valueFor(name, path, fallback) {
@@ -61,10 +75,8 @@ QtObject {
     // defaults: an override exists to differ from what this profile already
     // says, and recording a value equal to it would freeze it.
     function setForScreen(name, path, value) {
-        if (!root.writable) {
-            root.writeBlocked(root.lastError);
+        if (!root.writable)
             return false;
-        }
         const current = Obj.get(root.merged, path, undefined);
         const overlay = root.monitorData[name] ?? {};
         const next = Obj.deepEqual(value, current) ? Obj.unset(overlay, path)
@@ -72,15 +84,12 @@ QtObject {
         root.monitorData = Object.assign({}, root.monitorData, { [name]: next });
         root._monitorWrites[name] = true;
         root._monitorTimer.restart();
-        root.changed();
         return true;
     }
 
     function isOverriddenForScreen(name, path) {
         return Obj.has(root.monitorData[name] ?? {}, path);
     }
-
-    readonly property bool defaultsLoaded: Object.keys(root.defaults).length > 0
 
     // Whether anybody has ever set anything here. `schemaVersion` is written
     // by the shell itself when it seeds a profile, so a profile carrying only
@@ -112,17 +121,10 @@ QtObject {
     property bool writable: true
     property string lastError: ""
 
-    signal changed
-    signal writeBlocked(string reason)
-
     // ---- reading ------------------------------------------------------
 
     function value(path, fallback) {
         return Obj.get(root.merged, path, fallback);
-    }
-
-    function defaultValue(path, fallback) {
-        return Obj.get(root.defaults, path, fallback);
     }
 
     // True when the user has overridden this path, i.e. it is present in the
@@ -137,7 +139,6 @@ QtObject {
     // shipped default, the key is removed instead of written.
     function set(path, value) {
         if (!root.writable) {
-            root.writeBlocked(root.lastError);
             Log.warn("config", `refusing to write ${path}: ${root.lastError}`);
             return false;
         }
@@ -154,10 +155,8 @@ QtObject {
     }
 
     function reset(path) {
-        if (!root.writable) {
-            root.writeBlocked(root.lastError);
+        if (!root.writable)
             return false;
-        }
         root.profileData = Obj.unset(root.profileData, path);
         root._drop(path);
         root._scheduleWrite();
@@ -182,20 +181,24 @@ QtObject {
 
     // ---- persistence --------------------------------------------------
 
-    // Counts writes we initiated. The file watcher compares against it to tell
-    // our own save from an external edit.
-    property int _writeEpoch: 0
+    // The text of our own last save, until anything else is read. The file is
+    // read back after every save -- by the reload in onSaved, and again when
+    // the watcher sees the file replaced -- and _onProfileText compares
+    // against this to tell our own save from an external edit. Cleared the
+    // moment anything else is applied, so an edit that later puts the same
+    // text back is still read.
     property string _lastWritten: ""
+
+    // A different profile is a different file; nothing written to the last
+    // one says anything about this one.
+    onProfileChanged: root._lastWritten = ""
 
     // ensureDir runs as a detached process, so the write has to wait for the
     // directory to exist. A short delay is enough and keeps this off the
     // startup path.
     readonly property Timer _seedTimer: Timer {
         interval: 150
-        onTriggered: {
-            root._writeEpoch++;
-            root._profileView.setText(JSON.stringify({ schemaVersion: Migrations.currentVersion }, null, 4) + "\n");
-        }
+        onTriggered: root._profileView.setText(JSON.stringify({ schemaVersion: Migrations.currentVersion }, null, 4) + "\n")
     }
 
     readonly property Timer _writeTimer: Timer {
@@ -226,10 +229,11 @@ QtObject {
     readonly property FileView _monitorWriter: FileView {
         atomicWrites: true
         printErrors: false
+
+        onSaveFailed: Fs.forget(`${Paths.profileDir(root.profile)}/monitors`)
     }
 
     function _scheduleWrite() {
-        root.changed();
         root._writeTimer.restart();
     }
 
@@ -245,16 +249,30 @@ QtObject {
         if (onDisk.ok) {
             if (ConfigMerge.changedOnDisk(onDisk.data, root._lastParsed))
                 Log.info("config", "profile changed on disk; merging our delta onto it");
-            root.profileData = ConfigMerge.flushData(onDisk.data, root._lastParsed,
-                                                     root.profileData, root._removed);
+            // Assigned only when it differs: flushData hands back our own copy
+            // when nobody else wrote, and assigning even the same object
+            // rebuilt the whole merged configuration for nothing.
+            const next = ConfigMerge.flushData(onDisk.data, root._lastParsed,
+                                               root.profileData, root._removed);
+            if (!Obj.deepEqual(next, root.profileData))
+                root.profileData = next;
         }
         root._removed = [];
 
         const out = Object.assign({ schemaVersion: Migrations.currentVersion }, root.profileData);
         const text = JSON.stringify(out, null, 4) + "\n";
 
+        // What reading this file back would leave, set now: _onProfileText
+        // skips our own save when it comes back, so this is the only place
+        // it is set. Taken from the text rather than from profileData, which
+        // can hold what JSON cannot -- an undefined, say -- and the file is
+        // what the next flush compares against.
+        const written = ConfigMerge.withoutVersion(JSON.parse(text));
+        root._lastParsed = written;
+        if (!Obj.deepEqual(written, root.profileData))
+            root.profileData = Obj.clone(written);
+
         root._lastWritten = text;
-        root._writeEpoch++;
         root._profileView.setText(text);
     }
 
@@ -276,6 +294,19 @@ QtObject {
     }
 
     function _onProfileText(text) {
+        // Our own save, read back. _flush has already left everything as
+        // applying it would, so it is not applied again: doing that rebuilt
+        // the whole merged configuration twice more per change -- once for
+        // the reload after the save, once for the watcher -- and it undid any
+        // change made while the write was on its way, which the next flush
+        // then found nothing to write for.
+        if (root._lastWritten.length > 0 && text === root._lastWritten && root.writable) {
+            root.lastError = "";
+            root.profileLoaded = true;
+            return;
+        }
+        root._lastWritten = "";
+
         const res = root._parseProfile(text);
 
         if (!res.ok) {
@@ -308,7 +339,6 @@ QtObject {
             root.lastError = "";
             root._scheduleWrite();   // persist the migrated shape
             root.profileLoaded = true;
-            root.changed();
             return;
         }
 
@@ -318,19 +348,6 @@ QtObject {
         root.lastError = "";
         Log.info("config", `profile loaded (${Object.keys(data).length} top-level override(s))`);
         root.profileLoaded = true;
-        root.changed();
-    }
-
-    // The active profile is recorded in its own small file. Keeping it out of
-    // shell.json means switching profiles is one atomic write that cannot
-    // damage the configuration it is switching away from.
-    function switchProfile(name) {
-        if (!name || name === root.profile)
-            return;
-        Fs.ensureDir(Paths.configDir);
-        root._stateView.setText(JSON.stringify({ profile: name }, null, 4) + "\n");
-        root.profile = name;
-        Log.info("config", `switched to profile '${name}'`);
     }
 
     readonly property FileView _stateView: FileView {
@@ -364,7 +381,6 @@ QtObject {
             try {
                 root.defaults = JSON.parse(text());
                 Log.info("config", `defaults loaded from ${path}`);
-                root.changed();
             } catch (e) {
                 // Shipped defaults failing to parse is a packaging bug, not a
                 // user error, so it is loud.
@@ -391,6 +407,7 @@ QtObject {
         onLoaded: root._onProfileText(text())
 
         onLoadFailed: err => {
+            root._lastWritten = "";
             if (err === FileViewError.FileNotFound) {
                 // Normal on a fresh install: no overrides yet.
                 //
@@ -406,7 +423,6 @@ QtObject {
                 root.writable = true;
                 Fs.ensureDir(Paths.profileDir(root.profile));
                 root._seedTimer.restart();
-                root.changed();
             } else {
                 // Unreadable is an answer too: the defaults are what there is,
                 // and waiting for a file that cannot be read would leave the
@@ -421,6 +437,7 @@ QtObject {
         onSaveFailed: err => {
             root.lastError = `cannot write ${path} (error ${err})`;
             Log.error("config", root.lastError);
+            Fs.forget(Paths.profileDir(root.profile));
         }
 
         onFileChanged: reload()

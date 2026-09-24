@@ -23,6 +23,7 @@ pragma ComponentBehavior: Bound
 // here moves or rearranges a window.
 
 import QtQuick
+import Quickshell
 import qs.domain.config
 import qs.domain.desktops
 import qs.domain.theme
@@ -53,6 +54,12 @@ BarWidget {
         : Math.max(16, Math.min(56, Math.round(root.buttonHeight * root.iconScale / 100)))
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
+
+    // The application's name above its preview cards, and a second square
+    // peeking out behind the icon of an application with several windows.
+    readonly property bool previewHeader: root.widgetConfig?.previewHeader ?? false
+    readonly property bool previewScreen: root.widgetConfig?.previewScreen ?? false
+    readonly property bool stackGroups: root.widgetConfig?.stackGroups ?? true
 
     // Desktop entry ids, in the order they sit on the taskbar.
     readonly property var pinned: root.widgetConfig?.pinned ?? []
@@ -100,6 +107,20 @@ BarWidget {
     readonly property var items: WindowEvents.arrangeTasks(root.running, root.pinned,
                                                            id => WindowsService.launcherFor(id))
 
+    // A button's item: the one at its place, which is where it is once the
+    // list has settled, as long as the key agrees -- and found by key while
+    // the list is still moving under it. The buttons are repeated over the
+    // keys (see below), so this is how each reads what it shows.
+    function itemFor(index, key) {
+        const at = root.items[index];
+        return at?.key === key ? at : (root.items.find(i => i.key === key) ?? root.noItem);
+    }
+
+    // What a button on its way out reads, for the moment between its key
+    // leaving the list and the button going.
+    readonly property var noItem: ({ key: "", appName: "", windows: [], active: false, attention: false,
+                                     attentionSince: 0, iconName: "", iconFile: "" })
+
     // As tall as the design's buttons at this thickness. With titles a
     // button is as wide as its title needs, up to `maxWidth`; without, it is
     // the icon and its padding.
@@ -112,9 +133,7 @@ BarWidget {
     // below a readable width, down to the icon alone.
     readonly property real iconOnly: root.iconSize + 2 * root.padding
     givesWay: true
-    readonly property real share: root.room >= 0 && root.items.length > 0
-        ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
-        : 1e9
+    readonly property real share: Math.max(root.iconOnly, root.wanted)
 
     // Past a certain number of windows even the icon alone does not fit, and a
     // Row does not shrink: the buttons kept their width and ran on past the
@@ -140,23 +159,21 @@ BarWidget {
     readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
 
     // Buttons differ in width once they carry titles, so the one under the
-    // pointer is found by where each actually is rather than by dividing the
-    // position by one width.
+    // pointer is found by where each actually is (BarWidget.indexAlong)
+    // rather than by dividing the position by one width. The taskbar runs
+    // along the panel only.
     function indexAt(position) {
-        for (let i = 0; i < buttons.count; i++) {
-            const b = buttons.itemAt(i);
-            if (b && position >= b.x - root.spacing / 2 && position < b.x + b.width + root.spacing / 2)
-                return i;
-        }
-        return -1;
+        return root.indexAlong(buttons, position, root.spacing, false);
     }
 
     function centreOf(index) {
-        const b = buttons.itemAt(index);
-        return b ? b.x + b.width / 2 : 0;
+        return Math.max(0, root.centreAlong(buttons, index, false));
     }
 
-    popoutPadding: root.popoutMode === "menu" ? 8 : 14
+    // The preview's cards carry their own inner margin, so the card around
+    // them adds only a little: 14 on top of theirs was the wide empty border
+    // round a single window.
+    popoutPadding: root.popoutMode === "menu" ? 8 : 6
     // The menu is a list of actions and has a width of its own; the preview
     // is a picture and takes its size from what it is showing.
     readonly property int menuWidth: 262
@@ -171,7 +188,40 @@ BarWidget {
     // Reaching the card means taking the pointer off the button, so a card
     // that read `hoveredIndex` emptied itself on the way there and could never
     // be clicked -- which is exactly what "the popup disappears" was.
-    property var previewItem: null
+    //
+    // Kept as the button's key, and its item looked up afresh from `items`.
+    // The card used to hold the item itself, which was a snapshot: a window
+    // closed from the card stayed on it, and the first movement of the
+    // pointer after any change to the window list handed it a new object,
+    // which rebuilt every card and restarted every live picture. Still
+    // writable: dev/preview/popout.qml points the card at a group by setting
+    // it.
+    property string previewKey: ""
+    property var previewItem: root.items.find(i => i.key === root.previewKey) ?? null
+
+    // Its last window closed -- from the card or anywhere else -- the card
+    // goes with it, rather than staying up empty. For most applications the
+    // group goes too; a pinned one stays on the taskbar with no windows, and
+    // its card turned into "Pinned -- click to start it" under the pointer
+    // that had just closed it (2026-09-24). A card that opened on a pinned
+    // application with nothing running is a different thing, and stays.
+    // Asked of `items` rather than of `previewItem`: clearing the key from
+    // inside that property's own change is a binding loop.
+    property int _previewWindows: 0
+
+    onPreviewKeyChanged: root._previewWindows = root.items.find(i => i.key === root.previewKey)?.windows.length ?? 0
+
+    onItemsChanged: {
+        if (root.previewKey.length === 0 || root.popoutMode === "menu")
+            return;
+        const shown = root.items.find(i => i.key === root.previewKey)?.windows.length ?? -1;
+        if (shown < 0 || (shown === 0 && root._previewWindows > 0)) {
+            root.previewKey = "";
+            root.popoutVisible = false;
+            return;
+        }
+        root._previewWindows = shown;
+    }
 
     // And the card stays up while the pointer crosses the gap to it. Leaving
     // the button starts a short countdown rather than closing; entering the
@@ -185,7 +235,7 @@ BarWidget {
             if (root.popoutMode === "menu" || root.pointerInPopout || root.hoveredIndex >= 0)
                 return;
             root.popoutVisible = false;
-            root.previewItem = null;
+            root.previewKey = "";
         }
     }
 
@@ -216,7 +266,7 @@ BarWidget {
     readonly property int flashMs: 6000
 
     implicitWidth: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
-    implicitHeight: root.bar.thickness
+    implicitHeight: root.barThickness
 
     function handleHover(position, horizontal) {
         root.hoveredIndex = root.indexAt(position);
@@ -225,7 +275,7 @@ BarWidget {
             return;
         if (root.hoveredIndex >= 0) {
             root.cancelClose();
-            root.previewItem = root.items[root.hoveredIndex];
+            root.previewKey = root.items[root.hoveredIndex]?.key ?? "";
             root.popoutVisible = true;
             root.requestPopout("tasks", root.centreOf(root.hoveredIndex));
         } else {
@@ -250,7 +300,7 @@ BarWidget {
         if (!root.popoutVisible) {
             root.popoutMode = "preview";
             root.menuItem = null;
-            root.previewItem = null;
+            root.previewKey = "";
             root.pointerInPopout = false;
             root.cancelClose();
         }
@@ -305,23 +355,32 @@ BarWidget {
 
         Repeater {
             id: buttons
-            model: root.items
+
+            // Over the keys, not the items. `items` is made afresh on every
+            // push from the window daemon -- any window's title changing is
+            // one -- and a Repeater over it built every button again each
+            // time, each with its timer and its animation. Over the keys a
+            // button lives as long as its application or window is on the
+            // list, and reads its item through itemFor.
+            model: ScriptModel { values: root.items.map(i => i.key) }
 
             Rectangle {
                 id: button
 
-                required property var modelData
+                // The button's key, and its place on the taskbar.
+                required property string modelData
                 required property int index
+                readonly property var item: root.itemFor(button.index, button.modelData)
 
-                readonly property bool isActive: button.modelData.active === true
+                readonly property bool isActive: button.item.active === true
                 // A group is dimmed only when every window in it is minimised:
                 // one visible window means the application is on screen. A
                 // pinned application with no windows is not minimised, just
                 // not running.
                 readonly property bool isMinimized: button.windowCount > 0
-                                                    && button.modelData.windows.every(w => w.minimized)
+                                                    && button.item.windows.every(w => w.minimized)
                 readonly property bool isHovered: button.index === root.hoveredIndex
-                readonly property int windowCount: button.modelData.windows.length
+                readonly property int windowCount: button.item.windows.length
 
                 width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
                                       : root.drawnIconOnly
@@ -349,14 +408,15 @@ BarWidget {
                 // is activated, and the tint goes with it.
                 //
                 // The moment the request began is kept by WindowsService, not
-                // here: any change to the window list rebuilds every button,
-                // and a flash timed from the button would start over each
-                // time some other window changed its title.
-                readonly property bool wantsAttention: button.modelData.attention === true && !button.isActive
+                // here: a button is made again whenever its window leaves the
+                // list and comes back -- to another desktop and back, or the
+                // grouping switched -- and a flash timed from the button would
+                // start over each time.
+                readonly property bool wantsAttention: button.item.attention === true && !button.isActive
                 property bool flashing: false
 
                 function startFlash() {
-                    const left = root.flashMs - (Date.now() - (button.modelData.attentionSince ?? 0));
+                    const left = root.flashMs - (Date.now() - (button.item.attentionSince ?? 0));
                     button.flashing = button.wantsAttention && left > 0;
                     if (button.flashing) {
                         flashStop.interval = left;
@@ -395,11 +455,34 @@ BarWidget {
                     anchors.centerIn: parent
                     spacing: Math.round(10 * Math.max(0.7, root.unit))
 
-                    PanelIcon {
+                    Item {
                         anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: root.drawnIcon
-                        iconName: button.modelData.iconName
-                        iconFile: button.modelData.iconFile
+                        width: root.drawnIcon
+                        height: root.drawnIcon
+
+                        // Several windows: a square behind the icon, up and to
+                        // the right, as if a second copy of the application
+                        // were stacked under the first -- the count read at a
+                        // glance on the button itself, not only in the marks
+                        // under it.
+                        Rectangle {
+                            visible: root.stackGroups && button.windowCount > 1
+                            width: Math.round(root.drawnIcon * 0.86)
+                            height: width
+                            x: Math.round(root.drawnIcon * 0.26)
+                            y: -Math.round(root.drawnIcon * 0.14)
+                            radius: Math.round(width * 0.24)
+                            color: Theme.alpha(Theme.fg, button.isActive ? 0.3 : 0.2)
+                            border.width: 1
+                            border.color: Theme.alpha(Theme.fg, 0.4)
+                        }
+
+                        PanelIcon {
+                            anchors.fill: parent
+                            implicitSize: root.drawnIcon
+                            iconName: button.item.iconName
+                            iconFile: button.item.iconFile
+                        }
                     }
 
                     PanelText {
@@ -408,9 +491,9 @@ BarWidget {
                         visible: root.titlesFit
                         width: Math.min(title.implicitWidth, root.titleRoom)
                         elide: Text.ElideRight
-                        text: button.modelData.windows.length === 1
-                            ? WindowEvents.label(button.modelData.windows[0])
-                            : button.modelData.appName
+                        text: button.item.windows.length === 1
+                            ? WindowEvents.label(button.item.windows[0])
+                            : button.item.appName
                     }
                 }
 
@@ -422,7 +505,7 @@ BarWidget {
                 // well as tint.
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: parent.height + Math.max(1, Math.round(((root.bar?.thickness ?? 40) - root.buttonHeight) / 2 - 7))
+                    y: parent.height + Math.max(1, Math.round((root.barThickness - root.buttonHeight) / 2 - 7))
                     spacing: 3
 
                     Repeater {
@@ -521,6 +604,8 @@ BarWidget {
     readonly property Component preview: Component {
         TaskPreview {
             item: root.previewItem
+            showHeader: root.previewHeader
+            showScreen: root.previewScreen
             windows: item?.windows ?? []
 
             onPointerInsideChanged: {

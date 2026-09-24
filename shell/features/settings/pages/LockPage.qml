@@ -10,10 +10,8 @@ pragma ComponentBehavior: Bound
 // CLI does and refuses nothing on its own -- the gates are in the script.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
 import qs.platform.kde
-import qs.domain.config
+import qs.platform.system
 import qs.domain.session
 import qs.domain.surfaces
 import qs.domain.theme
@@ -23,10 +21,12 @@ import qs.ui.controls
 Column {
     id: root
 
-    // `lockscreen status --json`, parsed.
-    property var info: null
-    property string status: ""
-    property bool busy: false
+    // `lockscreen status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["lockscreen"]
+        readFailed: "Could not read the lock screen's state."
+    }
+    readonly property var info: root.ctl.state
 
     readonly property bool installed: root.info?.enabled === true
     // What `enable` itself requires: this exact build, unlocked in this
@@ -44,59 +44,13 @@ Column {
 
     spacing: 14
 
-    Component.onCompleted: root.refresh()
+    Component.onCompleted: root.ctl.refresh()
 
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "lockscreen"].concat(args);
-        runProc.running = true;
-    }
-
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "lockscreen", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.info = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the lock screen's state.";
-                    Log.warn("settings", `lockscreen status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
-
-    PanelText {
-        visible: root.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
-        text: root.status
-        font.pixelSize: 12
-        color: Theme.error
+    Hint {
+        visible: root.ctl.status.length > 0
+        text: root.ctl.status
+        tone: "error"
+        lineHeight: 1
     }
 
     Card {
@@ -124,13 +78,8 @@ Column {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Plasma's greeter does the locking either way; only the drawing would be this shell's. Try it first: it fills every screen and takes the keyboard, exactly as a real lock does, but nothing is locked and typing your password ends it. Turning it on before it has unlocked once is refused."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {
@@ -140,8 +89,8 @@ Column {
                 glyph: "play_circle"
                 iconName: "media-playback-start"
                 text: "Try it…"
-                enabled: !root.busy
-                onActivated: root.run(["try"])
+                enabled: !root.ctl.busy
+                onActivated: root.ctl.run(["try"])
             }
 
             TextButton {
@@ -150,8 +99,8 @@ Column {
                 glyph: "lock"
                 iconName: "lock"
                 text: "Turn it on"
-                enabled: !root.busy && root.ready
-                onActivated: root.run(["enable"])
+                enabled: !root.ctl.busy && root.ready
+                onActivated: root.ctl.run(["enable"])
             }
 
             TextButton {
@@ -159,8 +108,8 @@ Column {
                 glyph: "lock_open"
                 iconName: "unlock"
                 text: "Turn it off"
-                enabled: !root.busy
-                onActivated: root.run(["disable"])
+                enabled: !root.ctl.busy
+                onActivated: root.ctl.run(["disable"])
             }
         }
 
@@ -181,13 +130,10 @@ Column {
 
         SectionLabel { text: "How it looks" }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !root.installed
-            wrapMode: Text.WordWrap
             text: "Saved now, and drawn when this lock screen is turned on."
-            font.pixelSize: 12
-            color: Theme.mut
+            lineHeight: 1
         }
 
         // Twelve lock screens, not twelve colour schemes: they differ on where
@@ -267,20 +213,15 @@ Column {
                     }
 
                     HoverHandler { id: styleHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.run(["set", "style", styleRow.modelData.id]) }
+                    TapHandler { onTapped: root.ctl.run(["set", "style", styleRow.modelData.id]) }
                     Accessible.name: styleRow.modelData.name
                 }
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             visible: root.installed
             text: "A style changes at the next lock. The one that was tried is the one that is installed, so a style picked here is drawn without trying it again -- the password is taken the same way in all seven."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SettingRow {
@@ -294,7 +235,7 @@ Column {
                 values: ["left", "center"]
                 labels: ["Left", "Centred"]
                 current: root.lookValue("clock", "left")
-                onPicked: value => root.run(["set", "clock", value])
+                onPicked: value => root.ctl.run(["set", "clock", value])
             }
         }
 
@@ -308,7 +249,7 @@ Column {
             TextInputRow {
                 width: parent.width
                 text: root.lookValue("kioskName", "")
-                onCommitted: value => root.run(["set", "kioskName", value])
+                onCommitted: value => root.ctl.run(["set", "kioskName", value])
             }
         }
 
@@ -321,7 +262,7 @@ Column {
             TextInputRow {
                 width: parent.width
                 text: root.lookValue("kioskNote", "")
-                onCommitted: value => root.run(["set", "kioskNote", value])
+                onCommitted: value => root.ctl.run(["set", "kioskNote", value])
             }
         }
 
@@ -335,7 +276,7 @@ Column {
                 values: ["indigo", "terracotta", "green", "violet"]
                 labels: ["Indigo", "Terracotta", "Green", "Violet"]
                 current: root.lookValue("accent", "indigo")
-                onPicked: value => root.run(["set", "accent", value])
+                onPicked: value => root.ctl.run(["set", "accent", value])
             }
         }
 
@@ -348,14 +289,14 @@ Column {
             to: 40
             stepSize: 2
             value: Number(root.lookValue("blur", 26))
-            onMoved: value => root.run(["set", "blur", Math.round(value)])
+            onMoved: value => root.ctl.run(["set", "blur", Math.round(value)])
         }
 
         ToggleRow {
             label: "Show the clock while nothing is happening"
             description: "Off, the screen is dark until a key or the pointer wakes the prompt."
             checked: root.lookBool("idleClock")
-            onToggled: value => root.run(["set", "idleClock", value])
+            onToggled: value => root.ctl.run(["set", "idleClock", value])
         }
 
         SettingRow {
@@ -368,7 +309,7 @@ Column {
                 values: ["0", "10", "20", "60", "300"]
                 labels: ["Never", "10 s", "20 s", "1 min", "5 min"]
                 current: String(root.lookValue("dim", "20"))
-                onPicked: value => root.run(["set", "dim", value])
+                onPicked: value => root.ctl.run(["set", "dim", value])
             }
         }
 
@@ -376,7 +317,7 @@ Column {
             label: "Lift the shutter when unlocking"
             description: "The lock screen slides away over the unblurring wallpaper. Off, it goes at once, as Plasma's does."
             checked: root.lookBool("unlockAnimation")
-            onToggled: value => root.run(["set", "unlockAnimation", value])
+            onToggled: value => root.ctl.run(["set", "unlockAnimation", value])
         }
 
         SettingRow {
@@ -389,7 +330,7 @@ Column {
                 values: ["0", "2", "3", "5"]
                 labels: ["Never", "At 2%", "At 3%", "At 5%"]
                 current: String(root.lookValue("hibernateAt", "3"))
-                onPicked: value => root.run(["set", "hibernateAt", value])
+                onPicked: value => root.ctl.run(["set", "hibernateAt", value])
             }
         }
 
@@ -397,23 +338,18 @@ Column {
             label: "What is playing"
             description: "The media card, from the same players Plasma's lock screen controls. This is Plasma's own setting."
             checked: root.lookBool("media")
-            onToggled: value => root.run(["set", "media", value])
+            onToggled: value => root.ctl.run(["set", "media", value])
         }
 
         ToggleRow {
             label: "Sleep, hibernate and switch user"
             description: "The round buttons under the password."
             checked: root.lookBool("session")
-            onToggled: value => root.run(["set", "session", value])
+            onToggled: value => root.ctl.run(["set", "session", value])
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Notifications are not shown on the lock screen. The greeter is a separate program with none of this shell's memory, and notification bodies are never written to disk for something else to read -- so there is nothing there to draw, and a switch that promised otherwise would be a lie."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -422,13 +358,8 @@ Column {
 
         SectionLabel { text: "Locking" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "When the screen locks -- after how long, on suspend, whether a password is needed straight away -- is Plasma's, and applies whichever lock screen is drawn."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {
@@ -455,21 +386,15 @@ Column {
 
         SectionLabel { text: "Ending the session" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["plasma", "shell"]
             labels: ["Plasma's prompt", "This shell's screen"]
-            current: ConfigStore.value("session.prompt", "plasma")
-            onPicked: value => ConfigStore.set("session.prompt", value)
+            path: "session.prompt"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Either way the session ends through Plasma's session manager, so applications are asked to save and one with unsaved work can still object. This only chooses which screen does the asking."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {

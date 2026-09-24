@@ -1,14 +1,11 @@
 import QtQuick
-import qs.domain.theme
 import qs.domain.config
 import qs.features.panel
 
-Rectangle {
+Stage {
     id: stage
-    gradient: Gradient {
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
+    orientation: Gradient.Vertical
+    middle: false
 
     Component.onCompleted: ConfigStore.setRuntime("bar.entries", [
         { id: "launcher", zone: "left" }, { id: "search", zone: "left" }, { id: "taskview", zone: "left" },
@@ -32,19 +29,11 @@ Rectangle {
                 width: mock.extent
                 height: stage.height
 
-                QtObject {
+                MockBar {
                     id: mock
-                    property string screenName: "PREVIEW"
-                    property string position: slot.modelData[0]
-                    property bool horizontal: false
-                    property int thickness: 64
-                    property var screenObject: null
-                    property string style: slot.modelData[1]
-                    property int spacing: 6
-                    property int iconSize: 19
-                    property int edgeGap: style === "full" ? 0 : 14
-                    property int extent: thickness + edgeGap
-                    property Item openPopout: null
+                    position: slot.modelData[0]
+                    horizontal: false
+                    style: slot.modelData[1]
                 }
 
                 PanelSurface {

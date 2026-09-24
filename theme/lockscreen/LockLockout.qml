@@ -37,6 +37,9 @@ Rectangle {
     border.width: 1
     border.color: Qt.rgba(224 / 255, 120 / 255, 106 / 255, 0.45)
 
+    // Faded in and out, and hidden only once the fade has finished. A
+    // `visible` set from outside must keep that, or the fade out never
+    // plays.
     opacity: toast.counting ? 1 : 0
     visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }

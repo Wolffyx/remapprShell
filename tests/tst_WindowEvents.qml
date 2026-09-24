@@ -9,6 +9,7 @@
 import QtQuick
 import QtTest
 import qs.domain.windows.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "WindowEvents"
@@ -25,12 +26,7 @@ TestCase {
     }
 
     function signalLine(payload) {
-        return JSON.stringify({
-            type: "signal",
-            interface: "com.remappr.Shell.Windows",
-            member: "Changed",
-            payload: { type: "s", data: [payload] }
-        });
+        return Bus.signal("com.remappr.Shell.Windows", "Changed", "s", [payload]);
     }
 
     function test_parses_a_list() {
@@ -295,6 +291,24 @@ TestCase {
         compare(WindowEvents.togglePinned(["a", "b"], "a"), ["b"]);
         compare(WindowEvents.togglePinned(null, "a"), ["a"]);
         compare(WindowEvents.togglePinned(["a"], ""), ["a"]);
+    }
+
+    // The hash both switchers drew with before it was shared: the same id
+    // always gets the same hue, a hue is a fraction of the wheel, and a
+    // window with no id at all is not an error.
+    function test_a_tint_per_application() {
+        compare(WindowEvents.tintHue("org.kde.dolphin"), WindowEvents.tintHue("org.kde.dolphin"));
+        verify(WindowEvents.tintHue("org.kde.dolphin") !== WindowEvents.tintHue("firefox"));
+        compare(WindowEvents.tintHue(""), 0);
+        compare(WindowEvents.tintHue(undefined), 0);
+        // "a" is 97: 97 degrees of 360.
+        compare(WindowEvents.tintHue("a"), 97 / 360);
+        // (97 * 31 + 98) % 360 = 225.
+        compare(WindowEvents.tintHue("ab"), 225 / 360);
+        for (const id of ["", "x", "org.kde.konsole", "steam_app_1245620", "a".repeat(500)]) {
+            const hue = WindowEvents.tintHue(id);
+            verify(hue >= 0 && hue < 1, `${id}: ${hue}`);
+        }
     }
 
     function test_icon_prefers_the_desktop_file() {

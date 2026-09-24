@@ -23,14 +23,12 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: editorial
 
-    readonly property real unit: editorial.ui.unit
     readonly property int panelX: Math.round(editorial.width * 0.615)
 
     readonly property color ink: "#f4efe8"
     readonly property color dim: "#a89f94"
     readonly property color mut: "#8a8378"
     readonly property color accent: editorial.ui.accent
-    readonly property color paper: "#2a2521"
 
     blursWallpaper: false
     scrimsWallpaper: false
@@ -217,7 +215,6 @@ LockStyle {
             LockActions {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Options.showSessionButtons
                 enabled: editorial.ui.unlock.shown
                 session: editorial.ui.session
                 shape: "text"
@@ -230,10 +227,9 @@ LockStyle {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: editorial.ui.unlock.shown
-                keyboard: editorial.ui.keyboard
+                ui: editorial.ui
                 ink: editorial.dim
                 textSize: Math.round(13 * editorial.unit)
-                onFocusRequested: editorial.ui.focusPassword()
             }
         }
     }
@@ -248,5 +244,6 @@ LockStyle {
         width: Math.round(392 * editorial.unit)
         visible: media.hasPlayer && editorial.ui.setting("showMediaControls", true) && editorial.ui.unlock.shown
         textColor: "#ffffff"
+        unit: editorial.unit
     }
 }

@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import qs.domain.theme
 import qs.domain.config
 import qs.domain.notifications
 import qs.domain.osd
@@ -10,17 +9,10 @@ import qs.features.osd
 import qs.features.notifications
 
 // PREVIEW_OVERLAY: sidebar | keys | session | osd | osd-text
-Rectangle {
+Stage {
     id: stage
 
     readonly property string which: Quickshell.env("PREVIEW_OVERLAY") || "sidebar"
-
-    gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 0.45; color: Theme.dark ? "#2c2b3d" : "#e6dcd2" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
 
     Component.onCompleted: {
         ConfigStore.setRuntime("notifications.history", true);

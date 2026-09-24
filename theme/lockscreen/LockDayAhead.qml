@@ -34,21 +34,12 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.battery
 import org.kde.plasma.private.mpris as Mpris
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 LockStyle {
     id: day
-
-    readonly property real unit: day.ui.unit
-
-    function px(v: real): int {
-        return Math.round(v * day.unit);
-    }
 
     blursWallpaper: false
     scrimsWallpaper: false
@@ -138,21 +129,15 @@ LockStyle {
 
     // --- time -------------------------------------------------------------
 
-    function pad(n: int): string {
-        return String(n).padStart(2, "0");
-    }
-
     // A time of the palette's day ("05:00", "20:00"), 24 hours as drawn.
     function at(h: real): string {
-        return day.pad(Math.floor(h) % 24) + ":00";
+        return LockText.pad(Math.floor(h) % 24) + ":00";
     }
 
-    // The design's dur(): "40 min", "2 h", "2 h 28 min".
+    // The design's dur(), which counts in minutes: "40 min", "2 h",
+    // "2 h 28 min".
     function dur(mins: int): string {
-        if (mins < 60)
-            return mins + " min";
-        const h = Math.floor(mins / 60), r = mins % 60;
-        return h + " h" + (r ? " " + r + " min" : "");
+        return LockText.duration(mins * 60000, true);
     }
 
     // Where a moment falls on the palette's day, 5 to 29.
@@ -160,7 +145,14 @@ LockStyle {
         return ((d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600) - 5 + 24) % 24 + 5;
     }
 
-    readonly property real cycleNow: day.cycleOf(clock.now)
+    // The clock's time, and the moment it locked, to the minute. What the
+    // ruler draws from them -- the now line, the hours it hides, where the
+    // band labels sit, the stretch this screen has been locked -- moves once
+    // a minute, not with every tick of the seconds beside the clock.
+    readonly property double minuteNow: Math.floor(clock.now.getTime() / 60000) * 60000
+    readonly property double lockedMinute: Math.floor(day.ui.lockedAt.getTime() / 60000) * 60000
+
+    readonly property real cycleNow: day.cycleOf(new Date(day.minuteNow))
     readonly property int bandIndex: day.bands.findIndex(b => day.cycleNow >= b.from && day.cycleNow < b.to)
     readonly property var band: day.bands[Math.max(0, day.bandIndex)]
     readonly property var nextBand: day.bands[(Math.max(0, day.bandIndex) + 1) % day.bands.length]
@@ -174,46 +166,25 @@ LockStyle {
         return "Good evening";
     }
 
-    // Minutes, so the line changes once a minute however often `now` ticks.
-    readonly property int lockedMins: Math.max(0, Math.floor((clock.now.getTime() - day.ui.lockedAt.getTime()) / 60000))
-    readonly property string lockedAgo: day.lockedMins < 1 ? "locked just now" : "locked " + day.dur(day.lockedMins) + " ago"
+    // In whole minutes, so the line changes once a minute however often
+    // `now` ticks.
+    readonly property string lockedAgo: "locked " + LockText.ago(day.ui.lockedAt, clock.now, true)
     readonly property string lockedTime: day.ui.lockedAt.toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-
-    // Passwords refused while this screen has been up.
-    property int failures: 0
-
-    Connections {
-        target: day.ui.unlock
-        function onRejected() { day.failures += 1; }
-    }
 
     // --- the machine ------------------------------------------------------
 
-    BatteryControlModel {
-        id: battery
-    }
+    readonly property LockPower battery: day.ui.battery
 
-    readonly property bool hasBattery: battery.hasInternalBatteries
     readonly property string batteryLine: {
-        const left = day.dur(Math.max(1, Math.round(battery.remainingMsec / 60000)));
-        if (battery.pluggedIn) {
-            if (battery.state === BatteryControlModel.FullyCharged)
+        const left = day.dur(Math.max(1, Math.round(day.battery.remainingMsec / 60000)));
+        if (day.battery.plugged) {
+            if (day.battery.full)
                 return "plugged in · full";
-            if (battery.state === BatteryControlModel.Charging)
-                return battery.remainingMsec > 0 ? "charging · full in " + left : "charging";
+            if (day.battery.charging)
+                return day.battery.remainingMsec > 0 ? "charging · full in " + left : "charging";
             return "plugged in · not charging";
         }
-        return battery.remainingMsec > 0 ? "on battery · " + left + " left" : "on battery";
-    }
-
-    Layouts.KeyboardLayout {
-        id: layouts
-    }
-
-    readonly property var layoutNow: layouts.layoutsList[layouts.layout] ?? null
-
-    Mpris.MultiplexerModel {
-        id: players
+        return day.battery.remainingMsec > 0 ? "on battery · " + left + " left" : "on battery";
     }
 
     // --- pieces -----------------------------------------------------------
@@ -407,26 +378,22 @@ LockStyle {
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
 
             StatusButton {
-                visible: day.ui.keyboard?.status === Loader.Ready
-                glyph: day.ui.keyboard?.keyboardActive ? "keyboard_hide" : "keyboard"
+                visible: day.ui.keyboardAvailable
+                glyph: day.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 name: "On-screen keyboard"
-                onActivated: {
-                    day.ui.focusPassword();
-                    day.ui.keyboard.showHide();
-                }
+                onActivated: day.ui.toggleKeyboard()
             }
 
             // The layout by its short name, as the design draws it; a press
             // is the next one. A layout that is not the person's first is in
             // the warning colour, as LockMessage says in words.
             StatusButton {
-                visible: day.layoutNow !== null
-                label: day.layoutNow?.shortName ?? ""
-                tint: layouts.layout > 0 ? day.warn : day.ink
-                name: "Keyboard layout: " + (day.layoutNow?.longName ?? "")
+                visible: LockKeys.current !== null
+                label: LockKeys.current?.shortName ?? ""
+                tint: LockKeys.otherLayout ? day.warn : day.ink
+                name: "Keyboard layout: " + LockKeys.layoutName
                 onActivated: {
-                    if (layouts.layoutsList.length > 1)
-                        layouts.switchToNextLayout();
+                    LockKeys.nextLayout();
                     day.ui.focusPassword();
                 }
             }
@@ -477,7 +444,7 @@ LockStyle {
 
                 Text {
                     y: day.px(30)
-                    text: day.pad(clock.now.getSeconds())
+                    text: LockText.pad(clock.now.getSeconds())
                     textFormat: Text.PlainText
                     font.family: "JetBrains Mono"
                     font.pixelSize: day.px(20)
@@ -737,9 +704,9 @@ LockStyle {
                     // when it locked to now, or from dawn if it has been
                     // locked since before it.
                     Rectangle {
-                        readonly property real from: (clock.now.getTime() - day.ui.lockedAt.getTime()) >= 24 * 3600000
-                            || day.cycleOf(day.ui.lockedAt) > day.cycleNow
-                            ? 0 : ruler.yOf(day.cycleOf(day.ui.lockedAt))
+                        readonly property real from: day.minuteNow - day.lockedMinute >= 24 * 3600000
+                            || day.cycleOf(new Date(day.lockedMinute)) > day.cycleNow
+                            ? 0 : ruler.yOf(day.cycleOf(new Date(day.lockedMinute)))
 
                         x: ruler.railX
                         y: Math.min(from, ruler.nowY - height)
@@ -773,7 +740,7 @@ LockStyle {
                     Text {
                         x: ruler.timeX
                         y: ruler.nowY - height / 2
-                        text: day.pad(clock.now.getHours()) + ":" + day.pad(clock.now.getMinutes())
+                        text: LockText.pad(clock.now.getHours()) + ":" + LockText.pad(clock.now.getMinutes())
                         textFormat: Text.PlainText
                         font.family: "JetBrains Mono"
                         font.pixelSize: day.px(13)
@@ -833,11 +800,14 @@ LockStyle {
             width: board.width - x - day.px(80)
             spacing: day.px(18)
 
-            // What is playing, as the design's card: art, track, artist, and
-            // the one button. Drawn here rather than by MediaCard, whose
-            // second line is white on every ground.
+            // What is playing, as the design's card: art, track, artist and
+            // album, and the one button. Drawn here rather than by MediaCard
+            // because it is another card -- one round button rather than
+            // three, the album, art that waits on the accent's gradient --
+            // and MediaCard taking all of that would be parameters only this
+            // style sets. The rounded art is LockPicture, as the faces are.
             Repeater {
-                model: day.ui.setting("showMediaControls", true) ? players : null
+                model: day.ui.setting("showMediaControls", true) ? LockKeys.players : null
 
                 Card {
                     id: player
@@ -875,34 +845,14 @@ LockStyle {
                         }
                     }
 
-                    Image {
+                    LockPicture {
                         id: art
 
                         anchors.fill: artBack
-                        visible: false
+                        radius: artBack.radius
                         asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
                         source: player.model.artUrl ?? ""
                         sourceSize: Qt.size(artBack.width * 2, artBack.height * 2)
-                    }
-
-                    Rectangle {
-                        id: artMask
-
-                        anchors.fill: artBack
-                        radius: artBack.radius
-                        visible: false
-                        layer.enabled: true
-                    }
-
-                    MultiEffect {
-                        anchors.fill: artBack
-                        source: art
-                        visible: art.status === Image.Ready
-                        maskEnabled: true
-                        maskSource: artMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin: 1.0
                     }
 
                     Column {
@@ -1001,9 +951,9 @@ LockStyle {
                         }
 
                         Figure {
-                            value: String(day.failures)
-                            note: day.failures === 1 ? "password" : "passwords"
-                            tint: day.failures > 0 ? day.bad : day.ink
+                            value: String(day.ui.unlock.refusals)
+                            note: day.ui.unlock.refusals === 1 ? "password" : "passwords"
+                            tint: day.ui.unlock.refusals > 0 ? day.bad : day.ink
                         }
                     }
                 }
@@ -1015,14 +965,14 @@ LockStyle {
                     y: lockGrid.y + lockGrid.height + day.px(18)
                     width: parent.width - day.px(48)
                     spacing: day.px(6)
-                    visible: day.hasBattery
+                    visible: day.battery.present
 
                     Caption {
                         text: "BATTERY"
                     }
 
                     Figure {
-                        value: battery.percent + "%"
+                        value: day.battery.percent + "%"
                         note: day.batteryLine
                     }
 
@@ -1033,10 +983,10 @@ LockStyle {
                         color: day.line
 
                         Rectangle {
-                            width: parent.width * Math.max(0, Math.min(100, battery.percent)) / 100
+                            width: parent.width * Math.max(0, Math.min(100, day.battery.percent)) / 100
                             height: parent.height
                             radius: height / 2
-                            color: battery.percent <= 15 && !battery.pluggedIn ? day.bad : "#7fb98a"
+                            color: day.battery.percent <= 15 && !day.battery.plugged ? day.bad : "#7fb98a"
                         }
                     }
                 }
@@ -1051,8 +1001,10 @@ LockStyle {
             y: board.height - height - day.px(72)
             width: side.width
             height: sessionBody.height + day.px(44)
-            visible: Options.showSessionButtons
-                && (day.ui.session.canSuspend || day.ui.session.canHibernate || day.ui.session.canSwitchUser)
+            // The row's `any`, not its `visible`: a child reads as hidden for
+            // as long as its card is, so a card that asked could never
+            // come back.
+            visible: sessionActions.any
             opacity: board.shownOpacity
 
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
@@ -1070,6 +1022,8 @@ LockStyle {
                 }
 
                 LockActions {
+                    id: sessionActions
+
                     enabled: day.ui.unlock.shown
                     session: day.ui.session
                     shape: "round"
@@ -1110,9 +1064,7 @@ LockStyle {
             radius: day.px(26)
             color: day.cardFill
             border.width: Math.max(1, day.px(1.5))
-            border.color: day.ui.unlock.message.length > 0 ? day.bad
-                : password.field.activeFocus ? day.ui.accent
-                : Qt.rgba(0.5, 0.5, 0.5, 0.32)
+            border.color: password.stateBorder
             opacity: board.shownOpacity
 
             Behavior on opacity {
@@ -1170,12 +1122,12 @@ LockStyle {
                     width: parent.width
                     elide: Text.ElideRight
                     text: day.ui.unlock.resting ? "wait a moment"
-                        : day.failures > 0 ? day.failures + " refused · try again"
+                        : day.ui.unlock.refusals > 0 ? day.ui.unlock.refusals + " refused · try again"
                         : "password · enter ⏎"
                     textFormat: Text.PlainText
                     font.family: "JetBrains Mono"
                     font.pixelSize: day.px(12)
-                    color: day.failures > 0 && !day.ui.unlock.resting ? day.bad : day.sub
+                    color: day.ui.unlock.refusals > 0 && !day.ui.unlock.resting ? day.bad : day.sub
                 }
             }
 
@@ -1196,6 +1148,8 @@ LockStyle {
                 ink: day.ink
                 dim: day.sub
                 accent: day.ui.accent
+                errorColor: day.bad
+                alarm: day.ui.unlock.message.length > 0
             }
 
             Rectangle {

@@ -15,7 +15,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Effects
 
 Item {
     id: face
@@ -49,33 +48,13 @@ Item {
         }
     }
 
-    Image {
+    LockPicture {
         id: picture
 
         anchors.fill: parent
+        radius: width / 2
         source: face.image !== ""
             ? "file://" + face.image.split("/").map(encodeURIComponent).join("/")
             : ""
-        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        fillMode: Image.PreserveAspectCrop
-        visible: false
-    }
-
-    MultiEffect {
-        anchors.fill: parent
-        source: picture
-        visible: picture.status === Image.Ready
-        maskEnabled: true
-        maskSource: faceMask
-        maskThresholdMin: 0.5
-        maskSpreadAtMin: 1.0
-    }
-
-    Rectangle {
-        id: faceMask
-        anchors.fill: parent
-        radius: width / 2
-        visible: false
-        layer.enabled: true
     }
 }

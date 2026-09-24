@@ -8,19 +8,14 @@
 import QtQuick
 import QtTest
 import qs.domain.osd.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "OsdEvents"
 
     function signalLine(member, data) {
-        return JSON.stringify({
-            type: "signal",
-            sender: ":1.42",
-            path: "/org/kde/osdService",
-            interface: "org.kde.osdService",
-            member: member,
-            payload: { type: "siis", data: data }
-        });
+        return Bus.signal("org.kde.osdService", member, "siis", data,
+                          { sender: ":1.42", path: "/org/kde/osdService" });
     }
 
     function test_progress() {

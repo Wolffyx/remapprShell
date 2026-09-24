@@ -11,14 +11,9 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 export XDG_CONFIG_DIRS="$SANDBOX/etc"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
 REPO="$SANDBOX/repo"
 mkdir -p "$REPO/theme"
@@ -26,15 +21,8 @@ cp -a "$REPO_ROOT/scripts" "$REPO_ROOT/branding.json" "$REPO/"
 cp -a "$REPO_ROOT/VERSION" "$REPO/" 2>/dev/null || true
 cp -a "$REPO_ROOT/theme/lockscreen" "$REPO/theme/"
 
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in qdbus6 busctl systemctl kquitapp6; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 # The way back names the session and its terminal; read-only, but not this
 # machine's to answer.
 cat > "$FAKEBIN/loginctl" <<'EOF'
@@ -45,8 +33,6 @@ case "$*" in
 esac
 EOF
 chmod +x "$FAKEBIN/loginctl"
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
 export "${ENV_PREFIX}_LOCKSCREEN_SETTLE=0"
 unset XDG_SESSION_ID
 
@@ -110,15 +96,11 @@ chmod +x "$GREETER"
 export "${ENV_PREFIX}_GREETER=$GREETER"
 setmode() { printf '%s\n' "$1" > "$MODE"; }
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-contains() { case "$2" in *"$3"*) check "$1" yes yes ;; *) check "$1" "$2" "(containing) $3" ;; esac; }
-
 LS="$REPO/scripts/lockscreen.sh"
 ls_() { "$LS" "$@" 2>&1; }
 ok() { "$LS" "$@" >/dev/null 2>&1 && echo ran || echo refused; }
-js() { "$LS" status --json 2>/dev/null | jq -r "$1"; }
+status() { "$LS" status --json 2>/dev/null; }
+js() { status | jq -r "$1"; }
 # `try` is the one command that needs the desktop; it is given a stand-in
 # display, and the stand-in greeter is all that could reach it.
 try_() { env -u "$NO_SESSION_VAR" WAYLAND_DISPLAY=fake "$LS" try "$@" < /dev/null 2>&1; }
@@ -129,10 +111,12 @@ PL_PKG="$PLASMA_SHELLS_DIR/$PLASMA_SHELL_PACKAGE_ID"
 STATE="$STATE_DIR/lockscreen"
 
 echo "== status, fresh =="
-check "nothing tried"          "$(js .tried)" "null"
-check "not enabled"            "$(js .enabled)" "false"
-check "Plasma's is drawn"      "$(js .drawn)" "plasma"
-check "the source is hashed"   "$(js .source)" "$(src_hash "$REPO/theme/lockscreen")"
+# One read for the checks against one state: each read is a third of a second.
+s=$(status)
+check "nothing tried"          "$(jq -r .tried <<<"$s")" "null"
+check "not enabled"            "$(jq -r .enabled <<<"$s")" "false"
+check "Plasma's is drawn"      "$(jq -r .drawn <<<"$s")" "plasma"
+check "the source is hashed"   "$(jq -r .source <<<"$s")" "$(src_hash "$REPO/theme/lockscreen")"
 
 echo "== check =="
 setmode ready
@@ -193,20 +177,21 @@ check "recorded, with the build"          "$(jq -r .hash "$STATE/tried.json")" "
 check "and the greeter"                   "$(jq -r .greeter "$STATE/tried.json")" "$(sha256sum "$GREETER" | cut -c1-16)"
 check "the tried copy is the source"      "$(diff -r "$REPO/theme/lockscreen" "$STATE/tried" >/dev/null && echo same || echo differs)" "same"
 contains "shown for real, with a display" "$(tail -1 "$GCALLS")" "display=fake"
-check "status agrees"                     "$(js .triedIsSource),$(js .triedWithThisGreeter)" "true,true"
+check "status agrees"                     "$(js '"\(.triedIsSource),\(.triedWithThisGreeter)"')" "true,true"
 
 echo "== enable =="
 check "refused with no shell package to put it in" "$(ok enable)" "refused"
 mkdir -p "$QS_PKG/contents" "$PL_PKG/contents"
 out=$(ls_ enable)
-check "enabled"                         "$(js .enabled)" "true"
-check "in both packages"                "$(js '[.packages[] | select(.installed)] | length')" "2"
+s=$(status)
+check "enabled"                         "$(jq -r .enabled <<<"$s")" "true"
+check "in both packages"                "$(jq -r '[.packages[] | select(.installed)] | length' <<<"$s")" "2"
 check "the copy is the tried one"       "$(diff -r -x '.installed-by-*' "$STATE/tried" "$QS_PKG/contents/lockscreen" >/dev/null && echo same || echo differs)" "same"
 check "marked as ours"                  "$(cat "$QS_PKG/contents/lockscreen/.installed-by-$SLUG")" "$(jq -r .hash "$STATE/tried.json")"
 contains "gives the way back"           "$out" "loginctl unlock-session 7"
 contains "and the terminal to return to" "$out" "Ctrl+Alt+F2"
 contains "and the command"              "$out" "lockscreen disable"
-check "not drawn while plasmashell is on another package" "$(js .drawn)" "plasma"
+check "not drawn while plasmashell is on another package" "$(jq -r .drawn <<<"$s")" "plasma"
 kwriteconfig6 --file plasmashellrc --group Shell --key ShellPackage "$SHELL_PACKAGE_ID"
 check "drawn once it is on ours"        "$(js .drawn)" "ours"
 
@@ -234,11 +219,12 @@ echo "== disable, from a console =="
 # What a text console has: a HOME and a PATH. No display, no bus, none of
 # this suite's settings.
 out=$(env -i HOME="$HOME" PATH="$PATH" "$LS" disable 2>&1)
-check "off"                             "$(js .enabled)" "false"
+s=$(status)
+check "off"                             "$(jq -r .enabled <<<"$s")" "false"
 check "gone from ours"                  "$([ -e "$QS_PKG/contents/lockscreen" ] && echo there || echo gone)" "gone"
 check "the foreign one left alone"      "$([ -e "$PL_PKG/contents/lockscreen" ] && echo there || echo gone)" "there"
 contains "and said so"                  "$out" "not ours; left alone"
-check "Plasma's is drawn again"         "$(js .drawn)" "plasma"
+check "Plasma's is drawn again"         "$(jq -r .drawn <<<"$s")" "plasma"
 check "the rest of the package is untouched" "$([ -d "$QS_PKG/contents" ] && echo there || echo gone)" "there"
 
 echo "== a package installed afresh =="
@@ -261,8 +247,8 @@ echo "== how it looks =="
 # got -- and through the ledger. This shell's own go to a file of its own,
 # because the greeter's config object is built from the desktop package's
 # config.xml and a key of ours added there never arrives.
-plasmakey() { kreadconfig6 --file kscreenlockerrc --group Greeter --group LnF --group General --key "$1" --default '<unset>'; }
-ourkey() { kreadconfig6 --file "$XDG_CONFIG_HOME/$SLUG/lockscreen.conf" --group Lock --key "$1" --default '<unset>'; }
+plasmakey() { kread kscreenlockerrc Greeter LnF General "$1"; }
+ourkey() { kread "$XDG_CONFIG_HOME/$SLUG/lockscreen.conf" Lock "$1"; }
 lookval() { "$LS" status --json | jq -r --arg id "$1" '.look[] | select(.id == $id) | .value'; }
 
 check "an unknown setting is refused"    "$("$LS" set nosuch left >/dev/null 2>&1; echo $?)" "1"
@@ -302,11 +288,9 @@ check "text takes one line"                "$("$LS" set kioskNote $'one\ntwo' >/
 check "and a sensible length"              "$("$LS" set kioskNote "$(printf 'x%.0s' {1..121})" >/dev/null 2>&1; echo $?)" "1"
 "$LS" set kioskName "" >/dev/null
 check "and can be emptied"                 "$(lookval kioskName)" ""
-check "only Plasma's keys are ledgered"    "$(jq '[.entries[] | select(.scope == "lockscreen")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+check "only Plasma's keys are ledgered"    "$(ledger_count lockscreen)" "2"
 
 echo "== nothing reached the session =="
 check "no DBus call, restart or quit" "$(cat "$CALLS")" ""
 
-echo
-printf '%d passed, %d failed\n' "$pass" "$fail"
-[ "$fail" -eq 0 ]
+harness_done

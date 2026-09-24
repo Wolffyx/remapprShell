@@ -21,7 +21,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: poster
 
-    readonly property real unit: poster.ui.unit
     readonly property color ink: "#ffffff"
     readonly property color dim: Qt.rgba(1, 1, 1, 0.78)
 
@@ -165,6 +164,7 @@ LockStyle {
                     width: Math.round(300 * poster.unit)
                     chromeless: true
                     textColor: poster.ink
+                    unit: poster.unit
                 }
             }
 
@@ -178,15 +178,13 @@ LockStyle {
             LockStatus {
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: poster.ui.unlock.shown
-                keyboard: poster.ui.keyboard
+                ui: poster.ui
                 ink: poster.ink
                 textSize: Math.round(12.5 * poster.unit)
-                onFocusRequested: poster.ui.focusPassword()
             }
 
             LockActions {
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Options.showSessionButtons
                 enabled: poster.ui.unlock.shown
                 session: poster.ui.session
                 unit: poster.unit

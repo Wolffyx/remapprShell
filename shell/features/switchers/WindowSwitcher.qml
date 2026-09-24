@@ -7,12 +7,12 @@ pragma ComponentBehavior: Bound
 // other choice: `switching.windows: shell`, the design's card row, drawn here
 // where the shell decides everything about it.
 //
-// What it cannot do is show the windows. A picture of a window is KWin's to
-// give, and it gives one only to its own switcher layouts -- any other client
-// must speak the screencast protocol in C++ and feed PipeWire, which is what
-// every shell that shows previews is doing and what this project has no
-// compiled code for. So the cards carry the application's icon on a tinted
-// panel, exactly as the design draws them.
+// A picture of a window is KWin's to give, over the screencast protocol,
+// which a client has to speak in C++ -- the compiled module in plugin/ (see
+// WindowThumbnail). With it installed the selected card shows the window
+// itself; every other card, and every card without it, carries the
+// application's icon on a panel tinted per application, as the design draws
+// them.
 //
 // Held-modifier behaviour is the reason this is a layer surface with exclusive
 // keyboard focus: the key release that commits the choice only arrives at a
@@ -312,13 +312,8 @@ PanelWindow {
 
                             // A colour per application, so two windows of one
                             // program look alike and two programs do not.
-                            readonly property color tint: {
-                                const s = String(tile.modelData?.appId ?? "");
-                                let h = 0;
-                                for (let i = 0; i < s.length; i++)
-                                    h = (h * 31 + s.charCodeAt(i)) % 360;
-                                return Qt.hsla(h / 360, 0.34, Theme.dark ? 0.38 : 0.62, 1);
-                            }
+                            readonly property color tint: Qt.hsla(WindowEvents.tintHue(tile.modelData?.appId),
+                                                                  0.34, Theme.dark ? 0.38 : 0.62, 1)
 
                             Rectangle {
                                 id: panel
@@ -470,23 +465,10 @@ PanelWindow {
                                 required property var modelData
                                 spacing: 6
 
-                                Rectangle {
+                                KeyCap {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    height: 22
-                                    width: keyText.implicitWidth + 18
-                                    radius: 8
-                                    color: Theme.s2
-                                    border.width: 1
-                                    border.color: Theme.out
-
-                                    PanelText {
-                                        id: keyText
-                                        anchors.centerIn: parent
-                                        text: hint.modelData.key
-                                        font.pixelSize: 11
-                                        font.weight: Font.Medium
-                                        color: Theme.fg
-                                    }
+                                    text: hint.modelData.key
+                                    pixelSize: 11
                                 }
                                 PanelText {
                                     anchors.verticalCenter: parent.verticalCenter

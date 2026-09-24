@@ -46,6 +46,7 @@ import signal
 import subprocess
 import sys
 import time
+from array import array
 
 import gi
 
@@ -176,21 +177,13 @@ CTL = "@BIN_DIR@/@CTL_BIN@"
 # The friendly name is what System Settings shows in its shortcut list, so it
 # is a sentence a person recognises rather than the id. The command is the one
 # the action's desktop file used to carry, unchanged.
+#
+# The list itself is scripts/lib/shortcut-actions.tsv, rendered in here at
+# install: the CLI that binds the keys and the edges that run the same actions
+# read that file too, and one list is one answer to what exists.
 SHORTCUT_ACTIONS = {
-    "launcher":  ("Application menu", [CTL, "launcher"]),
-    "search":    ("Search", [CTL, "search"]),
-    "settings":  ("Settings", [CTL, "settings"]),
-    "ask":       ("Ask about the last notification", [CTL, "ask", "--last-notification"]),
-    "clipboard": ("Clipboard history", [CTL, "clipboard"]),
-    "screenshot": ("Screenshot of a region", [CTL, "screenshot", "region"]),
-    "screenshot-screen": ("Screenshot of the screen", [CTL, "screenshot", "screen"]),
-    "screenshot-window": ("Screenshot of the active window", [CTL, "screenshot", "window"]),
-    "sidebar":   ("Sidebar", [CTL, "sidebar"]),
-    "keys":      ("Keyboard shortcuts", [CTL, "keys"]),
-    "switcher":  ("Window switcher", [CTL, "switcher", "show"]),
-    "switcher-reverse": ("Window switcher (backwards)", [CTL, "switcher", "show", "--reverse"]),
-    "overview":  ("Desktops", [CTL, "switcher", "overview"]),
-    "overview-reverse": ("Desktops (backwards)", [CTL, "switcher", "overview", "--reverse"]),
+    action: (label, [CTL, *args])
+    for action, (label, args) in @SHORTCUT_ACTIONS@.items()
 }
 
 # What letting go of a key runs, for the shortcuts that are *held* rather than
@@ -258,29 +251,12 @@ _BARE_MODIFIERS = {
     "alt": 0x01000023,
 }
 
-_NAMED_KEYS = {
-    "space": 32, "tab": 0x01000001, "backtab": 0x01000002,
-    "return": 0x01000004, "enter": 0x01000004,
-    "escape": 0x01000000, "esc": 0x01000000,
-    "backspace": 0x01000003, "delete": 0x01000007, "del": 0x01000007,
-    "insert": 0x01000006, "ins": 0x01000006,
-    "home": 0x01000010, "end": 0x01000011,
-    "pgup": 0x01000016, "pageup": 0x01000016,
-    "pgdown": 0x01000017, "pagedown": 0x01000017,
-    "left": 0x01000012, "up": 0x01000013, "right": 0x01000014, "down": 0x01000015,
-    "print": 0x01000009, "sysreq": 0x01000009, "menu": 0x01000055,
-    "comma": 44, "period": 46, "slash": 47, "semicolon": 59,
-    "equal": 61, "minus": 45, "plus": 43,
-}
-
-# The same keys written as themselves. kglobalshortcutsrc holds what Qt's
-# QKeySequence prints, and for these that is the character -- "Meta+/", not
-# "Meta+Slash". Leaving them out is what made `shortcuts set keys "Meta+/"`
-# report success and bind nothing.
-_PUNCTUATION = {
-    "/": 47, ",": 44, ".": 46, ";": 59, "=": 61, "-": 45, "+": 43,
-    "[": 91, "]": 93, "\\": 92, "'": 39, "`": 96, "*": 42, "\u00a7": 0xA7,
-}
+# Qt::Key values for every named key and punctuation mark, by name: the table
+# scripts/lib/accel.sh reads, scripts/lib/keycodes.tsv, rendered in here at
+# install. Each side used to keep its own copy and they disagreed -- the CLI
+# accepted "Volume Up" and this refused it, so the key was written to the file
+# and never grabbed. Looked up without regard to case, like the modifiers.
+_KEYCODES = {name.lower(): code for name, code in @ACCEL_KEYCODES@.items()}
 
 
 def keycode(spec):
@@ -289,6 +265,13 @@ def keycode(spec):
     Anything this table does not know returns None rather than a guess: a
     wrong integer is a key bound to something the user never asked for.
     """
+    # The plus key itself: "Meta++" split on "+" is a modifier and nothing,
+    # which made it bare Meta here while the CLI bound Meta and Plus.
+    if spec == "+":
+        spec = "Plus"
+    elif spec.endswith("++"):
+        spec = spec[:-1] + "Plus"
+
     parts = [p.strip() for p in spec.split("+") if p.strip()]
     if len(parts) == 1 and parts[0].lower() in _BARE_MODIFIERS:
         return _BARE_MODIFIERS[parts[0].lower()]
@@ -307,10 +290,8 @@ def keycode(spec):
     base = bases[0]
 
     low = base.lower()
-    if low in _NAMED_KEYS:
-        return total | _NAMED_KEYS[low]
-    if base in _PUNCTUATION:
-        return total | _PUNCTUATION[base]
+    if low in _KEYCODES:
+        return total | _KEYCODES[low]
     if len(base) == 1 and base.isalnum():
         return total | ord(base.upper())
     match = re.fullmatch(r"[Ff]([1-9]|1[0-9]|2[0-5])", base)
@@ -477,6 +458,19 @@ class GlobalShortcuts:
         except OSError as exc:
             print(f"could not run {action}: {exc}", file=sys.stderr)
 
+    def sync_configured(self):
+        """Make KDE's bindings match the shell's configuration, once, at start.
+
+        The keys are the shell's configuration (`shortcuts.<action>`), and a
+        key there is enforced: another program that grabbed it while the shell
+        was not looking -- KRunner re-registering Meta+Space at login -- gives
+        it back here. The CLI does the work, since it keeps the ledger that
+        `shortcuts revert` undoes. Detached, not waited for: it ends by
+        calling Reload on this very process, which could not answer while it
+        was waiting.
+        """
+        self._run("sync", [CTL, "shortcuts", "sync", "--quiet"])
+
     def handle_call(self, _connection, _sender, _path, _interface, method, _params, invocation):
         if method == "Reload":
             self.reload()
@@ -533,11 +527,7 @@ class Pointer:
     draw.
     """
 
-    def __init__(self):
-        self._connection = None
-
     def handle_call(self, connection, _sender, _path, _interface, method, params, invocation):
-        self._connection = connection
         if method != "At":
             invocation.return_error_literal(
                 Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
@@ -558,6 +548,10 @@ class Pointer:
             GLib.Variant("(siis)", (action, int(params[1]), int(params[2]), str(params[3]))),
         )
         invocation.return_value(None)
+
+
+# An array typecode four bytes wide, which is what one pixel is.
+_U32 = "I" if array("I").itemsize == 4 else "L"
 
 
 class WindowIcons:
@@ -598,6 +592,7 @@ class WindowIcons:
     def __init__(self):
         self._cache = {}          # appId -> path or None
         self._misses = {}         # appId -> (attempts, monotonic of the last)
+        self._windows_by_pid = None   # pid -> X11 window, for one update
         self._available = self._check()
 
     @staticmethod
@@ -707,18 +702,37 @@ class WindowIcons:
             return False
         return time.monotonic() - last >= self.MISS_RETRY_SECONDS
 
+    def new_update(self):
+        """Forget which window belongs to which process.
+
+        That was true of the last update. Finding it out is an `xprop` for
+        every window on the display, and this runs on the thread that answers
+        D-Bus -- so it is done at most once an update, however many windows
+        in it have no icon yet, rather than once for each of them.
+        """
+        self._windows_by_pid = None
+
+    def _x11_window_for(self, pid):
+        if self._windows_by_pid is None:
+            # Set before the sweep, so one that fails is not tried again for
+            # every other window in the same update.
+            self._windows_by_pid = {}
+            self._windows_by_pid = self._x11_windows_by_pid()
+        return self._windows_by_pid.get(int(pid))
+
     @staticmethod
-    def _x11_window_for(pid):
+    def _x11_windows_by_pid():
+        """pid -> the first of its windows in the display's client list."""
         out = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"],
                              capture_output=True, text=True, timeout=5).stdout
-        ids = re.findall(r"0x[0-9a-fA-F]+", out)
-        for window in ids:
+        found = {}
+        for window in re.findall(r"0x[0-9a-fA-F]+", out):
             prop = subprocess.run(["xprop", "-id", window, "_NET_WM_PID"],
                                   capture_output=True, text=True, timeout=5).stdout
             match = re.search(r"=\s*(\d+)", prop)
-            if match and int(match.group(1)) == int(pid):
-                return window
-        return None
+            if match:
+                found.setdefault(int(match.group(1)), window)
+        return found
 
     def _extract(self, window, app_id):
         out = subprocess.run(["xprop", "-id", window, "-notype", "32c", "_NET_WM_ICON"],
@@ -731,18 +745,21 @@ class WindowIcons:
         width, height, pixels = image
         from PIL import Image
 
-        # _NET_WM_ICON is ARGB packed into 32-bit cardinals, which is not a
-        # byte order any image library reads directly.
-        data = bytearray()
-        for value in pixels:
-            data += bytes(((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF, (value >> 24) & 0xFF))
+        # _NET_WM_ICON is ARGB packed into 32-bit cardinals. Laid out as
+        # native unsigned ints those are the bytes B, G, R, A on a
+        # little-endian machine and A, R, G, B on a big-endian one, both raw
+        # modes Pillow reads as they are. Reordering them here one pixel at a
+        # time was a Python loop over up to 65536 of them, on the thread that
+        # answers D-Bus.
+        data = array(_U32, (value & 0xFFFFFFFF for value in pixels)).tobytes()
+        rawmode = "BGRA" if sys.byteorder == "little" else "ARGB"
 
         os.makedirs(ICON_CACHE, exist_ok=True)
         # The application id is a window class and can contain anything; it is
         # about to become a filename.
         safe = re.sub(r"[^A-Za-z0-9._-]", "_", app_id)[:96]
         path = os.path.join(ICON_CACHE, f"{safe}.png")
-        Image.frombytes("RGBA", (width, height), bytes(data)).save(path)
+        Image.frombytes("RGBA", (width, height), data, "raw", rawmode).save(path)
         return path
 
     @staticmethod
@@ -793,6 +810,7 @@ class WindowList:
 
         # A window with no application to match keeps the icon it carries
         # itself, which is the only copy of it that exists.
+        self._icons.new_update()
         for window in windows:
             if not isinstance(window, dict) or window.get("desktopFile"):
                 continue
@@ -817,8 +835,7 @@ class WindowList:
             None, OBJECT_PATH, INTERFACE, "Changed", GLib.Variant("(s)", (self._json,))
         )
 
-    def handle_call(self, connection, sender, path, interface, method, params, invocation):
-        self._connection = connection
+    def handle_call(self, _connection, _sender, _path, _interface, method, params, invocation):
         if method == "Update":
             self.update(params[0])
             invocation.return_value(None)
@@ -862,6 +879,7 @@ def main():
         # nothing, which is the whole point -- see SHORTCUT_OWNER above.
         if shortcuts_wanted():
             shortcuts.start(connection)
+            shortcuts.sync_configured()
         else:
             print("not the shell's own bus name; leaving the global shortcuts alone",
                   file=sys.stderr)

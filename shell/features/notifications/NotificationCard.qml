@@ -37,10 +37,16 @@ Rectangle {
                                                    ShellNotifications.timeoutMs)
     property real remaining: 1
 
+    // Stopped while the pointer holds the popup, as the popup itself is. The
+    // service lets the deadline pass meanwhile and gives the popup at least
+    // two seconds more once it is let go, so a bar that kept counting ran
+    // down to nothing under the pointer and then jumped back up. It picks up
+    // from the service's deadline when the pointer leaves.
     Timer {
         interval: 100
         repeat: true
         running: card.deadline > 0 && card.span > 0
+                 && ShellNotifications.held !== card.notification?.id
         onTriggered: card.remaining = Math.max(0, Math.min(1, (card.deadline - Date.now()) / card.span))
     }
 

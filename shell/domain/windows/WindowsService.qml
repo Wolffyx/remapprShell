@@ -18,6 +18,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.kde
 import qs.domain.windows.events
 
 QtObject {
@@ -30,8 +31,6 @@ QtObject {
     // Told apart from "no windows": before the daemon has answered at all we
     // do not know whether the list is empty or absent.
     property bool _answered: false
-
-    readonly property var activeWindow: root.windows.find(w => w.active) ?? null
 
     // uuid -> when that window began asking for attention. See
     // WindowEvents.attentionSince.
@@ -64,18 +63,15 @@ QtObject {
     // something.
     readonly property Process _initial: Process {
         running: true
-        command: ["busctl", "--user", "--json=short", "call",
-                  Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List"]
+        command: Dbus.callArgs(Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List")
         stdout: StdioCollector {
             onStreamFinished: {
-                let payload;
-                try {
-                    payload = JSON.parse(text).data?.[0];
-                } catch (e) {
+                const reply = Dbus.unwrap(text, "Windows.List");
+                if (reply === undefined) {
                     Log.debug("windows", "the window daemon is not answering yet");
                     return;
                 }
-                root._apply(WindowEvents.parseList(payload));
+                root._apply(WindowEvents.parseList(reply?.[0]));
                 Log.info("windows", `${root.windows.length} window(s) from the daemon`);
             }
         }
@@ -83,38 +79,30 @@ QtObject {
 
     // And then followed. A match rule rather than a whole-bus monitor: this
     // wants two signals, not every message on the session bus.
-    property int _dropped: 0
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='signal',interface='${Branding.dbusName}.Windows'`
 
-    readonly property Process _monitor: Process {
-        running: true
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='signal',interface='${Branding.dbusName}.Windows'`]
-        stdout: SplitParser {
-            onRead: line => {
-                const list = WindowEvents.parseSignal(line);
-                if (list === null) {
-                    // A dropped line means the window list on screen is now
-                    // out of date and nothing will say so, since the daemon
-                    // sends state rather than changes. Worth a warning, unlike
-                    // the ordinary case of a line that is simply not ours.
-                    if (BusLine.dropped > root._dropped) {
-                        root._dropped = BusLine.dropped;
-                        Log.warn("windows", "a window update was too large to read; the list may be stale");
-                    }
-                    return;
-                }
-                // A window opening or closing is worth a journal line; a title
-                // changing is not, and there are a great many of those.
-                const changed = list.length !== root.windows.length;
-                root._apply(list);
-                if (changed)
-                    Log.info("windows", `${list.length} window(s)`);
-                else
-                    Log.debug("windows", `${list.length} window(s), details changed`);
-            }
+        onRead: line => {
+            const list = WindowEvents.parseSignal(line);
+            if (list === null)
+                return;
+            // A window opening or closing is worth a journal line; a title
+            // changing is not, and there are a great many of those.
+            const changed = list.length !== root.windows.length;
+            root._apply(list);
+            if (changed)
+                Log.info("windows", `${list.length} window(s)`);
+            else
+                Log.debug("windows", `${list.length} window(s), details changed`);
         }
 
-        onRunningChanged: if (!running) Log.warn("windows", "the window list stopped following changes")
+        // A dropped line means the window list on screen is now out of date
+        // and nothing will say so, since the daemon sends state rather than
+        // changes. Worth a warning, unlike the ordinary case of a line that is
+        // simply not ours.
+        onDropped: Log.warn("windows", "a window update was too large to read; the list may be stale")
+
+        onListeningChanged: if (!listening) Log.warn("windows", "the window list stopped following changes")
     }
 
     // ---- matching a window to the application that owns it ---------------
@@ -183,7 +171,7 @@ QtObject {
     // the window carries. The daemon writes that out; this is the file.
     function iconFileFor(window) {
         const path = String(window?.iconPath ?? "");
-        return path.length > 0 ? `file://${path}` : "";
+        return path.length > 0 ? Paths.fileUrl(path) : "";
     }
 
     // "Dolphin", not "org.kde.dolphin".
@@ -330,14 +318,8 @@ QtObject {
     // The active window, minimised, by KWin's own "Window Minimize" action --
     // what its key does. Only ever asked for when the window clicked is the
     // active one, which is the one that action works on.
-    readonly property Process _minimize: Process {
-        command: ["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                  "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Window Minimize"]
-    }
-
     function minimizeActive() {
-        root._minimize.running = false;
-        root._minimize.running = true;
+        Dbus.invokeShortcut("Window Minimize");
     }
 
     // Any window, closed. KWin has no call for it, so the CLI loads a
@@ -351,14 +333,9 @@ QtObject {
 
     // KWin's own runner. The id it expects is the uuid in braces behind a
     // "0_" prefix, which is what its Match() hands out.
-    readonly property Process _activate: Process {}
-
     function activate(uuid) {
         if (!uuid)
             return;
-        root._activate.running = false;
-        root._activate.command = ["busctl", "--user", "call", "org.kde.KWin", "/WindowsRunner",
-                                  "org.kde.krunner1", "Run", "ss", `0_{${uuid}}`, ""];
-        root._activate.running = true;
+        Dbus.send("org.kde.KWin", "/WindowsRunner", "org.kde.krunner1", "Run", "ss", [`0_{${uuid}}`, ""]);
     }
 }

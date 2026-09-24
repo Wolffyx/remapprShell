@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 // reimplementing the logic, so the two cannot drift apart.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
 import qs.domain.config
@@ -23,10 +22,6 @@ CardGrid {
     property var snapshots: []
     property string status: ""
 
-    readonly property string ctl: `${Quickshell.env("HOME")}/.local/bin/${Branding.slug}-ctl`
-
-    count: 2
-
     Component.onCompleted: root.refresh()
 
     function refresh() {
@@ -40,7 +35,7 @@ CardGrid {
         // wider than its column leaves one space instead of two -- which this
         // page, splitting on runs of spaces, read as part of the name. Long
         // names arrived with the date stuck to them and the date line short.
-        command: [root.ctl, "snapshot", "list", "--json"]
+        command: [Branding.ctlBin, "snapshot", "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -72,7 +67,7 @@ CardGrid {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [root.ctl].concat(args);
+        runProc.command = [Branding.ctlBin].concat(args);
         runProc.running = true;
     }
 
@@ -87,13 +82,13 @@ CardGrid {
         // What it is called in the list. Empty is "manual", as from the CLI.
         TextInputRow {
             id: labelField
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             placeholderText: "What it is before -- \"trying a new theme\", say"
             onAccepted: takeButton.activated()
         }
 
         Flow {
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             spacing: 8
 
             TextButton {
@@ -114,17 +109,13 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: take.width - 2 * take.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: take.contentWidth
             text: "Restore points are never removed when reverting or uninstalling. They are removed only here, or by pruning, which never takes a locked one or the oldest. Removing one is permanent."
         }
 
         SettingRow {
-            width: take.width - 2 * take.padding
+            width: take.contentWidth
             stacked: true
             label: "Keep at most"
             description: root.keep === 0
@@ -162,7 +153,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: saved.width - 2 * saved.padding
+                width: saved.contentWidth
                 height: 48
                 radius: Theme.radiusOf(12)
                 color: Theme.s1

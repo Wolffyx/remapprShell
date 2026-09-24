@@ -16,7 +16,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.SystemTray
 import qs.core
 import qs.platform.kde
@@ -124,44 +123,31 @@ QtObject {
         Log.debug("notifications", `${entry.appName}: ${entry.summary}`);
     }
 
-    // Said once per notification dropped, and from outside the parser: the
-    // parser runs in a hot read handler and a pure function has nowhere to log
-    // to anyway. A drop means a line stayed over a megabyte after its pixels
-    // were removed, which should not happen -- so it is worth a line rather
-    // than silence.
-    property int _dropped: 0
-
-    function _reportDropped() {
-        const n = BusLine.dropped - root._dropped;
-        root._dropped = BusLine.dropped;
-        Log.warn("notifications", `${n} notification(s) too large to read safely; skipped`);
-    }
-
     onCapacityChanged: {
         if (root.entries.length > root.capacity)
             root.entries = root.entries.slice(0, root.capacity);
     }
 
-    // The eavesdrop. A match rule, not a whole-bus monitor, for the reason the
-    // OSD listener gives: eavesdropping on everything to catch one call would
-    // put every message on the session bus through this process.
-    readonly property Process _monitor: Process {
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='method_call',interface='${NotificationEvents.interfaceName}',member='Notify'`]
+    // The eavesdrop. A match rule, not a whole-bus monitor: see BusMonitor.
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='method_call',interface='${NotificationEvents.interfaceName}',member='Notify'`
         running: root.enabled
 
-        stdout: SplitParser {
-            onRead: line => {
-                const entry = NotificationEvents.parse(line);
-                if (entry)
-                    root._push(entry);
-                else if (BusLine.dropped > root._dropped)
-                    root._reportDropped();
-            }
+        onRead: line => {
+            const entry = NotificationEvents.parse(line);
+            if (entry)
+                root._push(entry);
         }
 
-        onRunningChanged: {
-            if (running)
+        // Said once per notification dropped, and from outside the parser:
+        // the parser runs in a hot read handler and a pure function has
+        // nowhere to log to anyway. A drop means a line stayed over a
+        // megabyte after its pixels were removed, which should not happen --
+        // so it is worth a line rather than silence.
+        onDropped: n => Log.warn("notifications", `${n} notification(s) too large to read safely; skipped`)
+
+        onListeningChanged: {
+            if (listening)
                 Log.info("notifications", "listening for notifications on the session bus");
             else if (root.enabled)
                 Log.warn("notifications", "the notification listener stopped; the history will not grow");

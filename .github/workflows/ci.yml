@@ -59,23 +59,27 @@ jobs:
       - name: Test import lint
         run: ./scripts/lint-tests.sh
 
-      # Fails if docs/config.md is not what the schema would generate. The
-      # reference is committed because people read it on the forge, where
-      # nothing runs, so a stale one is trusted and wrong.
       # Fails if the documented default and the shipped default disagree.
       - name: Defaults lint
         run: ./scripts/lint-defaults.sh
 
+      # Fails if docs/config.md is not what the schema would generate. The
+      # reference is committed because people read it on the forge, where
+      # nothing runs, so a stale one is trusted and wrong.
       - name: Docs lint
         run: ./scripts/lint-docs.sh
 
       - name: Tests
         run: xvfb-run -a ./scripts/test.sh
 
+      # Every shell script, the tests' and the previews' too, and the
+      # templates in bin/: a template parses as it stands, its @PLACEHOLDERS@
+      # being plain words to bash. The templates were in the find and then
+      # filtered straight back out of it, so bin/ was never checked at all.
       - name: Shell script syntax
         run: |
           fail=0
           while IFS= read -r f; do
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
-          done < <(find scripts bin -name '*.sh' -o -name '*.sh.in' | grep -v '\.in$')
+          done < <(find scripts bin tests dev/preview -name '*.sh' -o -name '*.sh.in')
           exit $fail

@@ -16,6 +16,7 @@ import Quickshell
 import qs.core
 import qs.domain.theme
 import qs.ui.primitives
+import qs.ui.controls
 import qs.features.settings.pages
 
 FloatingWindow {
@@ -257,26 +258,14 @@ FloatingWindow {
                     font.weight: Font.Medium
                 }
 
-                Rectangle {
-                    id: closeButton
-
+                IconButton {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 34
-                    height: 34
-                    radius: width / 2
-                    color: closeHover.hovered ? Theme.s2 : "transparent"
-
-                    Glyph {
-                        anchors.centerIn: parent
-                        name: "close"
-                        fallback: "window-close"
-                        size: 20
-                        color: Theme.mut
-                    }
-
-                    HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.visible = false }
+                    glyph: "close"
+                    iconName: "window-close"
+                    tooltip: "Close"
+                    color: Theme.mut
+                    onActivated: root.visible = false
                 }
             }
 
@@ -293,14 +282,9 @@ FloatingWindow {
                     width: root.width - nav.width - 76
                     spacing: 16
 
-                    PanelText {
+                    Hint {
                         visible: (root.currentSection?.description ?? "").length > 0
                         text: root.currentSection?.description ?? ""
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 12
-                        lineHeight: 1.35
-                        color: Theme.mut
                     }
 
                     // A section either lists keys, which the schema renderer turns

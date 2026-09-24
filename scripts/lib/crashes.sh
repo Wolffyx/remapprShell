@@ -54,12 +54,16 @@ crash_newest_epoch() { crash_list | tail -1 | cut -f4; }
 # reported as a new one. That is not hypothetical -- it happened the first time
 # this was wired up, and it is why the decision lives here where a test can
 # reach it rather than in QML where one cannot.
+#
+# Every shell start asks this, so the dumps are listed once: the newest line
+# has both the id and the time.
 crash_since() {
-    local since=${1:-0} newest
-    newest=$(crash_newest_epoch)
+    local since=${1:-0} newest when
+    newest=$(crash_list | tail -1)
     [ -n "$newest" ] || return 0
-    [ "$newest" -gt "$since" ] 2>/dev/null || return 0
-    printf '%s %s\n' "$newest" "$(crash_newest)"
+    when=${newest##*$'\t'}
+    [ "$when" -gt "$since" ] 2>/dev/null || return 0
+    printf '%s %s\n' "$when" "${newest%%$'\t'*}"
 }
 
 # crash_dir [id]   -- the newest of ours when no id is given.

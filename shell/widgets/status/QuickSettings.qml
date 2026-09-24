@@ -128,6 +128,32 @@ Item {
     readonly property var chosen: qs.widget.tiles
     readonly property var tiles: qs.chosen.map(id => qs.available.find(t => t.id === id)).filter(t => !!t)
 
+    // What the grid repeats: the ids, through a ScriptModel. `tiles` is made
+    // afresh whenever anything any tile says changes -- a signal strength, a
+    // device connecting -- and a Repeater over it built every tile again each
+    // time. Over the ids a tile is built once, and reads what it says through
+    // tileAt.
+    //
+    // Not a ScriptModel over the tiles themselves with `objectProp: "id"`. In
+    // Quickshell 0.3.1 a row it moves keeps the object it had, and once it has
+    // updated one row in place it goes on updating the rows after it by
+    // position, whatever their ids -- so a tile could show another's state, or
+    // a stale one, until the next change. Strings compare by value, and a list
+    // of them is only ever inserted into, removed from and reordered.
+    readonly property var tileIds: qs.tiles.map(t => t.id)
+
+    // A tile's contents: the one at its place, which is where it is once the
+    // list has settled, as long as the id agrees -- and found by id while the
+    // list is still moving under it.
+    function tileAt(index, id) {
+        const at = qs.tiles[index];
+        return at?.id === id ? at : (qs.tiles.find(t => t.id === id) ?? qs.noTile);
+    }
+
+    // What a tile on its way out reads, for the moment between its id leaving
+    // the list and the tile going.
+    readonly property var noTile: ({ id: "", title: "", sub: "", glyph: "", page: "", on: false })
+
     function activate(tile) {
         if (tile.page)
             qs.widget.page = tile.page;
@@ -139,14 +165,17 @@ Item {
     component Tile: Rectangle {
         id: tile
 
-        required property var modelData
+        // The tile's id, and its place in the grid.
+        required property string modelData
+        required property int index
+        readonly property var info: qs.tileAt(tile.index, tile.modelData)
 
         radius: Theme.radiusOf(20)
-        color: tile.modelData.on ? Theme.acc : (tileHover.hovered ? Theme.s3 : Theme.s2)
+        color: tile.info.on ? Theme.acc : (tileHover.hovered ? Theme.s3 : Theme.s2)
         implicitHeight: tileColumn.implicitHeight + 28
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
-        readonly property color ink: tile.modelData.on ? Theme.accFg : Theme.fg
+        readonly property color ink: tile.info.on ? Theme.accFg : Theme.fg
 
         Column {
             id: tileColumn
@@ -160,7 +189,7 @@ Item {
                 height: 24
 
                 Glyph {
-                    name: tile.modelData.glyph
+                    name: tile.info.glyph
                     size: 24
                     color: tile.ink
                 }
@@ -168,7 +197,7 @@ Item {
                 Glyph {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: (tile.modelData.page ?? "").length > 0
+                    visible: (tile.info.page ?? "").length > 0
                     name: "chevron_right"
                     size: 18
                     color: tile.ink
@@ -181,7 +210,7 @@ Item {
             PanelText {
                 width: parent.width
                 elide: Text.ElideRight
-                text: tile.modelData.title
+                text: tile.info.title
                 font.pixelSize: 14
                 font.weight: Font.Medium
                 color: tile.ink
@@ -190,14 +219,14 @@ Item {
             PanelText {
                 width: parent.width
                 elide: Text.ElideRight
-                text: tile.modelData.sub
+                text: tile.info.sub
                 font.pixelSize: 12
-                color: tile.modelData.on ? Theme.alpha(Theme.accFg, 0.8) : Theme.mut
+                color: tile.info.on ? Theme.alpha(Theme.accFg, 0.8) : Theme.mut
             }
         }
 
         HoverHandler { id: tileHover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: qs.activate(tile.modelData) }
+        TapHandler { onTapped: qs.activate(tile.info) }
     }
 
     // A tile as a row, when dense: its switch at the end, or a chevron to its
@@ -205,25 +234,28 @@ Item {
     component TileRow: Rectangle {
         id: row
 
-        required property var modelData
-        readonly property bool paged: (row.modelData.page ?? "").length > 0
+        // As a Tile's.
+        required property string modelData
+        required property int index
+        readonly property var info: qs.tileAt(row.index, row.modelData)
+        readonly property bool paged: (row.info.page ?? "").length > 0
 
         height: 44
         radius: Theme.radiusOf(14)
-        color: row.paged && row.modelData.on ? Theme.accC : (rowHover.hovered ? Theme.s2 : "transparent")
+        color: row.paged && row.info.on ? Theme.accC : (rowHover.hovered ? Theme.s2 : "transparent")
 
         Glyph {
             x: 14
             anchors.verticalCenter: parent.verticalCenter
-            name: row.modelData.glyph
+            name: row.info.glyph
             size: 20
-            color: row.modelData.on ? Theme.acc : Theme.mut
+            color: row.info.on ? Theme.acc : Theme.mut
         }
 
         PanelText {
             x: 48
             anchors.verticalCenter: parent.verticalCenter
-            text: row.modelData.title
+            text: row.info.title
             font.pixelSize: 14
         }
 
@@ -238,7 +270,7 @@ Item {
                 visible: row.paged
                 width: Math.min(implicitWidth, 160)
                 elide: Text.ElideRight
-                text: row.modelData.sub
+                text: row.info.sub
                 font.pixelSize: 12
                 color: Theme.mut
             }
@@ -254,13 +286,13 @@ Item {
             Toggle {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !row.paged
-                checked: row.modelData.on
-                onToggled: qs.activate(row.modelData)
+                checked: row.info.on
+                onToggled: qs.activate(row.info)
             }
         }
 
         HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: if (row.paged) qs.activate(row.modelData) }
+        TapHandler { onTapped: if (row.paged) qs.activate(row.info) }
     }
 
     // A page's head: back to the first page, a title, the page's own switch.
@@ -445,10 +477,9 @@ Item {
                 spacing: 10
 
                 Repeater {
-                    model: qs.dense ? [] : qs.tiles
+                    model: ScriptModel { values: qs.dense ? [] : qs.tileIds }
 
                     Tile {
-                        required property int index
                         width: index === qs.tiles.length - 1 && qs.tiles.length % 2 === 1
                             ? parent.width : (parent.width - 10) / 2
                     }
@@ -461,7 +492,7 @@ Item {
                 spacing: 4
 
                 Repeater {
-                    model: qs.dense ? qs.tiles : []
+                    model: ScriptModel { values: qs.dense ? qs.tileIds : [] }
 
                     TileRow { width: parent.width }
                 }
@@ -492,31 +523,17 @@ Item {
                     // and a slider per display. The tiles have had that since
                     // the design was drawn and the sliders had not, which left
                     // the output device pickable only in Plasma's own applet.
-                    Row {
+                    LevelSlider {
                         visible: !!AudioStatus.sink
                         width: parent.width
-                        spacing: 10
+                        glyph: AudioStatus.glyph
+                        iconName: AudioStatus.icon
+                        to: Math.round(AudioStatus.ceilingFor(AudioStatus.volume) * 100)
+                        value: AudioStatus.volume * 100
+                        onMoved: v => AudioStatus.setVolume(v / 100)
+                        onIconActivated: AudioStatus.toggleMute()
 
                         IconButton {
-                            id: muteButton
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: AudioStatus.glyph
-                            iconName: AudioStatus.icon
-                            onActivated: AudioStatus.toggleMute()
-                        }
-
-                        NumberSlider {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - muteButton.width - soundMore.width - 2 * parent.spacing
-                            live: true
-                            from: 0
-                            to: Math.round(AudioStatus.ceilingFor(AudioStatus.volume) * 100)
-                            value: AudioStatus.volume * 100
-                            onMoved: v => AudioStatus.setVolume(v / 100)
-                        }
-
-                        IconButton {
-                            id: soundMore
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "chevron_right"
                             iconName: "go-next"
@@ -526,38 +543,16 @@ Item {
 
                     // Every display powerdevil can dim, at once; the page
                     // behind this has a slider per display.
-                    Row {
+                    LevelSlider {
                         visible: BrightnessStatus.displays.length > 0
                         width: parent.width
-                        spacing: 10
+                        glyph: StatusIcons.brightnessGlyph(BrightnessStatus.level)
+                        iconName: BrightnessStatus.icon
+                        from: 1
+                        value: BrightnessStatus.level * 100
+                        onMoved: v => BrightnessStatus.setAllPercent(v)
 
                         IconButton {
-                            id: sun
-                            anchors.verticalCenter: parent.verticalCenter
-                            glyph: StatusIcons.brightnessGlyph(BrightnessStatus.level)
-                            iconName: BrightnessStatus.icon
-                        }
-
-                        NumberSlider {
-                            anchors.verticalCenter: parent.verticalCenter
-                            // A Row skips a hidden child but its width is
-                            // still its own, so the room it would have taken
-                            // has to be given back by hand.
-                            width: parent.width - sun.width - parent.spacing
-                                   - (brightnessMore.visible ? brightnessMore.width + parent.spacing : 0)
-                            live: true
-                            from: 1
-                            to: 100
-                            value: BrightnessStatus.level * 100
-                            onMoved: v => {
-                                for (const d of BrightnessStatus.displays)
-                                    BrightnessStatus.setBrightness(d.name, Math.max(StatusIcons.brightnessFloor(d.max),
-                                                                                    Math.round(v * d.max / 100)));
-                            }
-                        }
-
-                        IconButton {
-                            id: brightnessMore
                             anchors.verticalCenter: parent.verticalCenter
                             glyph: "chevron_right"
                             iconName: "go-next"
@@ -711,7 +706,17 @@ Item {
                 spacing: 2
 
                 Repeater {
-                    model: NetworkStatus.wifiEnabled ? wifi.networks : []
+                    // Through a ScriptModel, not the array: the list is sorted
+                    // by signal strength, so every scan made a new one, and a
+                    // Repeater handed a new array rebuilds every row -- the
+                    // password field with them, emptied under the person
+                    // typing into it. A network is the same object from one
+                    // scan to the next, so a re-sort is now a move and a row
+                    // lives as long as its network is on the list.
+                    model: ScriptModel {
+                        values: NetworkStatus.wifiEnabled ? wifi.networks : []
+                        comparisonMode: ObjectComparison.Identity
+                    }
 
                     Column {
                         id: network
@@ -879,27 +884,14 @@ Item {
 
         // The level itself, so the page it was reached from is not the only
         // place to set it.
-        Row {
+        LevelSlider {
             width: parent.width
-            spacing: 10
-
-            IconButton {
-                id: levelIcon
-                anchors.verticalCenter: parent.verticalCenter
-                glyph: level.glyph
-                onActivated: level.setMuted(!level.muted)
-            }
-
-            NumberSlider {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - levelIcon.width - parent.spacing
-                live: true
-                enabled: !level.muted
-                from: 0
-                to: Math.round(AudioStatus.ceilingFor(level.volume) * 100)
-                value: level.volume * 100
-                onMoved: v => level.setLevel(v / 100)
-            }
+            glyph: level.glyph
+            sliderEnabled: !level.muted
+            to: Math.round(AudioStatus.ceilingFor(level.volume) * 100)
+            value: level.volume * 100
+            onMoved: v => level.setLevel(v / 100)
+            onIconActivated: level.setMuted(!level.muted)
         }
 
         PanelText {
@@ -1022,13 +1014,19 @@ Item {
                 width: parent.width
                 spacing: 10
 
+                // Keyed by name, as the brightness widget's are: every step
+                // of a drag replaces the list of displays, and a Repeater over
+                // the list itself rebuilt the row -- and the slider -- being
+                // dragged.
                 Repeater {
-                    model: BrightnessStatus.displays
+                    model: JSON.parse(BrightnessStatus.displayNames)
 
                     Column {
-                        id: display
+                        id: screen
 
-                        required property var modelData
+                        required property string modelData
+                        readonly property var display: BrightnessStatus.displayNamed(screen.modelData)
+                                                       ?? { label: "", brightness: 0, max: 1 }
 
                         width: parent.width
                         spacing: 2
@@ -1041,33 +1039,18 @@ Item {
                         PanelText {
                             width: parent.width
                             elide: Text.ElideRight
-                            text: display.modelData.label || display.modelData.name
+                            text: screen.display.label || screen.modelData
                             font.pixelSize: 12
                             color: Theme.mut
                             leftPadding: 4
                         }
 
-                        Row {
+                        LevelSlider {
                             width: parent.width
-                            spacing: 10
-
-                            IconButton {
-                                id: displayIcon
-                                anchors.verticalCenter: parent.verticalCenter
-                                glyph: StatusIcons.brightnessGlyph((display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max))
-                            }
-
-                            NumberSlider {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - displayIcon.width - parent.spacing
-                                live: true
-                                from: 1
-                                to: 100
-                                value: 100 * (display.modelData.brightness ?? 0) / Math.max(1, display.modelData.max)
-                                onMoved: v => BrightnessStatus.setBrightness(display.modelData.name,
-                                    Math.max(StatusIcons.brightnessFloor(display.modelData.max),
-                                             Math.round(v * display.modelData.max / 100)))
-                            }
+                            glyph: StatusIcons.brightnessGlyph((screen.display.brightness ?? 0) / Math.max(1, screen.display.max))
+                            from: 1
+                            value: 100 * (screen.display.brightness ?? 0) / Math.max(1, screen.display.max)
+                            onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
                         }
                     }
                 }

@@ -28,7 +28,6 @@ QtObject {
                 ConfigStore.monitorData = Object.assign({}, ConfigStore.monitorData,
                                                         { [root.screenName]: data });
                 Log.info("config", `overrides for ${root.screenName} loaded`);
-                ConfigStore.changed();
             } catch (e) {
                 Log.error("config", `overrides for ${root.screenName} are invalid: ${e}`);
             }

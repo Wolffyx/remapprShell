@@ -3,38 +3,21 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/accel.sh"
 
 # Stand-ins for what reaches the running desktop. Before these, every run of
 # this suite restarted the user's own kglobalaccel four times.
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in systemctl kquitapp6 busctl; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" systemctl kquitapp6 busctl
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 sc() { "$REPO_ROOT/scripts/shortcuts.sh" "$@" 2>/dev/null; }
 # The whole value, so the friendly name and the default are checked too: both
 # are what System Settings shows and resets to.
-binding() { kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$1" --default '<unset>'; }
-legacy()  { kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$1.desktop" --key _launch --default '<unset>'; }
+binding() { kread kglobalshortcutsrc "$SLUG" "$1"; }
+legacy()  { kread kglobalshortcutsrc services "$SLUG-$1.desktop" _launch; }
 
 mkdir -p "$APPLICATIONS_DIR"
 for a in launcher search settings; do : > "$APPLICATIONS_DIR/$SLUG-$a.desktop"; done
@@ -102,6 +85,13 @@ check "a function key"        "$(accel_keycode 'F5')"                 "16777268"
 check "the last function key" "$(accel_keycode 'F12')"                "16777275"
 check "Alt+Tab"               "$(accel_keycode 'Alt+Tab')"            "150994945"
 check "every modifier at once" "$(accel_keycode 'Meta+Alt+Ctrl+Shift+Delete')" "520093703"
+# Named keys, as Plasma's own defaults spell them. KRunner's first key is
+# "Search", and not knowing it once left Meta+Space with KRunner until login.
+check "the Search key"        "$(accel_keycode 'Search')"             "16777362"
+check "a named key with a space" "$(accel_keycode 'Shift+Volume Up')" "50331762"
+check "a named key with a slash" "$(accel_keycode 'Keyboard Light On/Off')" "16777396"
+check "the plus key"          "$(accel_keycode 'Meta++')"             "268435499"
+check "the tilde"             "$(accel_keycode 'Alt+~')"              "134217854"
 
 # Refusing is the point: a key this table gets wrong would be bound to the
 # wrong thing silently, where a refusal falls back to applying at next login.
@@ -139,6 +129,34 @@ check "an unknown mode is refused" \
       "$("$REPO_ROOT/scripts/screenshot.sh" nonsense >/dev/null 2>&1 && echo ran || echo refused)" "refused"
 sc clear screenshot >/dev/null
 
+echo "== the configuration is where the keys live =="
+PROFILE="$XDG_CONFIG_HOME/$SLUG/profiles/default/shell.json"
+configured() { jq -r --arg a "$1" '.shortcuts[$a] // "<unset>"' "$PROFILE" 2>/dev/null || echo '<no profile>'; }
+# Its own starting point: the revert above gave every key back.
+sc set search "Meta+J" >/dev/null
+sc set settings "Meta+Shift+R" >/dev/null
+sc clear launcher >/dev/null
+check "set writes the key to the profile"   "$(configured search)" "Meta+J"
+check "clear writes none"                   "$(configured launcher)" "none"
+
+# KRunner holding Meta+Space, as it does again after every login.
+kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.krunner.desktop \
+    --key _launch "$(printf 'Search\tAlt+Space\tAlt+F2\tMeta+Space')"
+jq '.shortcuts.search = "Meta+Space"' "$PROFILE" > "$PROFILE.tmp" && mv "$PROFILE.tmp" "$PROFILE"
+sc sync >/dev/null
+check "sync binds what is configured"       "$(binding search)" "Meta+Space,none,Search"
+check "and takes it from KRunner"           "$(kreadconfig6 --file kglobalshortcutsrc --group services --group org.kde.krunner.desktop --key _launch)" \
+                                            "$(printf 'Search\tAlt+Space\tAlt+F2')"
+check "an unbound action stays unbound"     "$(binding launcher)" "none,none,Application menu"
+check "a second sync has nothing to do"     "$(sc sync; echo)" ""
+out=$("$REPO_ROOT/scripts/shortcuts.sh" sync 2>&1)
+check "and says so"                         "$(printf '%s' "$out" | grep -c 'already bound')" "1"
+
+# An empty value is not managed: a key bound in KDE by hand stays.
+jq '.shortcuts.settings = ""' "$PROFILE" > "$PROFILE.tmp" && mv "$PROFILE.tmp" "$PROFILE"
+sc sync >/dev/null
+check "an empty value leaves KDE's key"     "$(binding settings)" "Meta+Shift+R,none,Settings"
+
 echo "== the live session =="
 check "nothing reached the session"  "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&1
@@ -146,7 +164,62 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/shortcuts.sh" revert >/dev/null 2>&
 # is what makes a revert apply now rather than at the next login.
 check "the session daemon is told"   "$(grep -c 'busctl .*Shortcuts Reload' "$CALLS")" "1"
 check "and kglobalaccel restarted"   "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
+check "revert stops enforcing them"  "$(configured search)" ""
+check "every action, in one write"   "$(jq -r '[.shortcuts[] | select(. == "")] | length' "$PROFILE")" "${#ACCEL_ACTIONS[@]}"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+# The CLI checks a key before writing it and the session daemon registers what
+# was written, and each used to keep a table of its own. They disagreed: the
+# CLI took "Volume Up" and "Search", wrote them, and the daemon that owns the
+# component refused them, so the key grabbed nothing. One table now -- every
+# name in it, alone and under modifiers, must be the same integer to both.
+echo "== the daemon binds every key the CLI accepts =="
+if python3 -c "import gi; gi.require_version('Gio', '2.0')" 2>/dev/null; then
+    source "$REPO_ROOT/scripts/lib/render.sh"
+    render_template "$REPO_ROOT/bin/windowsd.py.in" "$SANDBOX/windowsd.py"
+    specs="$SANDBOX/key-specs"
+    {
+        while IFS=$'\t' read -r name code; do
+            [[ $code =~ ^[0-9]+$ ]] || continue
+            printf '%s\n' "$name" "Meta+$name" "Ctrl+Alt+Shift+$name"
+        done < "$REPO_ROOT/scripts/lib/keycodes.tsv"
+        printf '%s\n' Q q 7 F1 F12 F25 F26 Meta Ctrl Alt Shift Super Meta++ + Meta+Banana Hyper+Q ''
+    } | while IFS= read -r spec; do
+        printf '%s\t%s\n' "$spec" "$(accel_keycode "$spec" || echo none)"
+    done > "$specs"
+    agree=$(python3 - "$SANDBOX/windowsd.py" "$specs" <<'PY'
+import sys
+mod = {}
+exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
+bad = []
+for line in open(sys.argv[2], encoding="utf-8"):
+    spec, want = line.rstrip("\n").split("\t")
+    got = mod["keycode"](spec)
+    if ("none" if got is None else str(got)) != want:
+        bad.append(f"{spec!r}: the CLI says {want}, the daemon {got}")
+print("\n".join(bad) or "agree")
+PY
+)
+    check "every key, to both"          "$agree" "agree"
+    check "and there were keys to ask"  "$(( $(wc -l < "$specs") > 200 ))" "1"
+    check "Volume Up, to the CLI"       "$(accel_keycode 'Volume Up')" "16777330"
+    check "the section sign, too"       "$(accel_keycode 'Meta+§')" "268435623"
+
+    # And the actions: the daemon registers, names and runs exactly the ones
+    # the CLI binds, in the same order, under the same names.
+    daemon_actions=$(python3 - "$SANDBOX/windowsd.py" <<'PY'
+import sys
+mod = {}
+exec(compile(open(sys.argv[1], encoding="utf-8").read(), "windowsd", "exec"), mod)
+for action, (label, command) in mod["SHORTCUT_ACTIONS"].items():
+    print(f"{action}\t{label}\t{' '.join(command[1:])}")
+PY
+)
+    check "the daemon has the CLI's actions" "$(printf '%s\n' "$daemon_actions" | cut -f1-2)" \
+          "$(for a in "${ACCEL_ACTIONS[@]}"; do printf '%s\t%s\n' "$a" "${ACCEL_ACTION_LABEL[$a]}"; done)"
+    check "and runs what they ran"      "$(printf '%s\n' "$daemon_actions" | awk -F'\t' '$1 == "switcher-reverse" { print $3 }')" \
+          "switcher show --reverse"
+else
+    echo "  SKIP  python-gobject not installed; the daemon's side was not checked"
+fi
+
+harness_done

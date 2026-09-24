@@ -27,8 +27,6 @@ import org.kde.plasma.private.mpris as Mpris
 LockStyle {
     id: console_
 
-    readonly property real unit: console_.ui.unit
-
     readonly property color ink: "#cdc6be"
     readonly property color mut: "#8a8378"
     readonly property color accent: console_.ui.accent
@@ -40,38 +38,12 @@ LockStyle {
     promptField: password
     promptBlock: block
 
-    // "12 min ago", from when the greeter started, redrawn each minute.
-    property date now: new Date()
-    readonly property string lockedFor: {
-        const minutes = Math.floor((console_.now - console_.ui.lockedAt) / 60000);
-        return minutes < 1 ? "just now" : minutes < 60 ? minutes + " min ago"
-            : Math.floor(minutes / 60) + " h " + (minutes % 60) + " min ago";
-    }
-
-    Timer {
-        interval: 30000
-        repeat: true
-        running: true
-        onTriggered: console_.now = new Date()
-    }
+    // "12 min ago", from when the greeter started, read off the clock that
+    // is ticking anyway.
+    readonly property string lockedFor: LockText.ago(console_.ui.lockedAt, clockLine.now, false)
 
     // The one player Plasma's lock screen would control, or null.
-    Mpris.MultiplexerModel {
-        id: players
-    }
-
-    component Player: QtObject {
-        required property var model
-    }
-
-    Instantiator {
-        id: playerRow
-        model: players
-        delegate: Player {}
-    }
-
-    readonly property var player: console_.ui.setting("showMediaControls", true) && playerRow.count > 0
-        ? (playerRow.objectAt(0) as Player)?.model ?? null : null
+    readonly property var player: console_.ui.setting("showMediaControls", true) ? LockKeys.player : null
 
     readonly property var keys: [
         { key: "F1", label: "sleep", can: console_.ui.session.canSuspend && Options.showSessionButtons,
@@ -366,10 +338,9 @@ LockStyle {
         LockStatus {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            keyboard: console_.ui.keyboard
+            ui: console_.ui
             ink: console_.ink
             textSize: Math.round(15 * console_.unit)
-            onFocusRequested: console_.ui.focusPassword()
         }
 
         Text {

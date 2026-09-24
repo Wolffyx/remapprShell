@@ -255,7 +255,49 @@ TestCase {
         verify(unlock.alternatives & unlock.smartcard);
     }
 
+    function test_which_readers_are_offered_by_name() {
+        const { auth, unlock } = make();
+        verify(!unlock.hasFingerprint);
+        verify(!unlock.hasSmartcard);
+        auth.authenticatorTypes = 1;
+        verify(unlock.hasFingerprint);
+        verify(!unlock.hasSmartcard);
+        auth.authenticatorTypes = 2;
+        verify(!unlock.hasFingerprint);
+        verify(unlock.hasSmartcard);
+    }
+
     // ---- what is only drawn ----------------------------------------------
+
+    function test_refusals_are_counted() {
+        const { auth, unlock } = make();
+        compare(unlock.refusals, 0);
+        unlock.poke();
+        auth.wrongPassword();
+        compare(unlock.refusals, 1);
+        tryVerify(() => !unlock.resting, 1000);
+        auth.wrongPassword();
+        compare(unlock.refusals, 2);
+    }
+
+    function test_a_reader_failing_is_not_a_refusal() {
+        const { auth, unlock } = make();
+        unlock.poke();
+        auth.failed(1, null);
+        compare(unlock.refusals, 0);
+    }
+
+    // A style told of a refusal draws the count straight away, so the count
+    // must already include it.
+    function test_a_refusal_is_counted_before_it_is_told() {
+        const { auth, unlock } = make();
+        let counted = -1;
+        unlock.rejected.connect(() => { counted = unlock.refusals; });
+        unlock.poke();
+        auth.wrongPassword();
+        compare(counted, 1);
+    }
+
 
     function test_a_lockout_is_counted_from_what_pam_said() {
         const { auth, unlock } = make();
@@ -291,5 +333,51 @@ TestCase {
         unlock.poke();
         unlock.poke();
         compare(s.count, 2);
+    }
+
+    // ---- how a length of time is said (LockText) --------------------------
+
+    function test_under_an_hour_is_minutes() {
+        compare(LockText.duration(0, true), "0 min");
+        compare(LockText.duration(40 * 60000, true), "40 min");
+        compare(LockText.duration(40 * 60000, false), "40 min");
+    }
+
+    function test_a_duration_is_rounded_to_the_minute() {
+        compare(LockText.duration(59 * 60000 + 29999, true), "59 min");
+        compare(LockText.duration(59 * 60000 + 30000, true), "1 h");
+        compare(LockText.duration(90 * 60000 + 29999, false), "1 h 30 min");
+    }
+
+    // On the hour, some styles say "2 h" and some "2 h 0 min".
+    function test_on_the_hour_the_minutes_are_the_style_s_to_drop() {
+        compare(LockText.duration(120 * 60000, true), "2 h");
+        compare(LockText.duration(120 * 60000, false), "2 h 0 min");
+        compare(LockText.duration(148 * 60000, true), "2 h 28 min");
+        compare(LockText.duration(148 * 60000, false), "2 h 28 min");
+    }
+
+    function test_ago_counts_whole_minutes_gone_by() {
+        const t = new Date(2026, 8, 24, 14, 0, 0);
+        const after = ms => new Date(t.getTime() + ms);
+        compare(LockText.ago(t, t, true), "just now");
+        compare(LockText.ago(t, after(59999), true), "just now");
+        compare(LockText.ago(t, after(60000), true), "1 min ago");
+        compare(LockText.ago(t, after(12 * 60000 + 59999), true), "12 min ago");
+        compare(LockText.ago(t, after(60 * 60000), true), "1 h ago");
+        compare(LockText.ago(t, after(60 * 60000), false), "1 h 0 min ago");
+        compare(LockText.ago(t, after(125 * 60000), false), "2 h 5 min ago");
+    }
+
+    // A clock set back behind the moment the screen locked.
+    function test_ago_before_the_moment_is_just_now() {
+        const t = new Date(2026, 8, 24, 14, 0, 0);
+        compare(LockText.ago(t, new Date(t.getTime() - 5 * 60000), true), "just now");
+    }
+
+    function test_pad_is_two_digits() {
+        compare(LockText.pad(0), "00");
+        compare(LockText.pad(7), "07");
+        compare(LockText.pad(42), "42");
     }
 }

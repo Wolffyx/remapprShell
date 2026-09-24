@@ -8,30 +8,17 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init --no-home
 source "$REPO_ROOT/scripts/lib/render.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 
 CTL="$SANDBOX/ctl.sh"
 render_template "$REPO_ROOT/bin/ctl.sh.in" "$CTL" || { echo "render failed" >&2; exit 1; }
 
 # The suite says what is running, and what `quickshell ipc` did with it: the
 # stub records the --path it was handed instead of talking to anything.
-mkdir -p "$SANDBOX/bin"
-cat > "$SANDBOX/bin/pgrep" <<'STUB'
-#!/usr/bin/env bash
-[ -n "${FAKE_PROC:-}" ] && printf '%s\n' "$FAKE_PROC"
-exit 0
-STUB
-cat > "$SANDBOX/bin/quickshell" <<'STUB'
+fake_pgrep
+cat > "$FAKEBIN/quickshell" <<'STUB'
 #!/usr/bin/env bash
 # quickshell ipc --path <path> call <target> <function> [args...]
 # Prints the --path it was handed, or -- with RECORD_CALL set -- the call
@@ -49,8 +36,7 @@ while [ $# -gt 0 ]; do
 done
 exit 0
 STUB
-chmod +x "$SANDBOX/bin/pgrep" "$SANDBOX/bin/quickshell"
-export PATH="$SANDBOX/bin:$PATH"
+chmod +x "$FAKEBIN/quickshell"
 
 installed="$QS_CONFIG_DIR/shell.qml"
 checkout="$REPO_ROOT/shell/shell.qml"
@@ -155,5 +141,4 @@ unset RECORD_CALL
 # And nothing in the schema may be called `pages`, or the list would shadow it.
 check "no section named pages" "$(grep -c '"id": "pages"' "$REPO_ROOT/config/schema/shell.json")" "0"
 
-if [ "$fail" -gt 0 ]; then echo "FAILED: $pass passed, $fail failed" >&2; exit 1; fi
-echo "OK: $pass passed"
+harness_done

@@ -112,6 +112,11 @@ QtObject {
     // received file. It arrives as an array of strings, and as a single
     // string from senders that write it that way.
     //
+    // Read the same way for the history, which takes its hints off the bus:
+    // busctl wraps every hint as { type, data }, and every element of an
+    // array of variants the same way. Both shapes are unwrapped here, so the
+    // live popup and the history agree about what a notification points at.
+    //
     // `desktop-entry` is which application sent it, which is what Plasma
     // activates when a notification has nothing else to act on. Without that
     // fallback a click on a notification whose sender declared no `default`
@@ -119,11 +124,17 @@ QtObject {
     // written for.
 
     function urlsOf(hints) {
-        const raw = hints?.["x-kde-urls"] ?? null;
+        const raw = root.unwrapped(hints?.["x-kde-urls"]) ?? null;
         const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-        return list.map(u => String(u ?? "").trim())
+        return list.map(u => String(root.unwrapped(u) ?? "").trim())
                    .filter(u => u.startsWith("file://") || u.startsWith("/"))
                    .map(u => u.startsWith("/") ? `file://${u}` : u);
+    }
+
+    // A value as busctl renders a variant, { type, data }, as the value;
+    // anything else as it is.
+    function unwrapped(v) {
+        return (v && typeof v === "object" && "data" in v) ? v.data : v;
     }
 
     readonly property var pictureTypes: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"]

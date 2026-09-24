@@ -27,9 +27,11 @@ Item {
     required property Unlock unlock
 
     // The colours, which every style sets. The defaults are the glass ones.
+    // The caret is drawn in `ink`: it is Plasma's field's own.
     property color ink: "#ffffff"
     property color dim: Qt.rgba(1, 1, 1, 0.6)
     property color accent: Options.accent
+    property color errorColor: "#e0786a"
 
     // The chrome. `pill` is the rounded field of the glass and poster styles;
     // `underline` is a hairline under the text, as the ambient and editorial
@@ -40,6 +42,17 @@ Item {
     property color fieldColor: Qt.rgba(1, 1, 1, 0.16)
     property color fieldBorder: Qt.rgba(1, 1, 1, 0.28)
     property int radius: height / 2
+
+    // The border that says what the field is doing, for the styles that
+    // draw a box round it: the error colour while `alarm` holds, the accent
+    // while the field has the keyboard, and `restBorder` otherwise. `alarm`
+    // is a refused password resting; the day-ahead style makes it anything
+    // said at all, and keeps its box red for as long as the message stays.
+    property bool alarm: prompt.unlock.resting
+    property color restBorder: Qt.rgba(0.5, 0.5, 0.5, 0.32)
+    readonly property color stateBorder: prompt.alarm ? prompt.errorColor
+        : passwordBox.activeFocus ? prompt.accent
+        : prompt.restBorder
 
     // The glyph at the head of the field. Empty draws none.
     property string glyph: "lock"

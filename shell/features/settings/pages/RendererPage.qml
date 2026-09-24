@@ -83,8 +83,6 @@ CardGrid {
         return rendererId.startsWith("quickshell:");
     }
 
-    count: 1
-
     function unsupportedBy(rendererId) {
         if (root.isForeign(rendererId))
             return [];
@@ -137,7 +135,7 @@ CardGrid {
                                                : option.modelData.id === root.current
                 readonly property var missing: root.unsupportedBy(option.modelData.id)
 
-                width: card.width - 2 * card.padding
+                width: card.contentWidth
                 height: body.implicitHeight + 20
                 radius: Theme.radiusOf(12)
                 color: option.active ? Theme.accC : Theme.s1
@@ -198,18 +196,14 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: card.width - 2 * card.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: card.contentWidth
             text: "Only one of these draws a panel at a time. Switching takes a restore point first, and puts everything back if it does not work."
         }
 
         PanelText {
             visible: root.status.length > 0
-            width: card.width - 2 * card.padding
+            width: card.contentWidth
             wrapMode: Text.WordWrap
             text: root.status
             font.pixelSize: 12

@@ -32,13 +32,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.battery
-import org.kde.plasma.workspace.keyboardlayout as Layouts
 
 LockStyle {
     id: secure
-
-    readonly property real unit: secure.ui.unit
 
     // The design's slate, cooler than the other dark styles.
     readonly property color ground: "#0e1012"
@@ -60,14 +56,10 @@ LockStyle {
     promptField: password
     promptBlock: authCard
 
-    function px(n: real): int {
-        return Math.round(n * secure.unit);
-    }
-
     // --- what the greeter says it has --------------------------------------
 
-    readonly property bool hasFingerprint: (secure.ui.unlock.alternatives & secure.ui.unlock.fingerprint) !== 0
-    readonly property bool hasSmartcard: (secure.ui.unlock.alternatives & secure.ui.unlock.smartcard) !== 0
+    readonly property bool hasFingerprint: secure.ui.unlock.hasFingerprint
+    readonly property bool hasSmartcard: secure.ui.unlock.hasSmartcard
     readonly property bool hasAlternative: secure.hasFingerprint || secure.hasSmartcard
 
     // "key" or "password", as the tabs choose. The key comes first, as the
@@ -85,7 +77,6 @@ LockStyle {
 
     // --- the log of this lock ---------------------------------------------
 
-    property int refused: 0
     // Set once pam_faillock has said something: only then is it known to be
     // counting this account's failures.
     property bool faillock: false
@@ -113,8 +104,7 @@ LockStyle {
         target: secure.ui.unlock
 
         function onRejected() {
-            secure.refused += 1;
-            secure.addLog("Password refused", `attempt ${secure.refused} this lock`, secure.bad);
+            secure.addLog("Password refused", `attempt ${secure.ui.unlock.refusals} this lock`, secure.bad);
         }
 
         // Each new line PAM says, once. "Unlocking failed" is our own word
@@ -145,28 +135,7 @@ LockStyle {
 
     // --- the machine -------------------------------------------------------
 
-    BatteryControlModel {
-        id: battery
-    }
-
-    Layouts.KeyboardLayout {
-        id: layouts
-    }
-
-    readonly property string layoutName: layouts.layoutsList.length > 0
-        ? (layouts.layoutsList[layouts.layout]?.longName ?? "") : ""
-
-    readonly property string batteryGlyph: battery.pluggedIn ? "battery_charging_full"
-        : battery.percent >= 95 ? "battery_full"
-        : "battery_" + Math.max(0, Math.min(6, Math.floor(battery.percent / 15))) + "_bar"
-
-    function duration(ms: real): string {
-        const m = Math.round(ms / 60000);
-        if (m < 60)
-            return `${m} min`;
-        const h = Math.floor(m / 60), r = m % 60;
-        return r ? `${h} h ${r} min` : `${h} h`;
-    }
+    readonly property LockPower battery: secure.ui.battery
 
     // --- the ground --------------------------------------------------------
 
@@ -472,10 +441,12 @@ LockStyle {
                         ink: secure.ink
                         dim: secure.sub
                         accent: secure.ui.accent
+                        errorColor: secure.bad
                         fieldColor: secure.ground
-                        fieldBorder: secure.ui.unlock.resting ? secure.bad
-                            : password.field.activeFocus && !secure.keyMode ? secure.ui.accent
-                            : Qt.rgba(0.5, 0.5, 0.5, 0.32)
+                        // In key mode this panel is hidden, so the colour
+                        // the border has there -- the accent, since the
+                        // field keeps the keyboard -- is never seen.
+                        fieldBorder: password.stateBorder
 
                         onTextChanged: {
                             if (password.text.length > 0)
@@ -496,8 +467,8 @@ LockStyle {
 
                     Text {
                         readonly property var parts: [
-                            secure.refused > 0
-                                ? `${secure.refused} refused since ${Qt.formatTime(secure.ui.lockedAt, secure.twelveHour ? "h:mm AP" : "HH:mm")}`
+                            secure.ui.unlock.refusals > 0
+                                ? `${secure.ui.unlock.refusals} refused since ${Qt.formatTime(secure.ui.lockedAt, secure.twelveHour ? "h:mm AP" : "HH:mm")}`
                                 : "enter ⏎ to unlock",
                             secure.faillock ? "failures on this account are counted by pam_faillock" : "",
                         ].filter(p => p)
@@ -658,12 +629,12 @@ LockStyle {
         // Where the design has the help desk: the one other way in there is.
         Row {
             anchors.verticalCenter: parent.verticalCenter
-            visible: secure.ui.keyboard?.status === Loader.Ready
+            visible: secure.ui.keyboardAvailable
             spacing: secure.px(12)
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: secure.ui.keyboard?.keyboardActive ? "keyboard_hide" : "keyboard"
+                text: secure.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 font.family: "Material Symbols Rounded"
                 font.pixelSize: secure.px(22)
                 color: oskHover.hovered ? secure.ink : secure.sub
@@ -671,7 +642,7 @@ LockStyle {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: secure.ui.keyboard?.keyboardActive ? "Hide on-screen keyboard" : "On-screen keyboard"
+                text: secure.ui.keyboardShown ? "Hide on-screen keyboard" : "On-screen keyboard"
                 textFormat: Text.PlainText
                 font.family: "Rubik"
                 font.pixelSize: secure.px(14)
@@ -680,10 +651,7 @@ LockStyle {
 
             HoverHandler { id: oskHover; cursorShape: Qt.PointingHandCursor }
             TapHandler {
-                onTapped: {
-                    secure.ui.focusPassword();
-                    secure.ui.keyboard.showHide();
-                }
+                onTapped: secure.ui.toggleKeyboard()
             }
             Accessible.role: Accessible.Button
             Accessible.name: "On-screen keyboard"
@@ -692,7 +660,6 @@ LockStyle {
         LockActions {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: Options.showSessionButtons
             session: secure.ui.session
             shape: "square"
             unit: secure.unit
@@ -972,49 +939,59 @@ LockStyle {
 
             // Where the design has VPN and Wi-Fi: the two things about this
             // machine the greeter can read.
+            //
+            // Shown from what the tiles would say rather than from the tiles'
+            // own `visible`, which reads false for as long as this row is
+            // hidden -- so a row that asked its tiles stayed hidden for good
+            // once it had been, and the layouts arrive after the lock screen
+            // is up. On a machine with no battery the layout was never drawn.
             Row {
+                id: machine
+
+                readonly property bool hasLayout: LockKeys.layoutName !== ""
+                readonly property bool hasBattery: secure.battery.present
+                readonly property int tiles: (machine.hasLayout ? 1 : 0) + (machine.hasBattery ? 1 : 0)
+                readonly property real tileWidth: (width - (tiles - 1) * spacing) / Math.max(1, tiles)
+
                 width: parent.width
                 spacing: secure.px(12)
-                visible: layoutTile.visible || batteryTile.visible
-
-                readonly property int tiles: (layoutTile.visible ? 1 : 0) + (batteryTile.visible ? 1 : 0)
-                readonly property real tileWidth: (width - (tiles - 1) * spacing) / Math.max(1, tiles)
+                visible: machine.tiles > 0
 
                 Tile {
                     id: layoutTile
 
-                    visible: secure.layoutName !== ""
-                    width: parent.tileWidth
+                    visible: machine.hasLayout
+                    width: machine.tileWidth
                     glyph: "keyboard"
-                    label: layouts.layoutsList.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
-                    detail: secure.layoutName
-                    tint: layouts.layout > 0 ? secure.warn : secure.ink
+                    label: LockKeys.layouts.length > 1 ? "Layout · tap to switch" : "Keyboard layout"
+                    detail: LockKeys.layoutName
+                    tint: LockKeys.otherLayout ? secure.warn : secure.ink
 
                     HoverHandler {
-                        enabled: layouts.layoutsList.length > 1
+                        enabled: LockKeys.layouts.length > 1
                         cursorShape: Qt.PointingHandCursor
                     }
                     TapHandler {
-                        enabled: layouts.layoutsList.length > 1 && secure.ui.unlock.shown
+                        enabled: LockKeys.layouts.length > 1 && secure.ui.unlock.shown
                         onTapped: {
-                            layouts.switchToNextLayout();
+                            LockKeys.nextLayout();
                             secure.ui.focusPassword();
                         }
                     }
                     Accessible.role: Accessible.Button
-                    Accessible.name: "Keyboard layout: " + secure.layoutName
+                    Accessible.name: "Keyboard layout: " + LockKeys.layoutName
                 }
 
                 Tile {
                     id: batteryTile
 
-                    visible: battery.hasInternalBatteries
-                    width: parent.tileWidth
-                    glyph: secure.batteryGlyph
-                    label: `Battery · ${battery.percent}%`
-                    tint: battery.pluggedIn ? secure.good : secure.ink
-                    detail: battery.pluggedIn ? "plugged in"
-                        : battery.remainingMsec > 0 ? `on battery · ${secure.duration(battery.remainingMsec)} left`
+                    visible: machine.hasBattery
+                    width: machine.tileWidth
+                    glyph: secure.battery.glyph
+                    label: `Battery · ${secure.battery.percent}%`
+                    tint: secure.battery.plugged ? secure.good : secure.ink
+                    detail: secure.battery.plugged ? "plugged in"
+                        : secure.battery.remainingMsec > 0 ? `on battery · ${LockText.duration(secure.battery.remainingMsec, true)} left`
                         : "on battery"
                 }
             }

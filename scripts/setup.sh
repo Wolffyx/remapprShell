@@ -44,6 +44,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+# The front end, decided once here, now that --ui and --unattended have had
+# their say. Every question below asks inside `$(...)`, where it could not be
+# remembered, and detection is a kdialog lookup and a terminal check a time.
+ui_backend >/dev/null
+
 # Every key this setup can bind, and what it binds it to. These are the
 # defaults a fresh machine gets; anything already held by another shell is
 # taken, said so, and given back by `shortcuts revert`.

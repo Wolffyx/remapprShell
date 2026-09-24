@@ -22,45 +22,35 @@ OUT=${1:-$REPO_ROOT/docs/config.md}
 
 [ -f "$INDEX" ] || "$REPO_ROOT/scripts/gen-widget-index.sh" >/dev/null
 
-# Markdown tables end a cell at a pipe, and a description containing one would
-# silently shift every column after it.
-escape() { printf '%s' "${1//|/\\|}"; }
-
-# What a key accepts, from its schema entry.
-accepts() {
-    local spec=$1
-    local type
-    type=$(jq -r '.type // "string"' <<< "$spec")
-    case "$type" in
-        enum) jq -r '[.values[] | "`\(.)`"] | join(", ")' <<< "$spec" ;;
-        int|number)
-            local min max
-            min=$(jq -r '.min // empty' <<< "$spec")
-            max=$(jq -r '.max // empty' <<< "$spec")
-            if [ -n "$min" ] && [ -n "$max" ]; then printf 'a number, %s to %s' "$min" "$max"
-            else printf 'a number'; fi ;;
-        bool) printf '`true` or `false`' ;;
-        list) printf 'a list' ;;
-        # A fixed set: the members are the whole of what may be in the list, so
-        # the reference names them rather than saying "a list" and stopping.
-        set)  jq -r '[.values[] | "`\(.)`"] | join(", ")' <<< "$spec" ;;
-        *)    printf 'text' ;;
-    esac
-}
-
+# One row per key, from its schema entry -- by one jq for the whole table. It
+# was five a key, which on every `make lint` (lint-docs regenerates this) came
+# to several hundred.
+#
+# What a key accepts is said the way a person would: the values of an enum, a
+# number's range, and for a fixed set its members -- they are the whole of
+# what may be in the list, so the reference names them rather than saying "a
+# list" and stopping. Markdown tables end a cell at a pipe, so a pipe in a
+# description is escaped: one left in would silently shift every column after
+# it.
 key_table() {
     local keys=$1
     printf '| Setting | Accepts | Default | Meaning |\n'
     printf '| --- | --- | --- | --- |\n'
-    local name spec
-    while IFS= read -r name; do
-        spec=$(jq -c --arg k "$name" '.[$k]' <<< "$keys")
-        printf '| `%s` | %s | `%s` | %s |\n' \
-            "$name" \
-            "$(accepts "$spec")" \
-            "$(jq -r 'if has("default") then (.default | tostring) else "--" end' <<< "$spec")" \
-            "$(escape "$(jq -r '.description // .label // ""' <<< "$spec")")"
-    done < <(jq -r 'keys_unsorted[]' <<< "$keys")
+    jq -r '
+        def cell: tostring | sub("\n+\\z"; "");
+        def num: if . == null or . == false then "" else cell end;
+        to_entries[] | .key as $name | .value as $spec
+        | ($spec.type // "string" | cell) as $type
+        | (if $type == "enum" or $type == "set" then [$spec.values[] | "`\(.)`"] | join(", ")
+           elif $type == "int" or $type == "number" then
+               ($spec.min | num) as $min | ($spec.max | num) as $max
+               | if $min != "" and $max != "" then "a number, \($min) to \($max)" else "a number" end
+           elif $type == "bool" then "`true` or `false`"
+           elif $type == "list" then "a list"
+           else "text" end) as $accepts
+        | (if $spec | has("default") then ($spec.default | cell) else "--" end) as $default
+        | ($spec.description // $spec.label // "" | cell | gsub("\\|"; "\\|")) as $meaning
+        | "| `\($name)` | \($accepts) | `\($default)` | \($meaning) |"' <<< "$keys"
 }
 
 {
@@ -91,7 +81,6 @@ key_table() {
 
     printf '## Settings\n\n'
     while IFS= read -r section; do
-        local_id=$(jq -r '.id' <<< "$section")
         printf '### %s\n\n' "$(jq -r '.label // .id' <<< "$section")"
         desc=$(jq -r '.description // ""' <<< "$section")
         [ -n "$desc" ] && printf '%s\n\n' "$desc"

@@ -19,7 +19,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: glass
 
-    readonly property real unit: glass.ui.unit
     readonly property bool clockLeft: Options.clockPosition !== "center"
 
     promptField: password
@@ -94,6 +93,7 @@ LockStyle {
             width: Math.round(392 * glass.unit)
             visible: media.hasPlayer && glass.ui.setting("showMediaControls", true) && glass.ui.unlock.shown
             textColor: glass.ui.fg
+            unit: glass.unit
         }
 
         Column {
@@ -143,7 +143,6 @@ LockStyle {
 
             LockActions {
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: Options.showSessionButtons
                 enabled: glass.ui.unlock.shown
                 session: glass.ui.session
                 unit: glass.unit
@@ -169,9 +168,8 @@ LockStyle {
                 id: statusRow
 
                 anchors.centerIn: parent
-                keyboard: glass.ui.keyboard
+                ui: glass.ui
                 ink: glass.ui.fg
-                onFocusRequested: glass.ui.focusPassword()
             }
         }
     }

@@ -70,9 +70,6 @@ KWin.TabBoxSwitcher {
     readonly property color surface: Kirigami.Theme.backgroundColor
     readonly property color outline: Qt.rgba(tabBox.ink.r, tabBox.ink.g, tabBox.ink.b, 0.12)
 
-    // A colour per application, so two windows of one program look alike and
-    // two programs do not. Hashed from the caption because that is the only
-    // stable string a layout is given.
     // Moving and choosing, in one place: the delegate and the arrow keys both
     // go through these rather than reaching into whichever view is drawn.
     function select(index) {
@@ -87,6 +84,10 @@ KWin.TabBoxSwitcher {
         tabBox.select(((tabBox.currentIndex + delta) % n + n) % n);
     }
 
+    // A colour for a card's panel, hashed from the window's caption: of what
+    // a layout is given, the one string that says anything about the window.
+    // Two windows with one title share a colour -- and two windows of one
+    // program with different titles do not.
     function tintFor(text) {
         let h = 0;
         const s = String(text ?? "");

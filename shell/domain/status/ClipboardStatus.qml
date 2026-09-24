@@ -39,6 +39,7 @@ import QtQuick
 import Quickshell.Io
 import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.config
 import qs.domain.status.icons
 
@@ -86,23 +87,20 @@ QtObject {
 
     // Put an entry back on the clipboard. Text goes through stdin, so it is
     // never in a process's arguments where any local user could read it from
-    // /proc; an image is a file, and wl-copy reads it the same way.
+    // /proc; an image is a file, and wl-copy reads it the same way. See
+    // Clipboard.
     function pick(entry) {
         if (!entry)
             return;
         if (entry.image) {
             if (!entry.path || root.klipper)
                 return;
-            copyImage.command = ["sh", "-c", 'wl-copy --type image/png < "$1"', "--", String(entry.path)];
-            copyImage.running = false;
-            copyImage.running = true;
+            Clipboard.copyFile(entry.path, "image/png");
             return;
         }
         if (!entry.text)
             return;
-        root._pending = entry.text;
-        copy.stdinEnabled = true;
-        copy.running = true;
+        Clipboard.copyText(entry.text);
     }
 
     // Whether choosing this entry would do anything. An image in Klipper's
@@ -114,8 +112,7 @@ QtObject {
 
     function clear() {
         if (root.klipper) {
-            clearKlipper.running = false;
-            clearKlipper.running = true;
+            Dbus.send("org.kde.klipper", "/klipper", "org.kde.klipper.klipper", "clearClipboardHistory");
         } else {
             root._forget(StatusIcons.clipboardOrphans(root.ownEntries, []));
             root.ownEntries = [];
@@ -162,8 +159,6 @@ QtObject {
         history.running = true;
     }
 
-    property string _pending: ""
-
     Component.onCompleted: root._checkKlipper()
 
     onKlipperChanged: root._refresh()
@@ -200,23 +195,13 @@ QtObject {
 
     readonly property Process _history: Process {
         id: history
-        command: ["busctl", "--user", "--json=short", "call", "org.kde.klipper", "/klipper",
-                  "org.kde.klipper.klipper", "getClipboardHistoryMenu"]
+        command: Dbus.callArgs("org.kde.klipper", "/klipper", "org.kde.klipper.klipper", "getClipboardHistoryMenu")
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    root.klipperEntries = StatusIcons.klipperEntries(JSON.parse(this.text).data[0]);
-                } catch (e) {
-                    root.klipperEntries = [];
-                }
+                const reply = Dbus.unwrap(this.text, "getClipboardHistoryMenu");
+                root.klipperEntries = StatusIcons.klipperEntries(Array.isArray(reply?.[0]) ? reply[0] : []);
             }
         }
-    }
-
-    readonly property Process _clearKlipper: Process {
-        id: clearKlipper
-        command: ["busctl", "--user", "call", "org.kde.klipper", "/klipper",
-                  "org.kde.klipper.klipper", "clearClipboardHistory"]
     }
 
     // One JSON line per clipboard change, from a script run by wl-paste with
@@ -241,17 +226,6 @@ QtObject {
                 if (text.trim().length > 0)
                     root._keep(StatusIcons.clipboardAdd(root.ownEntries, text, root.limit));
             }
-        }
-    }
-
-    readonly property Process _copy: Process {
-        id: copy
-        command: ["wl-copy"]
-        stdinEnabled: true
-        onStarted: {
-            copy.write(root._pending);
-            root._pending = "";
-            copy.stdinEnabled = false;
         }
     }
 
@@ -291,8 +265,6 @@ QtObject {
             }
         }
     }
-
-    readonly property Process _copyImage: Process { id: copyImage }
 
     readonly property Process _remove: Process { id: remove }
 }

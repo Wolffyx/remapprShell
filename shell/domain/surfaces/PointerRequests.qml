@@ -12,27 +12,23 @@ pragma Singleton
 // gives: this wants one signal, not every message on the session bus.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.kde
 
 QtObject {
     id: root
 
-    readonly property Process _monitor: Process {
-        running: true
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='signal',interface='${Branding.dbusName}.Pointer'`]
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='signal',interface='${Branding.dbusName}.Pointer'`
 
-        stdout: SplitParser {
-            onRead: line => {
-                const msg = BusLine.parse(line);
-                if (!BusLine.isSignal(msg, `${Branding.dbusName}.Pointer`, "Requested"))
-                    return;
-                const data = BusLine.payload(msg, 4);
-                if (!data)
-                    return;
-                root.requested(String(data[0]), Number(data[1]), Number(data[2]), String(data[3]));
-            }
+        onRead: line => {
+            const msg = BusLine.parse(line);
+            if (!BusLine.isSignal(msg, `${Branding.dbusName}.Pointer`, "Requested"))
+                return;
+            const data = BusLine.payload(msg, 4);
+            if (!data)
+                return;
+            root.requested(String(data[0]), Number(data[1]), Number(data[2]), String(data[3]));
         }
     }
 

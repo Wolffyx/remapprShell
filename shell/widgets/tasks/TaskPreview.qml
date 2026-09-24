@@ -2,21 +2,23 @@ pragma ComponentBehavior: Bound
 
 // What a taskbar button shows when the pointer rests on it.
 //
-// One layout, whatever the window count. It used to be two: a single window
-// drew a large picture with the application's name *under* it and its title
-// under that, and two or more drew a header with a grid beneath. So the same
-// application read top-to-bottom in two different orders depending on how many
-// windows it happened to have, the picture changed size when a second one
-// opened, and an application whose window is titled after itself -- Claude,
-// Steam, most single-window applications -- said its own name twice in a row.
+// A card per window: a line with the application's small icon, the window's
+// title and a close button, and the picture of the window under it -- the
+// arrangement Windows uses, drawn in this shell's own surfaces and radii
+// rather than copied from it. The card is the window -- its title is on it,
+// its close button is on it, and clicking anywhere on it goes to it -- so
+// nothing above the cards has to say what they are.
 //
-// Now: the header says what the application is, once, and every window is a
-// card below it. One window is a grid of one.
+// The header this used to open with (a 40px icon, the application's name,
+// "3 windows -- pick one") said once what every card now says for itself, and
+// took a third of the height to do it. It is still there for anyone who wants
+// it (`widgets.tasks.previewHeader`), smaller; it is off by default.
 //
-// A card says what the window is *for* rather than only what it is called. A
-// title is often the application's own name again, and when it is, saying it
-// under the header is noise; what is worth the line is where the window is --
-// its desktop, and which monitor when there is more than one.
+// Each picture is as wide as its window's shape needs at one shared height,
+// rather than letterboxed into one box for every window. A tall window in a
+// wide box was mostly empty card -- the margin that made a single preview
+// look padded out -- and a row of windows that are all wide still lines up,
+// because they are all the same height.
 
 import QtQuick
 import Quickshell
@@ -43,27 +45,70 @@ Item {
     // A window was chosen, so the card has done its job.
     signal picked
 
-    readonly property bool many: root.windows.length > 1
+    // The application's name above the cards (`previewHeader`). Off, the
+    // cards say it for themselves.
+    property bool showHeader: false
+
+    // The monitor a window is on, beside its title (`previewScreen`). Off by
+    // default: a connector name like "DP-2" means something to whoever wired
+    // the machine and nothing to anybody reading a title.
+    property bool showScreen: false
 
     // Three across before it wraps. Four Chrome windows in a row is wider than
     // a laptop screen, and a card wider than the screen is clamped -- which
     // puts the cards under a button they did not come from.
-    readonly property int columns: Math.min(3, Math.max(1, root.windows.length))
+    readonly property int perRow: 3
 
-    // One size, whatever the window count. A picture of a window is there to
-    // be recognised, and how many other windows the application happens to
-    // have open says nothing about how big it needs to be to manage that.
-    readonly property int cellWidth: 300
-    readonly property int cellHeight: 169
+    // The picture's height, shared by every card; the width follows the
+    // window, between a floor that still fits a title and a ceiling that keeps
+    // an ultrawide window from taking the row.
+    readonly property int shotHeight: 132
+    readonly property int shotMin: 190
+    readonly property int shotMax: 250
+    readonly property int pad: 6
+    readonly property int titleHeight: 24
+    readonly property int gap: 6
 
-    implicitWidth: Math.max(260, body.implicitWidth + 28)
-    implicitHeight: body.implicitHeight + 28
+    function shotWidth(window) {
+        const w = Math.round(root.shotHeight * WindowEvents.aspectOf(window));
+        return Math.max(root.shotMin, Math.min(root.shotMax, w));
+    }
 
-    // Where a window is, said the way somebody looking for it would say it.
-    //
-    // Empty when there is nothing worth saying: one desktop and one monitor is
-    // every ordinary machine, and "Desktop 1" under every card on such a
-    // machine is a column of noise.
+    function cardWidth(window) {
+        return root.shotWidth(window) + 2 * root.pad;
+    }
+
+    // A card's window: the one at its place, which is where it is once the
+    // list has settled, as long as the uuid agrees -- and found by uuid while
+    // the list is still moving under it. The cards are repeated over the
+    // uuids (see below), so this is how each reads what it shows.
+    function windowFor(index, uuid) {
+        const at = root.windows[index];
+        return at?.uuid === uuid ? at : (root.windows.find(w => w.uuid === uuid) ?? root.noWindow);
+    }
+
+    // What a card on its way out reads, for the moment between its window
+    // leaving the list and the card going.
+    readonly property var noWindow: ({ uuid: "", title: "", appId: "", active: false, minimized: false,
+                                       desktops: [], output: "", width: 0, height: 0 })
+
+    // The widest row, so the Flow wraps after `perRow` cards and not earlier.
+    readonly property int rowsWidth: {
+        let widest = 0;
+        for (let i = 0; i < root.windows.length; i += root.perRow) {
+            const row = root.windows.slice(i, i + root.perRow);
+            const w = row.reduce((sum, win) => sum + root.cardWidth(win), 0) + root.gap * (row.length - 1);
+            widest = Math.max(widest, w);
+        }
+        return widest;
+    }
+
+    implicitWidth: Math.max(root.windows.length === 0 ? 220 : 0, body.implicitWidth) + 2 * root.pad
+    implicitHeight: body.implicitHeight + 2 * root.pad
+
+    // Where a window is, said the way somebody looking for it would say it --
+    // beside the title, dimmer. Empty on one desktop and one monitor, which is
+    // every ordinary machine.
     function place(window) {
         if (!window)
             return "";
@@ -80,27 +125,10 @@ Item {
             }
         }
 
-        if (window.output && Quickshell.screens.length > 1)
+        if (root.showScreen && window.output && Quickshell.screens.length > 1)
             parts.push(window.output);
 
         return parts.join(" · ");
-    }
-
-    // What a card's caption says. The title, unless the title is the
-    // application's own name -- then the place, which is the thing the title
-    // was failing to tell anybody.
-    //
-    // And nothing at all when neither says anything: one window of an
-    // application titled after itself, on a machine with one desktop and one
-    // monitor, has a header above it that already reads "Claude". A line
-    // repeating it is the fault this redesign started from, and a blank line
-    // held open for it is the same fault with the text removed.
-    function caption(window) {
-        const title = WindowEvents.label(window);
-        const app = root.item?.appName ?? "";
-        if (title.length > 0 && title !== app)
-            return title;
-        return root.place(window);
     }
 
     // The pointer being on the card is what keeps the card. Declared here
@@ -111,33 +139,31 @@ Item {
         onHoveredChanged: root.pointerInside = cardHover.hovered
     }
 
-    // Closing a window from its own picture, as every taskbar preview does.
-    //
-    // Drawn faintly rather than only under the pointer. A cross nobody can see
-    // is a feature nobody finds, and this one is small, in a corner, and on a
-    // card that is already a deliberate hover; the risk it guards against is a
-    // row of bright crosses over something somebody is only reading, which
-    // dimming answers just as well.
+    // Closing a window from its own card: a round button at the end of the
+    // title line, in the shell's error colour under the pointer. It is on the
+    // title line rather than over the corner of the picture, where the old
+    // one sat on top of the window's own content and was easy to miss. Shown
+    // while the pointer is on the card; the middle button closes it too.
     component CloseButton: Rectangle {
         id: closeButton
 
         required property string uuid
+        property bool shown: false
 
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 6
-        width: 20
-        height: 20
-        radius: 10
-        opacity: closePointer.hovered ? 1 : 0.55
-        color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.background, 0.8)
+        width: root.titleHeight
+        height: root.titleHeight
+        radius: width / 2
+        color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.foreground, 0.08)
+        opacity: closeButton.shown ? 1 : 0
+        visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
+        Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
         Glyph {
             anchors.centerIn: parent
             name: "close"
             fallback: "window-close"
-            size: 13
+            size: 15
             color: closePointer.hovered ? Theme.errorFg : Theme.foreground
         }
 
@@ -149,115 +175,164 @@ Item {
             // group does.
             onTapped: WindowsService.close(closeButton.uuid)
         }
+        Accessible.role: Accessible.Button
+        Accessible.name: "Close window"
     }
 
     Column {
         id: body
-        anchors.centerIn: parent
-        spacing: 12
+        x: root.pad
+        y: root.pad
+        spacing: root.gap
 
-        // The application, once, at the top, however many windows it has.
+        // The application, once -- only when asked for, or when there is no
+        // window to put a card for and the name is all there is to say.
         Row {
-            spacing: 12
+            visible: root.showHeader || root.windows.length === 0
+            leftPadding: 4
+            spacing: 8
 
             PanelIcon {
                 anchors.verticalCenter: parent.verticalCenter
-                implicitSize: 40
+                implicitSize: 20
                 iconName: root.item?.iconName ?? ""
                 iconFile: root.item?.iconFile ?? ""
             }
 
-            Column {
+            PanelText {
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
+                text: root.item?.appName ?? ""
+                font.bold: true
+            }
 
-                PanelText {
-                    text: root.item?.appName ?? ""
-                    font.bold: true
-                }
-
-                PanelText {
-                    visible: text.length > 0
-                    text: root.many ? `${root.windows.length} windows — pick one`
-                        : root.windows.length === 0 ? "Pinned — click to start it"
-                        : root.place(root.windows[0])
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
-                }
+            PanelText {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: text.length > 0
+                text: root.windows.length > 1 ? `${root.windows.length} windows`
+                    : root.windows.length === 0 ? "Pinned — click to start it"
+                    : ""
+                color: Theme.foregroundInactive
+                font.pixelSize: 11
             }
         }
 
-        // Every window it has, each with its own picture and each a target.
-        // Only `columns` is set -- see ZoneRow for why setting both goes wrong.
-        Grid {
-            columns: root.columns
-            spacing: 8
+        Flow {
+            width: root.rowsWidth
+            spacing: root.gap
+            visible: root.windows.length > 0
 
             Repeater {
-                model: root.windows
+                // Over the windows' uuids, not the windows. The list is made
+                // afresh on every push from the window daemon, and a Repeater
+                // over it built every card again each time -- and the live
+                // picture in each, a screencast stream restarted for a title
+                // changing anywhere. Over the uuids a card lives as long as
+                // its window, and reads it through windowFor.
+                model: ScriptModel { values: root.windows.map(w => w.uuid ?? "") }
 
                 Rectangle {
                     id: cell
 
-                    required property var modelData
+                    // The window's uuid, and its place among the cards.
+                    required property string modelData
                     required property int index
+                    readonly property var window: root.windowFor(cell.index, cell.modelData)
 
-                    width: root.cellWidth
-                    height: root.cellHeight + (cellTitle.visible ? cellTitle.implicitHeight + 4 : 0) + 10
+                    readonly property string where: root.place(cell.window)
+
+                    width: root.cardWidth(cell.window)
+                    height: root.pad + root.titleHeight + root.pad + root.shotHeight + root.pad
                     radius: Theme.radiusOf(12)
-                    // Every card has a surface of its own, resting. A
-                    // transparent one left the picture floating with its close
-                    // cross beside it in open space, and a grid of four read
-                    // as four unrelated things rather than one application's
-                    // windows.
-                    color: cell.modelData.active ? Theme.accC
+                    // Every card has a surface of its own, resting: without one
+                    // the picture floats with its close button beside it in
+                    // open space, and a grid of four reads as four unrelated
+                    // things rather than one application's windows. The focused
+                    // window is the accent's container, as its taskbar button
+                    // is.
+                    color: cell.window.active ? Theme.accC
                          : cellPointer.hovered ? Theme.s2
                                                : Theme.alpha(Theme.foreground, 0.05)
                     Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
+                    // --- the title line ---
+
+                    PanelIcon {
+                        id: cellIcon
+                        x: root.pad + 2
+                        y: root.pad + (root.titleHeight - height) / 2
+                        implicitSize: 16
+                        iconName: root.item?.iconName ?? ""
+                        iconFile: root.item?.iconFile ?? ""
+                    }
+
+                    PanelText {
+                        id: cellTitle
+                        anchors.left: cellIcon.right
+                        anchors.leftMargin: 8
+                        anchors.right: close.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: cellIcon.verticalCenter
+                        elide: Text.ElideRight
+                        textFormat: Text.StyledText
+                        // The title, and where the window is when that is worth
+                        // saying, dimmer after it.
+                        text: {
+                            const title = WindowEvents.label(cell.window) || (root.item?.appName ?? "");
+                            const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                            return cell.where.length > 0
+                                ? `${esc(title)} <font color="${Theme.foregroundInactive}">· ${esc(cell.where)}</font>`
+                                : esc(title);
+                        }
+                        color: cell.window.active ? Theme.accCFg
+                             : cell.window.minimized ? Theme.foregroundInactive : Theme.foreground
+                        font.pixelSize: 12
+                        font.italic: cell.window.minimized
+                    }
+
+                    CloseButton {
+                        id: close
+                        x: cell.width - width - root.pad
+                        y: root.pad
+                        uuid: cell.window.uuid ?? ""
+                        shown: cellPointer.hovered
+                    }
+
+                    // --- the picture ---
+
                     WindowThumbnail {
                         id: shot
-                        x: 4
-                        y: 4
-                        width: root.cellWidth - 8
-                        height: root.cellHeight
-                        windowId: cell.modelData.uuid ?? ""
+                        x: root.pad
+                        y: root.pad + root.titleHeight + root.pad
+                        width: cell.width - 2 * root.pad
+                        height: root.shotHeight
+                        windowId: cell.window.uuid ?? ""
                         iconName: root.item?.iconName ?? ""
                         iconFile: root.item?.iconFile ?? ""
                         iconScale: 0.4
-                        sourceAspect: WindowEvents.aspectOf(cell.modelData)
+                        sourceAspect: WindowEvents.aspectOf(cell.window)
                         // A picture is a screencast stream, and one per window
                         // is one per window. Eight is more than anybody picks
                         // from at a glance; past that the cards are icons,
                         // which is what a thumbnail falls back to anyway.
                         live: cell.index < 8
-                        opacity: cell.modelData.minimized ? 0.55 : 1
+                        opacity: cell.window.minimized ? 0.55 : 1
                     }
-
-                    PanelText {
-                        id: cellTitle
-                        x: 6
-                        width: cell.width - 12
-                        visible: text.length > 0
-                        anchors.top: shot.bottom
-                        anchors.topMargin: 4
-                        elide: Text.ElideRight
-                        text: root.caption(cell.modelData)
-                        color: cell.modelData.minimized ? Theme.foregroundInactive : Theme.foreground
-                        font.pixelSize: 11
-                        font.italic: cell.modelData.minimized
-                    }
-
-                    CloseButton { uuid: cell.modelData.uuid ?? "" }
 
                     HoverHandler { id: cellPointer; cursorShape: Qt.PointingHandCursor }
                     TapHandler {
-                        // The whole cell, not the picture: a target the size of
+                        // The whole card, not the picture: a target the size of
                         // the thing it stands for.
                         onTapped: {
-                            WindowsService.activate(cell.modelData.uuid);
+                            WindowsService.activate(cell.window.uuid);
                             root.picked();
                         }
+                    }
+                    TapHandler {
+                        // The wheel pressed on a card closes that window, as
+                        // it does on Windows' previews. The card stays, as it
+                        // does for the close button, and goes with the last.
+                        acceptedButtons: Qt.MiddleButton
+                        onTapped: WindowsService.close(cell.window.uuid)
                     }
                 }
             }

@@ -45,6 +45,9 @@ source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 
+# Read once: most commands here ask for the configuration many times over.
+config_load
+
 LNF_SRC="$REPO_ROOT/theme/lookandfeel"
 
 # Two packages, light and dark, and LNF_DEST is the light one -- the id this
@@ -328,21 +331,9 @@ plasma_fill_colours() {   # plasma_fill_colours <light|dark>
         || kconfig_set theme kdeglobals General ColorScheme "$SLUG-$variant"
 }
 
-# `night_light_daylight` and the rest of KWin's Night Light live in kwin.sh:
-# doctor asks the same question, and one copy of it is one answer.
-
-# Night Light answers over the bus, and on the login path it is asked seconds
-# after KWin started -- early enough to be told nothing at all. Answering
-# "no schedule" then is not neutral, so wait briefly for the real answer.
-night_light_wait() {   # [seconds]
-    local deadline=$(( SECONDS + ${1:-5} )) answer
-    while :; do
-        answer=$(night_light_daylight)
-        [ -n "$answer" ] && { printf '%s' "$answer"; return 0; }
-        [ "$SECONDS" -ge "$deadline" ] && return 0
-        sleep 0.25
-    done
-}
+# `night_light_daylight`, `night_light_wait` and the rest of KWin's Night
+# Light live in kwin.sh: doctor asks the same question, and one copy of it is
+# one answer.
 
 # Whether the colour scheme on the desktop right now is a dark one, by the
 # luminance of the window background -- the same question `Scheme.resolveMode`
@@ -946,22 +937,12 @@ osd_mode() {
 # that must agree are better set by one thing.
 set_osd_enabled() {
     local value=$1
-    local profile="$CONFIG_DIR/profiles/$( [ -f "$CONFIG_DIR/state.json" ] && jq -r '.profile // "default"' "$CONFIG_DIR/state.json" 2>/dev/null || echo default )/shell.json"
-    mkdir -p "$(dirname "$profile")"
-
-    if [ -f "$profile" ] && ! jq -e . "$profile" >/dev/null 2>&1; then
-        log_warn "$profile does not parse; leaving osd.enabled alone"
-        return 0
-    fi
-
-    local tmp
-    tmp=$(mktemp)
-    if [ -f "$profile" ]; then
-        jq --argjson v "$value" '.osd = ((.osd // {}) + {enabled: $v})' "$profile" > "$tmp" || return 1
-    else
-        jq -n --argjson v "$value" '{osd: {enabled: $v}}' > "$tmp" || return 1
-    fi
-    mv "$tmp" "$profile"
+    config_set '.osd.enabled' "$value"
+    case $? in
+        0) return 0 ;;
+        2) log_warn "$(profile_file) does not parse; leaving osd.enabled alone"; return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 case "$cmd" in

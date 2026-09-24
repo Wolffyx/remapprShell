@@ -224,9 +224,7 @@ BarWidget {
         id: row
         anchors.centerIn: parent
         spacing: root.spacing
-        columns: (root.bar?.horizontal ?? true)
-            ? Math.max(1, root.shown.length + (root.hasOverflow ? 1 : 0))
-            : 1
+        columns: root.barVertical ? 1 : Math.max(1, root.shown.length + (root.hasOverflow ? 1 : 0))
         verticalItemAlignment: Grid.AlignVCenter
         horizontalItemAlignment: Grid.AlignHCenter
 
@@ -365,7 +363,12 @@ BarWidget {
                             implicitSize: root.size
                             source: hiddenEntry.modelData.icon
                             fallbackName: hiddenEntry.modelData.id
-                            opacity: hiddenEntry.modelData.status === Status.Passive ? 0.5 : 1
+                            // Not dimmed when passive, as the panel's are.
+                            // Passive is most of why an icon is back here,
+                            // and this is where it is gone looking for: at
+                            // half strength on a light theme, grey icons on
+                            // a pale card could hardly be told apart
+                            // (2026-09-24).
                         }
 
                         HoverHandler { id: hiddenHover; cursorShape: Qt.PointingHandCursor }

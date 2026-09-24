@@ -1,14 +1,15 @@
 /*
     SPDX-License-Identifier: GPL-3.0-or-later
 
-    What is playing, as the design draws it: the art, the track, a line of
-    progress and three buttons.
+    What is playing, as the design draws it: the art, the track and who it is
+    by, and three buttons.
 
-    The players come from `org.kde.plasma.private.mpris`, which is the module
-    Plasma's own lock screen uses -- the greeter has no session of ours to ask,
-    and this way a player that Plasma's lock screen can control is one this one
-    can control too. Shown only when Plasma's own "show media controls" setting
-    is on, which is the setting System Settings already offers.
+    The players come from LockKeys, out of `org.kde.plasma.private.mpris`,
+    which is the module Plasma's own lock screen uses -- the greeter has no
+    session of ours to ask, and this way a player that Plasma's lock screen can
+    control is one this one can control too. Shown only when Plasma's own
+    "show media controls" setting is on, which is the setting System Settings
+    already offers.
 */
 pragma ComponentBehavior: Bound
 
@@ -19,6 +20,14 @@ Item {
     id: card
 
     property color textColor: "#ffffff"
+    // The artist's line, and the box that stands in for missing art: the
+    // text's own colour, fainter. Not white whatever the text is, which was
+    // white on white over the ambient style's pale veil.
+    property color subColor: Qt.alpha(card.textColor, 0.82)
+    property color placeholderColor: Qt.alpha(card.textColor, 0.18)
+
+    // The frame's scale, as every other part takes it.
+    property real unit: 1
 
     // The styles that put this on a bar or beside a line of type want the
     // track and the buttons without the frosted box around them.
@@ -33,13 +42,13 @@ Item {
     // empty box where no player is.
     readonly property bool hasPlayer: players.count > 0
 
-    implicitHeight: 104
+    implicitHeight: Math.round(104 * card.unit)
     visible: card.hasPlayer
 
     Rectangle {
         anchors.fill: parent
         visible: !card.chromeless
-        radius: 22
+        radius: Math.round(22 * card.unit)
         color: card.cardColor
         border.width: 1
         border.color: card.cardBorder
@@ -47,7 +56,7 @@ Item {
 
     Repeater {
         id: players
-        model: Mpris.MultiplexerModel {}
+        model: LockKeys.players
 
         Item {
             id: row
@@ -58,40 +67,40 @@ Item {
 
             Image {
                 id: art
-                x: 16
-                y: 16
-                width: 72
-                height: 72
+                x: Math.round(16 * card.unit)
+                y: Math.round(16 * card.unit)
+                width: Math.round(72 * card.unit)
+                height: Math.round(72 * card.unit)
                 asynchronous: true
                 fillMode: Image.PreserveAspectCrop
                 source: row.model.artUrl
-                sourceSize: Qt.size(144, 144)
+                sourceSize: Qt.size(Math.round(144 * card.unit), Math.round(144 * card.unit))
                 visible: status === Image.Ready
             }
 
             Rectangle {
-                x: 16
-                y: 16
-                width: 72
-                height: 72
-                radius: 14
+                x: Math.round(16 * card.unit)
+                y: Math.round(16 * card.unit)
+                width: Math.round(72 * card.unit)
+                height: Math.round(72 * card.unit)
+                radius: Math.round(14 * card.unit)
                 visible: art.status !== Image.Ready
-                color: Qt.rgba(1, 1, 1, 0.18)
+                color: card.placeholderColor
 
                 Text {
                     anchors.centerIn: parent
                     text: "music_note"
                     font.family: "Material Symbols Rounded"
-                    font.pixelSize: 30
+                    font.pixelSize: Math.round(30 * card.unit)
                     color: card.textColor
                 }
             }
 
             Column {
-                x: 102
-                width: parent.width - 102 - 48
+                x: Math.round(102 * card.unit)
+                width: parent.width - Math.round(102 * card.unit) - Math.round(48 * card.unit)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
+                spacing: Math.round(2 * card.unit)
 
                 Text {
                     width: parent.width
@@ -99,7 +108,7 @@ Item {
                     text: row.model.track.length > 0 ? row.model.track : "Nothing playing"
                     textFormat: Text.PlainText
                     font.family: "Rubik"
-                    font.pixelSize: 15
+                    font.pixelSize: Math.round(15 * card.unit)
                     font.weight: Font.Medium
                     color: card.textColor
                 }
@@ -110,16 +119,16 @@ Item {
                     text: row.model.artist || row.model.identity
                     textFormat: Text.PlainText
                     font.family: "Rubik"
-                    font.pixelSize: 12
-                    color: Qt.rgba(1, 1, 1, 0.82)
+                    font.pixelSize: Math.round(12 * card.unit)
+                    color: card.subColor
                 }
             }
 
             Column {
                 anchors.right: parent.right
-                anchors.rightMargin: 14
+                anchors.rightMargin: Math.round(14 * card.unit)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 4
+                spacing: Math.round(4 * card.unit)
 
                 Repeater {
                     model: [
@@ -134,14 +143,14 @@ Item {
 
                         required property var modelData
 
-                        width: 26
-                        height: 26
+                        width: Math.round(26 * card.unit)
+                        height: Math.round(26 * card.unit)
 
                         Text {
                             anchors.centerIn: parent
                             text: button.modelData.glyph
                             font.family: "Material Symbols Rounded"
-                            font.pixelSize: 22
+                            font.pixelSize: Math.round(22 * card.unit)
                             color: card.textColor
                             opacity: press.pressed ? 0.6 : 1
                         }

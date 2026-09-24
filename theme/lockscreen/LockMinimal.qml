@@ -37,7 +37,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: minimal
 
-    readonly property real unit: minimal.ui.unit
     readonly property bool shown: minimal.ui.unlock.shown
 
     blursWallpaper: false
@@ -123,10 +122,9 @@ LockStyle {
         anchors.verticalCenter: toggle.verticalCenter
         enabled: minimal.shown
         opacity: promptColumn.opacity
-        keyboard: minimal.ui.keyboard
+        ui: minimal.ui
         ink: minimal.sub
         textSize: Math.round(12 * minimal.unit)
-        onFocusRequested: minimal.ui.focusPassword()
     }
 
     // --- the clock --------------------------------------------------------

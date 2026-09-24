@@ -17,6 +17,9 @@ source "$REPO_ROOT/scripts/lib/lockscreen.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/renderers.sh"
 
+# Read once: every section below asks for a setting or two of its own.
+config_load
+
 problems=0
 warnings=0
 
@@ -138,6 +141,18 @@ if [ -f "$preview_module" ]; then
     fi
 fi
 
+# The other module the same build installs, beside it. It answers what QML
+# cannot ask without an event to hang the question on: which keys are held and
+# which locks are on. Without it the lock-key OSD is silent, and the switchers
+# cannot check whether their key is still down.
+input_module="$preview_dir/ShellInput/libshellinputplugin.so"
+if [ -f "$input_module" ]; then
+    ok "the input module is installed (held keys, lock keys)"
+else
+    warn "no input module: no lock-key OSD, and the switchers cannot check which keys are held"
+    fix "build it with: make plugin  (the same build as the previews)"
+fi
+
 if [ -d /usr/lib/qt6/qml/org/kde/pipewire ]; then
     ok "kpipewire present (it draws the stream)"
 else
@@ -225,7 +240,7 @@ fi
 
 section "known hazards"
 
-shell_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop')
+shell_pkg=$(live_shell_package)
 if [ "$shell_pkg" = "org.kde.plasma.desktop" ] \
    || [ -d "$XDG_DATA_HOME/plasma/shells/$shell_pkg" ] \
    || [ -d "/usr/share/plasma/shells/$shell_pkg" ]; then
@@ -239,16 +254,11 @@ fi
 # The headline failure mode of having two renderers: both drawing at once.
 # Counted rather than assumed, because the case that matters is the one where
 # the configuration and what is on screen have come apart.
-configured_renderer=$(config_get '.panel.renderer' quickshell)
-[ "$configured_renderer" = "null" ] && configured_renderer=$(jq -r '.panel.renderer // "quickshell"' "$defaults_file" 2>/dev/null || echo quickshell)
-configured_renderer=$(renderer_normalize "$configured_renderer")
+configured_renderer=$(renderer_normalize "$(config_get '.panel.renderer' quickshell)")
 
-case "$configured_renderer" in
-    plasma)     expected_pkg="$PLASMA_SHELL_PACKAGE_ID" ;;
-    none)       expected_pkg="org.kde.plasma.desktop" ;;
-    unknown)    expected_pkg="$shell_pkg" ;;
-    *)          expected_pkg="$SHELL_PACKAGE_ID" ;;
-esac
+# A value no renderer answers to is read as ours, as it always has been here.
+expected_pkg=$(package_for "$configured_renderer")
+[ -n "$expected_pkg" ] || expected_pkg=$SHELL_PACKAGE_ID
 
 if [ "$shell_pkg" = "$expected_pkg" ]; then
     ok "renderer '$configured_renderer' matches plasmashell's package"
@@ -321,7 +331,7 @@ if renderer_is_foreign "$configured_renderer"; then
     fi
 fi
 
-others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+others=$(other_quickshells)
 [ -n "$foreign" ] && others=$(printf '%s\n' "$others" | grep -vE -- "(-c|--config)[ =]$foreign( |\$)|/quickshell/$foreign/" || true)
 if [ -n "$others" ]; then
     warn "another Quickshell shell is running"
@@ -335,13 +345,13 @@ fi
 # grabbed, and that is invisible from the file: the record is perfect. It is
 # the one failure this project spent a whole evening finding, so it is checked
 # by name.
-bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key launcher --default '' 2>/dev/null)
-for k in search settings ask clipboard sidebar keys switcher; do
+bound=""
+for k in "${ACCEL_ACTIONS[@]}"; do
     [ -n "$bound" ] && break
     bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$k" --default '' 2>/dev/null)
 done
 legacy=""
-for k in launcher search settings ask clipboard sidebar keys switcher; do
+for k in "${ACCEL_ACTIONS[@]}"; do
     v=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$k.desktop" --key _launch --default '' 2>/dev/null | cut -d, -f1)
     [ -n "$v" ] && [ "$v" != none ] && legacy="$legacy $k"
 done
@@ -392,7 +402,7 @@ profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | j
 [ -n "$profile_entries" ] || profile_entries=$(jq -r '[.bar.entries[]? | select(.enabled != false) | .id] | join(" ")' \
     "$defaults_file" 2>/dev/null || echo "")
 
-script_loaded=$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo unknown)
+script_loaded=$(kwin_scripting isScriptLoaded "$KWIN_SCRIPT_ID" || echo unknown)
 daemon_answers=no
 busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List >/dev/null 2>&1 && daemon_answers=yes
 
@@ -782,7 +792,7 @@ else
     else
         warn "ours is on, but Plasma's greeter was not found to check it with"
     fi
-    live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default org.kde.plasma.desktop)
+    live_pkg=$(live_shell_package)
     case " ${LOCKSCREEN_PACKAGES[*]} " in
         *" $live_pkg "*) ;;
         *) warn "plasmashell is on $live_pkg, so its lock screen is drawn rather than ours" ;;
@@ -793,10 +803,11 @@ fi
 
 section "diagnostic reports"
 
-reports="$STATE_DIR/diagnostics"
-report_count=$(ls -1 "$reports" 2>/dev/null | wc -l)
+source "$REPO_ROOT/scripts/lib/reports.sh"
+
+report_count=$(ls -1 "$REPORT_DIR" 2>/dev/null | wc -l)
 if [ "$report_count" -gt 0 ]; then
-    ok "$report_count report(s) in $reports"
+    ok "$report_count report(s) in $REPORT_DIR"
     fix "read the newest: $ALIAS report show"
     fix "nothing in them has been sent anywhere; they are local files"
 else
@@ -828,9 +839,9 @@ else
     fix "quickshell catches these itself and restarts, so systemd never reports a failure"
     fix "read it:       $ALIAS crash show"
     fix "ask about it:  $ALIAS ask --crash"
-    reported=$(grep -rlxF "crash:  $newest" "$STATE_DIR/diagnostics"/*/error.txt 2>/dev/null | head -1)
+    reported=$(report_for_crash "$newest")
     if [ -n "$reported" ]; then
-        ok "the newest crash has a report: $(basename "$(dirname "$reported")")"
+        ok "the newest crash has a report: $(basename "$reported")"
     else
         warn "no report written for the newest crash"
         fix "the shell writes one when it comes back; this dump predates that, or the shell has not restarted since"
@@ -843,7 +854,7 @@ fi
 
 section "AI assist"
 
-merged_cfg=$(jq -s '.[0] * (.[1] // {})' "$defaults_file" "$profile_file" 2>/dev/null || cat "$defaults_file" 2>/dev/null || echo '{}')
+merged_cfg=$(config_merged)
 ai_enabled=$(jq -r '.ai.enabled // false' <<< "$merged_cfg")
 ai_provider=$(jq -r '.ai.provider // "clipboard"' <<< "$merged_cfg")
 history_on=$(jq -r '.notifications.history // false' <<< "$merged_cfg")
@@ -872,7 +883,7 @@ fi
 
 if [ "$ai_enabled" = true ] || [ "$history_on" = true ]; then
     if shell_running; then
-        n=$(quickshell ipc --path "$QS_CONFIG_DIR/shell.qml" call notifications count 2>/dev/null || echo '?')
+        n=$(quickshell ipc --path "$(shell_ipc_path)" call notifications count 2>/dev/null || echo '?')
         ok "the notification listener is wanted and the shell is running ($n remembered)"
     else
         warn "the notification listener is wanted, but the shell is not running"
@@ -890,15 +901,15 @@ section "Plasma services"
 # plasmashell. Where there is no Plasma tray -- our own renderer -- they exist
 # only because the shell hosts them, and with no owner at all a notification
 # is not queued or shown anywhere: it is dropped.
-live_pkg=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null)
+live_pkg=$(live_shell_package '')
 notif_server=$(jq -r '.notifications.server // "plasma"' <<< "$merged_cfg" 2>/dev/null)
 for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
     name=${pair%%:*}; what=${pair#*:}
-    comm=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^Comm=//p')
+    comm=$(bus_status_field "$name" Comm)
     # Asked to serve them itself, the shell waits for whoever holds the name
     # rather than taking it -- so the one thing worth saying is who that is.
     if [ "$name" = org.freedesktop.Notifications ] && [ "$notif_server" = shell ]; then
-        if busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' | grep -qF -- "$QS_CONFIG_DIR/"; then
+        if shell_holds_bus_name "$name"; then
             ok "notifications: served by this shell (notifications.server)"
             continue
         elif [ -n "$comm" ]; then
@@ -922,7 +933,7 @@ for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipb
         fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
     elif [ "$comm" = quickshell ]; then
         # Ours is Quickshell too, and so is caelestia's bar: name the config.
-        cfg=$(busctl --user status "$name" 2>/dev/null | sed -n 's/^CommandLine=//p' \
+        cfg=$(bus_status_field "$name" CommandLine \
               | grep -o -- '-p [^ ]*' | sed 's/^-p //; s|/shell.qml$||; s|.*/||')
         ok "$what: provided by quickshell (${cfg:-unknown config})"
     elif [ -n "$comm" ]; then

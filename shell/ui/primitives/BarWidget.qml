@@ -21,10 +21,22 @@ Item {
     // `iconSize`, for a tray or status icon, and `spacing`, between widgets.
     required property var bar
 
+    // The panel's thickness -- 40 until there is a panel to ask -- and whether
+    // it runs down the side of the screen rather than along an edge. Nearly
+    // every widget needs one or the other, so they are read here once rather
+    // than in twenty places.
+    readonly property real barThickness: root.bar?.thickness ?? 40
+    readonly property bool barVertical: !(root.bar?.horizontal ?? true)
+
     // The design's proportions are for a 64 px panel; a widget scales from
     // this rather than hardcoding sizes that only fit one thickness.
-    readonly property real unit: (root.bar?.thickness ?? 40) / 64
+    readonly property real unit: root.barThickness / 64
     readonly property int panelIconSize: root.bar?.iconSize ?? 19
+
+    // The side of a square panel button: the design's 40 at 64 px, never
+    // under 22. What most widgets hand their BarButton; the search field, the
+    // task view and the sidebar keep BarButton's own, larger default.
+    readonly property int tileSize: Math.max(22, Math.round(40 * root.unit))
 
     // This widget's own configuration: its manifest defaults merged with the
     // user's overrides. Never the whole shell config.
@@ -144,6 +156,40 @@ Item {
     function handleHover(position, horizontal) {}
     function handleWheel(delta) {}
     function handleActivate(button) {}
+
+    // ---- for a widget made of several things ----------------------------
+    //
+    // The panel tells a widget where the pointer is along it, and a widget of
+    // several parts -- the task buttons, the desktops, the status glyphs --
+    // has to turn that into which part. They differ in width, so it is found
+    // by where each one actually is rather than by dividing the position.
+
+    // Which of `repeater`'s items is at `position` along the panel, or -1.
+    // Each one's reach runs half of `spacing` out either side, so a gap
+    // belongs to the parts beside it rather than to nothing. `origin` is
+    // where their positioner starts inside the widget, measured the same way.
+    function indexAlong(repeater, position, spacing, vertical, origin) {
+        const p = position - (origin ?? 0);
+        for (let i = 0; i < repeater.count; i++) {
+            const item = repeater.itemAt(i);
+            if (!item)
+                continue;
+            const start = vertical ? item.y : item.x;
+            const length = vertical ? item.height : item.width;
+            if (p >= start - spacing / 2 && p < start + length + spacing / 2)
+                return i;
+        }
+        return -1;
+    }
+
+    // The middle of item `index`, along the panel from the widget's start --
+    // what `tooltipCentre` and requestPopout want -- or -1 without one.
+    function centreAlong(repeater, index, vertical, origin) {
+        const item = repeater.itemAt(index);
+        if (!item)
+            return -1;
+        return (origin ?? 0) + (vertical ? item.y + item.height / 2 : item.x + item.width / 2);
+    }
 
     // ---- signals to the host -------------------------------------------
 

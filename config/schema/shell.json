@@ -822,8 +822,93 @@
             "icon": "preferences-desktop-keyboard-shortcut",
             "glyph": "keyboard",
             "page": "shortcuts",
-            "description": "Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.",
-            "keys": {}
+            "description": "Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu and Meta+Space the search by default.",
+            "keys": {
+                "shortcuts.launcher": {
+                    "type": "string",
+                    "default": "Meta",
+                    "label": "Application menu",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.search": {
+                    "type": "string",
+                    "default": "Meta+Space",
+                    "label": "Search",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.settings": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Settings",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.ask": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Ask about the last notification",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.clipboard": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Clipboard history",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.sidebar": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Sidebar",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.keys": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Keyboard shortcuts",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.switcher": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Window switcher",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.switcher-reverse": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Window switcher (backwards)",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.overview": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Desktops",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.overview-reverse": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Desktops (backwards)",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.screenshot": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Screenshot of a region",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.screenshot-screen": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Screenshot of the screen",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                },
+                "shortcuts.screenshot-window": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Screenshot of the active window",
+                    "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it."
+                }
+            }
         },
         {
             "id": "lock",

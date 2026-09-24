@@ -51,7 +51,7 @@ QtObject {
     // the Plasma colour scheme's own darkness when it is not.
     //
     // Neither has answered in the first moments of a session: Night Light's
-    // properties arrive one by one, and kdeglobals has not been read. The
+    // reply is still on its way, and kdeglobals has not been read. The
     // fallback palette in PlasmaColors is a dark one -- chosen so a shell that
     // cannot read the desktop is still legible -- so resolving "auto" against
     // it before it is real answers "dark" every single start.

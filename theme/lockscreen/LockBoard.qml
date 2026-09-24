@@ -23,7 +23,6 @@ import org.kde.kirigami as Kirigami
 LockStyle {
     id: board
 
-    readonly property real unit: board.ui.unit
     readonly property color ink: "#ffffff"
     readonly property color dim: Qt.rgba(1, 1, 1, 0.8)
     readonly property int cardRadius: Math.round(26 * board.unit)
@@ -87,10 +86,9 @@ LockStyle {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             enabled: board.ui.unlock.shown
-            keyboard: board.ui.keyboard
+            ui: board.ui
             ink: board.ink
             textSize: Math.round(13 * board.unit)
-            onFocusRequested: board.ui.focusPassword()
         }
     }
 
@@ -187,6 +185,7 @@ LockStyle {
                     anchors.margins: Math.round(14 * board.unit)
                     chromeless: true
                     textColor: board.ink
+                    unit: board.unit
                 }
             }
 
@@ -313,7 +312,6 @@ LockStyle {
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: Options.showSessionButtons
             enabled: board.ui.unlock.shown
             session: board.ui.session
             shape: "square"

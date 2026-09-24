@@ -11,32 +11,24 @@ pragma Singleton
 // "\t".
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
 
     // { "group": { "action": { keys: ["Meta+W"], label: "Toggle Overview" } } }
     function parse(text) {
+        const ini = Ini.parse(text);
         const out = {};
-        let group = "";
-        for (const raw of String(text ?? "").split("\n")) {
-            const line = raw.trim();
-            if (line.length === 0 || line.startsWith("#"))
-                continue;
-            if (line.startsWith("[")) {
-                group = line.slice(1, -1);
-                out[group] = out[group] ?? {};
-                continue;
+        for (const group of Object.keys(ini)) {
+            out[group] = {};
+            for (const action of Object.keys(ini[group])) {
+                const fields = ini[group][action].split(",");
+                const current = (fields[0] ?? "").trim();
+                const keys = current === "none" || current.length === 0 ? []
+                    : current.split("\\t").map(k => k.trim()).filter(k => k.length > 0 && k !== "none");
+                out[group][action] = { keys: keys, label: fields.slice(2).join(",").trim() };
             }
-            const eq = line.indexOf("=");
-            if (eq < 0 || !group)
-                continue;
-            const action = line.slice(0, eq);
-            const fields = line.slice(eq + 1).split(",");
-            const current = (fields[0] ?? "").trim();
-            const keys = current === "none" || current.length === 0 ? []
-                : current.split("\\t").map(k => k.trim()).filter(k => k.length > 0 && k !== "none");
-            out[group][action] = { keys: keys, label: fields.slice(2).join(",").trim() };
         }
         return out;
     }

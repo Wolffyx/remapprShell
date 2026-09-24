@@ -8,15 +8,8 @@ import QtQuick
 import qs.domain.theme
 import qs.widgets.tasks
 
-Rectangle {
+Stage {
     id: stage
-
-    gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 0.45; color: Theme.dark ? "#2c2b3d" : "#e6dcd2" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
 
     function win(title, opts) {
         return Object.assign({
@@ -42,7 +35,13 @@ Rectangle {
             ]
         },
         {
-            label: "four, one minimised",
+            label: "a tall window",
+            item: { appName: "Spectacle", iconName: "spectacle", iconFile: "", windows: [] },
+            windows: [stage.win("Unsaved* — Spectacle", { width: 900, height: 1300 })]
+        },
+        {
+            label: "four, one minimised, header on",
+            header: true,
             item: { appName: "Spectacle", iconName: "spectacle", iconFile: "", windows: [] },
             windows: [
                 stage.win("Unsaved — Spectacle", { active: true }),
@@ -53,8 +52,9 @@ Rectangle {
         }
     ]
 
-    Row {
-        anchors.centerIn: parent
+    Flow {
+        anchors.fill: parent
+        anchors.margins: 28
         spacing: 28
 
         Repeater {
@@ -84,6 +84,7 @@ Rectangle {
                         height: implicitHeight
                         item: scene.modelData.item
                         windows: scene.modelData.windows
+                        showHeader: scene.modelData.header === true
                     }
                 }
             }

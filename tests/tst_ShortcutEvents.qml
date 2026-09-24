@@ -8,19 +8,14 @@
 import QtQuick
 import QtTest
 import qs.domain.shortcuts.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "ShortcutEvents"
 
     function line(member, data) {
-        return JSON.stringify({
-            type: "signal",
-            sender: ":1.390",
-            path: "/component/ours_shell",
-            interface: "org.kde.kglobalaccel.Component",
-            member: member,
-            payload: { type: "ssx", data: data }
-        });
+        return Bus.signal("org.kde.kglobalaccel.Component", member, "ssx", data,
+                          { sender: ":1.390", path: "/component/ours_shell" });
     }
 
     function test_pressed() {

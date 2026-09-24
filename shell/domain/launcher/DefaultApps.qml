@@ -22,10 +22,11 @@ pragma Singleton
 // that knows which of eight terminals is the right one.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.launcher.apps
+import qs.domain.theme
 
 QtObject {
     id: root
@@ -55,7 +56,14 @@ QtObject {
 
     // The terminal is not a MIME type, so it is not in mimeapps.list at all:
     // KDE keeps it in kdeglobals, as the command rather than the entry id.
-    property string terminal: ""
+    //
+    // Read from PlasmaColors, which already follows kdeglobals -- debounced,
+    // where a watcher of this file's own saw each colour-scheme change as
+    // four and read the whole file four times. The value is a command line
+    // ("konsole", "alacritty -e"); the first word of it is the binary, which
+    // is what a desktop id is built from.
+    readonly property string terminal:
+        String(PlasmaColors.groups.General?.TerminalApplication ?? "").split(/\s+/)[0] ?? ""
 
     function isDefault(id) {
         const wanted = String(id ?? "");
@@ -67,11 +75,8 @@ QtObject {
         return root.terminal.length > 0 && root.terminal === wanted.split(".").pop();
     }
 
-    readonly property string _configHome:
-        Quickshell.env("XDG_CONFIG_HOME") || `${Quickshell.env("HOME")}/.config`
-
     readonly property FileView _mimeapps: FileView {
-        path: `${root._configHome}/mimeapps.list`
+        path: `${Env.xdgConfigHome()}/mimeapps.list`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
@@ -97,16 +102,5 @@ QtObject {
                 Log.debug("launcher", `defaults: ${root.ids.join(", ") || "none"}`);
             }
         }
-    }
-
-    readonly property FileView _kdeglobals: FileView {
-        path: `${root._configHome}/kdeglobals`
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-        // The value is a command line ("konsole", "alacritty -e"); the first
-        // word of it is the binary, which is what a desktop id is built from.
-        onLoaded: root.terminal = Apps.iniValue(text(), "General", "TerminalApplication").split(/\s+/)[0] ?? ""
-        onLoadFailed: root.terminal = ""
     }
 }

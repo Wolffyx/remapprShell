@@ -8,6 +8,7 @@
 import QtQuick
 import QtTest
 import qs.domain.notifications.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "NotificationEvents"
@@ -15,12 +16,7 @@ TestCase {
     readonly property string captured: '{"type":"method_call","endian":"l","flags":0,"version":1,"cookie":9,"timestamp-realtime":1789051619890040,"sender":":1.1825","destination":":1.45","path":"/org/freedesktop/Notifications","interface":"org.freedesktop.Notifications","member":"Notify","payload":{"type":"susssasa{sv}i","data":["probe-app",0,"","Probe summary","Probe body with /home/someone/x",[],{"image-path":{"type":"s","data":"dialog-information"},"urgency":{"type":"y","data":0},"sender-pid":{"type":"x","data":568015}},-1]}}'
 
     function call(data, extra) {
-        return JSON.stringify(Object.assign({
-            type: "method_call",
-            interface: "org.freedesktop.Notifications",
-            member: "Notify",
-            payload: { type: "susssasa{sv}i", data: data }
-        }, extra ?? {}));
+        return Bus.notify(data, extra);
     }
 
     function test_captured_line() {
@@ -95,30 +91,15 @@ TestCase {
     // segfaults the QML engine from inside the read handler. Reproduced with
     // a real notification before this test was written.
 
-    function pixels(n) {
-        const a = [];
-        for (let i = 0; i < n; i++)
-            a.push(i % 256);
-        return a;
-    }
-
     function imageLine(n) {
-        return JSON.stringify({
-            type: "method_call",
-            interface: "org.freedesktop.Notifications",
-            member: "Notify",
-            payload: {
-                type: "susssasa{sv}i",
-                data: ["image-probe", 0, "", "Image probe", "has an image-data hint", [],
-                       {
-                           "image-data": {
-                               type: "(iiibiiay)",
-                               data: [64, 64, 256, true, 8, 4, pixels(n)]
-                           },
-                           "urgency": { type: "y", data: 1 }
-                       }, -1]
-            }
-        });
+        return Bus.notify(["image-probe", 0, "", "Image probe", "has an image-data hint", [],
+                           {
+                               "image-data": {
+                                   type: "(iiibiiay)",
+                                   data: [64, 64, 256, true, 8, 4, Bus.pixels(n)]
+                               },
+                               "urgency": { type: "y", data: 1 }
+                           }, -1]);
     }
 
     function test_a_notification_carrying_pixels_still_arrives() {
@@ -203,5 +184,21 @@ TestCase {
         compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf"] }), "");
         compare(NotificationEvents.pictureOf({ urls: [] }), "");
         compare(NotificationEvents.pictureOf(null), "");
+        // The popups' test of a picture: the extension, whatever its case,
+        // and never a query string.
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf", "file:///home/a/P.JPEG"] }),
+                "file:///home/a/P.JPEG");
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/x.pdf?name=y.png"] }), "");
+    }
+
+    // A sender that writes x-kde-urls as one string rather than a list, and
+    // as a bare path: still one file:// URL in the history.
+    function test_a_single_path_is_one_url() {
+        const line = JSON.stringify({
+            type: "method_call", interface: "org.freedesktop.Notifications", member: "Notify",
+            payload: { data: ["Downloads", 0, "", "Done", "", [],
+                              { "x-kde-urls": { type: "s", data: "/home/a/file.zip" } }, -1] }
+        });
+        compare(NotificationEvents.parse(line, 1000).urls, ["file:///home/a/file.zip"]);
     }
 }

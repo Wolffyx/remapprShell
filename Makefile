@@ -70,15 +70,15 @@ lint-tests: ## Fail if a QML test imports a module needing a running shell
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh
 
-plugin: ## Build and install the window-preview plugin (needs Qt6 dev + cmake)
+plugin: ## Build and install the compiled modules: window previews, held and lock keys (needs Qt6 dev + cmake)
 	@cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release
 	@cmake --build build/plugin
 	@cmake --install build/plugin
-	@printf '\033[32m==>\033[0m window previews installed; restart the shell to pick them up\n'
+	@printf '\033[32m==>\033[0m window previews and the input module installed; restart the shell to pick them up\n'
 
-plugin-clean: ## Remove the plugin's build directory and installed module
-	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast"
-	@printf '\033[32m==>\033[0m window previews removed\n'
+plugin-clean: ## Remove the plugin's build directory and both installed modules
+	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast" "$(HOME)/.local/lib/qt6/qml/ShellInput"
+	@printf '\033[32m==>\033[0m window previews and the input module removed\n'
 
 clean: ## Remove generated files
 	@rm -f shell/core/Branding.qml theme/colors/*.colors

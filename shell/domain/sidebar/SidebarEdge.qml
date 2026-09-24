@@ -13,8 +13,7 @@
 // behalf: an edge is the user's to give.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
+import qs.platform.system
 import qs.domain.config
 
 QtObject {
@@ -41,16 +40,12 @@ QtObject {
             return;
         }
         root.asked = root.position;
-        follow.running = false;
-        follow.running = true;
+        follow.run(["edges", "follow"]);
     }
 
-    readonly property Process _follow: Process {
+    readonly property CtlRun _follow: CtlRun {
         id: follow
-        command: [Branding.ctlBin, "edges", "follow"]
-        onExited: code => {
-            if (code !== 0)
-                Log.warn("sidebar", `could not put the screen edge where ${root.position} says (exit ${code})`);
-        }
+        tag: "sidebar"
+        label: `edges follow, for a sidebar at ${root.position}`
     }
 }

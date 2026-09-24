@@ -11,28 +11,11 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-DAEMON_PID=""
-cleanup() {
-    [ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null
-    rm -rf "$SANDBOX"
-}
-trap cleanup EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/render.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+DAEMON_PID=""
+harness_on_exit '[ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null'
 
 # KWin's own window behaviour: kwinrc keys, written through the ledger. What
 # matters is that a bad value never reaches kwinrc, that a write is recorded
@@ -41,7 +24,7 @@ check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
 echo "== KWin's window behaviour =="
 BEHAVE=("$REPO_ROOT/scripts/windows.sh" behaviour)
 behave() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${BEHAVE[@]}" "$@" 2>&1; }
-kwinrc_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default '<unset>'; }
+kwinrc_key() { kread kwinrc Windows "$1"; }
 
 FAKES="$SANDBOX/fakes"
 mkdir -p "$FAKES"
@@ -62,12 +45,12 @@ behave set borderlessMaximized true >/dev/null
 check "borderless maximised written"     "$(kwinrc_key BorderlessMaximizedWindows)" "true"
 check "status reads them back"           "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .value')" "FocusFollowsMouse"
 check "and says what the default was"    "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .default')" "ClickToFocus"
-check "the ledger has both"              "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+check "the ledger has both"              "$(ledger_count windows-behaviour)" "2"
 
 behave revert >/dev/null
 check "revert deletes a key that was unset" "$(kwinrc_key FocusPolicy)" "<unset>"
 check "and the other one too"               "$(kwinrc_key BorderlessMaximizedWindows)" "<unset>"
-check "the ledger is empty again"           "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "0"
+check "the ledger is empty again"           "$(ledger_count windows-behaviour)" "0"
 check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
 
 command -v busctl >/dev/null 2>&1 || { echo "  SKIP  busctl not available"; exit 0; }
@@ -81,12 +64,15 @@ python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo " 
 # It runs against the *real* session bus -- there is no other -- so a daemon
 # that claimed the shell's kglobalaccel component here would unbind the keys on
 # the machine running the tests, which is exactly what happened once. Belt and
-# braces: the no-session variable as well, which the daemon honours too.
-export "$NO_SESSION_VAR=1"
+# braces: the no-session variable as well, set by the harness for every suite
+# and honoured by the daemon too.
 TEST_NAME="com.remappr.ShellTest$$"
 DAEMON="$SANDBOX/windowsd"
 render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
-sed -i "s|\"$DBUS_NAME\"|\"$TEST_NAME\"|g; s|f\"{INTERFACE}\"|f\"{INTERFACE}\"|" "$DAEMON"
+# BUS_NAME and INTERFACE by name, and nothing else. SHORTCUT_OWNER keeps the
+# shell's own name, because BUS_NAME differing from it is the guard: a sed
+# over every quoted "$DBUS_NAME" renamed both, and left this copy believing
+# it owned the keys, with only the no-session variable standing in the way.
 python3 - "$DAEMON" "$TEST_NAME" <<'PY'
 import re, sys
 path, name = sys.argv[1], sys.argv[2]
@@ -135,21 +121,45 @@ call Update s '[]' >/dev/null
 check "no windows is accepted"      "$(list)" "[]"
 
 # The signal is what the shell actually follows.
+#
+# One monitor watches both cases, and is waited for rather than slept for.
+# It is listening once a signal sent after it started has reached it, so it is
+# sent probes until one does. That was two monitors and six seconds of sleep,
+# the second monitor started while the first was still writing to the same
+# file.
 monitor_out="$SANDBOX/monitor.json"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
+timeout 20 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
+monitor_pid=$!
+seen() {   # seen <text> <count>: up to five seconds for that many lines with it
+    local i
+    for i in $(seq 1 100); do
+        [ "$(grep -c -- "$1" "$monitor_out")" -ge "$2" ] && return 0
+        sleep 0.05
+    done
+    return 1
+}
+for _ in $(seq 1 100); do
+    busctl --user emit /Windows "$TEST_NAME.Windows" Listening 2>/dev/null
+    sleep 0.05
+    grep -q '"member":"Listening"' "$monitor_out" && break
+done
+
 call Update s "$WINDOW" >/dev/null
-sleep 2
+seen '"member":"Changed"' 1
 check "announces a change"     "$(grep -c '"member":"Changed"' "$monitor_out")" "1"
 
 # KWin repeats itself -- the same list arrives again on events that changed
 # nothing -- and a signal per repeat would wake the shell for no reason.
-: > "$monitor_out"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
+#
+# A real change after the repeat marks the end: one sender's signals arrive in
+# the order they were sent, so once its signal is in, any the repeat sent is in
+# too. Two in all -- the change above and the marker -- means the repeat said
+# nothing.
 call Update s "$WINDOW" >/dev/null
-sleep 2
-check "says nothing when nothing changed" "$(grep -c '"member":"Changed"' "$monitor_out")" "0"
+call Update s '[{"uuid":"b","title":"end-of-test","appId":"x","minimized":false,"active":false}]' >/dev/null
+seen 'end-of-test' 1
+check "says nothing when nothing changed" "$(( $(grep -c '"member":"Changed"' "$monitor_out") - 2 ))" "0"
+kill "$monitor_pid" 2>/dev/null
 
 # Closing a window writes the id into a KWin script's source, so anything
 # that is not exactly a uuid must be refused before it gets that far -- and
@@ -163,6 +173,11 @@ check "no id is refused"                      "$status" "1"
 out=$(nosession close 1f46c057-675a-4d51-99e5-17aafdfb5b06); status=$?
 check "no session, nothing closed"            "$status:$(printf '%s' "$out" | grep -c 'no session')" "1:1"
 
+# The blocks below read the daemon's source rather than a rendered copy, so
+# they put in the placeholders that are not names: the tables it shares with
+# lib/accel.sh, worked out the way an install renders them.
+render_tables; export ACCEL_KEYCODES SHORTCUT_ACTIONS
+
 # Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
 # from another application, holds several sizes one after another, and a
 # malformed one must yield nothing rather than an exception in the daemon
@@ -172,7 +187,9 @@ python3 - "$REPO_ROOT" <<'PYTEST'
 import sys, importlib.util, re, os
 repo = sys.argv[1]
 src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -210,7 +227,9 @@ python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -272,7 +291,9 @@ python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
 import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -336,7 +357,9 @@ import sys, os
 repo, sandbox = sys.argv[1], sys.argv[2]
 src = open(f"{repo}/bin/windowsd.py.in").read()
 for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t"}.items():
+             "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
     src = src.replace(k, v)
 mod = {}
 exec(compile(src, "windowsd", "exec"), mod)
@@ -405,6 +428,72 @@ sys.exit(1 if fails else 0)
 PYTEST
 if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+# Both run on the thread that answers D-Bus, so both are about time. Finding
+# which window a process owns is an xprop per window on the display, and it
+# was done again for every window in an update that had no icon yet; and the
+# icon's pixels were reordered one at a time in Python.
+echo "== the daemon's icon work, once an update and not pixel by pixel =="
+python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
+import sys, os
+repo, sandbox = sys.argv[1], sys.argv[2]
+src = open(f"{repo}/bin/windowsd.py.in").read()
+for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
+             "@ACCEL_KEYCODES@": os.environ["ACCEL_KEYCODES"],
+             "@SHORTCUT_ACTIONS@": os.environ["SHORTCUT_ACTIONS"]}.items():
+    src = src.replace(k, v)
+mod = {}
+exec(compile(src, "windowsd", "exec"), mod)
+
+fails = 0
+def check(name, got, want):
+    global fails
+    ok = got == want
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
+    fails += 0 if ok else 1
+
+class Counting(mod["WindowIcons"]):
+    def __init__(self):
+        self._cache, self._misses, self._available = {}, {}, True
+        self._windows_by_pid, self.sweeps, self.asked = None, 0, []
+    def _x11_windows_by_pid(self):
+        self.sweeps += 1
+        return {1: "0x1", 2: "0x2"}
+    def _extract(self, window, app_id):
+        self.asked.append(window)
+        return None
+
+icons = Counting()
+icons.new_update()
+for app, pid in (("a", 1), ("b", 2), ("c", 3)):
+    icons.path_for(app, pid)
+check("one sweep for a whole update", icons.sweeps, 1)
+check("and every window found in it", icons.asked, ["0x1", "0x2"])
+icons.new_update()
+icons.path_for("d", 1)
+check("the next update sweeps again", icons.sweeps, 2)
+
+try:
+    from PIL import Image
+except ImportError:
+    print("  SKIP  Pillow is not installed; the pixels were not checked")
+    sys.exit(1 if fails else 0)
+
+# Two pixels, as xprop prints the property: opaque blue, and black at 0x81.
+class Run:
+    stdout = "_NET_WM_ICON(CARDINAL) = 2, 1, 4278190335, 2164260864"
+class FakeSubprocess:
+    @staticmethod
+    def run(*_args, **_kwargs):
+        return Run()
+mod["subprocess"] = FakeSubprocess
+mod["ICON_CACHE"] = os.path.join(sandbox, "icons")
+path = mod["WindowIcons"]._extract(icons, "0x1", "some.app")
+image = Image.open(path)
+check("the icon is its size",     image.size, (2, 1))
+check("ARGB read as RGBA",        [image.getpixel((0, 0)), image.getpixel((1, 0))],
+                                  [(0, 0, 255, 255), (0, 0, 0, 0x81)])
+sys.exit(1 if fails else 0)
+PYTEST
+if [ $? -eq 0 ]; then pass=$((pass+5)); else fail=$((fail+1)); fi
+
+harness_done

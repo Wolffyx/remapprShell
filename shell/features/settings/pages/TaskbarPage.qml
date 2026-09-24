@@ -23,8 +23,13 @@ Column {
     // Set by the settings window: opens another page by its schema id.
     property var openPage: id => {}
 
-    readonly property string position: ConfigStore.value("panel.position", "bottom")
     readonly property bool autoHide: ConfigStore.value("panel.autoHide", false) === true
+
+    // The choices the shared rows and each monitor's rows both offer.
+    readonly property var positionValues: ["top", "bottom", "left", "right"]
+    readonly property var positionLabels: ["Top", "Bottom", "Left", "Right"]
+    readonly property var styleValues: ["full", "floating", "islands"]
+    readonly property var styleLabels: ["Full width", "Floating bar", "Islands"]
 
     // The right-click menu. What the monitor row can be set to is what is
     // installed -- PanelMenuModel is the one place that knows -- plus the two
@@ -78,28 +83,25 @@ Column {
 
         SectionLabel { text: "Position" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
-            values: ["top", "bottom", "left", "right"]
-            labels: ["Top", "Bottom", "Left", "Right"]
-            current: root.position
-            onPicked: value => ConfigStore.set("panel.position", value)
+            values: root.positionValues
+            labels: root.positionLabels
+            path: "panel.position"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Hide until pointed at"
             description: "The panel shrinks to a sliver and reserves no space, so windows use the whole screen."
-            checked: root.autoHide
-            onToggled: value => ConfigStore.set("panel.autoHide", value)
+            path: "panel.autoHide"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Reveal on hover"
             description: root.autoHide ? "The panel comes back when the pointer reaches the screen edge."
                                        : "Only matters while the panel hides."
             enabled: root.autoHide
-            checked: ConfigStore.value("panel.revealOnHover", true) === true
-            onToggled: value => ConfigStore.set("panel.revealOnHover", value)
+            path: "panel.revealOnHover"
         }
     }
 
@@ -108,21 +110,15 @@ Column {
 
         SectionLabel { text: "Style" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
-            values: ["full", "floating", "islands"]
-            labels: ["Full width", "Floating bar", "Islands"]
-            current: ConfigStore.value("panel.style", "full")
-            onPicked: value => ConfigStore.set("panel.style", value)
+            values: root.styleValues
+            labels: root.styleLabels
+            path: "panel.style"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Full width is a strip along the whole edge. Floating is a rounded bar held clear of it. Islands draws no bar at all: each zone is a rounded island of its own."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -131,13 +127,12 @@ Column {
 
         SectionLabel { text: "Sizing" }
 
-        SliderRow {
+        ConfigSliderRow {
             label: "Bar thickness"
             from: 28
             to: 96
             stepSize: 2
-            value: ConfigStore.value("panel.thickness", 56)
-            onMoved: value => ConfigStore.set("panel.thickness", Math.round(value))
+            path: "panel.thickness"
         }
 
         SliderRow {
@@ -153,20 +148,18 @@ Column {
             onMoved: value => ConfigStore.set("theme.rounding", Math.round(value))
         }
 
-        SliderRow {
+        ConfigSliderRow {
             label: "Tray icon size"
             from: 15
             to: 26
-            value: ConfigStore.value("panel.iconSize", 19)
-            onMoved: value => ConfigStore.set("panel.iconSize", Math.round(value))
+            path: "panel.iconSize"
         }
 
-        SliderRow {
+        ConfigSliderRow {
             label: "Spacing between widgets"
             from: 2
             to: 16
-            value: ConfigStore.value("panel.spacing", 6)
-            onMoved: value => ConfigStore.set("panel.spacing", Math.round(value))
+            path: "panel.spacing"
         }
     }
 
@@ -190,18 +183,16 @@ Column {
             onPicked: value => ConfigStore.set("widgets.clock.hour12", value === "12")
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Show the date"
             description: "Under the time; beside it on a thin panel, and not at all down the side of the screen."
-            checked: ConfigStore.value("widgets.clock.showDate", true) === true
-            onToggled: value => ConfigStore.set("widgets.clock.showDate", value)
+            path: "widgets.clock.showDate"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             enabled: clockCard.customFormat.length === 0
             label: "Show seconds"
-            checked: ConfigStore.value("widgets.clock.showSeconds", false) === true
-            onToggled: value => ConfigStore.set("widgets.clock.showSeconds", value)
+            path: "widgets.clock.showSeconds"
         }
 
         TextInputRow {
@@ -211,14 +202,11 @@ Column {
             onCommitted: value => ConfigStore.set("widgets.clock.format", value.trim())
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
             text: clockCard.customFormat.length > 0
                 ? `A format of your own, "${clockCard.customFormat}", is in use, so the choices above wait. Empty the field to use them again.`
                 : "A format of your own, as Qt writes one -- \"ddd HH:mm\", say -- wins over the choices above. Empty for those."
+            lineHeight: 1
         }
     }
 
@@ -227,36 +215,32 @@ Column {
 
         SectionLabel { text: "Workspaces" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["numbers", "icons", "dots"]
             labels: ["Numbers", "App icons", "Dots"]
-            current: ConfigStore.value("widgets.workspaces.style", "numbers")
-            onPicked: value => ConfigStore.set("widgets.workspaces.style", value)
+            path: "widgets.workspaces.style"
         }
 
-        SliderRow {
+        // These two have no shipped default of their own -- the widget's
+        // manifest has them -- so the fallbacks here are what is shown.
+        ConfigSliderRow {
             label: "Desktops shown"
             unit: ""
             from: 1
             to: 20
-            value: ConfigStore.value("widgets.workspaces.maxShown", 8)
-            onMoved: value => ConfigStore.set("widgets.workspaces.maxShown", Math.round(value))
+            path: "widgets.workspaces.maxShown"
+            fallback: 8
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Switch by scrolling"
-            checked: ConfigStore.value("widgets.workspaces.scrollToSwitch", true) === true
-            onToggled: value => ConfigStore.set("widgets.workspaces.scrollToSwitch", value)
+            path: "widgets.workspaces.scrollToSwitch"
+            fallback: true
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "These are KWin's virtual desktops. Adding and naming them is System Settings' page, which Plasma and this shell both read."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 
@@ -265,39 +249,57 @@ Column {
 
         SectionLabel { text: "Window buttons" }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Show titles"
             description: "Off, buttons are icons alone and the title is one hover away."
-            checked: ConfigStore.value("widgets.tasks.showTitles", true) === true
-            onToggled: value => ConfigStore.set("widgets.tasks.showTitles", value)
+            path: "widgets.tasks.showTitles"
         }
 
-        ToggleRow {
+        // The rest have no shipped default of their own -- the widget's
+        // manifest has them -- so the fallbacks here are what is shown.
+        ConfigToggleRow {
             label: "Group windows by application"
-            checked: ConfigStore.value("widgets.tasks.groupByApp", true) === true
-            onToggled: value => ConfigStore.set("widgets.tasks.groupByApp", value)
+            path: "widgets.tasks.groupByApp"
+            fallback: true
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Only this screen's windows"
             description: "Each monitor's panel lists the windows on that monitor."
-            checked: ConfigStore.value("widgets.tasks.thisScreenOnly", false) === true
-            onToggled: value => ConfigStore.set("widgets.tasks.thisScreenOnly", value)
+            path: "widgets.tasks.thisScreenOnly"
+            fallback: false
+        }
+
+        ConfigToggleRow {
+            label: "Stack the icon of an application with several windows"
+            description: "A second square behind the icon, so the count shows on the button itself."
+            path: "widgets.tasks.stackGroups"
+            fallback: true
+        }
+
+        ConfigToggleRow {
+            label: "Name the application above its previews"
+            description: "Off, each window's card carries the icon and title itself, as Windows draws them."
+            path: "widgets.tasks.previewHeader"
+            fallback: false
+        }
+
+        ConfigToggleRow {
+            label: "Name the monitor on each preview"
+            description: "With more than one monitor, the one a window is on -- \"DP-2\" -- after its title."
+            path: "widgets.tasks.previewScreen"
+            fallback: false
         }
     }
 
     Card {
+        id: menuCard
         width: root.width
 
         SectionLabel { text: "Right-click menu" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "The menu a right click on empty panel opens. Its first rows -- settings, widgets, reloading -- are fixed; the monitor it offers and anything below it are yours."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SettingRow {
@@ -324,13 +326,8 @@ Column {
 
         SectionLabel { text: "Your own entries" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Each row runs a command line, the way a terminal would -- pipes, arguments and $HOME all work. It is run detached, so a script that keeps going is not stopped when the menu closes. A row with no name or no command is not drawn."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Repeater {
@@ -345,7 +342,10 @@ Column {
                 required property var modelData
                 required property int index
 
-                width: root.width - 32
+                // The card's inner width: `root.width - 32` was four pixels
+                // wider than the card has room for, and the remove button
+                // hung over its edge.
+                width: menuCard.contentWidth
                 spacing: 6
 
                 Row {
@@ -394,13 +394,8 @@ Column {
 
         SectionLabel { text: "Entries" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Which widgets are on the panel, in which zone and in which order, is the Widgets page -- where a row is dragged rather than typed."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -416,15 +411,10 @@ Column {
 
         SectionLabel { text: "Displays" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: Quickshell.screens.length > 1
                 ? "Each monitor draws its own panel. Where it sits, how it is drawn, whether it hides and its size can differ per monitor; the widgets are shared."
                 : "One monitor. With a second one connected, each draws its own panel and can keep its own position, style, hiding and size."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Repeater {
@@ -473,44 +463,44 @@ Column {
                     }
                 }
 
-                Segmented {
+                ConfigSegmented {
                     width: parent.width
-                    values: ["top", "bottom", "left", "right"]
-                    labels: ["Top", "Bottom", "Left", "Right"]
-                    current: ConfigStore.valueFor(screenBlock.name, "panel.position", "bottom")
-                    onPicked: value => ConfigStore.setForScreen(screenBlock.name, "panel.position", value)
+                    values: root.positionValues
+                    labels: root.positionLabels
+                    screen: screenBlock.name
+                    path: "panel.position"
                 }
 
-                SliderRow {
+                ConfigSliderRow {
                     label: "Thickness on this monitor"
                     from: 28
                     to: 96
                     stepSize: 2
-                    value: ConfigStore.valueFor(screenBlock.name, "panel.thickness", 56)
-                    onMoved: value => ConfigStore.setForScreen(screenBlock.name, "panel.thickness", Math.round(value))
+                    screen: screenBlock.name
+                    path: "panel.thickness"
                 }
 
-                Segmented {
+                ConfigSegmented {
                     width: parent.width
-                    values: ["full", "floating", "islands"]
-                    labels: ["Full width", "Floating bar", "Islands"]
-                    current: ConfigStore.valueFor(screenBlock.name, "panel.style", "full")
-                    onPicked: value => ConfigStore.setForScreen(screenBlock.name, "panel.style", value)
+                    values: root.styleValues
+                    labels: root.styleLabels
+                    screen: screenBlock.name
+                    path: "panel.style"
                 }
 
-                SliderRow {
+                ConfigSliderRow {
                     label: "Tray icon size on this monitor"
                     from: 15
                     to: 26
-                    value: ConfigStore.valueFor(screenBlock.name, "panel.iconSize", 19)
-                    onMoved: value => ConfigStore.setForScreen(screenBlock.name, "panel.iconSize", Math.round(value))
+                    screen: screenBlock.name
+                    path: "panel.iconSize"
                 }
 
-                ToggleRow {
+                ConfigToggleRow {
                     width: parent.width
                     label: "Hide until pointed at, on this monitor"
-                    checked: ConfigStore.valueFor(screenBlock.name, "panel.autoHide", false) === true
-                    onToggled: value => ConfigStore.setForScreen(screenBlock.name, "panel.autoHide", value)
+                    screen: screenBlock.name
+                    path: "panel.autoHide"
                 }
 
                 TextButton {

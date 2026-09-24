@@ -8,7 +8,6 @@ WT=$(cd "$HERE/../.." && pwd)
 target=$(realpath "$1"); out=$(realpath -m "$2")
 W=${3:-1200}; H=${4:-800}; MODE=${5:-dark}; DELAY=${6:-2500}
 root=$(mktemp -d "$HERE/root.XXXX")
-rm -rf "$root"; mkdir -p "$root"
 # A copy of the whole shell, per run. Without this it stayed behind: 550 files
 # of leftover roots were sitting here when the harness was first committed.
 # PREVIEW_KEEP=1 leaves the rendered tree behind, for the times the picture is
@@ -16,6 +15,12 @@ rm -rf "$root"; mkdir -p "$root"
 [ "${PREVIEW_KEEP:-}" = "1" ] || trap 'rm -rf "$root"' EXIT
 cp -r "$WT/shell/." "$root/"
 cp "$target" "$root/PreviewTarget.qml"; echo "PreviewTarget 1.0 PreviewTarget.qml" >> "$root/qmldir"; mkdir -p "$(dirname "$out")"
+# What the targets share -- the stage they are drawn on, the stand-in bar --
+# goes beside the target, where it finds them by name.
+for f in "$HERE"/lib/*.qml; do
+    cp "$f" "$root/"
+    echo "$(basename "$f" .qml) 1.0 $(basename "$f")" >> "$root/qmldir"
+done
 cp "$HERE/harness.qml" "$root/preview.qml"
 [ -d "$HERE/stubs" ] && cp "$HERE/stubs/"*.qml "$root/features/panel/"
 # Attached layer-shell properties have nothing to attach to on a FloatingWindow.
@@ -224,7 +229,7 @@ fi
 # `QIcon::fromTheme` misses and every application icon in the picture is a
 # blank square -- which is what "the launcher preview shows empty tiles" was.
 # The KDE platform theme reads kdeglobals like the real session does.
-WT_SCRIPTS="$WT/scripts" env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen \
+env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen \
     QT_QPA_PLATFORMTHEME=kde XDG_CURRENT_DESKTOP=KDE QT_FORCE_STDERR_LOGGING=1 \
     WT_SCRIPTS="$WT/scripts" PREVIEW_OUT="$out" PREVIEW_W="$W" PREVIEW_H="$H" PREVIEW_MODE="$MODE" PREVIEW_DELAY="$DELAY" \
     timeout 40 quickshell -n -p "$root/preview.qml" 2>&1 | grep -vE 'DEBUG|^\s*$' | grep -iE 'warn|error|fail|preview|qml:' | head -40 || true

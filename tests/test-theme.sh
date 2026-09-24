@@ -7,22 +7,8 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 
 # A home with settings already in it, including ones the theme will overwrite.
 kwriteconfig6 --file kdeglobals --group General --key ColorScheme "UserScheme"
@@ -32,18 +18,11 @@ kwriteconfig6 --file plasmarc   --group Theme   --key name        "user-theme"
 kwriteconfig6 --file kwinrc     --group Windows --key Unrelated   "keepme"
 kwriteconfig6 --file kwinrc     --group TabBox  --key LayoutName  "thumbnail_grid"
 
-before=$(mktemp -d)
-cp -a "$XDG_CONFIG_HOME/." "$before/"
-# KDE's files, not ours. The gate is that reverting leaves the desktop
-# byte-identical; this project's own configuration directory is ours to write
-# and is removed by an uninstall, not by a theme revert.
-kde_sums() { (cd "$XDG_CONFIG_HOME" && find . -type f -not -path "./$SLUG/*" | sort | xargs sha256sum); }
 before_sums=$(kde_sums)
 
 # Stand-ins for the session and for anything that installs a package: both
 # must be reached by nothing here.
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/calls"; : > "$CALLS"
+CALLS="$SANDBOX/calls"
 # GTK's preference lives in dconf, which no sandbox HOME contains, so
 # gsettings is a stand-in that keeps its value in a file.
 cat > "$FAKEBIN/gsettings" <<'STUB'
@@ -59,12 +38,7 @@ chmod +x "$FAKEBIN/gsettings"
 export GSETTINGS_STORE="$SANDBOX/gtk-color-scheme"
 printf 'prefer-dark' > "$GSETTINGS_STORE"
 
-for t in busctl pacman sudo; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
+fake_recorders "$CALLS" busctl pacman sudo
 
 # Two style plugins "installed", in a directory of the test's own.
 mkdir -p "$SANDBOX/styles"
@@ -81,7 +55,6 @@ printf '[General]\nName=Theirs\n' > "$COLORS_DIR/TheirScheme.colors"
 # Choosing this shell's theme themes the desktop to match it: that is the
 # default, so that the panel and the applications under it do not disagree.
 # What it is allowed to touch is `theme.desktop`, part by part.
-profile="$CONFIG_DIR/profiles/default/shell.json"
 mkdir -p "$(dirname "$profile")"
 desktop_parts_off() {   # desktop_parts_off <jq assignment>
     if [ -n "$1" ]; then printf '{ "theme": { "desktop": %s } }\n' "$1" > "$profile"
@@ -116,8 +89,10 @@ check "colour scheme left alone"    "$(kreadconfig6 --file kdeglobals --group Ge
 check "but the icons are ours"      "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 check "and the decorations"         "$(kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key library)" "org.kde.breeze"
 check "the package is still active" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage)" "$LNF_DARK_PACKAGE_ID"
-check "status says which"           "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.colours')" "false"
-check "and which are on"            "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.desktop.icons')" "true"
+# One read for the checks against one state: here each read is five seconds.
+s=$("$REPO_ROOT/scripts/theme.sh" status --json)
+check "status says which"           "$(jq -r '.desktop.colours' <<<"$s")" "false"
+check "and which are on"            "$(jq -r '.desktop.icons' <<<"$s")" "true"
 "$REPO_ROOT/scripts/theme.sh" revert >/dev/null 2>&1
 
 echo "== the whole switch off writes nothing outside our own package =="
@@ -226,8 +201,9 @@ check "and back to dark"              "$(kreadconfig6 --file kdeglobals --group 
 check "with dark icons"               "$(kreadconfig6 --file kdeglobals --group Icons --key Theme)" "breeze-dark"
 
 check "a variant nobody has"          "$("$REPO_ROOT/scripts/theme.sh" variant sideways >/dev/null 2>&1 && echo ran || echo refused)" "refused"
-check "status carries it"             "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.resolved')" "light"
-check "and whether it follows"        "$("$REPO_ROOT/scripts/theme.sh" status --json | jq -r '.variant.follows')" "false"
+s=$("$REPO_ROOT/scripts/theme.sh" status --json)
+check "status carries it"             "$(jq -r '.variant.resolved' <<<"$s")" "light"
+check "and whether it follows"        "$(jq -r '.variant.follows' <<<"$s")" "false"
 
 # An apply in light leaves the desktop in light, not in whatever the file
 # happens to list first.
@@ -376,11 +352,12 @@ check "still silenced after apply" "$(grep -c 'drawn as nothing' "$osd_file")" "
 echo "== widget style =="
 th() { "$REPO_ROOT/scripts/theme.sh" "$@"; }
 tjs() { th status --json 2>/dev/null | jq -r "$1"; }
-check "every part reported"          "$(tjs '[.package, .parts.switcher, .parts.desktoptheme, .parts.splash, .parts.schemes] | map(tostring) | join(",")')" "true,true,true,true,2"
-check "an installed style offered"   "$(tjs '.styles[] | select(.id == "darkly") | .installed')" "true"
-check "a missing one is not"         "$(tjs '.styles[] | select(.id == "union") | .installed')" "false"
-check "Fusion is built into Qt"      "$(tjs '.styles[] | select(.id == "fusion") | .installed')" "true"
-check "the theme's style read back"  "$(tjs .style)" "breeze"
+s=$(th status --json 2>/dev/null)
+check "every part reported"          "$(jq -r '[.package, .parts.switcher, .parts.desktoptheme, .parts.splash, .parts.schemes] | map(tostring) | join(",")' <<<"$s")" "true,true,true,true,2"
+check "an installed style offered"   "$(jq -r '.styles[] | select(.id == "darkly") | .installed' <<<"$s")" "true"
+check "a missing one is not"         "$(jq -r '.styles[] | select(.id == "union") | .installed' <<<"$s")" "false"
+check "Fusion is built into Qt"      "$(jq -r '.styles[] | select(.id == "fusion") | .installed' <<<"$s")" "true"
+check "the theme's style read back"  "$(jq -r .style <<<"$s")" "breeze"
 th style darkly >/dev/null 2>&1
 check "written as Qt's key"          "$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle)" "Darkly"
 check "refuses one not installed"    "$(th style union >/dev/null 2>&1 && echo ran || echo refused)" "refused"
@@ -412,16 +389,39 @@ check "GTK's preference back"      "$(cat "$GSETTINGS_STORE")" "prefer-dark"
 check "L&F key removed (was unset)" "$(kreadconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage --default '<unset>')" "<unset>"
 
 # The gate: byte-identical, not merely equivalent.
-after_sums=$(kde_sums)
-if [ "$before_sums" = "$after_sums" ]; then
-    printf '  PASS  every config file byte-identical after revert\n'; pass=$((pass+1))
-else
-    printf '  FAIL  config files differ after revert:\n' >&2
-    diff <(printf '%s\n' "$before_sums") <(printf '%s\n' "$after_sums") | sed 's/^/        /' >&2
-    fail=$((fail+1))
-fi
+check_unchanged "every config file byte-identical after revert" "$before_sums" "$(kde_sums)"
 
-rm -rf "$before"
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+
+# Night Light switched off is an answer, and it used to be waited on: every
+# `theme status` and `theme variant` on a machine without a schedule spent five
+# seconds asking again for one. Only silence is worth the wait. The session is
+# a stand-in here -- a busctl that answers from a variable -- so it is the one
+# place this suite lets a script believe there is a session at all.
+echo "== Night Light off is an answer, not a wait =="
+NL_BIN="$SANDBOX/night-light"; mkdir -p "$NL_BIN"
+cat > "$NL_BIN/busctl" <<'STUB'
+#!/usr/bin/env bash
+b() { printf '{"type":"b","data":%s}\n' "$@"; }
+case "$NL_STATE" in
+    off)   b true false true ;;
+    day)   b true true true ;;
+    night) b true true false ;;
+    *)     exit 1 ;;
+esac
+STUB
+chmod +x "$NL_BIN/busctl"
+# "<answer>:<whether it took under a second>", from the lib itself.
+night_light() {
+    ( export NL_STATE=$1 PATH="$NL_BIN:$PATH"
+      unset "$NO_SESSION_VAR"
+      source "$REPO_ROOT/scripts/lib/kwin.sh"
+      t0=$(date +%s%N); a=$(night_light_wait 2); t1=$(date +%s%N)
+      printf '%s:%s' "${a:-none}" "$([ $(( (t1 - t0) / 1000000 )) -lt 900 ] && echo quick || echo waited)" )
+}
+check "daylight"                   "$(night_light day)"     "true:quick"
+check "night"                      "$(night_light night)"   "false:quick"
+check "switched off, at once"      "$(night_light off)"     "none:quick"
+check "no answer is waited for"    "$(night_light silent)"  "none:waited"
+check "and no session asks nobody" "$(export NL_STATE=day PATH="$NL_BIN:$PATH"; source "$REPO_ROOT/scripts/lib/kwin.sh"; night_light_daylight; echo ":$?")" ":0"
+
+harness_done

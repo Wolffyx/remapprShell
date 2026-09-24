@@ -7,6 +7,7 @@
 
 import QtQuick
 import QtTest
+import qs.core
 import qs.domain.status.icons
 
 TestCase {
@@ -218,6 +219,21 @@ TestCase {
         compare(StatusIcons.linkSpeed(2500), "2.5 Gbit/s");
     }
 
+    // What the network widget and the status cluster both say on hover.
+    function test_network_tooltip() {
+        const wired = { kind: "wired", name: "Wired connection 1", speed: 1000 };
+        const wifi = { kind: "wifi", name: "Home", strength: 0.72 };
+        compare(StatusIcons.networkTooltip([wired, wifi], "Full"),
+                "Wired connection 1 · 1 Gbit/s\nHome · 72%");
+        // A speed nobody reported is left out, not shown as nothing.
+        compare(StatusIcons.networkTooltip([{ kind: "wired", name: "eth0", speed: 0 }], "Full"), "eth0");
+        compare(StatusIcons.networkTooltip([wifi], "Portal"), "Home · 72%\nA sign-in page is in the way");
+        compare(StatusIcons.networkTooltip([wifi], "Limited"), "Home · 72%\nNo internet");
+        // Nothing connected says so, whatever the check thinks.
+        compare(StatusIcons.networkTooltip([], "None"), "Not connected");
+        compare(StatusIcons.networkTooltip(undefined, "Unknown"), "Not connected");
+    }
+
     function test_bluetooth() {
         compare(StatusIcons.bluetoothIcon(false, 2), "network-bluetooth-inactive-symbolic");
         compare(StatusIcons.bluetoothIcon(true, 0), "network-bluetooth");
@@ -416,12 +432,6 @@ TestCase {
         + '"IsInternal":{"type":"b","data":false},"Label":{"type":"s","data":"EXA Displays 27Q"},'
         + '"MaxBrightness":{"type":"i","data":10000}}]}'
 
-    function test_bus_props_are_flattened() {
-        compare(StatusIcons.busProps(JSON.parse(external).data).Label, "EXA Displays 27Q");
-        compare(Object.keys(StatusIcons.busProps(null)).length, 0);
-        compare(Object.keys(StatusIcons.busProps([])).length, 0);
-    }
-
     function test_displays_are_read_one_per_line() {
         const d = StatusIcons.brightnessDisplays([`display0 ${external}`, ""]);
         compare(d.length, 1);
@@ -460,6 +470,16 @@ TestCase {
         compare(StatusIcons.brightnessFloor(15), 1);
     }
 
+    // A slider's percent as a raw value: 1% at the bottom, never below.
+    function test_a_percent_is_a_raw_value_above_the_floor() {
+        compare(StatusIcons.brightnessFromPercent(50, 10000), 5000);
+        compare(StatusIcons.brightnessFromPercent(100, 15), 15);
+        compare(StatusIcons.brightnessFromPercent(33, 15), 5);
+        compare(StatusIcons.brightnessFromPercent(1, 10000), 100);
+        compare(StatusIcons.brightnessFromPercent(0, 10000), 100);
+        compare(StatusIcons.brightnessFromPercent(0, 15), 1);
+    }
+
     // Dimmed below the floor elsewhere: scrolling down leaves it there
     // rather than brightening it, and scrolling up starts from where it is.
     function test_below_the_floor_is_not_snapped_up() {
@@ -469,6 +489,25 @@ TestCase {
 
     function nl(props) {
         return Object.assign({ available: true, enabled: true, inhibited: false, currentTemperature: 6500 }, props);
+    }
+
+    // KWin's reply to Properties.GetAll on /org/kde/KWin/NightLight, in the
+    // shape busctl gives it, trimmed to the properties read here. NightLight
+    // flattens it with BusLine.props, and the brightness widget reads the
+    // result through BusLine too: the one read serves both.
+    readonly property string nightGetAll: '{"type":"a{sv}","data":[{'
+        + '"available":{"type":"b","data":true},"enabled":{"type":"b","data":true},'
+        + '"inhibited":{"type":"b","data":false},"daylight":{"type":"b","data":false},'
+        + '"currentTemperature":{"type":"u","data":4500},"mode":{"type":"u","data":0},'
+        + '"scheduledTransitionDateTime":{"type":"t","data":1790000000}}]}'
+
+    function test_night_light_from_its_bus_reply() {
+        const nl = BusLine.props(JSON.parse(nightGetAll).data);
+        compare(StatusIcons.nightLightState(nl), "warm");
+        compare(nl.daylight, false);
+        compare(nl.scheduledTransitionDateTime, 1790000000);
+        // No reply at all is no Night Light, not an error.
+        compare(StatusIcons.nightLightState(BusLine.props(undefined)), "unavailable");
     }
 
     function test_night_light_states() {
@@ -577,5 +616,17 @@ TestCase {
                 "Camera in use by Zoom\nMicrophone in use by Chrome, Discord");
         compare(StatusIcons.privacyTooltip({ microphone: ["Chrome"], camera: [] }, true),
                 "Microphone in use by Chrome (muted)");
+    }
+
+    // The middle-click hint comes only with a microphone in use, and says
+    // which way a click would go.
+    function test_privacy_hint() {
+        compare(StatusIcons.privacyHint({ microphone: ["Chrome"], camera: [] }, false),
+                "Microphone in use by Chrome\nMiddle-click to mute the microphone");
+        compare(StatusIcons.privacyHint({ microphone: ["Chrome"], camera: [] }, true),
+                "Microphone in use by Chrome (muted)\nMiddle-click to unmute the microphone");
+        compare(StatusIcons.privacyHint({ microphone: [], camera: ["Zoom"] }, false), "Camera in use by Zoom");
+        compare(StatusIcons.privacyHint({ microphone: [], camera: [] }, false), "");
+        compare(StatusIcons.privacyHint(undefined, false), "");
     }
 }

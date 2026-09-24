@@ -1,0 +1,26 @@
+# Every action this project can bind a key to -- and so every action a screen
+# edge of ours can run, which is the same list on purpose.
+#
+# One list for everything that needs it. shortcuts.sh reads it for what it
+# accepts and what it shows, edges.sh for what an edge may name, doctor for
+# what to look for; bin/windowsd.py.in has it rendered in, to register each
+# one with kglobalaccel and to run it. Before this there were three copies and
+# a fourth that held eight of the fourteen.
+#
+# The id, a tab, the name System Settings shows in its shortcut list -- a
+# sentence a person recognises, not the id -- a tab, and the arguments to the
+# CLI that runs it, split on spaces. In the order `shortcuts status` lists them.
+launcher	Application menu	launcher
+search	Search	search
+settings	Settings	settings
+ask	Ask about the last notification	ask --last-notification
+clipboard	Clipboard history	clipboard
+sidebar	Sidebar	sidebar
+keys	Keyboard shortcuts	keys
+switcher	Window switcher	switcher show
+switcher-reverse	Window switcher (backwards)	switcher show --reverse
+overview	Desktops	switcher overview
+overview-reverse	Desktops (backwards)	switcher overview --reverse
+screenshot	Screenshot of a region	screenshot region
+screenshot-screen	Screenshot of the screen	screenshot screen
+screenshot-window	Screenshot of the active window	screenshot window

@@ -138,61 +138,6 @@ QtObject {
 
     // ---- what the system opens things with ----------------------------------
 
-    // The value of one key in one group of an INI-shaped file, or "".
-    //
-    // Small and forgiving on purpose: this is asked of KDE's own files, which
-    // are written by KDE and read here only to learn what is already true.
-    function iniValue(text, group, key) {
-        let inGroup = false;
-        for (const raw of String(text ?? "").split("\n")) {
-            const line = raw.trim();
-            if (line.startsWith("[")) {
-                inGroup = line === `[${group}]`;
-                continue;
-            }
-            if (!inGroup)
-                continue;
-            const eq = line.indexOf("=");
-            if (eq > 0 && line.slice(0, eq).trim() === key)
-                return line.slice(eq + 1).trim();
-        }
-        return "";
-    }
-
-    // The desktop ids named as the default for something in a mimeapps.list:
-    // the browser that opens links, the viewer that opens images, and so on.
-    //
-    // Only the first id of each line: the rest are the fallbacks, and a
-    // fallback is not what the system opens that kind of thing with. Added
-    // Associations are skipped for the same reason -- a thing that *can* open
-    // PDFs is not the thing that does.
-    //
-    // Ids come back without the ".desktop", which is how a desktop entry
-    // names itself everywhere else in this shell.
-    function parseDefaultApps(text) {
-        const out = [];
-        let inDefaults = false;
-        for (const raw of String(text ?? "").split("\n")) {
-            const line = raw.trim();
-            if (line.startsWith("[")) {
-                inDefaults = line === "[Default Applications]";
-                continue;
-            }
-            if (!inDefaults || line.startsWith("#"))
-                continue;
-            const eq = line.indexOf("=");
-            if (eq <= 0)
-                continue;
-            const first = line.slice(eq + 1).split(";")[0].trim();
-            if (first.length === 0)
-                continue;
-            const id = first.endsWith(".desktop") ? first.slice(0, -8) : first;
-            if (out.indexOf(id) < 0)
-                out.push(id);
-        }
-        return out;
-    }
-
     // What `xdg-mime query default` answered, one type per line, in the order
     // the types were asked about.
     //

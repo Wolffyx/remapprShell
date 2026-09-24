@@ -13,9 +13,8 @@ pragma ComponentBehavior: Bound
 // more use than a control that writes a key nothing reads.
 
 import QtQuick
-import Quickshell.Io
-import qs.core
 import qs.platform.kde
+import qs.platform.system
 import qs.domain.theme
 import qs.domain.windows
 import qs.ui.primitives
@@ -24,13 +23,15 @@ import qs.ui.controls
 Column {
     id: root
 
-    // `windows behaviour status --json`, parsed. Null until the first read.
-    property var info: null
-    property string status: ""
-    property bool busy: false
+    // `windows behaviour status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["windows", "behaviour"]
+        readFailed: "Could not read KWin's window settings."
+        logLabel: "windows behaviour"
+    }
 
-    readonly property var settings: root.info?.settings ?? []
-    readonly property var tilingScripts: root.info?.tilingScripts ?? []
+    readonly property var settings: root.ctl.state?.settings ?? []
+    readonly property var tilingScripts: root.ctl.state?.tilingScripts ?? []
 
     function valueOf(id, fallback) {
         return (root.settings.find(s => s.id === id)?.value) ?? fallback;
@@ -41,59 +42,17 @@ Column {
 
     spacing: 14
 
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     function set(id, value) {
-        if (root.busy)
-            return;
-        root.status = "";
-        setProc.command = [Branding.ctlBin, "windows", "behaviour", "set", id, String(value)];
-        setProc.running = true;
+        root.ctl.run(["set", id, value]);
     }
 
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "windows", "behaviour", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.info = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read KWin's window settings.";
-                    Log.warn("settings", `windows behaviour: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _set: Process {
-        id: setProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
-
-    PanelText {
-        visible: root.status.length > 0
-        width: root.width
-        wrapMode: Text.WordWrap
-        text: root.status
-        font.pixelSize: 12
-        color: Theme.error
+    Hint {
+        visible: root.ctl.status.length > 0
+        text: root.ctl.status
+        tone: "error"
+        lineHeight: 1
     }
 
     Card {
@@ -109,13 +68,8 @@ Column {
             onPicked: value => root.set("focus", value)
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Strictly under the mouse gives focus to nothing at all when the pointer is over the desktop."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         SliderRow {
@@ -175,13 +129,8 @@ Column {
             onToggled: value => root.set("borderlessMaximized", value)
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Title bars, their buttons and the corner radius belong to the window decoration, which is Plasma's own page and applies to every application."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -197,15 +146,10 @@ Column {
 
         SectionLabel { text: "Tiling" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: root.tilingScripts.length > 0
                 ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge may go to it rather than to KWin's snapping.`
                 : "KWin has no tiling layouts of its own: it has snapping at the edges, and custom tiles under Meta+T. Gaps between windows and rounded window corners come from a tiling script, not from a shell, so nothing here pretends to set them."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         TextButton {
@@ -241,14 +185,9 @@ Column {
             }
         }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !WindowsService.available
-            wrapMode: Text.WordWrap
             text: "The task list and the window title need a small KWin script, which `rmpr windows enable` installs."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
     }
 }

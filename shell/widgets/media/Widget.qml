@@ -9,7 +9,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.status
-import qs.domain.status.icons
 import qs.domain.theme
 import qs.platform.kde
 import qs.ui.controls
@@ -18,11 +17,8 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
-
     readonly property bool showTitle: root.widgetConfig?.showTitle ?? true
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 180
-    readonly property bool horizontal: root.bar?.horizontal ?? true
     readonly property var player: MediaStatus.current
 
     present: MediaStatus.present
@@ -30,8 +26,8 @@ BarWidget {
     tooltip: [MediaStatus.title, MediaStatus.artist, MediaStatus.playing ? "" : "Paused"]
         .filter(s => s).join("\n")
 
-    implicitWidth: Math.max(root.size, row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit)))
-    implicitHeight: root.size
+    implicitWidth: Math.max(root.tileSize, row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit)))
+    implicitHeight: root.tileSize
 
     function handleActivate(button) {
         if (button === Qt.MiddleButton) {
@@ -43,10 +39,10 @@ BarWidget {
 
     BarButton {
         anchors.fill: parent
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: root.size
+        size: root.tileSize
     }
 
     Row {
@@ -64,7 +60,7 @@ BarWidget {
 
         PanelText {
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.showTitle && root.horizontal && text.length > 0
+            visible: root.showTitle && !root.barVertical && text.length > 0
             width: Math.min(implicitWidth, root.maxWidth)
             elide: Text.ElideRight
             text: MediaStatus.title
@@ -72,187 +68,129 @@ BarWidget {
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 320
-            implicitHeight: body.implicitHeight
+            spacing: 10
 
-            Column {
-                id: body
+            Row {
                 width: parent.width
                 spacing: 10
 
-                Row {
-                    width: parent.width
-                    spacing: 10
-
-                    Rectangle {
-                        width: 64
-                        height: 64
-                        radius: Theme.radiusOf(6)
-                        color: Theme.alpha(Theme.foreground, 0.08)
-                        clip: true
-
-                        Image {
-                            id: art
-                            anchors.fill: parent
-                            source: root.player?.trackArtUrl ?? ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            visible: art.status === Image.Ready
-                        }
-
-                        PanelIcon {
-                            anchors.centerIn: parent
-                            visible: !art.visible
-                            implicitSize: 32
-                            iconName: root.player?.desktopEntry ?? ""
-                            fallbackName: "media-album-cover"
-                        }
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 74
-                        spacing: 2
-
-                        PanelText {
-                            width: parent.width
-                            text: MediaStatus.title
-                            elide: Text.ElideRight
-                            font.bold: true
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            visible: text.length > 0
-                            text: MediaStatus.artist
-                            elide: Text.ElideRight
-                            font.pixelSize: 11
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            visible: text.length > 0
-                            text: root.player?.trackAlbum ?? ""
-                            elide: Text.ElideRight
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 10
-                        }
-                    }
+                AlbumArt {
+                    width: 64
+                    height: 64
+                    radius: Theme.radiusOf(6)
+                    color: Theme.alpha(Theme.foreground, 0.08)
+                    source: root.player?.trackArtUrl ?? ""
+                    // The player's own icon stands in for a missing cover.
+                    glyph: ""
+                    iconName: root.player?.desktopEntry ?? ""
                 }
 
-                // Where in the track, and a click on the bar to go elsewhere
-                // in it, when the player allows that.
                 Column {
-                    visible: (root.player?.lengthSupported ?? false) && (root.player?.length ?? 0) > 0
-                    width: parent.width
-                    spacing: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 74
+                    spacing: 2
 
-                    Rectangle {
-                        id: track
+                    PanelText {
                         width: parent.width
-                        height: 4
-                        radius: Theme.radiusOf(2)
-                        color: Theme.alpha(Theme.foreground, 0.2)
-
-                        Rectangle {
-                            width: parent.width * Math.min(1, (root.player?.position ?? 0) / Math.max(1, root.player?.length ?? 1))
-                            height: parent.height
-                            radius: parent.radius
-                            color: Theme.accent
-                        }
-
-                        TapHandler {
-                            enabled: root.player?.canSeek ?? false
-                            // A 4px bar is a small target; the handler's
-                            // margin makes the band around it count too.
-                            margin: 6
-                            onTapped: point => MediaStatus.seek(point.position.x / track.width * (root.player?.length ?? 0))
-                        }
+                        text: MediaStatus.title
+                        elide: Text.ElideRight
+                        font.bold: true
                     }
 
-                    Item {
+                    PanelText {
                         width: parent.width
-                        height: elapsed.implicitHeight
+                        visible: text.length > 0
+                        text: MediaStatus.artist
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                    }
 
-                        PanelText {
-                            id: elapsed
-                            text: StatusIcons.trackTime(root.player?.position ?? 0)
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 10
-                        }
-
-                        PanelText {
-                            anchors.right: parent.right
-                            text: StatusIcons.trackTime(root.player?.length ?? 0)
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 10
-                        }
+                    PanelText {
+                        width: parent.width
+                        visible: text.length > 0
+                        text: root.player?.trackAlbum ?? ""
+                        elide: Text.ElideRight
+                        color: Theme.foregroundInactive
+                        font.pixelSize: 10
                     }
                 }
+            }
 
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 12
+            // Where in the track, and a click on the bar to go elsewhere
+            // in it, when the player allows that.
+            SeekBar {
+                visible: (root.player?.lengthSupported ?? false) && (root.player?.length ?? 0) > 0
+                width: parent.width
+                position: root.player?.position ?? 0
+                length: root.player?.length ?? 0
+                canSeek: root.player?.canSeek ?? false
+                onSeek: seconds => MediaStatus.seek(seconds)
+            }
 
-                    IconButton {
-                        iconName: "media-skip-backward"
-                        opacity: (root.player?.canGoPrevious ?? false) ? 1 : 0.35
-                        onActivated: MediaStatus.previous()
-                    }
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 12
 
-                    IconButton {
-                        iconName: MediaStatus.playing ? "media-playback-pause" : "media-playback-start"
-                        opacity: (root.player?.canTogglePlaying ?? false) ? 1 : 0.35
-                        onActivated: MediaStatus.toggle()
-                    }
-
-                    IconButton {
-                        iconName: "media-skip-forward"
-                        opacity: (root.player?.canGoNext ?? false) ? 1 : 0.35
-                        onActivated: MediaStatus.next()
-                    }
+                IconButton {
+                    iconName: "media-skip-backward"
+                    opacity: (root.player?.canGoPrevious ?? false) ? 1 : 0.35
+                    onActivated: MediaStatus.previous()
                 }
 
-                // A choice only when there is one to make.
-                Flow {
-                    visible: MediaStatus.players.length > 1
-                    width: parent.width
-                    spacing: 6
-
-                    Repeater {
-                        model: MediaStatus.players
-
-                        TextButton {
-                            required property var modelData
-                            text: modelData?.identity ?? ""
-                            checked: modelData === MediaStatus.current
-                            onActivated: MediaStatus.choose(modelData)
-                        }
-                    }
+                IconButton {
+                    iconName: MediaStatus.playing ? "media-playback-pause" : "media-playback-start"
+                    opacity: (root.player?.canTogglePlaying ?? false) ? 1 : 0.35
+                    onActivated: MediaStatus.toggle()
                 }
 
-                Flow {
-                    width: parent.width
-                    spacing: 6
+                IconButton {
+                    iconName: "media-skip-forward"
+                    opacity: (root.player?.canGoNext ?? false) ? 1 : 0.35
+                    onActivated: MediaStatus.next()
+                }
+            }
+
+            // A choice only when there is one to make.
+            Flow {
+                visible: MediaStatus.players.length > 1
+                width: parent.width
+                spacing: 6
+
+                Repeater {
+                    model: MediaStatus.players
 
                     TextButton {
-                        visible: root.player?.canRaise ?? false
-                        text: `Show ${root.player?.identity ?? "the player"}`
-                        iconName: root.player?.desktopEntry ?? ""
-                        onActivated: {
-                            root.player.raise();
-                            root.popoutVisible = false;
-                        }
+                        required property var modelData
+                        text: modelData?.identity ?? ""
+                        checked: modelData === MediaStatus.current
+                        onActivated: MediaStatus.choose(modelData)
                     }
+                }
+            }
 
-                    TextButton {
-                        text: "Media controls…"
-                        iconName: "media-playback-start"
-                        onActivated: {
-                            PlasmaApplets.open("org.kde.plasma.mediacontroller");
-                            root.popoutVisible = false;
-                        }
+            Flow {
+                width: parent.width
+                spacing: 6
+
+                TextButton {
+                    visible: root.player?.canRaise ?? false
+                    text: `Show ${root.player?.identity ?? "the player"}`
+                    iconName: root.player?.desktopEntry ?? ""
+                    onActivated: {
+                        root.player.raise();
+                        root.popoutVisible = false;
+                    }
+                }
+
+                TextButton {
+                    text: "Media controls…"
+                    iconName: "media-playback-start"
+                    onActivated: {
+                        PlasmaApplets.open("org.kde.plasma.mediacontroller");
+                        root.popoutVisible = false;
                     }
                 }
             }

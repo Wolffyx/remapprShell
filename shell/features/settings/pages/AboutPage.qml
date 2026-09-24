@@ -15,8 +15,6 @@ import qs.ui.controls
 CardGrid {
     id: root
 
-    count: 2
-
     property string updateStatus: ""
     property bool checking: false
 
@@ -50,7 +48,7 @@ CardGrid {
         }
 
         PanelText {
-            width: what.width - 2 * what.padding
+            width: what.contentWidth
             wrapMode: Text.WordWrap
             text: "A configurable desktop shell for KDE Plasma."
             font.pixelSize: 13
@@ -91,7 +89,7 @@ CardGrid {
 
                 required property var modelData
 
-                width: where.width - 2 * where.padding
+                width: where.contentWidth
                 spacing: 1
 
                 PanelText {
@@ -120,7 +118,7 @@ CardGrid {
         SectionLabel { text: "Updates" }
 
         SettingRow {
-            width: updates.width - 2 * updates.padding
+            width: updates.contentWidth
             label: "Follow"
             description: ConfigStore.value("update.channel", "main") === "dev"
                 ? "dev: where work lands, every day."
@@ -136,7 +134,7 @@ CardGrid {
         }
 
         SettingRow {
-            width: updates.width - 2 * updates.padding
+            width: updates.contentWidth
             stacked: true
             label: "Update from"
             description: "A git URL. Empty uses this checkout's own origin."
@@ -151,7 +149,7 @@ CardGrid {
         }
 
         SettingRow {
-            width: updates.width - 2 * updates.padding
+            width: updates.contentWidth
             stacked: true
             label: "Or from a checkout here"
             description: "A path on this machine, which wins over the URL -- for trying a change before it is pushed."
@@ -166,7 +164,7 @@ CardGrid {
         }
 
         Flow {
-            width: updates.width - 2 * updates.padding
+            width: updates.contentWidth
             spacing: 8
             TextButton {
                 enabled: !root.checking
@@ -179,19 +177,17 @@ CardGrid {
 
         PanelText {
             visible: root.updateStatus.length > 0
-            width: updates.width - 2 * updates.padding
+            width: updates.contentWidth
             wrapMode: Text.WordWrap
             font.family: Theme.monoFamily
             font.pixelSize: 12
             text: root.updateStatus
         }
 
-        PanelText {
-            width: updates.width - 2 * updates.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
+        Hint {
+            width: updates.contentWidth
             text: "Nothing is installed from here. To take an update: rmpr update -- and rmpr update --rollback puts the last one back."
+            lineHeight: 1
         }
     }
 }

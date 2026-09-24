@@ -77,10 +77,11 @@ Item {
     readonly property real unit: Math.max(0.62, Math.min(1, ui.height / 1080))
     readonly property int edge: Math.round(96 * ui.unit)
 
-    // The glass style's colours, which the others override for themselves.
+    // The glass style's colour, which the others override for themselves.
     readonly property color fg: "#ffffff"
-    readonly property color fgDim: Qt.rgba(1, 1, 1, 0.82)
-    // Every style's focus ring, caret and primary button.
+    // Every style's focus ring, primary button and the border of a field
+    // with the keyboard. Not the caret, which Plasma's field draws in the
+    // text's own colour.
     readonly property color accent: Options.accent
 
     // When the lock screen started, which is as near as the greeter can know
@@ -345,8 +346,17 @@ Item {
         passwordField: ui.prompt?.field ?? null
     }
 
-    // Read by the styles, which draw the button that shows and hides it.
-    readonly property Item keyboard: inputPanel
+    // For the styles, which draw the button that shows and hides it: whether
+    // Plasma's keyboard loaded at all, whether it is up, and the press. The
+    // password field is focused first, so that the first key typed on the
+    // keyboard goes into the password rather than nowhere.
+    readonly property bool keyboardAvailable: inputPanel.status === Loader.Ready
+    readonly property bool keyboardShown: inputPanel.keyboardActive
+
+    function toggleKeyboard(): void {
+        ui.focusPassword();
+        inputPanel.showHide();
+    }
 
     Binding {
         target: ui.unlock
@@ -364,14 +374,22 @@ Item {
         visible: !ui.leaving
     }
 
+    // The battery, for a style that draws one: this frame's, so that every
+    // style reads the same one -- and a preview's stand-in reaches them all.
+    readonly property LockPower battery: power
+
     LockLockout {
+        id: lockout
         z: 4
         anchors.horizontalCenter: parent.horizontalCenter
         y: (ui.style?.toastY ?? -1) >= 0 ? ui.style.toastY
                                           : Math.round((power.critical ? 96 : 66) * ui.unit)
         unlock: ui.unlock
         unit: ui.unit
-        visible: counting && !ui.leaving
+        // Gone at once when the shutter lifts; otherwise it fades out as it
+        // faded in. Hidden on `counting`, it was hidden before the fade
+        // could play.
+        visible: !ui.leaving && lockout.opacity > 0
     }
 
     LockDim {

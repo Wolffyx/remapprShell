@@ -25,8 +25,8 @@
 // drifts -- so this decides *when*, and the script decides *what*.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.config
 
 QtObject {
@@ -70,8 +70,9 @@ QtObject {
     }
 
     // Night falls once; a colour scheme write arrives several times, and
-    // `theme.mode` can resolve twice while Night Light's properties come in
-    // one by one. One second of quiet is enough to ask only for the answer.
+    // `theme.mode` can resolve twice at startup -- once on the colour scheme,
+    // again when Night Light answers. One second of quiet is enough to ask
+    // only for the answer.
     readonly property Timer _debounce: Timer {
         id: debounce
         interval: 1000
@@ -79,22 +80,13 @@ QtObject {
             if (!root.following || root.variant === root.asked)
                 return;
             root.asked = root.variant;
-            apply.running = false;
-            apply.command = [Branding.ctlBin, "theme", "variant", root.variant, "--if-following"];
-            apply.running = true;
+            apply.run(["theme", "variant", root.variant, "--if-following"]);
             Log.info("theme", `putting the desktop in ${root.variant}`);
         }
     }
 
-    readonly property Process _apply: Process {
+    readonly property CtlRun _apply: CtlRun {
         id: apply
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim().length > 0)
-                Log.warn("theme", `theme variant: ${text.trim().split("\n").pop()}`)
-        }
-        onExited: (code, status) => {
-            if (code !== 0)
-                Log.warn("theme", `theme variant ${root.asked} exited ${code}`);
-        }
+        tag: "theme"
     }
 }
