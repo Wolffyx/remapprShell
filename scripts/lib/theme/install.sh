@@ -144,7 +144,7 @@ SWITCHER_LAYOUTS=("row||" "grid|-grid| (grid)" "icons|-icons| (icons)")
 switcher_dest() { printf '%s/%s%s' "$KWIN_SWITCHER_DIR" "$SLUG" "$1"; }
 
 install_switcher() {
-    local spec layout suffix label dest
+    local spec layout suffix label dest src ui
     for spec in "${SWITCHER_LAYOUTS[@]}"; do
         IFS='|' read -r layout suffix label <<< "$spec"
         dest=$(switcher_dest "$suffix")
@@ -153,9 +153,18 @@ install_switcher() {
         mkdir -p "$dest/contents/ui"
         render_template "$SWITCHER_SRC/metadata.json.in" "$dest/metadata.json" \
             || { log_error "could not render the $layout switcher metadata"; return 1; }
-        render_template "$SWITCHER_SRC/contents/ui/main.qml.in" "$dest/contents/ui/main.qml" \
-            || { log_error "could not render the $layout switcher"; return 1; }
-        chmod 644 "$dest/metadata.json" "$dest/contents/ui/main.qml"
+        chmod 644 "$dest/metadata.json"
+
+        # Every template in ui/, not main.qml alone: the header and the
+        # footer are files of their own beside it, and a package without one
+        # of them is a main.qml naming a type that is not there -- which KWin
+        # answers by drawing no switcher at all.
+        for src in "$SWITCHER_SRC"/contents/ui/*.in; do
+            ui="$dest/contents/ui/$(basename "${src%.in}")"
+            render_template "$src" "$ui" \
+                || { log_error "could not render the $layout switcher"; return 1; }
+            chmod 644 "$ui"
+        done
         unset SWITCHER_LAYOUT SWITCHER_SUFFIX SWITCHER_LABEL
         log_step "installed $dest"
     done

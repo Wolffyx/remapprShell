@@ -1,0 +1,90 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    The top of Alt+Tab: what this is, how many windows there are, and that
+    Alt is still held.
+
+    Part of the window switcher, and drawn inside kwin_wayland like the rest
+    of it -- main.qml places it, and hands it the count and the colours.
+*/
+import QtQuick
+import org.kde.plasma.components as PlasmaComponents3
+import org.kde.kirigami as Kirigami
+
+Item {
+    id: header
+
+    required property int count
+    required property color accent
+    required property color ink
+    required property color outline
+
+    height: 34
+
+    Row {
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 12
+
+        Kirigami.Icon {
+            width: 20; height: 20
+            source: "preferences-system-windows"
+            color: header.accent
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        PlasmaComponents3.Label {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Windows"
+            font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+            font.weight: Font.Medium
+            color: header.ink
+        }
+
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            height: 24
+            width: countLabel.implicitWidth + 22
+            radius: height / 2
+            color: Qt.rgba(header.accent.r, header.accent.g, header.accent.b, 0.16)
+
+            PlasmaComponents3.Label {
+                id: countLabel
+                anchors.centerIn: parent
+                text: `${header.count} open · most recent first`
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.weight: Font.Medium
+                color: header.accent
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        height: 26
+        width: heldRow.implicitWidth + 24
+        radius: height / 2
+        color: Qt.rgba(header.ink.r, header.ink.g, header.ink.b, 0.06)
+        border.width: 1
+        border.color: header.outline
+
+        Row {
+            id: heldRow
+            anchors.centerIn: parent
+            spacing: 8
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 7; height: 7; radius: 4
+                color: header.accent
+            }
+            PlasmaComponents3.Label {
+                text: "Alt held"
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.weight: Font.Medium
+                color: header.ink
+            }
+        }
+    }
+}

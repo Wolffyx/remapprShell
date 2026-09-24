@@ -22,6 +22,15 @@
     Colours come from the active colour scheme through Kirigami.Theme, which is
     the whole point of shipping one: this matches the panel without either
     knowing about the other.
+
+    The header and the footer are files of their own beside this one,
+    SwitcherHeader.qml and SwitcherFooter.qml. KWin loads this file by its
+    path, and QML finds a type in the same directory by its file name, so
+    the package needs no qmldir. It holds no qs.* imports either, for the
+    same reason as this file: it runs inside kwin_wayland, not the shell.
+    The card stays here, because it is the one that draws with KWin's own
+    types -- a second file importing org.kde.kwin is a second import the
+    linter cannot resolve.
 */
 
 // The base type lives in KWin's own qrc and cannot be resolved by the linter,
@@ -40,11 +49,11 @@ KWin.TabBoxSwitcher {
 
     // Which of the design's three layouts this package is.
     //
-    // Three packages are installed from this one file -- row, grid and icons
-    // -- because KWin picks a switcher by package and a layout running inside
-    // kwin_wayland cannot read this shell's configuration. Choosing one is
-    // therefore choosing a switcher, which is what `rmpr switcher layout` and
-    // the settings page already do.
+    // Three packages are installed from these same files -- row, grid and
+    // icons -- because KWin picks a switcher by package and a layout running
+    // inside kwin_wayland cannot read this shell's configuration. Choosing one
+    // is therefore choosing a switcher, which is what `rmpr switcher layout`
+    // and the settings page already do.
     readonly property string layout: "@SWITCHER_LAYOUT@"
     readonly property bool grid: tabBox.layout === "grid"
     readonly property bool icons: tabBox.layout === "icons"
@@ -130,81 +139,18 @@ KWin.TabBoxSwitcher {
             implicitHeight: header.height + content.cardsHeight + footer.height + 3 * tabBox.pad / 2
 
             // ---- header: what this is, and that Alt is still held ----------
-            Item {
+            SwitcherHeader {
                 id: header
 
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: tabBox.pad / 2
-                height: 34
 
-                Row {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 12
-
-                    Kirigami.Icon {
-                        width: 20; height: 20
-                        source: "preferences-system-windows"
-                        color: tabBox.accent
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    PlasmaComponents3.Label {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Windows"
-                        font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
-                        font.weight: Font.Medium
-                        color: tabBox.ink
-                    }
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 24
-                        width: countLabel.implicitWidth + 22
-                        radius: height / 2
-                        color: Qt.rgba(tabBox.accent.r, tabBox.accent.g, tabBox.accent.b, 0.16)
-
-                        PlasmaComponents3.Label {
-                            id: countLabel
-                            anchors.centerIn: parent
-                            text: `${cards.count} open · most recent first`
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            font.weight: Font.Medium
-                            color: tabBox.accent
-                        }
-                    }
-                }
-
-                Rectangle {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: 26
-                    width: heldRow.implicitWidth + 24
-                    radius: height / 2
-                    color: Qt.rgba(tabBox.ink.r, tabBox.ink.g, tabBox.ink.b, 0.06)
-                    border.width: 1
-                    border.color: tabBox.outline
-
-                    Row {
-                        id: heldRow
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 7; height: 7; radius: 4
-                            color: tabBox.accent
-                        }
-                        PlasmaComponents3.Label {
-                            text: "Alt held"
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            font.weight: Font.Medium
-                            color: tabBox.ink
-                        }
-                    }
-                }
+                count: cards.count
+                accent: tabBox.accent
+                ink: tabBox.ink
+                outline: tabBox.outline
             }
 
             // ---- the cards -------------------------------------------------
@@ -443,7 +389,7 @@ KWin.TabBoxSwitcher {
             }
 
             // ---- footer: the selected window, and the keys ------------------
-            Item {
+            SwitcherFooter {
                 id: footer
 
                 anchors.top: tabBox.grid ? gridCards.bottom : cards.bottom
@@ -451,73 +397,12 @@ KWin.TabBoxSwitcher {
                 anchors.right: parent.right
                 anchors.margins: tabBox.pad / 2
                 anchors.topMargin: 14
-                height: 40
 
-                Rectangle {
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 1
-                    color: tabBox.outline
-                }
-
-                PlasmaComponents3.Label {
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    width: parent.width * 0.5
-                    text: (tabBox.grid ? gridCards.currentItem?.caption : cards.currentItem?.caption)
-                          ?? "No open windows"
-                    textFormat: Text.PlainText
-                    elide: Text.ElideMiddle
-                    font.weight: Font.Medium
-                    color: tabBox.ink
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    spacing: 8
-
-                    Repeater {
-                        model: [
-                            { key: "Tab", what: "next" },
-                            { key: "Shift+Tab", what: "back" },
-                            { key: "Alt ↑", what: "focus" },
-                            { key: "Esc", what: "cancel" }
-                        ]
-
-                        delegate: Row {
-                            required property var modelData
-                            spacing: 6
-
-                            Rectangle {
-                                anchors.verticalCenter: parent.verticalCenter
-                                height: 22
-                                width: keyLabel.implicitWidth + 18
-                                radius: 8
-                                color: Qt.rgba(tabBox.ink.r, tabBox.ink.g, tabBox.ink.b, 0.06)
-                                border.width: 1
-                                border.color: tabBox.outline
-
-                                PlasmaComponents3.Label {
-                                    id: keyLabel
-                                    anchors.centerIn: parent
-                                    text: modelData.key
-                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                    font.weight: Font.Medium
-                                    color: tabBox.ink
-                                }
-                            }
-                            PlasmaComponents3.Label {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.what
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                color: tabBox.inkMuted
-                                rightPadding: 6
-                            }
-                        }
-                    }
-                }
+                caption: (tabBox.grid ? gridCards.currentItem?.caption : cards.currentItem?.caption)
+                         ?? "No open windows"
+                ink: tabBox.ink
+                inkMuted: tabBox.inkMuted
+                outline: tabBox.outline
             }
 
             PlasmaComponents3.Label {
