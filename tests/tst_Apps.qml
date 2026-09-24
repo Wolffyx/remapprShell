@@ -49,6 +49,24 @@ TestCase {
         compare(p.map(a => a.id), ["firefox", "org.kde.kate"]);
     }
 
+    // System monitors by what their entries say, not by name: the one asked
+    // for first, then windows before terminals, then the alphabet. A hidden
+    // entry and a program that is not a monitor are left out.
+    function test_monitors_by_category() {
+        const list = [
+            app("zeta", "Zeta Monitor", ["GTK", "System", "Monitor"]),
+            Object.assign(app("atop", "Alpha top", ["System", "Monitor", "ConsoleOnly"]), { runInTerminal: true }),
+            app("own.monitor", "System Monitor", ["Qt", "KDE", "System"]),
+            app("beta", "Beta Monitor", "System,Monitor"),
+            Object.assign(app("hidden", "Hidden Monitor", ["System", "Monitor"]), { noDisplay: true }),
+            apps[0]
+        ];
+        compare(Apps.monitors(list, ["own.monitor"]).map(a => a.id), ["own.monitor", "beta", "zeta", "atop"]);
+        compare(Apps.monitors(list, ["not.installed"]).map(a => a.id), ["beta", "zeta", "atop"]);
+        compare(Apps.monitors(apps, []).length, 0);
+        compare(Apps.monitors(null, null).length, 0);
+    }
+
     function test_everyday_picks() {
         const p = Apps.pickPinned(apps, 10).map(a => a.id);
         compare(p[0], "org.kde.konsole");

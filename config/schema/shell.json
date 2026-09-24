@@ -217,7 +217,7 @@
                     "type": "string",
                     "default": "auto",
                     "label": "System monitor",
-                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
+                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
                 },
                 "panel.menu.entries": {
                     "type": "list",
