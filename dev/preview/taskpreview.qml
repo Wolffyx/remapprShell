@@ -8,15 +8,8 @@ import QtQuick
 import qs.domain.theme
 import qs.widgets.tasks
 
-Rectangle {
+Stage {
     id: stage
-
-    gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 0.45; color: Theme.dark ? "#2c2b3d" : "#e6dcd2" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
 
     function win(title, opts) {
         return Object.assign({

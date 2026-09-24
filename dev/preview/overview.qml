@@ -4,21 +4,13 @@
 import QtQuick
 import Quickshell
 import qs.domain.config
-import qs.domain.theme
 import qs.domain.desktops
 import qs.domain.windows
 import qs.domain.surfaces
 import qs.features.switchers
 
-Rectangle {
+Stage {
     id: stage
-
-    gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 0.45; color: Theme.dark ? "#2c2b3d" : "#e6dcd2" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
 
     // KWin answers over the session bus a moment after this loads and
     // overwrites the stand-ins with this machine's one desktop, so they go

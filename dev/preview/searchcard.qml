@@ -4,13 +4,9 @@ import qs.domain.theme
 import qs.domain.launcher
 import qs.features.launcher
 
-Rectangle {
+Stage {
     id: stage
-    gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0; color: Theme.dark ? "#20283f" : "#c8d5ef" }
-        GradientStop { position: 1; color: Theme.dark ? "#3b3138" : "#f2d7c4" }
-    }
+    middle: false
 
     Rectangle {
         anchors.fill: parent
