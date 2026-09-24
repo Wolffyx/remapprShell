@@ -18,24 +18,20 @@ pragma ComponentBehavior: Bound
 // Every card folds. Which are open is a setting (Cards, and `sidebar.expanded`)
 // rather than a property here, so a sidebar opened tomorrow looks the way this
 // one was left.
+//
+// The cards are files of their own -- SidebarCard is the frame, and
+// SidebarMediaCard, SidebarDayCard, SidebarWeatherCard, SidebarMachineCard and
+// SidebarNotesCard fill it -- and this file is the surface they sit in.
 
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Services.Mpris
 import qs.domain.config
-import qs.domain.notifications
-import qs.domain.notifications.centre
-import qs.domain.session
 import qs.domain.sidebar.cards
-import qs.domain.status
-import qs.domain.status.icons
 import qs.domain.surfaces
 import qs.domain.system
-import qs.domain.system.stats
 import qs.domain.theme
 import qs.domain.weather
-import qs.domain.weather.forecast
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -82,182 +78,10 @@ PanelWindow {
     }
     Component.onDestruction: SystemStats.watch(false)
 
-    readonly property var player: MediaStatus.current
     readonly property SystemClock clock: SystemClock { precision: SystemClock.Minutes }
 
     property real shown: 0
     NumberAnimation on shown { from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic; running: true }
-
-    // One card: a heading that folds it, the part always shown, and the part
-    // that appears when it is open.
-    component Card: Rectangle {
-        id: box
-
-        required property string cardId
-        required property string title
-        required property string glyph
-        property bool foldable: true
-        property alias content: inner.data
-
-        // What an open card adds, as a component rather than as children:
-        // the month grid, the forecast and the rest are built when the card
-        // opens and destroyed when it folds. Each card's is a Column, spaced
-        // as the card's own rows are.
-        property Component extra: null
-
-        readonly property bool open: box.foldable ? win.isOpen(box.cardId) : true
-
-        width: parent ? parent.width : 0
-        height: shape.implicitHeight + 32
-        radius: 20
-        color: Theme.s2
-
-        Column {
-            id: shape
-            x: 16
-            y: 16
-            width: parent.width - 32
-            spacing: 12
-
-            Item {
-                width: parent.width
-                height: 20
-
-                Glyph {
-                    id: mark
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: box.glyph
-                    size: 16
-                    color: Theme.mut
-                }
-
-                PanelText {
-                    anchors.left: mark.right
-                    anchors.leftMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: box.title.toUpperCase()
-                    font.pixelSize: 11
-                    font.letterSpacing: 0.8
-                    font.weight: Font.Medium
-                    color: Theme.mut
-                }
-
-                Glyph {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: box.foldable
-                    name: box.open ? "expand_less" : "expand_more"
-                    size: 18
-                    color: Theme.mut
-                }
-
-                HoverHandler { cursorShape: box.foldable ? Qt.PointingHandCursor : Qt.ArrowCursor }
-                TapHandler {
-                    enabled: box.foldable
-                    onTapped: win.fold(box.cardId)
-                }
-            }
-
-            Column {
-                id: inner
-                width: parent.width
-                spacing: 12
-            }
-
-            // Built only while it is open, and destroyed when it folds: the
-            // month grid and the forecast are not worth keeping alive behind
-            // a closed card. It used to say so over children that were only
-            // hidden -- a folded day card still ran the forecast lookup for
-            // every day of the month.
-            Item {
-                id: more
-                width: parent.width
-                visible: box.open
-                implicitHeight: extraLoader.implicitHeight
-                height: box.open ? implicitHeight : 0
-                clip: true
-                Behavior on height { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
-
-                Loader {
-                    id: extraLoader
-                    width: parent.width
-                    active: box.open
-                    sourceComponent: box.extra
-                }
-            }
-        }
-    }
-
-    component Meter: Column {
-        id: meter
-        property string label: ""
-        property string value: ""
-        property real fraction: 0
-        width: parent ? parent.width : 0
-        spacing: 6
-
-        Item {
-            width: parent.width
-            height: 16
-            PanelText { text: meter.label; font.pixelSize: 12; color: Theme.mut }
-            PanelText { anchors.right: parent.right; text: meter.value; font.pixelSize: 12; color: Theme.mut }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 5
-            radius: 2.5
-            color: Theme.alpha(Theme.fg, 0.12)
-
-            Rectangle {
-                width: parent.width * Math.max(0, Math.min(1, meter.fraction))
-                height: parent.height
-                radius: parent.radius
-                color: Theme.acc
-                Behavior on width { NumberAnimation { duration: 400 } }
-            }
-        }
-    }
-
-    // One hour or one day of the forecast, as a column of three lines.
-    component Moment: Column {
-        id: moment
-        property string when: ""
-        property string glyph: ""
-        property string value: ""
-        property string second: ""
-        width: 52
-        spacing: 4
-
-        PanelText {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: moment.when
-            font.pixelSize: 11
-            color: Theme.mut
-        }
-
-        Glyph {
-            anchors.horizontalCenter: parent.horizontalCenter
-            name: moment.glyph
-            size: 20
-            color: Theme.acc
-        }
-
-        PanelText {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: moment.value
-            font.pixelSize: 12
-            font.weight: Font.Medium
-        }
-
-        PanelText {
-            anchors.horizontalCenter: parent.horizontalCenter
-            visible: moment.second.length > 0
-            text: moment.second
-            font.pixelSize: 10
-            color: Theme.mut
-        }
-    }
 
     Rectangle {
         id: card
@@ -327,519 +151,57 @@ PanelWindow {
     }
 
     // ---- the cards ---------------------------------------------------------
+    //
+    // Each is a file of its own, drawn in a SidebarCard. What they share with
+    // the sidebar is handed to them here: whether they are open, which is a
+    // setting the sidebar keeps, and the clock the day, the forecast and the
+    // notifications all read.
 
-    // What is playing. Folded, it is the track; open, the controls and how far
-    // through it is.
     Component {
         id: media
 
-        Card {
-            cardId: "media"
-            title: "Playing"
-            glyph: "music_note"
-
-            content: [
-                Row {
-                    width: parent.width
-                    spacing: 14
-
-                    AlbumArt {
-                        width: 56
-                        height: 56
-                        radius: 14
-                        source: win.player?.trackArtUrl ?? ""
-                    }
-
-                    Column {
-                        width: parent.width - 70
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: MediaStatus.present ? MediaStatus.title : "Nothing playing"
-                            font.pixelSize: 15
-                            font.weight: Font.Medium
-                            color: MediaStatus.present ? Theme.fg : Theme.mut
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            visible: text.length > 0
-                            text: [MediaStatus.artist, win.player?.trackAlbum ?? ""].filter(s => s).join(" · ")
-                            font.pixelSize: 13
-                            color: Theme.mut
-                        }
-                    }
-                }
-            ]
-
-            extra: Column {
-                spacing: 12
-
-                Item {
-                    visible: (win.player?.lengthSupported ?? false) && (win.player?.length ?? 0) > 0
-                    width: parent.width
-                    height: 30
-
-                    SeekBar {
-                        y: 6
-                        width: parent.width
-                        spacing: 4
-                        position: win.player?.position ?? 0
-                        length: win.player?.length ?? 0
-                        canSeek: win.player?.canSeek ?? false
-                        trackColor: Theme.alpha(Theme.fg, 0.12)
-                        trackRadius: 2
-                        timeFamily: Theme.monoFamily
-                        timeSize: 11
-                        onSeek: seconds => MediaStatus.seek(seconds)
-                    }
-                }
-
-                Row {
-                    visible: MediaStatus.present
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 14
-
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: win.player?.shuffleSupported ?? false
-                        glyph: "shuffle"
-                        color: (win.player?.shuffle ?? false) ? Theme.acc : Theme.fg
-                        onActivated: win.player.shuffle = !win.player.shuffle
-                    }
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        glyph: "skip_previous"
-                        onActivated: MediaStatus.previous()
-                    }
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        size: 48
-                        glyph: MediaStatus.playing ? "pause_circle" : "play_circle"
-                        color: Theme.acc
-                        onActivated: MediaStatus.toggle()
-                    }
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        glyph: "skip_next"
-                        onActivated: MediaStatus.next()
-                    }
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: win.player?.loopSupported ?? false
-                        glyph: (win.player?.loopState ?? MprisLoopState.None) === MprisLoopState.Track ? "repeat_one" : "repeat"
-                        color: (win.player?.loopState ?? MprisLoopState.None) !== MprisLoopState.None ? Theme.acc : Theme.fg
-                        onActivated: {
-                            const s = win.player.loopState;
-                            win.player.loopState = s === MprisLoopState.None ? MprisLoopState.Playlist
-                                                 : s === MprisLoopState.Playlist ? MprisLoopState.Track
-                                                 : MprisLoopState.None;
-                        }
-                    }
-                }
-            }
+        SidebarMediaCard {
+            expanded: win.isOpen("media")
+            onFold: win.fold("media")
         }
     }
 
-    // The day. Folded, the date and how long the machine has been up; open,
-    // the month -- with the forecast on the days it is known for.
     Component {
         id: day
 
-        Card {
-            id: dayCard
-            cardId: "day"
-            title: "Today"
-            glyph: "calendar_month"
-
-            readonly property var chosen: Forecast.dayAt(WeatherStatus.days, dayCard.picked.getTime())
-            property date picked: win.clock.date
-
-            content: [
-                Row {
-                    width: parent.width
-                    spacing: 16
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        PanelText {
-                            text: win.clock.date.toLocaleDateString(Qt.locale(), "dddd")
-                            font.pixelSize: 20
-                            font.weight: Font.Medium
-                        }
-
-                        PanelText {
-                            // The weekday is the line above.
-                            text: [win.clock.date.toLocaleDateString(Qt.locale(), "d MMMM yyyy"), Session.uptime].filter(s => s).join(" · ")
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-                    }
-                }
-            ]
-
-            extra: Column {
-                spacing: 12
-
-                MonthGrid {
-                    id: month
-                    width: parent.width
-                    now: win.clock.date
-                    cellHeight: 34
-                    dayDiameter: 30
-                    dayFontSize: 13
-                    selected: dayCard.picked
-                    // The forecast, on the days there is one for: five days out,
-                    // which is all Open-Meteo is asked for.
-                    badgeFor: cell => {
-                        const d = Forecast.dayAt(WeatherStatus.days, new Date(cell.year, cell.month, cell.day).getTime());
-                        return d ? Forecast.describe(d.code, true).glyph : "";
-                    }
-                    onPicked: cell => dayCard.picked = new Date(cell.year, cell.month, cell.day)
-                }
-
-                // What the chosen day's weather is, when it is one the forecast
-                // reaches. Nothing at all for a day in April.
-                Row {
-                    visible: dayCard.chosen !== null
-                    width: parent.width
-                    spacing: 10
-
-                    Glyph {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: dayCard.chosen ? Forecast.describe(dayCard.chosen.code, true).glyph : ""
-                        size: 22
-                        color: Theme.acc
-                    }
-
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: dayCard.chosen
-                            ? `${dayCard.picked.toLocaleDateString(Qt.locale(), "ddd d MMM")} · ${Forecast.describe(dayCard.chosen.code, true).label}`
-                            : ""
-                        font.pixelSize: 12
-                        color: Theme.mut
-                    }
-
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: dayCard.chosen
-                            ? `${Forecast.degrees(dayCard.chosen.high, WeatherStatus.temperatureUnit)} / ${Forecast.degrees(dayCard.chosen.low, "")}`
-                            : ""
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-                }
-            }
+        SidebarDayCard {
+            expanded: win.isOpen("day")
+            onFold: win.fold("day")
+            clock: win.clock
         }
     }
 
-    // The weather. Folded, now; open, the next hours and the next days.
     Component {
         id: weather
 
-        Card {
-            cardId: "weather"
-            title: "Weather"
-            glyph: WeatherStatus.condition.glyph
-
-            content: [
-                // Off, or not yet answered: one line that says which, rather
-                // than an empty card that looks broken.
-                Hint {
-                    visible: !WeatherStatus.ready
-                    text: !WeatherStatus.enabled
-                        ? "Off. Settings → Weather turns it on; it asks Open-Meteo for a forecast and nothing else."
-                        : (WeatherStatus.error.length > 0 ? WeatherStatus.error : "Asking…")
-                    lineHeight: 1
-                },
-
-                Row {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    spacing: 14
-
-                    Glyph {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: WeatherStatus.condition.glyph
-                        size: 44
-                        color: Theme.acc
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 58
-
-                        PanelText {
-                            text: WeatherStatus.temperatureText
-                            font.pixelSize: 24
-                            font.weight: Font.Medium
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: [WeatherStatus.condition.label, WeatherStatus.placeName].filter(s => s).join(" · ")
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-                    }
-                }
-            ]
-
-            extra: Column {
-                spacing: 12
-
-                Row {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    spacing: 16
-
-                    PanelText {
-                        text: WeatherStatus.current
-                            ? `Feels ${Forecast.degrees(WeatherStatus.current.feelsLike, WeatherStatus.temperatureUnit)}` : ""
-                        font.pixelSize: 12
-                        color: Theme.mut
-                    }
-                    PanelText {
-                        text: WeatherStatus.current ? `Humidity ${Math.round(WeatherStatus.current.humidity)}%` : ""
-                        font.pixelSize: 12
-                        color: Theme.mut
-                    }
-                    PanelText {
-                        text: WeatherStatus.current
-                            ? `Wind ${Math.round(WeatherStatus.current.wind)} ${WeatherStatus.forecast?.windUnit ?? ""}` : ""
-                        font.pixelSize: 12
-                        color: Theme.mut
-                    }
-                }
-
-                // The next hours, across.
-                Flickable {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    height: 76
-                    contentWidth: hours.implicitWidth
-                    flickableDirection: Flickable.HorizontalFlick
-                    clip: true
-
-                    Row {
-                        id: hours
-                        spacing: 4
-
-                        Repeater {
-                            model: WeatherStatus.hours.slice(0, 12)
-
-                            Moment {
-                                required property var modelData
-                                when: Qt.formatDateTime(new Date(modelData.when), "HH:mm")
-                                glyph: Forecast.describe(modelData.code, modelData.isDay).glyph
-                                value: Forecast.degrees(modelData.temperature, "°")
-                                second: modelData.rain > 0 ? `${Math.round(modelData.rain)}%` : ""
-                            }
-                        }
-                    }
-                }
-
-                // And the days.
-                Column {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    spacing: 8
-
-                    Repeater {
-                        model: WeatherStatus.days.slice(0, 5)
-
-                        Item {
-                            id: line
-                            required property var modelData
-                            width: parent.width
-                            height: 20
-
-                            PanelText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 70
-                                text: Forecast.dayName(line.modelData.when, win.clock.date.getTime(), Qt.locale())
-                                font.pixelSize: 12
-                                color: Theme.mut
-                            }
-
-                            Glyph {
-                                x: 74
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: Forecast.describe(line.modelData.code, true).glyph
-                                size: 16
-                                color: Theme.acc
-                            }
-
-                            PanelText {
-                                x: 100
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: line.modelData.rain > 0
-                                text: `${Math.round(line.modelData.rain)}%`
-                                font.pixelSize: 11
-                                color: Theme.mut
-                            }
-
-                            PanelText {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: `${Forecast.degrees(line.modelData.high, "°")} / ${Forecast.degrees(line.modelData.low, "°")}`
-                                font.pixelSize: 12
-                            }
-                        }
-                    }
-                }
-
-                PanelText {
-                    visible: WeatherStatus.ready
-                    width: parent.width
-                    text: WeatherStatus.fetchedAt > 0
-                        ? `Open-Meteo · ${Qt.formatDateTime(new Date(WeatherStatus.fetchedAt), "HH:mm")}` : ""
-                    font.pixelSize: 10
-                    color: Theme.mut
-                }
-            }
+        SidebarWeatherCard {
+            expanded: win.isOpen("weather")
+            onFold: win.fold("weather")
+            clock: win.clock
         }
     }
 
-    // The machine. Folded, the processor and the memory; open, the rest.
     Component {
         id: machine
 
-        Card {
-            cardId: "machine"
-            title: "Machine"
-            glyph: "memory"
-
-            content: [
-                Meter {
-                    label: SystemStats.cpuTemp > 0 ? `CPU · ${SystemStats.cpuTemp} °C` : "CPU"
-                    value: `${Math.round(SystemStats.cpu * 100)}%`
-                    fraction: SystemStats.cpu
-                },
-                Meter {
-                    label: "Memory"
-                    value: `${Stats.bytes(SystemStats.memUsed)} / ${Stats.bytes(SystemStats.memTotal)}`
-                    fraction: SystemStats.memTotal > 0 ? SystemStats.memUsed / SystemStats.memTotal : 0
-                }
-            ]
-
-            extra: Column {
-                spacing: 12
-
-                Meter {
-                    visible: SystemStats.gpu >= 0
-                    label: SystemStats.gpuTemp > 0 ? `GPU · ${SystemStats.gpuTemp} °C` : "GPU"
-                    value: `${Math.round(Math.max(0, SystemStats.gpu) * 100)}%`
-                    fraction: Math.max(0, SystemStats.gpu)
-                }
-
-                Meter {
-                    label: "Network"
-                    value: `${Stats.bytes(SystemStats.netRate)}/s`
-                    // A gigabit's worth is the whole bar.
-                    fraction: SystemStats.netRate / (125 * 1024 * 1024)
-                }
-
-                PanelText {
-                    width: parent.width
-                    text: Session.uptime.length > 0 ? `Up ${Session.uptime}` : ""
-                    font.pixelSize: 11
-                    color: Theme.mut
-                }
-            }
+        SidebarMachineCard {
+            expanded: win.isOpen("machine")
+            onFold: win.fold("machine")
         }
     }
 
-    // The latest notifications, from the history. Folded, three; open, ten --
-    // and a click opens whatever the notification was about.
     Component {
         id: notes
 
-        Card {
-            id: noteCard
-            cardId: "notifications"
-            title: "Notifications"
-            glyph: "notifications"
-
-            readonly property int shown: noteCard.open ? 10 : 3
-
-            content: [
-                Hint {
-                    visible: !NotificationWatch.enabled || NotificationWatch.entries.length === 0
-                    text: NotificationWatch.enabled ? "Nothing recent."
-                        : "The history is off; Settings → Notifications keeps one."
-                    lineHeight: 1
-                },
-
-                Repeater {
-                    model: NotificationWatch.entries.slice(0, noteCard.shown)
-
-                    Column {
-                        id: note
-                        required property var modelData
-                        width: parent.width
-                        spacing: 2
-
-                        Item {
-                            width: parent.width
-                            height: 18
-
-                            PanelText {
-                                width: parent.width - when.width - 8
-                                elide: Text.ElideRight
-                                text: note.modelData.summary
-                                font.pixelSize: 13
-                                font.weight: Font.Medium
-                            }
-
-                            PanelText {
-                                id: when
-                                anchors.right: parent.right
-                                text: Centre.ago(note.modelData.when, win.clock.date.getTime())
-                                font.family: Theme.monoFamily
-                                font.pixelSize: 11
-                                color: Theme.mut
-                            }
-                        }
-
-                        PanelText {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            text: note.modelData.appName
-                            font.pixelSize: 12
-                            color: Theme.mut
-                        }
-
-                        HoverHandler { cursorShape: NotificationWatch.openable(note.modelData) ? Qt.PointingHandCursor : Qt.ArrowCursor }
-                        TapHandler {
-                            enabled: NotificationWatch.openable(note.modelData)
-                            onTapped: {
-                                NotificationWatch.open(note.modelData);
-                                Surfaces.closeAll();
-                            }
-                        }
-                    }
-                }
-            ]
-
-            extra: Column {
-                spacing: 12
-
-                TextButton {
-                    visible: NotificationWatch.entries.length > 0
-                    glyph: "clear_all"
-                    iconName: "edit-clear-history"
-                    text: "Clear"
-                    onActivated: NotificationWatch.clear()
-                }
-            }
+        SidebarNotesCard {
+            expanded: win.isOpen("notifications")
+            onFold: win.fold("notifications")
+            clock: win.clock
         }
     }
 }
