@@ -6,7 +6,17 @@ pragma ComponentBehavior: Bound
 // is reachable afterwards from the settings window, so nothing here is a
 // one-way door and every step can be skipped.
 //
-// Two rules it follows:
+// Two ways to answer it, chosen on the first page. Live, the default, draws
+// each answer on the desktop as it is given -- the panel moves when a position
+// is picked -- through ConfigStore's preview, which is never written: closing
+// the wizard, or skipping it, drops the preview and the desktop is what it
+// was. Held, nothing changes until Finish. Either way nothing is SAVED before
+// Finish, and the renderer and the desktop theme are never previewed: they
+// change KDE's own settings, and a preview that wrote those would not be one.
+// What the preview draws and what Finish writes come from one list,
+// WizardAnswers.writes(), so the two cannot disagree.
+//
+// The rules it follows:
 //
 //   * A preset REPLACES the profile, so it is applied first and the other
 //     answers are written on top of it. The other order would have the preset
@@ -29,6 +39,7 @@ import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.theme
+import qs.domain.wizard
 import qs.ui.primitives
 
 FloatingWindow {
@@ -39,9 +50,13 @@ FloatingWindow {
     readonly property int stepCount: 7
     property int step: 0
 
-    // Answers, held until Finish. Nothing is written while the user is still
-    // deciding: a wizard that applied each answer as it was given would leave a
-    // half-configured shell behind if it were closed halfway through.
+    // Whether each answer is drawn as it is given; see the header.
+    property bool live: true
+
+    // Answers, saved at Finish. Nothing is written while the user is still
+    // deciding: a wizard that saved each answer as it was given would leave a
+    // half-configured shell behind if it were closed halfway through. Live,
+    // they are only drawn.
     property string position: ConfigStore.value("panel.position", "bottom")
     property int thickness: ConfigStore.value("panel.thickness", 52)
     property string preset: ""
@@ -84,6 +99,69 @@ FloatingWindow {
     Component.onCompleted: {
         presetsProc.running = true;
         providersProc.running = true;
+        ConfigStore.preview = root._shown;
+    }
+
+    // Closed or skipped, the desktop goes back to what is saved. Finished,
+    // the preview stays until the saved profile has caught up with it, or
+    // the old one would flash on screen between the two.
+    Component.onDestruction: {
+        if (!root._finishing)
+            ConfigStore.endPreview();
+    }
+
+    property bool _finishing: false
+
+    // What Finish writes into this shell's settings, and what live mode draws.
+    readonly property var _writes: WizardAnswers.writes({
+        position: root.position,
+        thickness: root.thickness,
+        launcher: root.launcher,
+        ai: root.ai
+    })
+
+    // Each preset's configuration, by name, read when it is first picked.
+    property var _presetConfigs: ({})
+    readonly property var _presetConfig: root.preset.length > 0 ? (root._presetConfigs[root.preset] ?? null) : null
+
+    readonly property var _shown: root.live
+        ? WizardAnswers.preview(ConfigStore.profileData, root._presetConfig, root._writes)
+        : null
+    on_ShownChanged: if (!root._finishing) ConfigStore.preview = root._shown
+
+    onPresetChanged: root._readPreset()
+    onLiveChanged: root._readPreset()
+
+    // One read at a time; a pick made while one is out is read after it.
+    function _readPreset() {
+        if (!root.live || root.preset.length === 0 || root.preset in root._presetConfigs)
+            return;
+        if (presetShowProc.running)
+            return;   // picked up when the running read exits
+        presetShowProc.name = root.preset;
+        presetShowProc.command = [Branding.ctlBin, "preset", "show", root.preset];
+        presetShowProc.running = true;
+    }
+
+    readonly property Process _presetShow: Process {
+        id: presetShowProc
+        property string name: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let config = null;
+                try {
+                    config = JSON.parse(text);
+                } catch (e) {
+                    Log.warn("wizard", `could not read preset '${presetShowProc.name}': ${e}`);
+                }
+                // Remembered even when unreadable -- the preview then draws
+                // the saved profile -- so it is not asked for on every pick.
+                const next = Object.assign({}, root._presetConfigs);
+                next[presetShowProc.name] = config;
+                root._presetConfigs = next;
+            }
+        }
+        onRunningChanged: if (!running) root._readPreset()
     }
 
     // Detected rather than listed: a provider whose program is not installed
@@ -143,12 +221,8 @@ FloatingWindow {
     // whatever preset was chosen has landed.
     function _write() {
         // Written after the preset has landed, so these win over it.
-        ConfigStore.set("panel.position", root.position);
-        ConfigStore.set("panel.thickness", root.thickness);
-        ConfigStore.set("launcher.provider", root.launcher);
-        ConfigStore.set("ai.enabled", root.ai !== "off");
-        if (root.ai !== "off")
-            ConfigStore.set("ai.provider", root.ai);
+        for (const path of Object.keys(root._writes))
+            ConfigStore.set(path, root._writes[path]);
 
         ConfigStore.set("theme.desktop.enabled", root.themeDesktop);
         for (const part of root.themeParts)
@@ -168,6 +242,9 @@ FloatingWindow {
     }
 
     function finish() {
+        // From here the preview is left alone: what it shows is what is
+        // about to be saved, and it goes once the saved profile says so.
+        root._finishing = true;
         root.status = "Applying...";
         if (root.preset.length > 0) {
             // `preset apply` keeps the profile it replaces; see the header.
@@ -193,6 +270,8 @@ FloatingWindow {
         // decide whether to show this at all, and a second writer of one file
         // is how the two come to disagree.
         FirstRun.markDone();
+        if (root._finishing)
+            ConfigStore.releasePreview();
         Log.info("wizard", root.kept.length > 0
             ? `finished; what was there is now the profile '${root.kept}'`
             : "finished");
@@ -220,6 +299,8 @@ FloatingWindow {
         WizardWelcomeStep {
             visible: root.step === 0
             width: parent.width
+            live: root.live
+            onLivePicked: value => root.live = value
         }
 
         WizardPanelStep {
@@ -272,6 +353,17 @@ FloatingWindow {
                 next[key] = value;
                 root.themeWanted = next;
             }
+        }
+
+        // Live, the two answers that are not drawn say why, so a desktop that
+        // does not change is not taken for a wizard that did not listen.
+        PanelText {
+            visible: root.live && (root.step === 4 || root.step === 6)
+            width: parent.width
+            wrapMode: Text.WordWrap
+            color: Theme.foregroundInactive
+            font.pixelSize: 11
+            text: "This one is not shown until Finish: it changes KDE's own settings, not only this shell's."
         }
 
         // What Finish is about to do to a configuration that already exists.

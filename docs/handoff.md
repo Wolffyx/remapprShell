@@ -1,8 +1,9 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-25**: in the afternoon a one-line
-installer ("The afternoon of 2026-09-25"); in the morning, two things
+sessions, and added to since -- most recently on **2026-09-25**: in the evening a first-run wizard that
+draws each answer as it is given ("The evening of 2026-09-25"); in the
+afternoon a one-line installer ("The afternoon of 2026-09-25"); in the morning, two things
 seen in use: a slow start at login and a panel over a full-screen window
 ("The morning of 2026-09-25"). Before that, **2026-09-24**, a cleanup
 of the whole tree for duplicated and wasteful code that found a dozen bugs in
@@ -303,6 +304,43 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### The evening of 2026-09-25: a first-run wizard that shows each answer
+
+The README went in first (`f6d3483`). Then the item left from the installer
+work: **the first-run wizard can draw each answer on the desktop as it is
+given.** Its first page asks which way -- "Show each choice as I make it", on
+by default; off is the old wizard, where nothing changes until Finish.
+
+- **Nothing is saved early either way.** `ConfigStore.preview` is a whole
+  profile drawn in place of the saved one and never written: `merged` is
+  defaults + (preview ?? profile) + runtime. Closing the wizard or skipping it
+  calls `endPreview()` and the desktop is what it was. Finish calls
+  `releasePreview()`, which drops it at the next read of the profile (or after
+  1.5 s): dropped at once, the old profile flashed up between the preview and
+  the save, since a preset lands through the file a moment after its command
+  exits.
+- **The preview is what Finish writes**, from one list:
+  `qs.domain.wizard.WizardAnswers` -- `writes()` is the setting paths, and
+  `preview()` puts a picked preset *in place of* the saved profile (it
+  replaces at Finish, never merges) with the answers on top. Tested in
+  `tst_WizardAnswers.qml`. A preset's configuration is read with `preset show`
+  when it is first picked.
+- **Not previewed: the renderer and the desktop theme.** Both change KDE's own
+  settings; a preview that wrote those would not be one. Live, those two
+  pages say so.
+- Why not the runtime layer: `clearRuntime()` is IPC's, and a preset has to
+  *replace* the profile, which an overlay cannot express.
+
+Not yet seen on a screen: the live wizard itself (`rmpr wizard` opens it on
+the desktop, which only the user should do). Seen offscreen: the first page,
+both ways. **A race older than this, found reading it:** on Finish with a
+preset, if the preset file's reload lands *after* the answers are set and
+before the 250 ms flush, it replaces them in memory and the flush writes the
+preset alone. Usually the reload wins, since the file is renamed before the
+command exits; not fixed.
+
+`make test`: 659 QML cases (9 new tests) and the shell checks, green.
+
 ### The morning of 2026-09-25: a late start, and a panel over a full-screen window
 
 **The shell started 6.5 s after plasmashell at login.** Its unit was ordered
@@ -477,8 +515,9 @@ that. `dev/preview/installer.qml` draws any page (`PREVIEW_STEP=0..5`, with
 `<PREFIX>_INSTALLER_SOURCE` pointing at the checkout). Not yet run for real:
 an install from the window, and pkexec.
 
-**Still to do, asked for with it:** the first-run welcome should make each
-choice visible live as it is made (today it holds every answer until Finish).
+~~**Still to do, asked for with it:** the first-run welcome should make each
+choice visible live as it is made~~ -- **done the evening of 2026-09-25**, see
+that entry.
 
 **Two bugs from the VM and from a system update.**
 

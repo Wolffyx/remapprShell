@@ -41,7 +41,14 @@ QtObject {
     property var profileData: ({})
     property var runtime: ({})
 
-    readonly property var merged: Obj.deepMerge(root.defaults, root.profileData, root.runtime)
+    // A whole profile drawn in place of the saved one, and never written: the
+    // first-run wizard's live mode, where each answer shows on the desktop as
+    // it is given and closing the wizard puts back what was there. Null when
+    // nothing is being previewed. Writes still go to the saved profile, where
+    // they wait unseen until the preview ends.
+    property var preview: null
+
+    readonly property var merged: Obj.deepMerge(root.defaults, root.preview ?? root.profileData, root.runtime)
 
     // The configuration as it applies to one output. Everything drawn per
     // screen reads through this rather than `merged`, so a per-monitor override
@@ -177,6 +184,32 @@ QtObject {
 
     function clearRuntime() {
         root.runtime = ({});
+    }
+
+    // Puts the saved profile back on screen.
+    function endPreview() {
+        root._releasePreview = false;
+        root._previewTimer.stop();
+        root.preview = null;
+    }
+
+    // Ends a preview whose answers have just been saved. Dropped at once, the
+    // desktop would flash back to the old profile first: a preset lands
+    // through the file, which is read back a moment after the command that
+    // wrote it has exited. So the preview goes at the next read of the
+    // profile, or after a second and a half if no read comes.
+    function releasePreview() {
+        if (root.preview === null)
+            return;
+        root._releasePreview = true;
+        root._previewTimer.restart();
+    }
+
+    property bool _releasePreview: false
+
+    readonly property Timer _previewTimer: Timer {
+        interval: 1500
+        onTriggered: root.endPreview()
     }
 
     // ---- persistence --------------------------------------------------
@@ -404,7 +437,11 @@ QtObject {
         atomicWrites: true
         printErrors: false
 
-        onLoaded: root._onProfileText(text())
+        onLoaded: {
+            root._onProfileText(text());
+            if (root._releasePreview)
+                root.endPreview();
+        }
 
         onLoadFailed: err => {
             root._lastWritten = "";
