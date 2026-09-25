@@ -124,6 +124,38 @@ os ID=ubuntu ID_LIKE=debian
 got=$(install_says)
 case "$got" in *add-apt-repository*) check "Ubuntu: no PPA without need" "$got" "(no PPA)" ;; *) check "Ubuntu: no PPA without need" yes yes ;; esac
 
+echo "== one refused package does not sink the rest =="
+# A sudo that refuses any list of packages and takes one at a time: what a
+# pacman that does not know one name in the list does.
+cat > "$STUBS/sudo" <<'STUB'
+#!/bin/sh
+[ "$1" = -n ] && exit 0
+echo "sudo $*" >> "$SUDO_LOG"
+[ "$#" -gt 5 ] && exit 1
+exit 0
+STUB
+chmod +x "$STUBS/sudo"
+rm "$STUBS/jq" "$STUBS/kdialog"
+os ID=arch
+export SUDO_LOG="$SANDBOX/sudo.log"
+DEPS_DRY=0 deps install --yes >/dev/null 2>&1 < /dev/null
+check "tried together first"   "$(grep -c 'pacman -S --needed --noconfirm jq kdialog' "$SUDO_LOG")" 1
+check "then each on its own"   "$(grep -cE 'pacman -S --needed --noconfirm (jq|kdialog)$' "$SUDO_LOG")" 2
+rm -f "$STUBS/sudo"
+for c in kdialog; do printf '#!/bin/sh\nexit 0\n' > "$STUBS/$c"; chmod +x "$STUBS/$c"; done
+
+echo "== a font that does not come is not a reason to stop =="
+printf '#!/bin/sh\nexit 0\n' > "$STUBS/jq"; chmod +x "$STUBS/jq"
+cat > "$STUBS/curl" <<'STUB'
+#!/bin/sh
+exit 22
+STUB
+chmod +x "$STUBS/curl"
+printf '#!/bin/sh\nexit 0\n' > "$STUBS/fc-cache"; chmod +x "$STUBS/fc-cache"
+check "Rubik unfetchable, install still succeeds" \
+    "$(NO_FONT=Rubik DEPS_DRY=0 deps install --yes >/dev/null 2>&1 < /dev/null; echo $?)" 0
+rm -f "$STUBS/curl" "$STUBS/fc-cache" "$STUBS/jq"
+
 os ID=gentoo
 check "an unknown family installs nothing" "$(deps install --yes >/dev/null 2>&1; echo $?)" 1
 
@@ -135,6 +167,9 @@ echo "== fonts =="
 os ID=arch
 got=$(NO_FONT="Material Symbols Rounded" deps install --yes 2>/dev/null)
 contains "Arch: the font is a package" "$got" "pacman -S --needed --noconfirm ttf-material-symbols-variable"
+got=$(NO_FONT=Rubik deps install --yes 2>/dev/null)
+contains "Arch: Rubik is fetched -- Arch has no package" "$got" "curl -fsSL -o $HOME/.local/share/fonts/Rubik[wght].ttf"
+case "$got" in *ttf-rubik*) check "Arch: no ttf-rubik-vf asked of pacman" "$got" "(none)" ;; *) check "Arch: no ttf-rubik-vf asked of pacman" yes yes ;; esac
 os ID=fedora
 got=$(NO_FONT="Material Symbols Rounded" deps install --yes 2>/dev/null)
 contains "Fedora: fetched, not installed" "$got" "curl -fsSL -o $HOME/.local/share/fonts/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf"

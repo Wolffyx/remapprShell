@@ -35,13 +35,20 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 
 # id | kind | provides | arch | fedora | debian
 #
+# kind: `run`, what the shell cannot run without; `build`, what `make plugin`
+# needs (with --build); `look`, what it is drawn with -- installed with the
+# rest, but never a reason to stop: without it the shell falls back to the
+# desktop's fonts and icons, and the lock screen to words.
+#
 # `provides` is cmd:<command>, py:<module>, cmake:<package> or font:<family>.
 # A family's column may name several packages, space-separated; one written
 # @<url> is not a package but a file fetched into ~/.local/share/fonts, for
-# the two fonts neither Fedora nor Ubuntu packages -- Material Symbols, which
-# draws every icon in the shell and on its lock screen by name (without it
-# the lock screen said "bedtime" and "group" where its buttons were, on the
-# first fresh install), and Rubik, its type. Qt's Wayland client is
+# the fonts a distribution does not package -- Material Symbols on Fedora and
+# Ubuntu, which draws every icon in the shell and on its lock screen by name
+# (without it the lock screen said "bedtime" and "group" where its buttons
+# were, on the first fresh install), and Rubik, its type, everywhere: Arch
+# does not package it either -- ttf-rubik-vf is CachyOS's, and asking plain
+# Arch's pacman for it failed the whole install on the first VM run. Qt's Wayland client is
 # the one that needs two, found by building in containers (2026-09-25): on
 # Fedora its CMake files name a metatypes file that qt6-qtbase-private-devel
 # ships, and on Ubuntu qtwaylandscanner moved to qt6-base-dev-tools.
@@ -56,8 +63,8 @@ DEPS=(
     "kdialog|run|cmd:kdialog|kdialog|kdialog|kdialog"
     "python-gobject|run|py:gi|python-gobject|python3-gobject|python3-gi"
     "pillow|run|py:PIL|python-pillow|python3-pillow|python3-pil"
-    "material-symbols|run|font:Material Symbols Rounded|ttf-material-symbols-variable|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf"
-    "rubik|run|font:Rubik|ttf-rubik-vf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf"
+    "material-symbols|look|font:Material Symbols Rounded|ttf-material-symbols-variable|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf"
+    "rubik|look|font:Rubik|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf"
     "cmake|build|cmd:cmake|cmake|cmake|cmake"
     "c++|build|cmd:c++|gcc|gcc-c++|g++"
     "wayland-scanner|build|cmd:wayland-scanner|wayland|wayland-devel|libwayland-bin"
@@ -223,7 +230,9 @@ install_missing() {
     [ ${#fetch[@]} -eq 0 ] || log_info "  fonts, into ~/.local/share/fonts: $(for u in "${fetch[@]}"; do font_name "$u"; printf ' '; done)"
     ask "Install them now?" || { log_info "nothing was installed."; return 1; }
 
-    fetch_fonts "${fetch[@]}" || return 1
+    # Fonts only, and not worth stopping for: finish_check says what did
+    # not come.
+    fetch_fonts "${fetch[@]}" || log_warn "a font could not be fetched"
     if [ ${#pkgs[@]} -eq 0 ]; then
         finish_check "$build"
         return
@@ -232,46 +241,92 @@ install_missing() {
     local quickshell=0 id
     for id in "${ids[@]}"; do [ "$id" = quickshell ] && quickshell=1; done
 
+    prepare_repos "$fam" "$quickshell" || { log_error "the package manager failed"; return 1; }
+    install_packages "$fam" "$quickshell" "${pkgs[@]}"
+    finish_check "$build"
+}
+
+# The packages, all at once -- and when the package manager refuses the lot,
+# one at a time, so one name it does not know costs that one package and not
+# the rest. What is still missing afterwards is finish_check's to judge.
+install_packages() {
+    local fam=$1 quickshell=$2 p
+    shift 2
+    [ $# -gt 0 ] || return 0
+    install_with "$fam" "$quickshell" "$@" && return 0
+    [ $# -gt 1 ] || return 0
+    log_warn "the package manager refused them together; trying one at a time"
+    for p in "$@"; do
+        install_with "$fam" "$quickshell" "$p" || log_warn "not installed: $p"
+    done
+    return 0
+}
+
+install_with() {
+    local fam=$1 quickshell=$2
+    shift 2
     case "$fam" in
         arch)
             # -S alone, never -Sy: refreshing the database without upgrading
             # is the partial upgrade Arch warns against.
-            as_root pacman -S --needed --noconfirm "${pkgs[@]}" ;;
+            as_root pacman -S --needed --noconfirm "$@" ;;
+        fedora) as_root dnf install -y "$@" ;;
+        debian) as_root apt-get install -y "$@" ;;
+    esac
+}
+
+# What has to happen once, before any package: the lists read, and
+# Quickshell's repository added where the distribution has none of its own.
+prepare_repos() {
+    local fam=$1 quickshell=$2
+    case "$fam" in
         fedora)
-            if [ $quickshell = 1 ]; then
+            if [ "$quickshell" = 1 ]; then
                 as_root dnf copr enable -y errornointernet/quickshell || return 1
-            fi
-            as_root dnf install -y "${pkgs[@]}" ;;
+            fi ;;
         debian)
-            if [ $quickshell = 1 ] && ! is_ubuntu; then
+            if [ "$quickshell" = 1 ] && ! is_ubuntu; then
                 log_error "Quickshell has no package for Debian itself; build it from https://quickshell.org, then run the setup again."
                 return 1
             fi
             # The lists first: on a fresh machine even the package that adds
             # a PPA is not found until they are read (seen in a container).
             as_root apt-get update || return 1
-            if [ $quickshell = 1 ]; then
+            if [ "$quickshell" = 1 ]; then
                 as_root apt-get install -y software-properties-common || return 1
                 # add-apt-repository reads the lists again itself.
                 as_root add-apt-repository -y ppa:avengemedia/danklinux || return 1
-            fi
-            as_root apt-get install -y "${pkgs[@]}" ;;
-    esac || { log_error "the package manager failed"; return 1; }
-
-    finish_check "$build"
+            fi ;;
+    esac
+    return 0
 }
 
 # Said again rather than trusted: a package that installed but did not
 # provide what it was for is a wrong name in the table above.
+#
+# Only what the shell cannot run without stops it; a font that did not come
+# is said and let go (see `look` above).
 finish_check() {
-    local build=$1 ids
+    local build=$1 ids id kind fatal=() soft=()
     [ "${DEPS_DRY:-0}" = 1 ] && return 0
     mapfile -t ids < <(missing "$build")
-    if [ ${#ids[@]} -gt 0 ]; then
-        log_error "still missing after the install: ${ids[*]}"
+    for id in "${ids[@]}"; do
+        kind=$(kind_of "$id")
+        if [ "$kind" = look ]; then soft+=("$id"); else fatal+=("$id"); fi
+    done
+    [ ${#soft[@]} -eq 0 ] || log_warn "not installed, and not needed to run: ${soft[*]} (the desktop's own fonts stand in)"
+    if [ ${#fatal[@]} -gt 0 ]; then
+        log_error "still missing after the install: ${fatal[*]}"
         return 1
     fi
     log_step "everything needed is installed"
+}
+
+kind_of() {
+    local entry
+    for entry in "${DEPS[@]}"; do
+        [ "${entry%%|*}" = "$1" ] && { printf '%s' "$entry" | cut -d'|' -f2; return; }
+    done
 }
 
 # A font file's name, from its URL: the last part, with [ and ] back.
