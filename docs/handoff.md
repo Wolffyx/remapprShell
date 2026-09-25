@@ -1,7 +1,9 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-24**, a cleanup
+sessions, and added to since -- most recently on **2026-09-25**, two things
+seen in use: a slow start at login and a panel over a full-screen window
+("The morning of 2026-09-25"). Before that, **2026-09-24**, a cleanup
 of the whole tree for duplicated and wasteful code that found a dozen bugs in
 the copies; that afternoon three things that came out of using it; and that
 evening every source file over 500 lines split by what it does ("The evening
@@ -299,6 +301,45 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The morning of 2026-09-25: a late start, and a panel over a full-screen window
+
+**The shell started 6.5 s after plasmashell at login.** Its unit was ordered
+after `graphical-session.target`, which Plasma reaches only when the whole
+workspace is up -- and `plasma-powerdevil.service` alone took 6.4 s of that
+(`systemd-analyze --user critical-chain remappr-shell.service` shows it).
+plasmashell starts with `plasma-core.target`. The unit is now `After=`,
+`Requisite=` and `WantedBy=plasma-core.target`; that target is implicitly
+after KWin, ksmserver, kded6 and plasmashell, so everything the shell reads at
+start is there. `install.sh` re-enables an enabled unit, because the old
+`graphical-session.target.wants/` link otherwise survives an update.
+Unproven at a real login: check the critical chain after the next one.
+
+Starting earlier exposed a bug that was already there: `DbusWatch` threw away
+gdbus's `The name X is owned by :1.N`, which is how a service arriving *after*
+the watch says so. Brightness read powerdevil once, found nothing, and never
+asked again -- the same happened on any powerdevil restart. That line now
+reports a change (past any `filter`); the banner at start does not.
+
+What is left of the start is the shell's own: 1.3 s warm, 2.0 s cold, from
+the unit starting to the panel -- 0.6 s loading QML, the rest building it.
+Profiling that is its own job.
+
+**A panel over a full-screen window.** Our layer-shell surfaces land in KWin's
+Dock layer. KWin puts a full-screen window above that (Active layer) only while
+it is the window last activated on its monitor; once anything else there was,
+it drops to the Normal layer, under the panel. Reproduced by a KWin script
+(full screen, activate another window on that monitor, raise the full-screen
+one again: `layer` 2). The panel now steps aside -- draws nothing, takes no
+clicks, keeps its exclusive zone so nothing is resized -- while the top window
+on its monitor, on the current desktop, is full screen
+(`WindowEvents.fullScreenOn`, tested). `panel.fullScreen: kwin` leaves it to
+KWin's stacking instead; `hide` is the default. The windows script sends
+`fullScreen`, and publishes on `stackingOrderChanged` and `fullScreenChanged`
+through a 50 ms timer: sent at once, the list carried the stacking from
+before KWin had moved the window, with the full-screen one below what it
+covered. Seen on a screenshot in the reproduced state; not yet seen with a
+game.
 
 ### The sunset of 2026-09-24, watched
 
