@@ -154,6 +154,13 @@ done < <(manifest_entries)
 # login, and `rmpr start` fails with a confusing "unit not found".
 if session_available && command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload 2>/dev/null || true
+
+    # Enabling is a symlink in whichever target [Install] named at the time.
+    # When that target changes, an enabled unit keeps the old link until it
+    # is re-enabled -- and keeps starting as late as it used to.
+    if [ "$MODE" != uninstall ] && systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1; then
+        systemctl --user reenable "$SYSTEMD_UNIT" >/dev/null 2>&1 || true
+    fi
 fi
 
 # The bus caches its list of activatable names the same way. Without this the
