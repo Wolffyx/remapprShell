@@ -107,7 +107,9 @@ curl -fsSL .../install.sh | bash -s -- --yes           # ask nothing, take every
 ```
 
 Run again, it brings the same source up to date and sets up again;
-`rmpr update` does the same without the questions.
+`rmpr update` does the same without the questions. When it finishes the shell
+is running, drawing the panel, and starts at login -- there is nothing left to
+run by hand.
 
 From a checkout of your own, the guided install on its own:
 
@@ -146,6 +148,39 @@ Alt+Tab left with KWin drawing our switcher layout, the look and feel applied, a
 user service enabled so it starts at login. A key another shell already holds is taken
 from it and said so; `rmpr shortcuts revert` gives it back.
 
+## Removing it
+
+```bash
+rmpr uninstall              # Plasma's own panel, keys, Alt+Tab and look back; the shell's files gone
+rmpr uninstall --purge      # and your settings, restore points and the fetched source with them
+rmpr uninstall --dry-run    # what it would do
+```
+
+Each change is undone by the script that made it, from what it recorded -- so
+what comes back is what was there, key by key, and nothing another program
+changed since is overwritten. Your settings and restore points stay unless
+`--purge` says otherwise, so a reinstall picks up where you left off. Packages
+are left installed: jq, git and Qt are not this shell's to remove. Log out and
+back in afterwards.
+
+`rmpr restore --preinstall` is the blunter way back: whole files as they were
+before the first install.
+
+## Reinstalling it
+
+```bash
+rmpr reinstall              # uninstall, then the guided setup again
+rmpr reinstall --yes        # the same, taking every default
+rmpr reinstall --fresh      # and start from no settings (restore points are kept)
+curl -fsSL .../install.sh | bash -s -- --reinstall        # the latest source first
+```
+
+The uninstall and the setup, run in turn, from the source already here -- or,
+through the one-line install, from the latest one. It ends with the shell
+running, as an install does. The setup's questions come after the uninstall,
+so answering no at its summary leaves the shell uninstalled; it says so, and
+how to finish.
+
 ## Development
 
 ```bash
@@ -154,7 +189,8 @@ make link     # symlink into ~/.config/quickshell/<slug>; most edits reload live
 make run      # run in the foreground against the working tree
 make lint     # slug, layer and QML lints
 make test     # QML tests, plus shell tests in a throwaway HOME
-make uninstall
+make uninstall  # the whole uninstall, as `rmpr uninstall`
+make reinstall  # uninstall, then set up again from this tree
 ```
 
 `make help` lists every target.

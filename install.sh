@@ -11,8 +11,10 @@
 #   --channel <branch>   main (releases, the default) or dev
 #   --dir <path>         where the source goes (default: the shell's data
 #                        directory, .../source)
-#   --yes                install packages without asking, and pass
-#                        --unattended to the setup
+#   --yes                install packages without asking, and take the
+#                        setup's defaults
+#   --reinstall          take off what is installed and set it up again
+#   --fresh              with --reinstall: start from no settings
 #   --                   everything after it goes to the setup as it is
 #
 # This file is the one part of the install that runs before the source is
@@ -24,6 +26,8 @@ REPO=${REPO:-https://github.com/Wolffyx/remapprShell.git}
 CHANNEL=main
 DIR=""
 YES=0
+REINSTALL=0
+FRESH=0
 SETUP_ARGS=()
 
 say()  { printf '\033[32m==>\033[0m %s\n' "$*" >&2; }
@@ -34,8 +38,10 @@ while [ $# -gt 0 ]; do
         --channel) [ $# -ge 2 ] || fail "--channel needs a branch"; CHANNEL=$2; shift ;;
         --dir)     [ $# -ge 2 ] || fail "--dir needs a path"; DIR=$2; shift ;;
         --yes)     YES=1 ;;
+        --reinstall) REINSTALL=1 ;;
+        --fresh)   FRESH=1 ;;
         --)        shift; SETUP_ARGS+=("$@"); break ;;
-        -h|--help) printf '%s\n' "usage: install.sh [--channel main|dev] [--dir <path>] [--yes] [-- <setup arguments>]"; exit 0 ;;
+        -h|--help) printf '%s\n' "usage: install.sh [--channel main|dev] [--dir <path>] [--yes] [--reinstall [--fresh]] [-- <setup arguments>]"; exit 0 ;;
         *)         fail "unknown argument: $1" ;;
     esac
     shift
@@ -123,9 +129,19 @@ deps_args=()
 
 # --- the setup ----------------------------------------------------------------
 
-[ $YES = 1 ] && SETUP_ARGS=(--unattended "${SETUP_ARGS[@]}")
-say "starting the setup"
 # exec replaces this process, and the EXIT trap with it.
 rm -rf "$tmp"
 trap - EXIT
+
+if [ $REINSTALL = 1 ]; then
+    args=()
+    [ $YES = 1 ] && args+=(--yes)
+    [ $FRESH = 1 ] && args+=(--fresh)
+    say "reinstalling"
+    exec "$DIR/scripts/reinstall.sh" "${args[@]}" < "$TTY"
+fi
+
+[ $FRESH = 0 ] || fail "--fresh goes with --reinstall"
+[ $YES = 1 ] && SETUP_ARGS=(--unattended "${SETUP_ARGS[@]}")
+say "starting the setup"
 exec "$DIR/scripts/setup.sh" "${SETUP_ARGS[@]}" < "$TTY"

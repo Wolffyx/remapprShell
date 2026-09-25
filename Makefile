@@ -28,8 +28,11 @@ link: ## Symlink the shell into place (development; widget edits need `rmpr relo
 install: ## Copy the shell into place (frozen install)
 	@scripts/install.sh --copy
 
-uninstall: ## Remove everything the manifest owns
-	@scripts/install.sh --uninstall
+uninstall: ## Take the shell off: every change reverted, then its files removed
+	@scripts/uninstall.sh
+
+reinstall: ## Uninstall, then the guided setup again, from this tree
+	@scripts/reinstall.sh
 
 run: brand ## Run the shell in the foreground against the working tree
 # The absolute path is what makes the process say where it came from: every

@@ -15,6 +15,8 @@ usage: @ALIAS@ <command> [options]
   preflight [--suggest-snapshots]   check this machine, report what may change
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
+  uninstall [--purge|--dry-run]     take the shell off, and give Plasma back its own
+  reinstall [--fresh|--yes|--dry-run]  take it off and set it up again, running at the end
   renderer status|list|set|revert   choose what draws the panel
   theme apply|revert|variant|osd|style|status  the look and feel, light or dark, which OSD draws
   report create|list|show|remove    write a local diagnostic report
@@ -117,6 +119,8 @@ case "$cmd" in
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;
     update)    require_repo; exec "$REPO_ROOT/scripts/update.sh" "$@" ;;
+    uninstall) require_repo; exec "$REPO_ROOT/scripts/uninstall.sh" "$@" ;;
+    reinstall) require_repo; exec "$REPO_ROOT/scripts/reinstall.sh" "$@" ;;
     profile)   require_repo; exec "$REPO_ROOT/scripts/profile.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     switcher)  require_repo; exec "$REPO_ROOT/scripts/switcher.sh" "$@" ;;
