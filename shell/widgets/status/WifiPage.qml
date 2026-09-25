@@ -6,7 +6,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
-import Quickshell.Networking
 import qs.domain.status
 import qs.domain.status.icons
 import qs.domain.theme
@@ -21,25 +20,24 @@ Column {
     // password is typed, and its `page` is where the header goes back to.
     required property var widget
 
-    readonly property var device: NetworkStatus.wifiDevices[0] ?? null
-    readonly property var networks: Array.from(wifi.device?.networks?.values ?? [])
-        .filter(n => n && (n.name ?? "").length > 0)
-        .sort((a, b) => (b.connected - a.connected) || (b.known - a.known)
-                        || ((b.signalStrength ?? 0) - (a.signalStrength ?? 0)))
-        .slice(0, 9)
+    // Already sorted -- connected, then saved, then by signal -- and one per
+    // name (NmcliState).
+    readonly property var networks: NetworkStatus.wifiNetworks.slice(0, 9)
 
     // The network a password is being asked for.
     property string asking: ""
 
-    function secured(n) {
-        return n.security !== WifiSecurityType.Open && n.security !== WifiSecurityType.Owe;
-    }
-
     function choose(n) {
-        if (n.connected || n.stateChanging)
+        if (n.connected || NetworkStatus.joining.length > 0)
             return;
-        if (n.known || !wifi.secured(n)) {
-            n.connect();
+        // More than a password: Plasma's applet sets those up.
+        if (n.enterprise && !n.known) {
+            PlasmaApplets.open("org.kde.plasma.networkmanagement");
+            wifi.widget.closePopout();
+            return;
+        }
+        if (n.known || !n.secured) {
+            NetworkStatus.connectTo(n, "");
             return;
         }
         wifi.asking = n.name;
@@ -48,12 +46,16 @@ Column {
 
     spacing: 12
 
-    // A fresh list while the page is open.
-    Component.onCompleted: if (wifi.device) wifi.device.scannerEnabled = true
-    Component.onDestruction: {
-        if (wifi.device)
-            wifi.device.scannerEnabled = false;
-        wifi.widget.typing = false;
+    // A fresh list while the page is open: a rescan now, and again while it
+    // stays open, as Plasma's applet does.
+    Component.onCompleted: NetworkStatus.scan()
+    Component.onDestruction: wifi.widget.typing = false
+
+    Timer {
+        interval: 12000
+        running: true
+        repeat: true
+        onTriggered: NetworkStatus.scan()
     }
 
     PageHeader {
@@ -82,36 +84,38 @@ Column {
         spacing: 2
 
         Repeater {
-            // Through a ScriptModel, not the array: the list is sorted by
-            // signal strength, so every scan made a new one, and a Repeater
-            // handed a new array rebuilds every row -- the password field with
-            // them, emptied under the person typing into it. A network is the
-            // same object from one scan to the next, so a re-sort is now a
-            // move and a row lives as long as its network is on the list.
+            // Through a ScriptModel keyed by name, not the array: every read
+            // makes new objects, and a Repeater handed a new array rebuilds
+            // every row -- the password field with them, emptied under the
+            // person typing into it. Keyed, a network's row lives as long as
+            // the network is on the list, and reads its latest state by name.
             model: ScriptModel {
                 values: NetworkStatus.wifiEnabled ? wifi.networks : []
-                comparisonMode: ObjectComparison.Identity
+                objectProp: "key"
             }
 
             Column {
                 id: network
 
                 required property var modelData
+                readonly property var live: wifi.networks.find(n => n.key === network.modelData.key) ?? network.modelData
 
                 width: parent.width
                 spacing: 6
 
                 ItemRow {
-                    glyph: StatusIcons.wifiGlyph(network.modelData.signalStrength ?? 0)
-                    title: network.modelData.name
-                    current: network.modelData.connected
-                    sub: network.modelData.stateChanging ? "Connecting…"
-                       : network.modelData.connected ? "Connected"
-                       : network.modelData.known ? "Saved"
-                       : wifi.secured(network.modelData) ? "Secured" : "Open"
-                    mark: network.modelData.connected ? "check"
-                        : !network.modelData.known && wifi.secured(network.modelData) ? "lock" : ""
-                    onActivated: wifi.choose(network.modelData)
+                    glyph: StatusIcons.wifiGlyph(network.live.signal ?? 0)
+                    title: network.live.name
+                    current: network.live.connected
+                    sub: NetworkStatus.joining === network.live.name ? "Connecting…"
+                       : network.live.connected ? "Connected"
+                       : NetworkStatus.failed === network.live.name ? "Could not connect"
+                       : network.live.known ? "Saved"
+                       : network.live.enterprise ? "Enterprise -- set up in Plasma's applet"
+                       : network.live.secured ? "Secured" : "Open"
+                    mark: network.live.connected ? "check"
+                        : !network.live.known && network.live.secured ? "lock" : ""
+                    onActivated: wifi.choose(network.live)
                 }
 
                 // The password, for a secured network not yet saved.
@@ -141,7 +145,7 @@ Column {
                         onActivated: {
                             if (password.text.length === 0)
                                 return;
-                            network.modelData.connectWithPsk(password.text);
+                            NetworkStatus.connectTo(network.live, password.text);
                             password.text = "";
                             wifi.asking = "";
                             wifi.widget.typing = false;

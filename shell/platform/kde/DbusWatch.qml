@@ -20,18 +20,28 @@ QtObject {
 
     property bool running: true
 
+    // "session", or "system" for a service on the system bus -- NetworkManager.
+    property string bus: "session"
+
     signal changed(string line)
+
+    // The service has (re)appeared after this started watching: it started
+    // late, or it restarted. Emitted alongside `changed`, for a consumer that
+    // must do more than re-read -- NetworkStatus, whose library does not
+    // recover from a restart by itself.
+    signal appeared
 
     // gdbus prints two banner lines before any signal, the second saying
     // whether the name has an owner yet. After that, "The name ... is owned
-    // by" means the service has just (re)appeared: everything on it is new,
-    // whatever `filter` says. The shell starts with Plasma's core, before
+    // by" means the service has just (re)appeared, and "does not have an
+    // owner" that it has gone: either way everything read from it is out of
+    // date, whatever `filter` says. The shell starts with Plasma's core, before
     // powerdevil and the rest of the workspace, so this is how it learns of
     // them -- a read at startup found nothing there.
     property bool _banner: true
 
     readonly property Process _proc: Process {
-        command: ["gdbus", "monitor", "--session", "--dest", root.service, "--object-path", root.path]
+        command: ["gdbus", "monitor", `--${root.bus}`, "--dest", root.service, "--object-path", root.path]
         running: root.running
 
         stdout: SplitParser {
@@ -39,8 +49,13 @@ QtObject {
                 if (line.startsWith("Monitoring signals"))
                     return;
                 if (line.startsWith("The name ")) {
-                    if (!root._banner && line.includes(" is owned by "))
+                    // Gone, or back: either way what was read is out of date.
+                    // Only coming back is `appeared`.
+                    if (!root._banner) {
                         root.changed(line);
+                        if (line.includes(" is owned by "))
+                            root.appeared();
+                    }
                     root._banner = false;
                     return;
                 }
