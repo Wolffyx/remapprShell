@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Restore points.
 #
-#   create [label]     take one now
+#   create [--label] <label>  take one now
 #   list [--json]      show what exists, with sizes
 #   remove <name>      delete one
 #   prune [--keep N]   delete all but the newest N
@@ -18,6 +18,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
 cmd=${1:-list}
@@ -25,7 +26,20 @@ cmd=${1:-list}
 
 case "$cmd" in
     create)
-        snapshot_create "${1:-manual}" >/dev/null
+        # `--label X` too: that is how every other command here names things,
+        # and taking the flag as the label is how a restore point came to be
+        # called `--label`.
+        label=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --label)   label=${2:?usage: $ALIAS snapshot create [--label] <label>}; shift ;;
+                --label=*) label=${1#--label=} ;;
+                -*)        die "unknown option: $1 (usage: $ALIAS snapshot create [--label] <label>)" ;;
+                *)         [ -z "$label" ] || die "one label only (quote it if it has spaces)"; label=$1 ;;
+            esac
+            shift
+        done
+        snapshot_create "${label:-manual}" >/dev/null
         # Only if `snapshots.keep` says so; off until then.
         snapshot_autoprune
         ;;
@@ -38,13 +52,8 @@ case "$cmd" in
 
     remove)
         name=${1:?usage: $ALIAS snapshot remove <name>}
-        snapshot_list | grep -q "^$(basename "$name") " || true
         log_warn "about to permanently delete snapshot '$name'"
-        if [ "${2:-}" != "--yes" ]; then
-            printf 'continue? [y/N] ' >&2
-            read -r reply < /dev/tty || reply=""
-            case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
-        fi
+        [ "${2:-}" = "--yes" ] || confirm_or_die
         snapshot_remove "$name"
         ;;
 
@@ -59,11 +68,7 @@ case "$cmd" in
             shift
         done
         log_warn "about to permanently delete all but the newest $keep snapshot(s)"
-        if [ "${ASSUME_YES:-0}" != 1 ]; then
-            printf 'continue? [y/N] ' >&2
-            read -r reply < /dev/tty || reply=""
-            case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
-        fi
+        [ "${ASSUME_YES:-0}" = 1 ] || confirm_or_die
         snapshot_prune "$keep"
         ;;
 

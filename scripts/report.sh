@@ -24,16 +24,13 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 source "$REPO_ROOT/scripts/lib/redact.sh"
 source "$REPO_ROOT/scripts/lib/crashes.sh"
+source "$REPO_ROOT/scripts/lib/reports.sh"
 
-REPORT_DIR="$STATE_DIR/diagnostics"
 JOURNAL_LINES=${JOURNAL_LINES:-200}
-
-active_profile() {
-    local state="$CONFIG_DIR/state.json"
-    [ -f "$state" ] && jq -r '.profile // "default"' "$state" 2>/dev/null || echo default
-}
 
 # --- the four parts --------------------------------------------------------
 
@@ -73,7 +70,7 @@ part_crash() {
     }
 
     crash_text "$crash" | redact_text > "$dir/crash.txt"
-    printf 'crash:  %s\n' "$(basename "$crash")" >> "$dir/error.txt"
+    printf '%s\n' "$(report_crash_line "$(basename "$crash")")" >> "$dir/error.txt"
 }
 
 part_environment() {
@@ -82,8 +79,8 @@ part_environment() {
         printf '%-18s %s\n' "$DISPLAY_NAME" "$VERSION"
         printf '%-18s %s\n' "schema" "$(jq -r '.schemaVersion // "?"' "$DATA_DIR/config/defaults/shell.json" 2>/dev/null || echo '?')"
         printf '%-18s %s\n' "profile" "$(active_profile)"
-        printf '%-18s %s\n' "renderer" "$("$REPO_ROOT/scripts/renderer.sh" status 2>/dev/null | sed -n 's/^configured: *//p')"
-        printf '%-18s %s\n' "shell package" "$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default '<unset>' 2>/dev/null)"
+        printf '%-18s %s\n' "renderer" "$(config_get '.panel.renderer' quickshell)"
+        printf '%-18s %s\n' "shell package" "$(live_shell_package '<unset>')"
         printf '%-18s %s\n' "desktop" "${XDG_CURRENT_DESKTOP:-unset}"
         printf '%-18s %s\n' "session" "${XDG_SESSION_TYPE:-unset}"
         printf '%-18s %s\n' "quickshell" "$(quickshell --version 2>/dev/null | head -1 || echo 'not found')"
@@ -97,22 +94,12 @@ part_environment() {
 
 part_config() {
     local dir=$1
-    local defaults="$DATA_DIR/config/defaults/shell.json"
-    [ -f "$defaults" ] || defaults="$REPO_ROOT/config/defaults/shell.json"
-    local profile
-    profile="$CONFIG_DIR/profiles/$(active_profile)/shell.json"
 
-    local merged
-    if [ -f "$profile" ] && jq -e . "$profile" >/dev/null 2>&1; then
-        merged=$(jq -s '.[0] * .[1]' "$defaults" "$profile")
-    else
-        merged=$(cat "$defaults" 2>/dev/null || echo '{}')
-        # Worth saying out loud: an unparseable profile is itself the most
-        # likely reason a report is being written.
-        [ -f "$profile" ] && printf 'the profile does not parse: %s\n' "$profile" >> "$dir/error.txt"
-    fi
+    # Worth saying out loud: an unparseable profile is itself the most likely
+    # reason a report is being written.
+    config_profile_broken && printf 'the profile does not parse: %s\n' "$(profile_file)" >> "$dir/error.txt"
 
-    printf '%s' "$merged" | redact_json "$HOME" "${USER:-$(id -un)}" > "$dir/config.json"
+    config_merged | redact_json "$HOME" "${USER:-$(id -un)}" > "$dir/config.json"
 
     # Proof the pass ran, for anyone about to paste this somewhere. A bundle
     # that merely claims to be redacted is not worth much.
@@ -164,10 +151,7 @@ case "$cmd" in
         # reports written in the same one -- a widget failing and the unit dying
         # right after it, exactly when reports matter -- would otherwise land in
         # the same directory, and the second would overwrite the first.
-        base="$REPORT_DIR/$(date +%Y%m%d-%H%M%S)"
-        dir=$base
-        n=2
-        while [ -e "$dir" ]; do dir="$base-$n"; n=$((n + 1)); done
+        dir=$(unique_path "$REPORT_DIR/$(date +%Y%m%d-%H%M%S)")
         mkdir -p "$dir" || die "cannot write to $REPORT_DIR"
 
         part_error       "$dir" "$REASON" "$QML_FILE"
@@ -201,7 +185,7 @@ case "$cmd" in
     show)
         name=${args[0]:-}
         if [ -z "$name" ]; then
-            name=$(ls -1 "$REPORT_DIR" 2>/dev/null | sort | tail -1)
+            name=$(report_newest)
             [ -n "$name" ] || die "no reports yet"
         fi
         dir="$REPORT_DIR/$(basename "$name")"

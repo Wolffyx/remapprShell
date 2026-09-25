@@ -18,6 +18,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.core
+import qs.platform.kde
+import qs.platform.system
 import qs.domain.windows.events
 
 QtObject {
@@ -30,8 +32,6 @@ QtObject {
     // Told apart from "no windows": before the daemon has answered at all we
     // do not know whether the list is empty or absent.
     property bool _answered: false
-
-    readonly property var activeWindow: root.windows.find(w => w.active) ?? null
 
     // uuid -> when that window began asking for attention. See
     // WindowEvents.attentionSince.
@@ -64,18 +64,15 @@ QtObject {
     // something.
     readonly property Process _initial: Process {
         running: true
-        command: ["busctl", "--user", "--json=short", "call",
-                  Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List"]
+        command: Dbus.callArgs(Branding.dbusName, "/Windows", `${Branding.dbusName}.Windows`, "List")
         stdout: StdioCollector {
             onStreamFinished: {
-                let payload;
-                try {
-                    payload = JSON.parse(text).data?.[0];
-                } catch (e) {
+                const reply = Dbus.unwrap(text, "Windows.List");
+                if (reply === undefined) {
                     Log.debug("windows", "the window daemon is not answering yet");
                     return;
                 }
-                root._apply(WindowEvents.parseList(payload));
+                root._apply(WindowEvents.parseList(reply?.[0]));
                 Log.info("windows", `${root.windows.length} window(s) from the daemon`);
             }
         }
@@ -83,115 +80,86 @@ QtObject {
 
     // And then followed. A match rule rather than a whole-bus monitor: this
     // wants two signals, not every message on the session bus.
-    property int _dropped: 0
+    readonly property BusMonitor _monitor: BusMonitor {
+        match: `type='signal',interface='${Branding.dbusName}.Windows'`
 
-    readonly property Process _monitor: Process {
-        running: true
-        command: ["busctl", "--user", "--json=short", "monitor",
-                  "--match", `type='signal',interface='${Branding.dbusName}.Windows'`]
-        stdout: SplitParser {
-            onRead: line => {
-                const list = WindowEvents.parseSignal(line);
-                if (list === null) {
-                    // A dropped line means the window list on screen is now
-                    // out of date and nothing will say so, since the daemon
-                    // sends state rather than changes. Worth a warning, unlike
-                    // the ordinary case of a line that is simply not ours.
-                    if (BusLine.dropped > root._dropped) {
-                        root._dropped = BusLine.dropped;
-                        Log.warn("windows", "a window update was too large to read; the list may be stale");
-                    }
-                    return;
-                }
-                // A window opening or closing is worth a journal line; a title
-                // changing is not, and there are a great many of those.
-                const changed = list.length !== root.windows.length;
-                root._apply(list);
-                if (changed)
-                    Log.info("windows", `${list.length} window(s)`);
-                else
-                    Log.debug("windows", `${list.length} window(s), details changed`);
-            }
+        onRead: line => {
+            const list = WindowEvents.parseSignal(line);
+            if (list === null)
+                return;
+            // A window opening or closing is worth a journal line; a title
+            // changing is not, and there are a great many of those.
+            const changed = list.length !== root.windows.length;
+            root._apply(list);
+            if (changed)
+                Log.info("windows", `${list.length} window(s)`);
+            else
+                Log.debug("windows", `${list.length} window(s), details changed`);
         }
 
-        onRunningChanged: if (!running) Log.warn("windows", "the window list stopped following changes")
+        // A dropped line means the window list on screen is now out of date
+        // and nothing will say so, since the daemon sends state rather than
+        // changes. Worth a warning, unlike the ordinary case of a line that is
+        // simply not ours.
+        onDropped: Log.warn("windows", "a window update was too large to read; the list may be stale")
+
+        onListeningChanged: if (!listening) Log.warn("windows", "the window list stopped following changes")
     }
 
     // ---- matching a window to the application that owns it ---------------
     //
-    // KWin gives us two hints and neither is reliably an icon name: the
-    // desktop file it associated with the window (often empty), and the X11
-    // resource class (often the wrong case, sometimes a binary name). Guessing
-    // an icon from those is what produces a panel of identical grey
-    // placeholders.
-    //
-    // So the hints are resolved against the desktop entries the system
-    // actually has, by the three keys a launcher would use, and only then
-    // falls back to guessing.
+    // The way Plasma's own task manager does it, step for step, so a window is
+    // the same application here as in Plasma's panel: see AppMatch, which
+    // holds the order and is tested without a shell. What is here is only
+    // what needs one -- the installed entries, the lookup by id that also
+    // sees the entries hidden from menus, and the icon theme.
     readonly property var _entries: DesktopEntries.applications.values
 
     // Built once per change of the installed applications rather than per
     // window per repaint.
-    readonly property var _index: {
-        const byKey = ({});
-        for (const entry of root._entries ?? []) {
-            const add = (key, value) => {
-                const k = String(key ?? "").toLowerCase();
-                if (k.length > 0 && !byKey[k])
-                    byKey[k] = value;
-            };
-            add(entry.id, entry);
-            // The .desktop id without its suffix, which is the form KWin
-            // usually reports.
-            add(String(entry.id ?? "").replace(/\.desktop$/, ""), entry);
-            // What the application tells the compositor to call itself. This
-            // is the one that matches windows whose class bears no relation to
-            // their desktop file.
-            add(entry.startupClass, entry);
-        }
-        return byKey;
+    readonly property var _index: AppMatch.index(root._entries)
+
+    // The application a window belongs to, as AppMatch finds it -- an
+    // installed entry, a desktop file read from disk, or only a name -- or
+    // null when nothing matched.
+    function appFor(window) {
+        return AppMatch.match(window, root._index, id => DesktopEntries.byId(id));
     }
 
+    // The installed entry, for what only one of those can do: be pinned, be
+    // started again, offer its own actions.
     function entryFor(window) {
-        if (!window)
-            return null;
-        const index = root._index;
-        for (const hint of [window.desktopFile, window.appId]) {
-            const key = String(hint ?? "").toLowerCase();
-            if (key.length === 0)
-                continue;
-            if (index[key])
-                return index[key];
-            const stripped = key.replace(/\.desktop$/, "");
-            if (index[stripped])
-                return index[stripped];
-        }
-        return null;
+        return root.appFor(window)?.entry ?? null;
     }
 
-    // The icon to draw, as a theme name. The entry's own icon first, because
-    // that is the one the application chose.
+    // Every icon and name below comes through these two, groups included.
+    function _iconOf(app, window) {
+        return AppMatch.icon(app, window, name => Quickshell.hasThemeIcon(name));
+    }
+
+    function _nameOf(app, window) {
+        return AppMatch.name(app, window);
+    }
+
+    // The icon to draw, as a theme name: the application's own where the
+    // theme has it, else the window's desktop file or class to try.
     function iconFor(window) {
-        const entry = root.entryFor(window);
-        if (entry && String(entry.icon ?? "").length > 0)
-            return entry.icon;
-        return WindowEvents.iconName(window);
+        return root._iconOf(root.appFor(window), window).name;
     }
 
-    // Some windows match no installed application at all -- a Steam game's
-    // class is a numeric app id -- and the only copy of their icon is the one
-    // the window carries. The daemon writes that out; this is the file.
+    // Or as a file, which a drawn icon prefers: the application's icon given
+    // as a path, or one beside its desktop file, or -- where the application
+    // has none to offer, or there is no application -- the icon the window
+    // carries, which the daemon writes out.
     function iconFileFor(window) {
-        const path = String(window?.iconPath ?? "");
-        return path.length > 0 ? `file://${path}` : "";
+        const path = root._iconOf(root.appFor(window), window).file;
+        return path.length > 0 ? Paths.fileUrl(path) : "";
     }
 
-    // "Dolphin", not "org.kde.dolphin".
+    // "Example Viewer", not "org.example.Viewer"; and a window no
+    // application matched by its own title.
     function appNameFor(window) {
-        const entry = root.entryFor(window);
-        if (entry && String(entry.name ?? "").length > 0)
-            return entry.name;
-        return window?.appId ?? "";
+        return root._nameOf(root.appFor(window), window);
     }
 
     // ---- windows grouped by the application that owns them ---------------
@@ -213,13 +181,17 @@ QtObject {
         const byKey = ({});
 
         for (const window of windows ?? []) {
-            const entry = root.entryFor(window);
-            const key = entry ? String(entry.id) : `class:${window.appId}`;
+            const app = root.appFor(window);
+            const key = AppMatch.groupKey(app, window);
 
             if (!byKey[key]) {
+                const icon = root._iconOf(app, window);
                 byKey[key] = {
                     key: key,
-                    appName: root.appNameFor(window),
+                    // What pinning and the menu of actions go by: an
+                    // installed application's id, and nothing for the rest.
+                    appKey: app?.entry ? String(app.entry.id) : "",
+                    appName: root._nameOf(app, window),
                     windows: [],
                     active: false,
                     // Whether any of its windows is asking for attention,
@@ -229,8 +201,8 @@ QtObject {
                     attentionSince: 0,
                     // The first window's icon stands for the group: they are
                     // the same application, so it is the same icon.
-                    iconName: root.iconFor(window),
-                    iconFile: root.iconFileFor(window)
+                    iconName: icon.name,
+                    iconFile: icon.file.length > 0 ? Paths.fileUrl(icon.file) : ""
                 };
                 order.push(key);
             }
@@ -267,9 +239,13 @@ QtObject {
 
     // ---- pinned applications, and acting on windows --------------------
 
+    // An installed application by its id -- or by a desktop file name or a
+    // window class, which is what a notification or a pin may hold instead.
     function entryById(id) {
-        const key = String(id ?? "").toLowerCase();
-        return key.length > 0 ? (root._index[key] ?? null) : null;
+        const key = String(id ?? "").toLowerCase().replace(/\.desktop$/, "");
+        if (key.length === 0)
+            return null;
+        return (root._index.id.get(key) ?? root._index.startupClass.get(key) ?? [])[0] ?? null;
     }
 
     // A pinned application with no windows: a button that starts it. Null
@@ -278,6 +254,7 @@ QtObject {
         const entry = root.entryById(id);
         if (!entry)
             return null;
+        const icon = root._iconOf(AppMatch.installed(entry), null);
         return {
             key: String(entry.id),
             appKey: String(entry.id),
@@ -286,32 +263,52 @@ QtObject {
             active: false,
             attention: false,
             attentionSince: 0,
-            iconName: entry.icon || "",
-            iconFile: ""
+            iconName: icon.name || entry.icon || "",
+            iconFile: icon.file.length > 0 ? Paths.fileUrl(icon.file) : ""
         };
     }
 
-    // Starts the application -- or one of its own actions, "New Incognito
-    // Window" and the like -- the way a launcher would.
-    function launch(id, action) {
-        if (action) {
-            action.execute();
+    // An application by its desktop-entry id: raised when it already has a
+    // window, started when it does not. What clicking a notification means --
+    // "take me to the thing that told me" -- and what Plasma does with one.
+    //
+    // The window is found through the same index the task list matches on, so
+    // an entry id ("org.kde.spectacle"), a desktop file name and a window
+    // class all reach the same application.
+    function open(entryId) {
+        const key = String(entryId ?? "").replace(/\.desktop$/, "").toLowerCase();
+        if (key.length === 0)
+            return;
+        const entry = root.entryById(key);
+        const mine = root.windows.filter(w => {
+            const matched = root.entryFor(w);
+            if (matched && entry && String(matched.id).toLowerCase() === String(entry.id).toLowerCase())
+                return true;
+            return String(w.appId ?? "").toLowerCase().replace(/\.desktop$/, "") === key;
+        });
+        if (mine.length > 0) {
+            root.activateGroup({ windows: mine });
             return;
         }
-        root.entryById(id)?.execute();
+        Launch.entry(entry);
+    }
+
+    // Starts the application -- or one of its own actions, "New Incognito
+    // Window" and the like -- the way a launcher would: in a scope of its own,
+    // so the shell restarting does not end it (see Launch).
+    function launch(id, action) {
+        if (action) {
+            Launch.action(action, root.entryById(id));
+            return;
+        }
+        Launch.entry(root.entryById(id));
     }
 
     // The active window, minimised, by KWin's own "Window Minimize" action --
     // what its key does. Only ever asked for when the window clicked is the
     // active one, which is the one that action works on.
-    readonly property Process _minimize: Process {
-        command: ["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                  "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Window Minimize"]
-    }
-
     function minimizeActive() {
-        root._minimize.running = false;
-        root._minimize.running = true;
+        Dbus.invokeShortcut("Window Minimize");
     }
 
     // Any window, closed. KWin has no call for it, so the CLI loads a
@@ -325,14 +322,9 @@ QtObject {
 
     // KWin's own runner. The id it expects is the uuid in braces behind a
     // "0_" prefix, which is what its Match() hands out.
-    readonly property Process _activate: Process {}
-
     function activate(uuid) {
         if (!uuid)
             return;
-        root._activate.running = false;
-        root._activate.command = ["busctl", "--user", "call", "org.kde.KWin", "/WindowsRunner",
-                                  "org.kde.krunner1", "Run", "ss", `0_{${uuid}}`, ""];
-        root._activate.running = true;
+        Dbus.send("org.kde.KWin", "/WindowsRunner", "org.kde.krunner1", "Run", "ss", [`0_{${uuid}}`, ""]);
     }
 }

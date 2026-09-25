@@ -8,25 +8,10 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/config.sh"
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-
-profile="$CONFIG_DIR/profiles/default/shell.json"
 mkdir -p "$(dirname "$profile")"
 write_profile() { printf '%s\n' "$1" > "$profile"; }
 
@@ -55,5 +40,74 @@ echo "== a profile that does not parse is ignored, as the shell ignores it =="
 write_profile '{ this is not json'
 check "the defaults are used"      "$(config_get '.panel.renderer' 'none')"       "quickshell"
 
-if [ "$fail" -gt 0 ]; then echo "FAILED: $pass passed, $fail failed" >&2; exit 1; fi
-echo "OK: $pass passed"
+# Every command that changes a setting writes it through config_set: into the
+# active profile, only the one path, and by a rename beside the file the shell
+# is watching -- never a truncate in place, never a copy in from /tmp.
+echo "== one setting written into the profile =="
+write_profile '{ "panel": { "thickness": 44 }, "keep": "me" }'
+config_set_string '.panel.renderer' plasma; rc=$?
+check "written"                    "$rc:$(jq -c '.panel' "$profile")"         '0:{"thickness":44,"renderer":"plasma"}'
+check "and nothing else touched"   "$(jq -r '.keep' "$profile")"                "me"
+config_set '.osd.enabled' false
+check "JSON goes in as JSON"       "$(jq -c '.osd' "$profile")"                 '{"enabled":false}'
+check "and reads back"             "$(config_get '.osd.enabled' true)"          "false"
+TMPDIR=/nonexistent config_set '.panel.thickness' 50; rc=$?
+check "not by way of /tmp"         "$rc:$(jq -r '.panel.thickness' "$profile")" "0:50"
+check "and nothing left beside it" "$(ls -A "$(dirname "$profile")" | grep -vx shell.json | wc -l)" "0"
+
+printf '{"profile": "other"}\n' > "$CONFIG_DIR/state.json"
+config_set_string '.panel.position' left
+check "into the active profile"    "$(jq -r '.panel.position' "$CONFIG_DIR/profiles/other/shell.json")" "left"
+check "not the default one"        "$(jq -r '.panel.position // "untouched"' "$profile")" "untouched"
+rm -f "$CONFIG_DIR/state.json"
+
+write_profile '{ this is not json'
+config_set_string '.panel.renderer' plasma; rc=$?
+check "a broken profile says so"   "$rc" "2"
+check "and is left exactly as it was" "$(cat "$profile")" '{ this is not json'
+
+# A command that asks for many settings reads the files once. What it read is
+# what it goes on reading -- until it writes, when it reads again, so no
+# command sees a setting from before its own write.
+echo "== read once, and again after a write =="
+write_profile '{ "panel": { "thickness": 44 } }'
+config_load
+check "what was loaded"            "$(config_get '.panel.thickness' 0)" "44"
+write_profile '{ "panel": { "thickness": 45 } }'
+check "is what is read"            "$(config_get '.panel.thickness' 0)" "44"
+config_set '.panel.thickness' 46
+check "until a write loads again"  "$(config_get '.panel.thickness' 0)" "46"
+check "and the rest is still there" "$(config_get '.panel.renderer' none)" "quickshell"
+unset CONFIG_MERGED
+
+# An update checks that the new version can migrate the profile before it
+# restarts the shell into it. It used to look for config/migrations/NNN-*.js,
+# which nothing loads: the migrations are the keys of `steps` in the shell's
+# Migrations.qml, so the first real one would have rolled every update back.
+echo "== the migrations an update looks for are the shell's =="
+qml="$SANDBOX/Migrations.qml"
+cat > "$qml" <<'QML'
+QtObject {
+    // Keyed by the version being migrated *to*.
+    //   9: obj => Obj.set(obj, "panel.thickness", ...)
+    readonly property var steps: ({
+        2: obj => Obj.set(obj, "panel.thickness", 40),
+        "3": obj => {
+            const nested = { 7: "a step's own object", "8": 1 };
+            return "4: in a string" ? obj : nested;
+        },
+        /* 5: commented out */
+        6 : function (obj) { return obj }
+    })
+    readonly property var other: ({ 11: 1 })
+}
+QML
+check "the steps, and nothing inside them" "$(config_migration_steps "$qml" | paste -sd' ')" "2 3 6"
+printf 'QtObject {\n    readonly property var steps: ({})\n}\n' > "$qml"
+check "none is none"                       "$(config_migration_steps "$qml")" ""
+real="$REPO_ROOT/shell/domain/config/Migrations.qml"
+current=$(sed -n 's/.*readonly property int currentVersion: *\([0-9]*\).*/\1/p' "$real")
+want=$(seq 2 "${current:-1}" | paste -sd' ')
+check "the shell has a step to every version it knows" "$(config_migration_steps "$real" | paste -sd' ')" "$want"
+
+harness_done

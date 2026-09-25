@@ -10,7 +10,7 @@
 # the migration and verification steps would mean the path most used during
 # development is the one least tested.
 #
-#   preflight -> snapshot -> record -> apply -> migrate -> verify -> restart
+#   preflight -> snapshot -> record -> apply -> packages -> migrate -> verify -> restart
 #
 # and if verification fails, back to where it started.
 set -uo pipefail
@@ -42,13 +42,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-profile="$CONFIG_DIR/profiles/default/shell.json"
-config_get() {
-    [ -f "$profile" ] || { printf '%s' "$2"; return; }
-    local v
-    v=$(jq -r "$1 // empty" "$profile" 2>/dev/null)
-    printf '%s' "${v:-$2}"
-}
+# The active profile over the defaults, as everything else reads it. This
+# used to read profiles/default alone, so an update channel set in any other
+# profile -- including from the settings window -- was ignored.
+source "$REPO_ROOT/scripts/lib/config.sh"
+profile=$(profile_file)
 
 [ -n "$CHANNEL" ]      || CHANNEL=$(config_get '.update.channel' 'main')
 [ -n "$LOCAL_SOURCE" ] || LOCAL_SOURCE=$(config_get '.update.localSource' '')
@@ -196,19 +194,34 @@ fi
 
 new_version=$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo "0.0.0")
 
+# ----------------------------------------------------------------- packages
+
+# A new version can need something the old one did not. Asked for here, from
+# the new version's own list, before anything of it is verified or run.
+if ! "$REPO_ROOT/scripts/deps.sh" check >/dev/null; then
+    "$REPO_ROOT/scripts/deps.sh" install || {
+        log_error "the new version needs packages that were not installed"
+        "$0" --rollback
+        exit 1
+    }
+fi
+
 # -------------------------------------------------------------------- migrate
 
 # Configuration migrations run inside the shell when it next reads the profile,
 # because that is the only place that knows the schema. What matters here is
-# that a migration exists for the jump, so the shell is not asked to make one up.
+# that a migration exists for the jump, so the shell is not asked to make one up
+# -- asked of the migrations the new version actually carries, the steps in its
+# Migrations.qml (config_migration_steps says how they are read).
 shipped_version=$(jq -r '.schemaVersion // 1' "$REPO_ROOT/config/defaults/shell.json" 2>/dev/null || echo 1)
 current_version=$(jq -r '.schemaVersion // 1' "$profile" 2>/dev/null || echo "$shipped_version")
 
 if [ "$current_version" -lt "$shipped_version" ]; then
     log_step "configuration schema $current_version -> $shipped_version"
+    steps=$(config_migration_steps "$REPO_ROOT/shell/domain/config/Migrations.qml")
     v=$((current_version + 1))
     while [ "$v" -le "$shipped_version" ]; do
-        if ! ls "$REPO_ROOT"/config/migrations/"$(printf '%03d' "$v")"-*.js >/dev/null 2>&1; then
+        if ! grep -qx -- "$v" <<< "$steps"; then
             log_error "no migration for schema version $v"
             log_error "the shell would refuse to load this configuration"
             "$0" --rollback
@@ -226,7 +239,7 @@ log_step "verifying"
 "$REPO_ROOT/scripts/gen-qmldir.sh"       >/dev/null || true
 "$REPO_ROOT/scripts/gen-widget-index.sh" >/dev/null || true
 
-if ! "$REPO_ROOT/scripts/lint-qml.sh" >/dev/null 2>&1; then
+if ! LINT_QML_OPTIONAL=1 "$REPO_ROOT/scripts/lint-qml.sh" >/dev/null 2>&1; then
     log_error "the new version does not pass its own QML lint"
     "$0" --rollback
     exit 1

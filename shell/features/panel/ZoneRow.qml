@@ -53,6 +53,23 @@ Item {
         return Math.max(0, root.room - others - count * layout.spacing);
     }
 
+    // What this zone takes whatever room it is given: every slot's fixed
+    // length and the spacing between them. The other zones' rooms are worked
+    // out from this rather than from this zone's drawn length, which depends
+    // on its own room -- reading that went round a loop through all three.
+    readonly property int shown: layout.shown
+    readonly property real fixedLength: {
+        let total = 0;
+        let count = 0;
+        for (const c of layout.children) {
+            if (c === slots || !c.visible)
+                continue;
+            total += c.fixedLength;
+            count++;
+        }
+        return total + Math.max(0, count - 1) * layout.spacing;
+    }
+
     // See the Repeater below for why this is a string and not the list.
     readonly property string entriesKey: JSON.stringify(PanelModel.entriesForScreen(root.screenName, root.zone))
     property var entries: []
@@ -123,11 +140,22 @@ Item {
             WidgetSlot {
                 id: slot
                 required property var modelData
+
+                // The same trick as `entriesKey`, for the same reason. The
+                // merge is read again on every configuration change of any
+                // kind -- folding a sidebar card writes one -- and each time
+                // it made a new object, which WidgetHost handed to the widget
+                // as a new configuration: every widget on every panel
+                // re-evaluated everything it reads from its configuration,
+                // for a key none of them read. The string is equal unless
+                // this widget's configuration really changed.
+                readonly property string configKey: JSON.stringify(PanelModel.configFor(slot.modelData))
+
                 room: root.roomFor(slot)
                 entry: modelData
                 bar: root.bar
                 screenName: root.screenName
-                widgetConfig: PanelModel.configFor(modelData)
+                widgetConfig: JSON.parse(slot.configKey)
             }
         }
     }

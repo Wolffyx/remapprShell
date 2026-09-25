@@ -9,8 +9,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.config
+import qs.domain.settings.groups
 import qs.domain.launcher
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -20,7 +20,34 @@ Column {
     readonly property bool builtinMenu: LauncherService.appsProvider?.providerId === "builtin"
     readonly property bool builtinSearch: LauncherService.searchProvider?.providerId === "builtin"
 
+    // What search can look through, once: the switches below are drawn from
+    // it, and the list is written back in its order.
+    readonly property var sourceRows: [
+        { id: "apps", label: "Applications", description: "Everything installed, by name, by the binary, or by its initials." },
+        { id: "windows", label: "Open windows", description: "By their titles, so a window can be raised by the page it is showing." },
+        { id: "files", label: "Recent files", description: "What KDE and GTK applications record having opened." },
+        { id: "settings", label: "This shell's settings", description: "The pages of this window, by name." }
+    ]
+    readonly property var sourceIds: root.sourceRows.map(s => s.id)
+
+    readonly property var sources: ConfigStore.value("launcher.searchSources", root.sourceIds) ?? []
+
+    // Written back in the order the switches are drawn, not the order they
+    // were turned on: the file is read by people as well as by the shell. The
+    // schema's `set` keys are chosen the same way, by the same function.
+    function setSource(id, on) {
+        ConfigStore.set("launcher.searchSources", SettingGroups.chooseFrom(root.sourceIds, root.sources, id, on));
+    }
+
     spacing: 14
+
+    // The choices in both lists: automatic, then whatever is usable here,
+    // named as the providers name themselves. A custom command is only usable
+    // once there is one, which is what the field below this card is for.
+    readonly property var providerIds: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
+    readonly property var providerLabels: ["Automatic"].concat(LauncherService.availableProviders.map(p => p.label))
+    readonly property bool kickoffInUse: LauncherService.appsProvider?.providerId === "kickoff"
+                                         || LauncherService.searchProvider?.providerId === "kickoff"
 
     Card {
         width: root.width
@@ -33,9 +60,9 @@ Column {
             description: `Now: ${LauncherService.appsProvider?.label ?? "none"}.`
 
             Select {
-                values: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                currentIndex: Math.max(0, ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                                              .indexOf(ConfigStore.value("launcher.provider", "auto")))
+                values: root.providerIds
+                labels: root.providerLabels
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.provider", "builtin")))
                 onPicked: value => ConfigStore.set("launcher.provider", value)
             }
         }
@@ -46,10 +73,39 @@ Column {
             description: `Now: ${LauncherService.searchProvider?.label ?? "none"}.`
 
             Select {
-                values: ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                currentIndex: Math.max(0, ["auto"].concat(LauncherService.availableProviders.map(p => p.providerId))
-                                              .indexOf(ConfigStore.value("launcher.searchProvider", "auto")))
+                values: root.providerIds
+                labels: root.providerLabels
+                currentIndex: Math.max(0, root.providerIds.indexOf(ConfigStore.value("launcher.searchProvider", "builtin")))
                 onPicked: value => ConfigStore.set("launcher.searchProvider", value)
+            }
+        }
+
+        SettingRow {
+            width: parent.width
+            stacked: true
+            label: "A command of your own"
+            description: "Any launcher, run as written -- `wofi --show drun`, say. Once it is set, \"Custom command\" is in both lists above."
+
+            TextInputRow {
+                width: parent.width
+                placeholderText: "wofi --show drun"
+                text: SettingGroups.formatList(ConfigStore.value("launcher.command", []) ?? [], "words")
+                onCommitted: value => ConfigStore.set("launcher.command", SettingGroups.parseList(value, "words"))
+            }
+        }
+
+        // Only worth asking while Kickoff is the one that opens.
+        SettingRow {
+            width: parent.width
+            visible: root.kickoffInUse
+            label: "Kickoff opens as"
+            description: "A window is slower, and does not close itself when it loses focus."
+
+            Select {
+                values: ["menu", "windowed"]
+                labels: ["A menu", "A window"]
+                currentIndex: ConfigStore.value("launcher.kickoffMode", "menu") === "windowed" ? 1 : 0
+                onPicked: value => ConfigStore.set("launcher.kickoffMode", value)
             }
         }
     }
@@ -60,22 +116,18 @@ Column {
 
         SectionLabel { text: "Start menu layout" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: ["twopane", "grid", "list"]
             labels: ["Two-pane", "Pinned grid", "A–Z list"]
             glyphs: ["vertical_split", "grid_view", "sort_by_alpha"]
-            current: ConfigStore.value("launcher.layout", "twopane")
-            onPicked: value => ConfigStore.set("launcher.layout", value)
+            path: "launcher.layout"
         }
 
-        PanelText {
-            width: parent.width
+        Hint {
             visible: !root.builtinMenu
-            wrapMode: Text.WordWrap
             text: "The menu key opens Plasma's Kickoff at the moment, which has a layout of its own."
-            font.pixelSize: 12
-            color: Theme.mut
+            lineHeight: 1
         }
     }
 
@@ -85,17 +137,62 @@ Column {
 
         SectionLabel { text: "Search" }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Compact rows"
             description: "More results in the same room."
-            checked: ConfigStore.value("launcher.dense", false) === true
-            onToggled: value => ConfigStore.set("launcher.dense", value)
+            path: "launcher.dense"
         }
 
-        ToggleRow {
+        ConfigToggleRow {
             label: "Key hints along the bottom"
-            checked: ConfigStore.value("launcher.hints", true) === true
-            onToggled: value => ConfigStore.set("launcher.hints", value)
+            path: "launcher.hints"
+        }
+    }
+
+    Card {
+        width: root.width
+        opacity: root.builtinSearch ? 1 : 0.6
+
+        SectionLabel { text: "What search looks through" }
+
+        // One switch per source, written back as the list the shell reads.
+        // A list rather than a key each: the order results appear in is the
+        // shell's, and what a person wants to say here is "not my files".
+        Repeater {
+            model: root.sourceRows
+
+            ToggleRow {
+                required property var modelData
+
+                label: modelData.label
+                description: modelData.description
+                checked: root.sources.indexOf(modelData.id) >= 0
+                onToggled: value => root.setSource(modelData.id, value)
+            }
+        }
+    }
+
+    Card {
+        width: root.width
+
+        SectionLabel { text: "What it remembers" }
+
+        ConfigToggleRow {
+            label: "Learn what you open"
+            description: "What has been opened before is offered first, and an empty search suggests it. Kept on this machine and sent nowhere."
+            path: "launcher.learn"
+        }
+
+        Hint {
+            text: `${Object.keys(Frecency.entries).length} thing(s) remembered.`
+            lineHeight: 1
+        }
+
+        TextButton {
+            glyph: "delete_history"
+            iconName: "edit-clear-history"
+            text: "Forget what I have opened"
+            onActivated: Frecency.forget()
         }
     }
 
@@ -104,20 +201,14 @@ Column {
 
         SectionLabel { text: "Action prefix" }
 
-        Segmented {
+        ConfigSegmented {
             width: parent.width
             values: [">", ":", "/"]
-            current: ConfigStore.value("launcher.actionPrefix", ">")
-            onPicked: value => ConfigStore.set("launcher.actionPrefix", value)
+            path: "launcher.actionPrefix"
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
+        Hint {
             text: "Typed at the start of a search, this runs the shell's own actions -- lock, log out, the sidebar, the key sheet -- instead of looking for applications."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.mut
         }
 
         Row {

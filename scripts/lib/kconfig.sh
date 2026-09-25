@@ -11,9 +11,15 @@
 
 kconfig_ledger() { printf '%s/kconfig-ledger.json' "$STATE_DIR"; }
 
+# Once a process, for each ledger: kconfig_set calls this before every write,
+# and a theme apply writes a hundred keys. Checked again whenever the file has
+# gone -- a revert or a restore can take it away between two writes.
+_KCONFIG_LEDGER_READY=""
+
 _kconfig_ledger_init() {
     local led
     led=$(kconfig_ledger)
+    [ "$_KCONFIG_LEDGER_READY" = "$led" ] && [ -s "$led" ] && return 0
     mkdir -p "$(dirname "$led")"
     [ -s "$led" ] || printf '{"entries":[]}\n' > "$led"
 
@@ -28,6 +34,7 @@ _kconfig_ledger_init() {
         mv "$tmp" "$led"
         log_debug "kconfig: gave unscoped ledger entries a scope"
     fi
+    _KCONFIG_LEDGER_READY=$led
 }
 
 # Turns a "A/B" group path into the repeated --group arguments kwriteconfig6
@@ -38,11 +45,12 @@ _kconfig_ledger_init() {
 # contains one -- plasmashellrc's "[PlasmaViews][Panel 811]" being exactly that
 # case, written as two groups called "Panel" and "811" that KDE never reads.
 _kconfig_group_args() {
-    local path=$1 g
-    local -a out=()
-    while IFS= read -r g; do
+    local g
+    local -a parts=() out=()
+    IFS=/ read -ra parts <<< "$1"
+    for g in "${parts[@]}"; do
         [ -n "$g" ] && out+=(--group "$g")
-    done < <(printf '%s\n' "$path" | tr '/' '\n')
+    done
     printf '%s\n' "${out[@]}"
 }
 

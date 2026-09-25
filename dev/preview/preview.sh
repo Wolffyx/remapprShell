@@ -8,7 +8,6 @@ WT=$(cd "$HERE/../.." && pwd)
 target=$(realpath "$1"); out=$(realpath -m "$2")
 W=${3:-1200}; H=${4:-800}; MODE=${5:-dark}; DELAY=${6:-2500}
 root=$(mktemp -d "$HERE/root.XXXX")
-rm -rf "$root"; mkdir -p "$root"
 # A copy of the whole shell, per run. Without this it stayed behind: 550 files
 # of leftover roots were sitting here when the harness was first committed.
 # PREVIEW_KEEP=1 leaves the rendered tree behind, for the times the picture is
@@ -16,10 +15,17 @@ rm -rf "$root"; mkdir -p "$root"
 [ "${PREVIEW_KEEP:-}" = "1" ] || trap 'rm -rf "$root"' EXIT
 cp -r "$WT/shell/." "$root/"
 cp "$target" "$root/PreviewTarget.qml"; echo "PreviewTarget 1.0 PreviewTarget.qml" >> "$root/qmldir"; mkdir -p "$(dirname "$out")"
+# What the targets share -- the stage they are drawn on, the stand-in bar --
+# goes beside the target, where it finds them by name.
+for f in "$HERE"/lib/*.qml; do
+    cp "$f" "$root/"
+    echo "$(basename "$f" .qml) 1.0 $(basename "$f")" >> "$root/qmldir"
+done
 cp "$HERE/harness.qml" "$root/preview.qml"
 [ -d "$HERE/stubs" ] && cp "$HERE/stubs/"*.qml "$root/features/panel/"
 # Attached layer-shell properties have nothing to attach to on a FloatingWindow.
-sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/WidgetSlot.qml"
+# They are the popout's, which WidgetSlot opens and SlotPopout draws.
+sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/SlotPopout.qml"
 # Full-screen layer surfaces become plain Items (PanelWindow has no offscreen
 # backend); the drawing inside them is untouched.
 for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root"/features/desktop/*.qml "$root"/features/switchers/*.qml; do
@@ -31,6 +37,20 @@ for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$r
         /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: Region|screen: |color: "transparent")/d;
         s/^    required property var modelData/    property var modelData/' "$f"
 done
+# The profile and the state directory are the user's, and a preview is not.
+# Branding names them as absolute paths, so no variable moves them: they are
+# pointed into this run's root instead -- the profile copied, so a preview
+# still looks like this machine, and the state empty. Before this every render
+# wrote the running shell's widget-health.json ("booting", from a shell that
+# never lived past three seconds), and a target that saved a setting saved it
+# into the real profile (2026-09-24).
+branding="$root/core/Branding.qml"
+real_config=$(sed -nE 's/^ *readonly property string configDir: "(.*)"$/\1/p' "$branding")
+mkdir -p "$root/profile" "$root/state"
+[ -n "$real_config" ] && [ -d "$real_config" ] && cp -a "$real_config/." "$root/profile/"
+sed -i -E "s|^( *readonly property string configDir: )\".*\"$|\1\"$root/profile\"|; s|^( *readonly property string stateDir: )\".*\"$|\1\"$root/state\"|" "$branding"
+grep -qF "configDir: \"$root/profile\"" "$branding" && grep -qF "stateDir: \"$root/state\"" "$branding" \
+    || { echo "preview: could not point the profile and state at a copy; not rendering" >&2; exit 1; }
 # Pages that shell out use Branding.ctlBin, which is the *installed* CLI from
 # the main tree. Point it at this worktree's scripts instead, so a preview
 # shows what this branch's commands say.
@@ -107,8 +127,8 @@ PYEOF
     # picture is a blank square on every machine that does not have it.
     #
     # `demoIcon` and `demoName` are read by the two substitutions below and by
-    # nothing else, so the real lookup -- desktop entry first, window class
-    # second -- is exactly as it was.
+    # nothing else, so the real lookup -- AppMatch's, Plasma's order -- is
+    # exactly as it was for any window that does not carry them.
     demo "$root/domain/windows/WindowsService.qml" \
         'property var windows: []' \
         'property var windows: [
@@ -129,11 +149,11 @@ PYEOF
           active: false, minimized: true, desktops: [], output: "PREVIEW", width: 1600, height: 1000 }
     ]'
     demo "$root/domain/windows/WindowsService.qml" \
-        'return WindowEvents.iconName(window);' \
-        'return window?.demoIcon ?? WindowEvents.iconName(window);'
+        'return AppMatch.icon(app, window, name => Quickshell.hasThemeIcon(name));' \
+        'return window?.demoIcon ? { name: window.demoIcon, file: "" } : AppMatch.icon(app, window, name => Quickshell.hasThemeIcon(name));'
     demo "$root/domain/windows/WindowsService.qml" \
-        'return window?.appId ?? "";' \
-        'return window?.demoName ?? window?.appId ?? "";'
+        'return AppMatch.name(app, window);' \
+        'return window?.demoName ?? AppMatch.name(app, window);'
     # ...and the daemon must not put the real ones back a moment later.
     demo "$root/domain/windows/WindowsService.qml" \
         'root.windows = list;' \
@@ -224,7 +244,7 @@ fi
 # `QIcon::fromTheme` misses and every application icon in the picture is a
 # blank square -- which is what "the launcher preview shows empty tiles" was.
 # The KDE platform theme reads kdeglobals like the real session does.
-WT_SCRIPTS="$WT/scripts" env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen \
+env -u WAYLAND_DISPLAY -u DISPLAY QT_QPA_PLATFORM=offscreen \
     QT_QPA_PLATFORMTHEME=kde XDG_CURRENT_DESKTOP=KDE QT_FORCE_STDERR_LOGGING=1 \
     WT_SCRIPTS="$WT/scripts" PREVIEW_OUT="$out" PREVIEW_W="$W" PREVIEW_H="$H" PREVIEW_MODE="$MODE" PREVIEW_DELAY="$DELAY" \
     timeout 40 quickshell -n -p "$root/preview.qml" 2>&1 | grep -vE 'DEBUG|^\s*$' | grep -iE 'warn|error|fail|preview|qml:' | head -40 || true

@@ -20,6 +20,12 @@ Rectangle {
     required property var notification
 
     readonly property var icon: Popups.iconOf(card.notification?.image ?? "", card.notification?.appIcon ?? "")
+
+    // The file a notification names, when it is a picture: a screenshot that
+    // was just taken, a photo that just finished downloading. Drawn under the
+    // text at a size worth looking at -- Spectacle sends no image of its own,
+    // only the path it saved to, so an icon is all there would be otherwise.
+    readonly property string picture: ShellNotifications.pictureOf(card.notification)
     readonly property bool critical: (card.notification?.urgency ?? 1) >= Popups.critical
     readonly property var actions: (card.notification?.actions ?? []).filter(a => a.identifier !== "default")
 
@@ -31,10 +37,16 @@ Rectangle {
                                                    ShellNotifications.timeoutMs)
     property real remaining: 1
 
+    // Stopped while the pointer holds the popup, as the popup itself is. The
+    // service lets the deadline pass meanwhile and gives the popup at least
+    // two seconds more once it is let go, so a bar that kept counting ran
+    // down to nothing under the pointer and then jumped back up. It picks up
+    // from the service's deadline when the pointer leaves.
     Timer {
         interval: 100
         repeat: true
         running: card.deadline > 0 && card.span > 0
+                 && ShellNotifications.held !== card.notification?.id
         onTriggered: card.remaining = Math.max(0, Math.min(1, (card.deadline - Date.now()) / card.span))
     }
 
@@ -152,6 +164,41 @@ Rectangle {
 
             TapHandler {
                 onTapped: if (card.notification) ShellNotifications.activate(card.notification)
+            }
+        }
+
+        // What it is telling you about, when that is a picture.
+        Item {
+            width: parent.width
+            height: visible ? shot.height + 10 : 0
+            visible: card.picture.length > 0 && image.status !== Image.Error
+
+            Rectangle {
+                id: shot
+
+                y: 10
+                width: parent.width
+                height: Math.min(180, Math.max(64, width * (image.implicitHeight / Math.max(1, image.implicitWidth))))
+                radius: 14
+                color: Theme.s2
+                clip: true
+
+                Image {
+                    id: image
+                    anchors.fill: parent
+                    source: card.picture
+                    // Bounded: the file is chosen by whoever sent the
+                    // notification, and a photograph from a phone is 50
+                    // megapixels of it.
+                    sourceSize: Qt.size(760, 400)
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                }
+
+                TapHandler {
+                    onTapped: if (card.notification) ShellNotifications.activate(card.notification)
+                }
             }
         }
 

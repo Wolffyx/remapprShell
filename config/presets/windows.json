@@ -82,7 +82,8 @@
         },
         "widgets": {
             "clock": {
-                "format": "HH:mm",
+                "hour12": false,
+                "showSeconds": false,
                 "showDate": true,
                 "dateFormat": "ddd d MMM"
             },

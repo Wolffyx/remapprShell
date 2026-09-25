@@ -8,26 +8,29 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
-
-# Everything below runs against these, never the caller's real directories.
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
 
-pass=0; fail=0
-ok()   { printf '  PASS  %s\n' "$1"; pass=$((pass + 1)); }
-bad()  { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
-check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (expected '$3', got '$2')"; fi; }
+# A snapshot is named for the second it was taken in, and the order of those
+# names is what pruning and "newest" read -- so the cases below needed a
+# different second each, and slept for one between snapshots: nine seconds of
+# a suite that does nothing else slow. This `date` answers that one format
+# with a clock that moves on a second per call, and passes anything else to
+# the real one.
+REAL_DATE=$(command -v date)
+cat > "$FAKEBIN/date" <<STUB
+#!/usr/bin/env bash
+if [ "\$*" = "+%Y%m%d-%H%M%S" ]; then
+    n=\$(( \$(cat "$SANDBOX/clock" 2>/dev/null || echo 0) + 1 ))
+    printf '%s' "\$n" > "$SANDBOX/clock"
+    printf '20260101-%06d\n' "\$n"
+    exit 0
+fi
+exec "$REAL_DATE" "\$@"
+STUB
+chmod +x "$FAKEBIN/date"
 
 # --- a plausible KDE home -------------------------------------------------
 
@@ -101,7 +104,7 @@ check "a second snapshot exists" "$([ -d "$extra" ] && echo yes)" "yes"
 snapshot_remove "$(basename "$extra")" >/dev/null 2>&1
 check "explicit remove works" "$([ -d "$extra" ] && echo yes || echo no)" "no"
 
-for i in 1 2 3; do snapshot_create "p$i" >/dev/null; sleep 1; done
+for i in 1 2 3; do snapshot_create "p$i" >/dev/null; done
 
 # `keep` is a floor, not a target. The oldest snapshot is the pre-install
 # state -- the only one that can put the machine back the way it was found --
@@ -112,7 +115,7 @@ check "prune keeps the newest N"      "$(ls -1 "$(snapshot_root)" | sort | tail 
 check "and never the oldest"          "$([ -d "$(snapshot_root)/$oldest" ] && echo yes)" "yes"
 
 echo "== locking =="
-for i in 4 5 6; do snapshot_create "q$i" >/dev/null; sleep 1; done
+for i in 4 5 6; do snapshot_create "q$i" >/dev/null; done
 keepme=$(ls -1 "$(snapshot_root)" | sort | sed -n '2p')     # not the oldest
 snapshot_lock "$keepme" on >/dev/null 2>&1
 check "a locked snapshot reads as locked" \
@@ -132,8 +135,53 @@ check "nothing deleted after refusal" "$([ -e "$XDG_CONFIG_HOME/kdeglobals" ] &&
 rm -rf "$broken"
 
 echo
-if [ "$fail" -gt 0 ]; then
-    printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2
-    exit 1
-fi
-printf 'OK: %d passed\n' "$pass"
+echo "== what a label may make of a directory name =="
+# The label is part of a directory name: a slash made directories inside the
+# root, `..` one outside it, and a leading dash a name that reads as a flag.
+name_of() { basename "$(snapshot_create "$1")" | sed -E 's/^[0-9]{8}-[0-9]{6}-//'; }
+check "a slash is a dash"           "$(name_of 'a/b')" "a-b"
+check "nothing climbs out"          "$(name_of '../../escape')" "escape"
+check "no leading dash"             "$(name_of '--label')" "label"
+check "spaces are kept"             "$(name_of 'My shell setup')" "My shell setup"
+check "nothing left is manual"      "$(name_of '///')" "manual"
+check "every one inside the root"   "$(find "$(snapshot_root)" -mindepth 1 -maxdepth 1 -type d | wc -l)" \
+                                    "$(find "$(snapshot_root)" -name manifest.txt | wc -l)"
+
+echo "== the CLI takes --label =="
+cli() { "$REPO_ROOT/scripts/snapshot.sh" create "$@" >/dev/null 2>&1; }
+newest() { ls "$(snapshot_root)" | sort | tail -1 | sed -E 's/^[0-9]{8}-[0-9]{6}-//'; }
+cli --label flagged;            check "--label X"     "$(newest)" "flagged"
+cli --label=equals;             check "--label=X"     "$(newest)" "equals"
+cli plain;                      check "a bare label"  "$(newest)" "plain"
+cli --bogus;                    check "an unknown flag is refused" "$?" "1"
+
+# `snapshot create` read `snapshots.keep` through config.sh, which it never
+# sourced. The lookup failed out of sight, the setting read as 0, and a machine
+# told to keep two restore points went on keeping every one.
+echo "== snapshots.keep prunes after a create =="
+rm -rf "$(snapshot_root)"
+mkdir -p "$CONFIG_DIR/profiles/default"
+for l in k1 k2 k3; do cli "$l"; done
+check "unset, nothing is pruned"   "$(ls -1 "$(snapshot_root)" | wc -l)" "3"
+printf '{"snapshots": {"keep": 2}}\n' > "$CONFIG_DIR/profiles/default/shell.json"
+cli k4
+kept=$(ls -1 "$(snapshot_root)" | sed -E 's/^[0-9]{8}-[0-9]{6}-//' | paste -sd' ')
+check "keep=2 prunes on create"    "$kept" "k1 k3 k4"
+rm -f "$CONFIG_DIR/profiles/default/shell.json"
+
+# `restore --list` kept a listing of its own, which had fallen behind: no
+# sizes, no locks.
+echo "== one listing =="
+check "restore --list is snapshot list" "$("$REPO_ROOT/scripts/restore.sh" --list 2>&1)" \
+                                        "$("$REPO_ROOT/scripts/snapshot.sh" list 2>&1)"
+
+# Pruning walked the names word by word, so a label with a space in it was
+# looked for in pieces and never removed.
+echo "== a name with spaces is pruned whole =="
+rm -rf "$(snapshot_root)"
+for l in a "b c" "d e" f; do cli "$l"; done
+snapshot_prune 1 >/dev/null 2>&1
+check "the oldest and the newest are left" \
+      "$(snapshot_names | sed -E 's/^[0-9]{8}-[0-9]{6}-//' | paste -sd'|')" "a|f"
+
+harness_done

@@ -11,6 +11,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/protected.sh"
 source "$REPO_ROOT/scripts/lib/snapshot.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 
 SUGGEST=0
 [ "${1:-}" = "--suggest-snapshots" ] && SUGGEST=1
@@ -58,7 +59,7 @@ fi
 
 log_step "conflicts"
 
-others=$(pgrep -a -x quickshell 2>/dev/null | grep -v "quickshell/$SLUG" || true)
+others=$(other_quickshells)
 if [ -n "$others" ]; then
     warn "another Quickshell instance is running:"
     printf '%s\n' "$others" | sed 's/^/      /' >&2
@@ -67,7 +68,7 @@ else
     log_info "  no other Quickshell instance"
 fi
 
-current_shell=$(kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage 2>/dev/null || true)
+current_shell=$(live_shell_package '')
 log_info "  active Plasma shell package: ${current_shell:-org.kde.plasma.desktop (default)}"
 
 # --- existing install -----------------------------------------------------

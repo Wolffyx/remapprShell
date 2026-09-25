@@ -14,6 +14,7 @@ pragma Singleton
 
 import QtQuick
 import qs.core
+import qs.domain.config.steps
 
 QtObject {
     id: root
@@ -21,11 +22,16 @@ QtObject {
     // The version the shipped defaults are written against. Bump this in the
     // same commit that changes the config shape, and add the matching entry
     // below.
-    readonly property int currentVersion: 1
+    readonly property int currentVersion: 2
 
-    // Keyed by the version being migrated *to*.
+    // Keyed by the version being migrated *to*. The body of each is in
+    // MigrationSteps, where the tests can reach it; the keys stay here,
+    // because this is where scripts/update.sh reads them from.
     //   2: obj => Obj.set(obj, "panel.thickness", ...)
-    readonly property var steps: ({})
+    readonly property var steps: ({
+        // fuzzel and rofi became the custom command they always were.
+        2: obj => MigrationSteps.toVersion2(obj)
+    })
 
     function needsMigration(version) {
         return version < root.currentVersion;

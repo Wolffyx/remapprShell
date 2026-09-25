@@ -10,7 +10,10 @@ import Quickshell
 import Quickshell.Wayland
 import qs.core
 import qs.features.panel.model
+import qs.domain.desktops
 import qs.domain.theme
+import qs.domain.windows
+import qs.domain.windows.events
 
 PanelWindow {
     id: root
@@ -29,16 +32,47 @@ PanelWindow {
 
     // How it is drawn, and the sizes widgets share: the gap between them and
     // the size of a tray or status icon.
-    readonly property string style: PanelModel.styleFor(root.screenName)
+    //
+    // `style` is what is drawn, which is the configured one except while a
+    // floating bar or islands fill the edge for a window -- see `defloated`.
+    readonly property string configuredStyle: PanelModel.styleFor(root.screenName)
+    readonly property string style: root.defloated ? "full" : root.configuredStyle
     readonly property int spacing: PanelModel.spacingFor(root.screenName)
     readonly property int iconSize: PanelModel.iconSizeFor(root.screenName)
 
     // A floating bar and islands keep clear of the screen edge; the whole
     // strip, including that margin, is what the panel takes from the screen
-    // and what a popout opens beyond.
-    readonly property int edgeGap: root.style === "full" ? 0 : 14
-    readonly property int extent: root.thickness + root.edgeGap
+    // and what a popout opens beyond. Filling the edge for a window gives the
+    // margin back: the strip is then the bar's own thickness, no more, and a
+    // maximised window grows into the space -- as it does under Plasma's.
+    readonly property int edgeGap: root.configuredStyle === "full" ? 0 : 14
+    readonly property int floatExtent: root.thickness + root.edgeGap
+    readonly property int extent: root.defloated ? root.thickness : root.floatExtent
 
+    // ---- floating, and filling the edge ------------------------------------
+    //
+    // As Plasma's floating panel does: a floating bar or islands become a
+    // full strip while a window on this monitor reaches into the panel's
+    // space -- a maximised one always does, stopping where the reserved space
+    // starts -- and float again when none does. `panel.defloat` turns it off.
+    readonly property bool defloated: root.configuredStyle !== "full"
+                                      && PanelModel.defloatsFor(root.screenName)
+                                      && WindowEvents.reachesEdge(WindowsService.windows, Desktops.currentId,
+                                                                  { x: root.modelData.x, y: root.modelData.y,
+                                                                    width: root.modelData.width,
+                                                                    height: root.modelData.height },
+                                                                  root.position, root.floatExtent)
+
+    // 1 floating, 0 against the edge; PanelSurface draws the margins, the
+    // corners and the strip's depth from it, so the change is a movement
+    // rather than a jump.
+    property real floatAmount: root.style === "full" ? 0 : 1
+    Behavior on floatAmount { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+    // What is drawn, moving with floatAmount; `extent` is what is reserved,
+    // which changes once rather than every frame -- each change resizes the
+    // maximised windows.
+    readonly property real drawnExtent: root.thickness + root.edgeGap * root.floatAmount
     // ---- hiding ---------------------------------------------------------
     //
     // The one thing in this project that genuinely belongs to us: layer-shell
@@ -82,6 +116,33 @@ PanelWindow {
         }
     }
 
+    // ---- a full-screen window ------------------------------------------
+    //
+    // KWin keeps a full-screen window above the panel only while it is the
+    // window last activated on its monitor. Focus going anywhere else there
+    // -- an applet, a dialog, one of our own surfaces, or nothing at all --
+    // drops it to the ordinary layer, beneath this one, and the panel is
+    // drawn over the game or the video. So the panel steps aside on its own
+    // account while the window on top of its monitor is full screen, unless
+    // `panel.fullScreen` leaves that to KWin.
+    //
+    // Stepping aside is drawing nothing and taking no clicks, not unmapping:
+    // the surface keeps its exclusive zone, so the maximised windows behind
+    // the full-screen one are not resized away and back.
+    readonly property bool fullScreenBelow: PanelModel.hidesForFullScreen(root.screenName)
+                                            && WindowEvents.fullScreenOn(WindowsService.windows, root.screenName,
+                                                                         Desktops.currentId)
+
+    onFullScreenBelowChanged: {
+        if (!root.fullScreenBelow)
+            return;
+        root.menuOpen = false;
+        if (PanelModel.openPopoutSlot?.screenName === root.screenName)
+            PanelModel.closeOpenPopout();
+    }
+
+    readonly property Region _deaf: Region {}
+
     anchors {
         top: root.position !== "bottom"
         bottom: root.position !== "top"
@@ -92,7 +153,7 @@ PanelWindow {
     // Per output, not the global value: a monitor override that changed the
     // widgets' idea of the thickness but not the panel's own size left the
     // widgets drawn against a strip of a different height.
-    readonly property int visibleThickness: root.revealed ? root.extent : root.revealStrip
+    readonly property int visibleThickness: root.revealed ? Math.ceil(root.drawnExtent) : root.revealStrip
 
     implicitHeight: root.horizontal ? root.visibleThickness : 0
     implicitWidth: root.horizontal ? 0 : root.visibleThickness
@@ -110,12 +171,13 @@ PanelWindow {
     // Only what is drawn takes the pointer. The margin a floating bar keeps
     // from the edge, and the gaps between islands, let a click through to the
     // window beneath. While hidden, the whole sliver is the target.
-    mask: root.revealed && root.style !== "full" ? surface.shape : null
+    mask: root.fullScreenBelow ? root._deaf
+        : root.revealed && root.style !== "full" ? surface.shape : null
 
     // Blurred behind, where the compositor offers it -- KWin does, through
     // ext-background-effect -- so a translucent panel reads as frosted glass
     // rather than as a tinted hole.
-    BackgroundEffect.blurRegion: Theme.translucent && root.revealed ? surface.shape : null
+    BackgroundEffect.blurRegion: Theme.translucent && root.revealed && !root.fullScreenBelow ? surface.shape : null
 
     // Only while a popout that wants the keyboard is open.
     //
@@ -139,8 +201,9 @@ PanelWindow {
         // from the screen edge means what stays visible is the panel's own
         // inner edge. Squashing it would re-lay-out every widget twice per
         // reveal, for something nobody sees.
-        width: root.horizontal ? parent.width : root.extent
-        height: root.horizontal ? root.extent : parent.height
+        width: root.horizontal ? parent.width : root.drawnExtent
+        height: root.horizontal ? root.drawnExtent : parent.height
+        visible: !root.fullScreenBelow
 
         // Positioned, not anchored. Anchors switched by bindings do not
         // survive the panel changing edge while it runs: the new anchor can be
@@ -305,6 +368,6 @@ PanelWindow {
     }
 
     Component.onCompleted: Log.info("panel",
-        `up on ${modelData.name} (${modelData.width}x${modelData.height}, ${root.position}, ${root.thickness}px, ${root.style}`
+        `up on ${modelData.name} (${modelData.width}x${modelData.height}, ${root.position}, ${root.thickness}px, ${root.configuredStyle}`
         + `${root.autoHide ? ", hidden until pointed at" : ""})`)
 }

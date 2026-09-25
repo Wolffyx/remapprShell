@@ -3,36 +3,19 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 
 # Stand-ins for everything that reaches the running desktop. A throwaway HOME
 # does not make a throwaway KWin, so the suite must never reach the real one;
 # these record any call that gets through.
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in qdbus6 busctl systemctl kquitapp6; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 edges() { "$REPO_ROOT/scripts/edges.sh" "$@" >/dev/null 2>&1; }
-key() { kreadconfig6 --file kwinrc --group "$1" --key "$2" --default '<unset>'; }
-js() { "$REPO_ROOT/scripts/edges.sh" status --json 2>/dev/null | jq -r "$1"; }
-scoped() { jq "[.entries[] | select(.scope == \"$1\")] | length" "$STATE_DIR/kconfig-ledger.json"; }
+key() { kread kwinrc "$1" "$2"; }
+status() { "$REPO_ROOT/scripts/edges.sh" status --json 2>/dev/null; }
+js() { status | jq -r "$1"; }
 
 # A user who has already configured an edge themselves. Their choice must
 # survive everything below and come back on revert.
@@ -63,13 +46,15 @@ check "an unchanged key is not written" "$(key ElectricBorders BottomLeft)" "<un
 check "nothing writes desktopgrid"      "$(key Effect-desktopgrid BorderActivate)" "<unset>"
 
 echo "== status --json =="
-check "top-left reads as window view"   "$(js .edges.TopLeft)" "windowview"
-check "top-right reads as grid"         "$(js .edges.TopRight)" "grid"
-check "bottom-right reads as a border"  "$(js .edges.BottomRight)" "showdesktop"
-check "untouched edge reads as none"    "$(js .edges.Bottom)" "none"
-check "triggers on"                     "$(js .triggers)" "true"
-check "customised"                      "$(js .customised)" "true"
-check "every action is offered"         "$(js '.actions | length')" "11"
+# One read for the checks against one state: each read is a third of a second.
+s=$(status)
+check "top-left reads as window view"   "$(jq -r .edges.TopLeft <<<"$s")" "windowview"
+check "top-right reads as grid"         "$(jq -r .edges.TopRight <<<"$s")" "grid"
+check "bottom-right reads as a border"  "$(jq -r .edges.BottomRight <<<"$s")" "showdesktop"
+check "untouched edge reads as none"    "$(jq -r .edges.Bottom <<<"$s")" "none"
+check "triggers on"                     "$(jq -r .triggers <<<"$s")" "true"
+check "customised"                      "$(jq -r .customised <<<"$s")" "true"
+check "every action is offered"         "$(jq -r '.actions | length' <<<"$s")" "11"
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
 check "a tiling script is named"        "$(js '.tilingScripts | join(",")')" "krohnkite"
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled --delete
@@ -105,7 +90,7 @@ check "grid back"                   "$(key Effect-overview GridBorderActivate)" 
 check "top-left stays as we set it" "$(key ElectricBorders TopLeft)" "None"
 check "snap stays as we set it"     "$(key Windows ElectricBorderTiling)" "false"
 check "reads as on"                 "$(js .triggers)" "true"
-check "switch records dropped"      "$(scoped edges-off)" "0"
+check "switch records dropped"      "$(ledger_count edges-off)" "0"
 
 echo "== revert restores the user's own configuration =="
 edges revert
@@ -124,13 +109,57 @@ edges revert
 check "user's corner back"         "$(key ElectricBorders TopLeft)" "krunner"
 check "ours gone, not resurrected" "$(key ElectricBorders BottomRight)" "<unset>"
 check "reads as on"                "$(js .triggers)" "true"
-check "ledger holds no edges"      "$(( $(scoped edges) + $(scoped edges-off) ))" "0"
+check "ledger holds no edges"      "$(( $(ledger_count edges) + $(ledger_count edges-off) ))" "0"
+
+echo "== this shell's own edges =="
+edges shell Left sidebar
+check "binding written"          "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:sidebar"
+check "script switched on"       "$(key Plugins "${KWIN_EDGES_SCRIPT_ID}Enabled")" "true"
+check "script rendered"          "$([ -f "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js" ] && echo yes || echo no)" "yes"
+# ElectricBorder 6 is Left. A wrong number here is an edge that silently does
+# nothing, which is indistinguishable from the script not loading.
+check "rendered as the border"   "$(sed -n 's/^const BINDINGS = //p' "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js")" '[[6,"sidebar"]];'
+check "no placeholder left"      "$(grep -c '@[A-Z_]*@' "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID/contents/code/main.js")" "0"
+
+# An edge runs one action. Binding it again replaces rather than stacking.
+edges shell Left launcher
+check "rebound, not doubled"     "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:launcher"
+
+edges shell Right sidebar
+check "a second edge is kept"    "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Left:launcher,Right:sidebar"
+
+check "rejects unknown action"   "$(edges shell Top nonsense && echo ran || echo refused)" "refused"
+check "rejects unknown edge"     "$(edges shell Nowhere sidebar && echo ran || echo refused)" "refused"
+
+edges shell Left none
+check "one edge released"        "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Right:sidebar"
+
+# The last one going takes the package with it: a loaded script claiming no
+# edge is a thing to explain rather than a thing to keep.
+edges shell Right none
+check "last edge released"       "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" ""
+check "script switched off"      "$(key Plugins "${KWIN_EDGES_SCRIPT_ID}Enabled")" "false"
+check "script removed"           "$([ -d "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID" ] && echo yes || echo no)" "no"
+
+edges shell Left sidebar
+edges revert
+check "revert takes it away"     "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "<unset>"
+check "revert removes the script" "$([ -d "$KWIN_SCRIPTS_DIR/$KWIN_EDGES_SCRIPT_ID" ] && echo yes || echo no)" "no"
 
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"
 env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/edges.sh" revert >/dev/null 2>&1
 check "with one, KWin is asked to reload" "$(grep -c reconfigure "$CALLS")" "1"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+# An edge runs the same actions a key does, and says so from the same list the
+# daemon that runs them is rendered from. It used to pick them out of the
+# daemon's source with sed.
+echo "== an edge offers every shortcut action =="
+listed=$("$REPO_ROOT/scripts/edges.sh" shell 2>/dev/null | sed -n 's/^actions: //p' | tr ' ' '\n' | grep . | paste -sd' ')
+check "the shortcut list, in order" "$listed" \
+      "$(grep -v '^#' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv" | cut -f1 | paste -sd' ')"
+edges shell Top screenshot-window
+check "and takes one of them"       "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Top:screenshot-window"
+edges revert
+
+harness_done

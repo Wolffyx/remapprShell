@@ -14,6 +14,6 @@
                 { "id": "battery", "zone": "right",  "enabled": true }
             ]
         },
-        "widgets": { "clock": { "format": "HH:mm" } }
+        "widgets": { "clock": { "hour12": false, "showSeconds": false } }
     }
 }

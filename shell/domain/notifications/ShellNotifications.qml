@@ -29,6 +29,7 @@ import qs.platform.kde
 import qs.domain.config
 import qs.domain.backend
 import qs.domain.notifications.popups
+import qs.domain.windows
 
 QtObject {
     id: root
@@ -96,13 +97,33 @@ QtObject {
         return root.tracked.find(x => x.id === id) ?? null;
     }
 
-    // A click on a popup's text: its default action, or closing it.
+    // A click on a popup's text. The sender's own `default` action first;
+    // then the file it named, opened the way the desktop opens files; then
+    // the application that sent it, raised if it has a window and started if
+    // it does not.
+    //
+    // Only the first of those used to happen, and a notification without a
+    // `default` action was closed by a click and nothing more -- which on a
+    // desktop where Plasma raises the sender reads as "clicking notifications
+    // does nothing".
     function activate(n) {
-        const d = (n.actions ?? []).find(a => a.identifier === "default");
-        if (d)
-            root.invoke(n, d);
-        else
-            n.dismiss();
+        if (!n)
+            return;
+        const target = Popups.openTarget(n, n.hints ?? ({}));
+        if (target.kind === "action") {
+            root.invoke(n, target.value);
+            return;
+        }
+        Log.debug("notifications", `clicked ${n.appName}: ${target.kind} ${target.kind === "none" ? "" : target.value}`);
+        NotificationWatch.go(target);
+        n.dismiss();
+    }
+
+    // The picture a notification names, or "": a screenshot's file, a
+    // finished download's. Drawn at a size worth looking at rather than as an
+    // icon; see Popups.pictureOf.
+    function pictureOf(n) {
+        return n ? Popups.pictureOf(n.hints ?? ({})) : "";
     }
 
     // The spec has the server close a notification once an action is taken,
@@ -176,6 +197,11 @@ QtObject {
             bodyHyperlinksSupported: false
             persistenceSupported: false
             inlineReplySupported: false
+            // Hints the spec does not name and every KDE application sends.
+            // Without asking for them they are dropped before the popup is
+            // built, so a click had nothing to act on and a screenshot
+            // notification had no picture in it.
+            extraHints: ["x-kde-urls", "image-path", "image_path", "x-kde-eventId"]
             onNotification: n => root._received(n)
         }
     }

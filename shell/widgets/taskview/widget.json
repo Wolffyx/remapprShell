@@ -13,6 +13,7 @@
         "effect": {
             "type": "enum",
             "values": ["Overview", "Grid View", "Expose", "ExposeAll"],
+            "labels": ["The Overview", "The desktop grid", "This desktop's windows", "Every desktop's windows"],
             "default": "Overview",
             "label": "Opens",
             "description": "Which of KWin's views: the Overview, the grid of virtual desktops, or the windows of this desktop (Expose) or of all of them (ExposeAll)."

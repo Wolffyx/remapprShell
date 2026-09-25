@@ -179,7 +179,13 @@ QtObject {
     readonly property bool _expectingWindows: root._expecting > 0
         && Date.now() < root._expectingUntil
 
+    // Not through Launch, and not in a scope of its own: this is not an
+    // application somebody opened but a service the shell hosts and owns --
+    // started for this renderer, closed again by handOverNotifications and by
+    // a renderer switch -- so it belongs in the shell's own service. When
+    // that stops it goes too, and the next run hosts it again.
     function _host(applet) {
+        // lint-launch: allow -- a service the shell hosts and owns, see above
         Quickshell.execDetached(["plasmawindowed", "--statusnotifier", applet]);
         root._expecting += 1;
         root._expectingUntil = Date.now() + root.windowGrace;

@@ -25,11 +25,19 @@ Item {
     readonly property bool horizontal: root.bar.horizontal
     readonly property string position: root.bar.position
     readonly property int thickness: root.bar.thickness
-    readonly property int gap: root.bar.edgeGap
     readonly property real unit: root.thickness / 64
 
+    // How far off the edge it is drawn: 1 floating, 0 against it. The panel
+    // animates this between the two when a floating bar or islands fill the
+    // edge for a window (Panel.defloated); anything else holding a surface
+    // has no such thing, and gets its style's own.
+    readonly property real floating: root.bar.floatAmount ?? (root.style === "full" ? 0 : 1)
+
+    // The space between the bar and the screen edge, closing as it docks.
+    readonly property real gap: root.bar.edgeGap * root.floating
+
     // Along the edge, a floating bar and islands stop short of the corners.
-    readonly property int inset: root.style === "full" ? 0 : 18
+    readonly property real inset: 18 * root.floating
     // Inside the bar, before the first widget.
     readonly property int pad: root.style === "full" ? 12 : root.style === "floating" ? 10 : 0
     // Around the widgets of an island.
@@ -42,7 +50,7 @@ Item {
         root.horizontal ? root.width - 2 * root.inset : root.thickness,
         root.horizontal ? root.thickness : root.height - 2 * root.inset)
 
-    readonly property real radius: root.style === "full" ? 0 : Math.min(Theme.radius, root.thickness / 2)
+    readonly property real radius: Math.min(Theme.radius, root.thickness / 2) * root.floating
     readonly property real islandRadius: Math.min(Theme.radiusMedium, root.thickness / 2)
 
     // ---- what is drawn -----------------------------------------------------
@@ -140,10 +148,8 @@ Item {
     readonly property int lead: root.pad + (root.style === "islands" ? root.islandPad : 0)
 
     // How much of the bar each zone may take before it runs into another --
-    // what a widget that can give way, the task list, has to fit in. The
-    // middle has everything between the two ends; an end has what the middle
-    // and the other end leave. Nothing here depends on a zone's own length,
-    // so a widget shrinking into its room does not change the room.
+    // what a widget that can give way, the task list, has to fit in. See
+    // `rooms` below.
     readonly property real bodyLength: root.horizontal ? root.body.width : root.body.height
     readonly property real bodyStart: root.horizontal ? root.body.x : root.body.y
     readonly property int zoneGap: Math.round(16 * Math.max(0.7, root.unit)) + (root.style === "islands" ? 2 * root.islandPad : 0)
@@ -154,12 +160,29 @@ Item {
     // past zero handed the most crowded panel of all the fewest constraints --
     // which is how a taskbar with too many windows ended up drawn over the
     // clock rather than cut short.
-    readonly property real middleRoom: Math.max(0, root.bodyLength - root.lengthOf(leftZone) - root.lengthOf(rightZone)
-        - 2 * (root.lead + root.zoneGap))
-    function endRoom(other) {
-        const middle = root.lengthOf(middleZone);
-        return Math.max(0, root.bodyLength - root.lengthOf(other) - middle - 2 * root.lead
-                           - (middle > 0 ? 2 : 1) * root.zoneGap);
+    //
+    // Each room is worked out once, from the zones' fixed lengths, rather than
+    // from their drawn ones. A drawn length depends on that zone's own room,
+    // so the middle's room read the ends, whose rooms read the middle, and Qt
+    // reported a binding loop at every panel start on a crowded bar.
+    //
+    // While everything fits, every zone is given its own length and all of
+    // what is spare: only a widget that gives way grows into it. When it does
+    // not fit, the middle gives way first, then the right end -- from its
+    // inner side, so the clock at the far end is the last thing cut -- and
+    // the left end last.
+    readonly property var rooms: {
+        const l = leftZone.fixedLength;
+        const m = middleZone.fixedLength;
+        const r = rightZone.fixedLength;
+        const avail = Math.max(0, root.bodyLength - 2 * root.lead
+                                  - (middleZone.shown > 0 ? 2 : 1) * root.zoneGap);
+        const spare = avail - l - m - r;
+        if (spare >= 0)
+            return { left: l + spare, middle: m + spare, right: r + spare };
+        const middle = Math.max(0, avail - l - r);
+        const right = Math.max(0, Math.min(r, avail - l));
+        return { left: Math.min(l, avail), middle: middle, right: right };
     }
 
     // The middle is centred on the bar itself while it fits there, so a long
@@ -176,7 +199,7 @@ Item {
     ZoneRow {
         id: leftZone
         zone: "left"
-        room: root.endRoom(rightZone)
+        room: root.rooms.left
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal
@@ -187,7 +210,7 @@ Item {
     ZoneRow {
         id: middleZone
         zone: "middle"
-        room: root.middleRoom
+        room: root.rooms.middle
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal
@@ -198,7 +221,7 @@ Item {
     ZoneRow {
         id: rightZone
         zone: "right"
-        room: root.endRoom(leftZone)
+        room: root.rooms.right
         bar: root.bar
         screenName: root.bar.screenName
         horizontal: root.horizontal

@@ -42,15 +42,10 @@ CardGrid {
     // A tray item's id is a machine string; its title is what a person would
     // recognise. Neither is reliably present, so this falls back through what
     // there is rather than showing an empty row.
-    function labelFor(id) {
-        const item = root.itemFor(id);
+    function labelFor(item, id) {
         if (!item)
             return id;
         return item.tooltipTitle || item.title || item.id;
-    }
-
-    function runningNow(id) {
-        return root.itemFor(id) !== null;
     }
 
     // ---- the flat list the page draws and drags -------------------------
@@ -88,11 +83,15 @@ CardGrid {
 
     readonly property int rowHeight: 38
 
-    property int dragIndex: -1
-    property int dropIndex: -1
+    // How many are on the panel: the last of them may not leave it.
+    readonly property int panelCount: root.rows.filter(r => !r.header && r.section === 0).length
 
-    function countIn(section) {
-        return root.rows.filter(r => !r.header && r.section === section).length;
+    // A drop lands below the first heading, so nothing is ever put above it.
+    readonly property ReorderState reorder: ReorderState {
+        rowHeight: root.rowHeight
+        minIndex: 1
+        maxIndex: root.rows.length - 1
+        onDropped: (from, to) => root.moveRow(from, to)
     }
 
     // Writes all three lists from a flat order. One write, so the panel
@@ -133,37 +132,6 @@ CardGrid {
         root.commit(flat);
     }
 
-    function commitDrag() {
-        const from = root.dragIndex;
-        const to = root.dropIndex;
-        root.dragIndex = -1;
-        root.dropIndex = -1;
-        root.moveRow(from, to);
-    }
-
-    // Where a row sits mid-drag: the dragged one follows the pointer, and the
-    // rows it has passed shift by one to open a gap.
-    function dragShift(index) {
-        if (root.dragIndex < 0 || index === root.dragIndex)
-            return 0;
-        if (root.dragIndex < root.dropIndex && index > root.dragIndex && index <= root.dropIndex)
-            return -root.rowHeight;
-        if (root.dragIndex > root.dropIndex && index >= root.dropIndex && index < root.dragIndex)
-            return root.rowHeight;
-        return 0;
-    }
-
-    // Which list a row would land in, for the label on the dragged row.
-    function sectionAt(index) {
-        let section = 0;
-        for (let i = 0; i < Math.min(index, root.rows.length); i++)
-            if (root.rows[i].header)
-                section = root.rows[i].section;
-        return section;
-    }
-
-    count: 2
-
     // The three lists are dragged between, so this card takes the whole row.
     Card {
         id: lists
@@ -173,12 +141,7 @@ CardGrid {
 
         SectionLabel { text: "The three lists" }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
             text: root.items.length === 0
                 ? "Nothing is in the tray at the moment. Applications appear here as they start."
                 : "Drag a row into another list. Icons on the panel keep the order you leave them in."
@@ -197,14 +160,19 @@ CardGrid {
                     required property var modelData
                     required property int index
 
-                    readonly property bool dragging: root.dragIndex === row.index
+                    readonly property bool dragging: root.reorder.dragIndex === row.index
                     readonly property bool isLastOnPanel: !row.modelData.header
-                        && row.modelData.section === 0 && root.countIn(0) === 1
+                        && row.modelData.section === 0 && root.panelCount === 1
+
+                    // Looked up once per row rather than once per line that
+                    // shows something of it.
+                    readonly property var trayItem: row.modelData.header ? null : root.itemFor(row.modelData.id)
+                    readonly property bool running: row.trayItem !== null
 
                     width: parent.width
                     height: root.rowHeight
                     y: row.index * root.rowHeight
-                       + (row.dragging ? dragHandler.activeTranslation.y : root.dragShift(row.index))
+                       + (row.dragging ? grip.translation : root.reorder.shift(row.index))
                     z: row.dragging ? 2 : 1
 
                     Behavior on y {
@@ -261,9 +229,9 @@ CardGrid {
                             PanelIcon {
                                 anchors.verticalCenter: parent.verticalCenter
                                 implicitSize: 18
-                                source: root.itemFor(row.modelData.id)?.icon ?? ""
+                                source: row.trayItem?.icon ?? ""
                                 fallbackName: row.modelData.id ?? ""
-                                opacity: root.runningNow(row.modelData.id) ? 1 : 0.4
+                                opacity: row.running ? 1 : 0.4
                             }
 
                             Column {
@@ -273,7 +241,7 @@ CardGrid {
                                 PanelText {
                                     width: parent.width
                                     elide: Text.ElideRight
-                                    text: root.labelFor(row.modelData.id ?? "")
+                                    text: root.labelFor(row.trayItem, row.modelData.id ?? "")
                                     font.pixelSize: 12
                                 }
 
@@ -283,7 +251,7 @@ CardGrid {
                                 PanelText {
                                     width: parent.width
                                     elide: Text.ElideMiddle
-                                    text: root.runningNow(row.modelData.id)
+                                    text: row.running
                                         ? (row.modelData.id ?? "")
                                         : `${row.modelData.id ?? ""} -- not running`
                                     color: Theme.mut
@@ -294,48 +262,18 @@ CardGrid {
                             // Drag to move between lists. The arrows beside it do
                             // the same thing for anyone who would rather not drag,
                             // and appear only under the pointer.
-                            Item {
+                            DragGrip {
                                 id: grip
                                 anchors.verticalCenter: parent.verticalCenter
-                                implicitWidth: 22
-                                implicitHeight: 22
-
-                                PanelIcon {
-                                    anchors.centerIn: parent
-                                    implicitSize: 16
-                                    iconName: "transform-move"
-                                    opacity: row.dragging ? 1 : 0.5
-                                }
-
-                                DragHandler {
-                                    id: dragHandler
-                                    target: null
-                                    xAxis.enabled: false
-                                    cursorShape: Qt.ClosedHandCursor
-                                    enabled: !row.isLastOnPanel
-
-                                    onActiveChanged: {
-                                        if (active) {
-                                            root.dragIndex = row.index;
-                                            root.dropIndex = row.index;
-                                        } else {
-                                            root.commitDrag();
-                                        }
-                                    }
-
-                                    onTranslationChanged: {
-                                        if (!dragHandler.active)
-                                            return;
-                                        const steps = Math.round(dragHandler.activeTranslation.y / root.rowHeight);
-                                        root.dropIndex = Math.max(1, Math.min(root.rows.length - 1,
-                                                                              row.index + steps));
-                                    }
-                                }
+                                enabled: !row.isLastOnPanel
+                                reorder: root.reorder
+                                index: row.index
                             }
 
                             IconButton {
                                 id: up
                                 anchors.verticalCenter: parent.verticalCenter
+                                glyph: "arrow_upward"
                                 iconName: "go-up"
                                 visible: rowHover.hovered && !row.isLastOnPanel
                                 onActivated: root.moveRow(row.index, row.index - 1)
@@ -344,6 +282,7 @@ CardGrid {
                             IconButton {
                                 id: down
                                 anchors.verticalCenter: parent.verticalCenter
+                                glyph: "arrow_downward"
                                 iconName: "go-down"
                                 visible: rowHover.hovered && !row.isLastOnPanel
                                 onActivated: root.moveRow(row.index, row.index + 1)
@@ -356,12 +295,7 @@ CardGrid {
             }
         }
 
-        PanelText {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
             text: "One icon always stays on the panel: an empty list means 'show everything', so emptying it would bring them all back. An application that is not running keeps its place until you move it."
         }
     }
@@ -383,7 +317,7 @@ CardGrid {
                 from: 12
                 to: 48
                 stepSize: 2
-                value: ConfigStore.value(`${root.base}.iconSize`, 18)
+                value: ConfigStore.value(`${root.base}.iconSize`, 22)
                 onMoved: value => ConfigStore.set(`${root.base}.iconSize`, Math.round(value))
             }
         }

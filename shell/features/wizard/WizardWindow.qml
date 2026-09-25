@@ -6,7 +6,17 @@ pragma ComponentBehavior: Bound
 // is reachable afterwards from the settings window, so nothing here is a
 // one-way door and every step can be skipped.
 //
-// Two rules it follows:
+// Two ways to answer it, chosen on the first page. Live, the default, draws
+// each answer on the desktop as it is given -- the panel moves when a position
+// is picked -- through ConfigStore's preview, which is never written: closing
+// the wizard, or skipping it, drops the preview and the desktop is what it
+// was. Held, nothing changes until Finish. Either way nothing is SAVED before
+// Finish, and the renderer and the desktop theme are never previewed: they
+// change KDE's own settings, and a preview that wrote those would not be one.
+// What the preview draws and what Finish writes come from one list,
+// WizardAnswers.writes(), so the two cannot disagree.
+//
+// The rules it follows:
 //
 //   * A preset REPLACES the profile, so it is applied first and the other
 //     answers are written on top of it. The other order would have the preset
@@ -29,8 +39,8 @@ import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.theme
+import qs.domain.wizard
 import qs.ui.primitives
-import qs.ui.controls
 
 FloatingWindow {
     id: root
@@ -40,13 +50,17 @@ FloatingWindow {
     readonly property int stepCount: 7
     property int step: 0
 
-    // Answers, held until Finish. Nothing is written while the user is still
-    // deciding: a wizard that applied each answer as it was given would leave a
-    // half-configured shell behind if it were closed halfway through.
+    // Whether each answer is drawn as it is given; see the header.
+    property bool live: true
+
+    // Answers, saved at Finish. Nothing is written while the user is still
+    // deciding: a wizard that saved each answer as it was given would leave a
+    // half-configured shell behind if it were closed halfway through. Live,
+    // they are only drawn.
     property string position: ConfigStore.value("panel.position", "bottom")
-    property int thickness: ConfigStore.value("panel.thickness", 40)
+    property int thickness: ConfigStore.value("panel.thickness", 52)
     property string preset: ""
-    property string launcher: ConfigStore.value("launcher.provider", "auto")
+    property string launcher: ConfigStore.value("launcher.provider", "builtin")
     property string renderer: "quickshell"
 
     // What this shell's theme is allowed to change outside itself. The whole
@@ -85,6 +99,69 @@ FloatingWindow {
     Component.onCompleted: {
         presetsProc.running = true;
         providersProc.running = true;
+        ConfigStore.preview = root._shown;
+    }
+
+    // Closed or skipped, the desktop goes back to what is saved. Finished,
+    // the preview stays until the saved profile has caught up with it, or
+    // the old one would flash on screen between the two.
+    Component.onDestruction: {
+        if (!root._finishing)
+            ConfigStore.endPreview();
+    }
+
+    property bool _finishing: false
+
+    // What Finish writes into this shell's settings, and what live mode draws.
+    readonly property var _writes: WizardAnswers.writes({
+        position: root.position,
+        thickness: root.thickness,
+        launcher: root.launcher,
+        ai: root.ai
+    })
+
+    // Each preset's configuration, by name, read when it is first picked.
+    property var _presetConfigs: ({})
+    readonly property var _presetConfig: root.preset.length > 0 ? (root._presetConfigs[root.preset] ?? null) : null
+
+    readonly property var _shown: root.live
+        ? WizardAnswers.preview(ConfigStore.profileData, root._presetConfig, root._writes)
+        : null
+    on_ShownChanged: if (!root._finishing) ConfigStore.preview = root._shown
+
+    onPresetChanged: root._readPreset()
+    onLiveChanged: root._readPreset()
+
+    // One read at a time; a pick made while one is out is read after it.
+    function _readPreset() {
+        if (!root.live || root.preset.length === 0 || root.preset in root._presetConfigs)
+            return;
+        if (presetShowProc.running)
+            return;   // picked up when the running read exits
+        presetShowProc.name = root.preset;
+        presetShowProc.command = [Branding.ctlBin, "preset", "show", root.preset];
+        presetShowProc.running = true;
+    }
+
+    readonly property Process _presetShow: Process {
+        id: presetShowProc
+        property string name: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let config = null;
+                try {
+                    config = JSON.parse(text);
+                } catch (e) {
+                    Log.warn("wizard", `could not read preset '${presetShowProc.name}': ${e}`);
+                }
+                // Remembered even when unreadable -- the preview then draws
+                // the saved profile -- so it is not asked for on every pick.
+                const next = Object.assign({}, root._presetConfigs);
+                next[presetShowProc.name] = config;
+                root._presetConfigs = next;
+            }
+        }
+        onRunningChanged: if (!running) root._readPreset()
     }
 
     // Detected rather than listed: a provider whose program is not installed
@@ -144,12 +221,8 @@ FloatingWindow {
     // whatever preset was chosen has landed.
     function _write() {
         // Written after the preset has landed, so these win over it.
-        ConfigStore.set("panel.position", root.position);
-        ConfigStore.set("panel.thickness", root.thickness);
-        ConfigStore.set("launcher.provider", root.launcher);
-        ConfigStore.set("ai.enabled", root.ai !== "off");
-        if (root.ai !== "off")
-            ConfigStore.set("ai.provider", root.ai);
+        for (const path of Object.keys(root._writes))
+            ConfigStore.set(path, root._writes[path]);
 
         ConfigStore.set("theme.desktop.enabled", root.themeDesktop);
         for (const part of root.themeParts)
@@ -169,6 +242,9 @@ FloatingWindow {
     }
 
     function finish() {
+        // From here the preview is left alone: what it shows is what is
+        // about to be saved, and it goes once the saved profile says so.
+        root._finishing = true;
         root.status = "Applying...";
         if (root.preset.length > 0) {
             // `preset apply` keeps the profile it replaces; see the header.
@@ -194,6 +270,8 @@ FloatingWindow {
         // decide whether to show this at all, and a second writer of one file
         // is how the two come to disagree.
         FirstRun.markDone();
+        if (root._finishing)
+            ConfigStore.releasePreview();
         Log.info("wizard", root.kept.length > 0
             ? `finished; what was there is now the profile '${root.kept}'`
             : "finished");
@@ -214,191 +292,78 @@ FloatingWindow {
             font.pixelSize: 20
         }
 
-        // ---- 0: welcome
-        Column {
+        // One file per step, beside this one. Each draws its question from the
+        // answers handed in and says what was picked through a signal: the
+        // answers stay here, where Finish writes them, and a step never
+        // reaches into the window.
+        WizardWelcomeStep {
             visible: root.step === 0
             width: parent.width
-            spacing: 8
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: `${Branding.displayName} draws a panel and rethemes Plasma's own components. It does not replace your notifications, lock screen, wallpaper or task switcher -- Plasma already has those, and they keep working.`
-            }
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "Nothing is written until the last step, and everything here can be changed afterwards in settings."
-            }
+            live: root.live
+            onLivePicked: value => root.live = value
         }
 
-        // ---- 1: panel
-        Column {
+        WizardPanelStep {
             visible: root.step === 1
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Position"
-                Select {
-                    values: ["bottom", "top", "left", "right"]
-                    currentIndex: Math.max(0, ["bottom", "top", "left", "right"].indexOf(root.position))
-                    onPicked: value => root.position = value
-                }
-            }
-
-            SettingRow {
-                width: parent.width
-                label: "Thickness"
-                NumberSlider {
-                    width: parent.width
-                    from: 20
-                    to: 96
-                    stepSize: 2
-                    value: root.thickness
-                    onMoved: value => root.thickness = Math.round(value)
-                }
-            }
+            position: root.position
+            thickness: root.thickness
+            onPositionPicked: value => root.position = value
+            onThicknessMoved: value => root.thickness = value
         }
 
-        // ---- 2: preset
-        Column {
+        WizardPresetStep {
             visible: root.step === 2
             width: parent.width
-            spacing: 6
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "A layout replaces your current configuration. Your existing one is kept, and 'preset apply' can be undone from the Layouts page."
-            }
-
-            SettingRow {
-                width: parent.width
-                label: "Layout"
-                Select {
-                    values: ["keep what I have"].concat(root.presets)
-                    currentIndex: 0
-                    onPicked: value => root.preset = (value === "keep what I have" ? "" : value)
-                }
-            }
+            presets: root.presets
+            onPresetPicked: value => root.preset = value
         }
 
-        // ---- 3: launcher
-        Column {
+        WizardLauncherStep {
             visible: root.step === 3
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Application menu"
-                description: "Kickoff is Plasma's own menu. The built-in one is ours. Either can be changed later."
-                Select {
-                    values: ["auto", "kickoff", "builtin", "krunner"]
-                    currentIndex: Math.max(0, ["auto", "kickoff", "builtin", "krunner"].indexOf(root.launcher))
-                    onPicked: value => root.launcher = value
-                }
-            }
+            launcher: root.launcher
+            onLauncherPicked: value => root.launcher = value
         }
 
-        // ---- 4: renderer
-        Column {
+        WizardRendererStep {
             visible: root.step === 4
             width: parent.width
-            spacing: 6
-
-            SettingRow {
-                width: parent.width
-                label: "Drawn by"
-                description: "Plasma's panel is drawn from this same configuration, but with stock applets only."
-                Select {
-                    values: ["quickshell", "plasma"]
-                    currentIndex: root.renderer === "plasma" ? 1 : 0
-                    onPicked: value => root.renderer = value
-                }
-            }
-
-            PanelText {
-                visible: root.renderer !== "quickshell"
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: "This one changes KDE's own settings. A restore point is taken first, and it is put back automatically if the switch does not work."
-            }
+            renderer: root.renderer
+            onRendererPicked: value => root.renderer = value
         }
 
-        // ---- 5: AI assist
-        Column {
+        WizardAiStep {
             visible: root.step === 5
             width: parent.width
-            spacing: 6
+            ai: root.ai
+            aiProviders: root.aiProviders
+            onAiPicked: value => root.ai = value
+        }
 
-            SettingRow {
-                width: parent.width
-                label: "AI assist"
-                description: "Hands a redacted diagnostic report to an assistant, on request. Nothing leaves this machine without showing you exactly what would go."
-                Select {
-                    values: ["off"].concat(root.aiProviders)
-                    currentIndex: Math.max(0, ["off"].concat(root.aiProviders).indexOf(root.ai))
-                    onPicked: value => root.ai = value
-                }
+        WizardThemeStep {
+            visible: root.step === 6
+            width: parent.width
+            themeDesktop: root.themeDesktop
+            themeParts: root.themeParts
+            themeWanted: root.themeWanted
+            onThemeDesktopToggled: value => root.themeDesktop = value
+            onPartToggled: (key, value) => {
+                const next = Object.assign({}, root.themeWanted);
+                next[key] = value;
+                root.themeWanted = next;
             }
         }
 
-        // ---- 6: what the theme changes
-        Column {
-            visible: root.step === 6
+        // Live, the two answers that are not drawn say why, so a desktop that
+        // does not change is not taken for a wizard that did not listen.
+        PanelText {
+            visible: root.live && (root.step === 4 || root.step === 6)
             width: parent.width
-            spacing: 6
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: `Choosing ${Branding.displayName}'s theme can retheme KDE itself, so applications match the shell rather than only the panel. Every key is recorded, and \`${Branding.shortName} theme revert\` puts all of it back.`
-            }
-
-            ToggleRow {
-                label: "Theme the whole desktop"
-                description: "Off confines the theme to what this shell draws."
-                checked: root.themeDesktop
-                onToggled: value => root.themeDesktop = value
-            }
-
-            Column {
-                width: parent.width
-                opacity: root.themeDesktop ? 1 : 0.45
-                enabled: root.themeDesktop
-
-                Repeater {
-                    model: root.themeParts
-
-                    delegate: ToggleRow {
-                        required property var modelData
-                        label: modelData.label
-                        description: modelData.sub
-                        checked: root.themeWanted[modelData.key] !== false
-                        onToggled: value => {
-                            const next = Object.assign({}, root.themeWanted);
-                            next[modelData.key] = value;
-                            root.themeWanted = next;
-                        }
-                    }
-                }
-            }
-
-            PanelText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                text: root.aiProviders.length === 0
-                    ? "No provider was found on this machine. The clipboard one needs wl-copy; claude-code needs the claude command."
-                    : "The clipboard provider copies the report and sends nothing. The others are named after the program they run, and were found here."
-            }
+            wrapMode: Text.WordWrap
+            color: Theme.foregroundInactive
+            font.pixelSize: 11
+            text: "This one is not shown until Finish: it changes KDE's own settings, not only this shell's."
         }
 
         // What Finish is about to do to a configuration that already exists.

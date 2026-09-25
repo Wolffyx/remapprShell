@@ -1,38 +1,14 @@
 #!/usr/bin/env bash
-# Tests the window daemon inside a throwaway HOME.
+# Tests the CLI's window commands inside a throwaway HOME: KWin's window
+# behaviour, and closing a window.
 #
-# The daemon is the piece that exists only because a KWin script can call DBus
-# but cannot be called. What matters about it is not that it holds a list --
-# that is four lines -- but that a bad payload cannot blank a panel, and that
-# two copies cannot answer with two different lists.
-#
-# It owns a real name on the real session bus, so it runs under a name of its
-# own here rather than the one an installed shell would be using.
+# The daemon that holds the window list is tested on its own, in
+# tests/test-windowsd*.sh.
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
-SANDBOX=$(mktemp -d)
-DAEMON_PID=""
-cleanup() {
-    [ -n "$DAEMON_PID" ] && kill "$DAEMON_PID" 2>/dev/null
-    rm -rf "$SANDBOX"
-}
-trap cleanup EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
-
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
-source "$REPO_ROOT/scripts/lib/render.sh"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 
 # KWin's own window behaviour: kwinrc keys, written through the ledger. What
 # matters is that a bad value never reaches kwinrc, that a write is recorded
@@ -41,7 +17,7 @@ check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
 echo "== KWin's window behaviour =="
 BEHAVE=("$REPO_ROOT/scripts/windows.sh" behaviour)
 behave() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${BEHAVE[@]}" "$@" 2>&1; }
-kwinrc_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default '<unset>'; }
+kwinrc_key() { kread kwinrc Windows "$1"; }
 
 FAKES="$SANDBOX/fakes"
 mkdir -p "$FAKES"
@@ -62,94 +38,13 @@ behave set borderlessMaximized true >/dev/null
 check "borderless maximised written"     "$(kwinrc_key BorderlessMaximizedWindows)" "true"
 check "status reads them back"           "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .value')" "FocusFollowsMouse"
 check "and says what the default was"    "$(behave status --json | jq -r '.settings[] | select(.id=="focus") | .default')" "ClickToFocus"
-check "the ledger has both"              "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "2"
+check "the ledger has both"              "$(ledger_count windows-behaviour)" "2"
 
 behave revert >/dev/null
 check "revert deletes a key that was unset" "$(kwinrc_key FocusPolicy)" "<unset>"
 check "and the other one too"               "$(kwinrc_key BorderlessMaximizedWindows)" "<unset>"
-check "the ledger is empty again"           "$(jq '[.entries[] | select(.scope == "windows-behaviour")] | length' "$XDG_STATE_HOME/$SLUG/kconfig-ledger.json")" "0"
+check "the ledger is empty again"           "$(ledger_count windows-behaviour)" "0"
 check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
-
-command -v busctl >/dev/null 2>&1 || { echo "  SKIP  busctl not available"; exit 0; }
-[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || { echo "  SKIP  no session bus"; exit 0; }
-python3 -c "import gi; gi.require_version('Gio','2.0')" 2>/dev/null || { echo "  SKIP  python-gobject not installed"; exit 0; }
-
-# A name of its own: the installed daemon may be running on this bus, and two
-# daemons answering one name is the thing the daemon itself refuses to do.
-#
-# That name is also what stops this copy touching the user's global shortcuts.
-# It runs against the *real* session bus -- there is no other -- so a daemon
-# that claimed the shell's kglobalaccel component here would unbind the keys on
-# the machine running the tests, which is exactly what happened once. Belt and
-# braces: the no-session variable as well, which the daemon honours too.
-export "$NO_SESSION_VAR=1"
-TEST_NAME="com.remappr.ShellTest$$"
-DAEMON="$SANDBOX/windowsd"
-render_template "$REPO_ROOT/bin/windowsd.py.in" "$DAEMON"
-sed -i "s|\"$DBUS_NAME\"|\"$TEST_NAME\"|g; s|f\"{INTERFACE}\"|f\"{INTERFACE}\"|" "$DAEMON"
-python3 - "$DAEMON" "$TEST_NAME" <<'PY'
-import re, sys
-path, name = sys.argv[1], sys.argv[2]
-src = open(path).read()
-src = re.sub(r'^BUS_NAME = .*$', f'BUS_NAME = "{name}"', src, flags=re.M)
-src = re.sub(r'^INTERFACE = .*$', f'INTERFACE = "{name}.Windows"', src, flags=re.M)
-open(path, 'w').write(src)
-PY
-
-python3 "$DAEMON" & DAEMON_PID=$!
-for _ in $(seq 1 40); do
-    busctl --user --json=short call "$TEST_NAME" /Windows "$TEST_NAME.Windows" List >/dev/null 2>&1 && break
-    sleep 0.25
-done
-
-call() { busctl --user --json=short call "$TEST_NAME" /Windows "$TEST_NAME.Windows" "$@" 2>/dev/null; }
-list()  { call List | jq -r '.data[0]'; }
-
-check "starts empty"          "$(list)" "[]"
-
-# The guard that keeps this test off the user's keyboard. Checked here rather
-# than only in the unit block below, because this is the copy that would do the
-# damage: if it ever registers a component, the live session loses its keys.
-check "it claims no shortcuts" \
-    "$(busctl --user --json=short call org.kde.kglobalaccel /kglobalaccel \
-        org.kde.KGlobalAccel allComponents 2>/dev/null \
-        | grep -c "ShellTest" || true)" "0"
-
-WINDOW='[{"uuid":"a","title":"Work","appId":"org.kde.dolphin","minimized":false,"active":true}]'
-call Update s "$WINDOW" >/dev/null
-check "holds what it is given" "$(list | jq -r '.[0].title')" "Work"
-check "one window"             "$(list | jq -r 'length')" "1"
-
-# The rule the whole thing rests on: a payload that cannot be read must leave
-# the last good list in place. A blank panel is the failure being designed
-# against, and it is worse than a stale one.
-call Update s 'not json at all' >/dev/null
-check "junk leaves the list alone"  "$(list | jq -r '.[0].title')" "Work"
-call Update s '{"not":"a list"}' >/dev/null
-check "a non-list is refused"       "$(list | jq -r 'length')" "1"
-call Update s '' >/dev/null
-check "an empty payload is refused" "$(list | jq -r 'length')" "1"
-
-# But an empty list is a legitimate answer: every window really can be closed.
-call Update s '[]' >/dev/null
-check "no windows is accepted"      "$(list)" "[]"
-
-# The signal is what the shell actually follows.
-monitor_out="$SANDBOX/monitor.json"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
-call Update s "$WINDOW" >/dev/null
-sleep 2
-check "announces a change"     "$(grep -c '"member":"Changed"' "$monitor_out")" "1"
-
-# KWin repeats itself -- the same list arrives again on events that changed
-# nothing -- and a signal per repeat would wake the shell for no reason.
-: > "$monitor_out"
-timeout 4 busctl --user --json=short monitor --match "type='signal',interface='$TEST_NAME.Windows'" > "$monitor_out" 2>&1 &
-sleep 1
-call Update s "$WINDOW" >/dev/null
-sleep 2
-check "says nothing when nothing changed" "$(grep -c '"member":"Changed"' "$monitor_out")" "0"
 
 # Closing a window writes the id into a KWin script's source, so anything
 # that is not exactly a uuid must be refused before it gets that far -- and
@@ -163,121 +58,4 @@ check "no id is refused"                      "$status" "1"
 out=$(nosession close 1f46c057-675a-4d51-99e5-17aafdfb5b06); status=$?
 check "no session, nothing closed"            "$status:$(printf '%s' "$out" | grep -c 'no session')" "1:1"
 
-# Icon extraction. The parsing is what matters here: `_NET_WM_ICON` arrives
-# from another application, holds several sizes one after another, and a
-# malformed one must yield nothing rather than an exception in the daemon
-# everything else depends on.
-echo "== icons taken from the windows themselves =="
-python3 - "$REPO_ROOT" <<'PYTEST'
-import sys, importlib.util, re, os
-repo = sys.argv[1]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t"}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-largest = mod["WindowIcons"]._largest
-
-def case(name, values, expect):
-    got = largest(values)
-    ok = (got is None and expect is None) or (got is not None and (got[0], got[1]) == expect)
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}")
-    return ok
-
-fails = 0
-# One 2x2 icon.
-fails += not case("reads a single size", [2, 2] + [0] * 4, (2, 2))
-# Two sizes: the bigger one wins, because it is the one worth drawing.
-fails += not case("prefers the larger size", [2, 2] + [0] * 4 + [4, 4] + [0] * 16, (4, 4))
-# Absurd dimensions and truncated data are what a malformed property looks like.
-fails += not case("refuses absurd dimensions", [99999, 99999, 1], None)
-fails += not case("refuses truncated data", [4, 4, 1, 2, 3], None)
-fails += not case("refuses nothing at all", [], None)
-fails += not case("refuses a zero size", [0, 0], None)
-# A size beyond what a panel would draw is skipped, but a usable one after it
-# is still found.
-fails += not case("skips a size too large to draw", [512, 1] + [0] * 512 + [8, 1] + [0] * 8, (8, 1))
-sys.exit(1 if fails else 0)
-PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+7)); else fail=$((fail+1)); fi
-
-# The shortcuts the daemon owns. Two things can be checked without a session:
-# that a key string becomes the integer kglobalaccel wants -- the same numbers
-# scripts/lib/accel.sh is checked against, from the same measurements off a
-# running server -- and that the component's group is read out of the file the
-# way kglobalaccel writes it.
-echo "== the shortcuts the daemon owns =="
-python3 - "$REPO_ROOT" "$SANDBOX" <<'PYTEST'
-import sys, os
-repo, sandbox = sys.argv[1], sys.argv[2]
-src = open(f"{repo}/bin/windowsd.py.in").read()
-for k, v in {"@DBUS_NAME@": "com.example.T", "@DISPLAY_NAME@": "T", "@SLUG@": "t",
-             "@BIN_DIR@": "/nowhere", "@CTL_BIN@": "t-ctl", "@ALIAS@": "t"}.items():
-    src = src.replace(k, v)
-mod = {}
-exec(compile(src, "windowsd", "exec"), mod)
-keycode, shortcuts = mod["keycode"], mod["GlobalShortcuts"]
-
-fails = 0
-def case(name, got, want):
-    global fails
-    ok = got == want
-    fails += not ok
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f" (expected {want!r}, got {got!r})"))
-
-for name, spec, want in [
-    ("Print", "Print", 16777225),
-    ("Meta+Shift+Print", "Meta+Shift+Print", 318767113),
-    ("a letter is its ASCII", "Q", 81),
-    ("lower case too", "q", 81),
-    ("Meta+Space", "Meta+Space", 268435488),
-    ("a function key", "F5", 16777268),
-    ("Alt+Tab", "Alt+Tab", 150994945),
-    ("every modifier at once", "Meta+Alt+Ctrl+Shift+Delete", 520093703),
-    ("Meta alone is a key", "Meta", 16777250),
-    ("a modifier nobody knows", "Hyper+Q", None),
-    ("a key nobody knows", "Meta+Banana", None),
-    ("nothing at all", "", None),
-]:
-    case(name, keycode(spec), want)
-
-# The file as kglobalaccel keeps it: a component's group, three fields, a tab
-# between two keys written as a literal backslash-t.
-config = os.path.join(sandbox, "kglobalshortcutsrc")
-os.environ["XDG_CONFIG_HOME"] = sandbox
-open(config, "w").write(
-    "[somebodyelse]\n"
-    "launcher=Meta+X,none,Not ours\n"
-    "\n"
-    "[t]\n"
-    "launcher=Meta,none,Application menu\n"
-    "search=none,none,Search\n"
-    "switcher=Alt+Tab\\tMeta+F1,none,Window switcher\n"
-    "nosuchaction=Meta+Z,none,Unknown\n"
-)
-found = shortcuts.bindings()
-case("reads our group only", found.get("launcher"), ["Meta"])
-case("an unbound action is empty", found.get("search"), [])
-case("two keys on one action", found.get("switcher"), ["Alt+Tab", "Meta+F1"])
-case("an action we do not know is ignored", "nosuchaction" in found, False)
-
-# Ownership: only the daemon holding the shell's own bus name claims the
-# shell's keys. A second copy that did would take them off the first, on the
-# live session, which is what the test suite itself once did.
-wanted = mod["shortcuts_wanted"]
-os.environ.pop(mod["NO_SESSION_VAR"], None)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
-case("the daemon that owns the name claims them", wanted(), True)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"] + "Test1234"
-case("a copy under another name claims nothing", wanted(), False)
-mod["BUS_NAME"] = mod["SHORTCUT_OWNER"]
-os.environ[mod["NO_SESSION_VAR"]] = "1"
-case("and neither does one with no session", wanted(), False)
-
-sys.exit(1 if fails else 0)
-PYTEST
-if [ $? -eq 0 ]; then pass=$((pass+19)); else fail=$((fail+1)); fi
-
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

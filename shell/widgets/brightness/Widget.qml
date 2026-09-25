@@ -48,137 +48,130 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: BrightnessStatus.glyph
         fallback: BrightnessStatus.icon
         glyphSize: root.panelIconSize
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 320
-            implicitHeight: body.implicitHeight
+            spacing: 10
 
-            Column {
-                id: body
+            // Keyed by name, so a value moving does not rebuild the row
+            // whose slider is being dragged.
+            Repeater {
+                model: JSON.parse(BrightnessStatus.displayNames)
+
+                Column {
+                    id: screen
+
+                    required property string modelData
+                    readonly property var display: BrightnessStatus.displayNamed(screen.modelData)
+                                                   ?? { label: "", brightness: 0, max: 1 }
+
+                    width: body.width
+                    spacing: 2
+
+                    PanelText {
+                        width: parent.width
+                        text: screen.display.label || screen.modelData
+                        elide: Text.ElideRight
+                        color: Theme.foregroundInactive
+                        font.pixelSize: 11
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 6
+
+                        PanelIcon {
+                            id: glyph
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 22
+                            iconName: StatusIcons.brightnessIcon(screen.display.brightness / screen.display.max)
+                        }
+
+                        NumberSlider {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - glyph.width - parent.spacing
+                            live: true
+                            from: 1
+                            to: 100
+                            value: screen.display.brightness / screen.display.max * 100
+                            onMoved: v => BrightnessStatus.setPercent(screen.modelData, v)
+                        }
+                    }
+                }
+            }
+
+            Row {
+                visible: root.nightState !== "unavailable"
                 width: parent.width
                 spacing: 10
 
-                // Keyed by name, so a value moving does not rebuild the row
-                // whose slider is being dragged.
-                Repeater {
-                    model: JSON.parse(BrightnessStatus.displayNames)
+                PanelIcon {
+                    id: nightGlyph
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitSize: 22
+                    iconName: StatusIcons.nightLightIcon(root.nightState)
+                }
 
-                    Column {
-                        id: screen
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - nightGlyph.width - nightSwitch.width - 2 * parent.spacing
+                    spacing: 1
 
-                        required property string modelData
-                        readonly property var display: BrightnessStatus.displays.find(d => d.name === screen.modelData)
-                                                       ?? { label: "", brightness: 0, max: 1 }
+                    PanelText {
+                        width: parent.width
+                        text: StatusIcons.nightLightLabel(BrightnessStatus.nightLight)
+                        elide: Text.ElideRight
+                    }
 
-                        width: body.width
-                        spacing: 2
-
-                        PanelText {
-                            width: parent.width
-                            text: screen.display.label || screen.modelData
-                            elide: Text.ElideRight
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 11
-                        }
-
-                        Row {
-                            width: parent.width
-                            spacing: 6
-
-                            PanelIcon {
-                                id: glyph
-                                anchors.verticalCenter: parent.verticalCenter
-                                implicitSize: 22
-                                iconName: StatusIcons.brightnessIcon(screen.display.brightness / screen.display.max)
-                            }
-
-                            NumberSlider {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - glyph.width - parent.spacing
-                                live: true
-                                from: 1
-                                to: 100
-                                value: screen.display.brightness / screen.display.max * 100
-                                onMoved: v => BrightnessStatus.setBrightness(screen.modelData,
-                                    Math.max(StatusIcons.brightnessFloor(screen.display.max),
-                                             Math.round(v * screen.display.max / 100)))
-                            }
-                        }
+                    PanelText {
+                        visible: text.length > 0
+                        width: parent.width
+                        text: BrightnessStatus.nightDetail
+                        elide: Text.ElideRight
+                        color: Theme.foregroundInactive
+                        font.pixelSize: 11
                     }
                 }
 
-                Row {
+                Toggle {
+                    id: nightSwitch
+                    anchors.verticalCenter: parent.verticalCenter
+                    enabled: root.nightSwitchable
+                    opacity: enabled ? 1 : 0.4
+                    checked: root.nightState === "warm" || root.nightState === "day"
+                    onToggled: BrightnessStatus.toggleNightLight()
+                }
+            }
+
+            Row {
+                spacing: 6
+
+                TextButton {
                     visible: root.nightState !== "unavailable"
-                    width: parent.width
-                    spacing: 10
-
-                    PanelIcon {
-                        id: nightGlyph
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 22
-                        iconName: StatusIcons.nightLightIcon(root.nightState)
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - nightGlyph.width - nightSwitch.width - 2 * parent.spacing
-                        spacing: 1
-
-                        PanelText {
-                            width: parent.width
-                            text: StatusIcons.nightLightLabel(BrightnessStatus.nightLight)
-                            elide: Text.ElideRight
-                        }
-
-                        PanelText {
-                            visible: text.length > 0
-                            width: parent.width
-                            text: BrightnessStatus.nightDetail
-                            elide: Text.ElideRight
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 11
-                        }
-                    }
-
-                    Toggle {
-                        id: nightSwitch
-                        anchors.verticalCenter: parent.verticalCenter
-                        enabled: root.nightSwitchable
-                        opacity: enabled ? 1 : 0.4
-                        checked: root.nightState === "warm" || root.nightState === "day"
-                        onToggled: BrightnessStatus.toggleNightLight()
+                    text: "Night Light settings…"
+                    iconName: "redshift-status-on"
+                    onActivated: {
+                        PlasmaApplets.openSettings("kcm_nightlight");
+                        root.popoutVisible = false;
                     }
                 }
 
-                Row {
-                    spacing: 6
-
-                    TextButton {
-                        visible: root.nightState !== "unavailable"
-                        text: "Night Light settings…"
-                        iconName: "redshift-status-on"
-                        onActivated: {
-                            PlasmaApplets.openSettings("kcm_nightlight");
-                            root.popoutVisible = false;
-                        }
-                    }
-
-                    TextButton {
-                        text: "…"
-                        iconName: "brightness-high"
-                        onActivated: {
-                            PlasmaApplets.open("org.kde.plasma.brightness");
-                            root.popoutVisible = false;
-                        }
+                TextButton {
+                    text: "…"
+                    iconName: "brightness-high"
+                    onActivated: {
+                        PlasmaApplets.open("org.kde.plasma.brightness");
+                        root.popoutVisible = false;
                     }
                 }
             }

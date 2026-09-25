@@ -28,8 +28,8 @@ default.
 - **Real window previews.** The taskbar's hover card, the desktop overview and this
   shell's own Alt+Tab draw live pictures of the windows, through KWin's screencast
   protocol.
-- **Pluggable launcher and search.** Kickoff, KRunner, a built-in launcher, rofi, fuzzel or
-  a custom command, chosen at runtime.
+- **Pluggable launcher and search.** Kickoff, KRunner, a built-in launcher, or any launcher
+  of your own (rofi, fuzzel, wofi...) as a custom command, chosen at runtime.
 - **Configurable everywhere.** A sparse JSON config with live reload, layered as
   defaults → profile → per-monitor, plus an in-shell settings GUI generated from the
   schema — so a new setting is a schema entry, not a page.
@@ -57,9 +57,9 @@ tiles it draws is a setting.
 ![The start menu](docs/images/launcher.png)
 
 The built-in start menu: pinned applications, recent files, what is playing, what the
-machine is doing, and a search that also runs actions. It is one of six launchers the
-shell can open — Kickoff, KRunner, rofi, fuzzel or a command of your own are the others,
-chosen at runtime.
+machine is doing, and a search that also runs actions. It is one of four launchers the
+shell can open — Kickoff, KRunner or a command of your own are the others, chosen at
+runtime.
 
 ![Alt+Tab](docs/images/switcher.png)
 
@@ -82,8 +82,125 @@ and there is none offscreen — the windows in it were opened for the photograph
 
 ## Requirements
 
-- KDE Plasma 6, Wayland
-- `quickshell`, `qt6-declarative`, `jq`
+- KDE Plasma 6 on Wayland, with NetworkManager (the network status reads it
+  through `nmcli`)
+- Everything else the installer fetches for you: Quickshell, `jq`, `git`,
+  `make`, `wl-clipboard`, `libnotify`, `kdialog`, Python's GObject bindings and
+  Pillow, and the Material Symbols and Rubik fonts -- the icons and the type.
+  The window previews need a C++ compiler, CMake and the Qt and KF6 development
+  files as well, installed only if you ask for the previews.
+
+## Installing it
+
+One line, on a machine running Plasma 6 on Wayland:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/main/install.sh | bash
+```
+
+The installer reaches `main` with the next release; until then, from `dev`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/dev/install.sh | bash -s -- --channel dev
+```
+
+It fetches the source into the shell's data directory, installs what the
+distribution has to provide, and starts the guided setup below -- in a
+graphical session, as the installer window: the steps along the top (check,
+panel, keys, look, review, install), a page per step, and the install's
+progress drawn as it happens. At a terminal with no desktop it asks the same
+questions there. Arch and its
+family (CachyOS, EndeavourOS, Manjaro), Fedora and Ubuntu are known to it;
+Quickshell comes from the distribution on Arch, from the
+`errornointernet/quickshell` COPR on Fedora and from the
+`avengemedia/danklinux` PPA on Ubuntu, each added only when Quickshell is
+missing. The fonts are packages where the distribution has them and are
+fetched into `~/.local/share/fonts` where it does not (Rubik everywhere, Material
+Symbols outside Arch); a font that cannot be had is warned about, not a reason to
+stop -- the desktop's own stand in. Anything else is told which packages to
+install first. Packages are installed with `sudo` at a terminal, and through
+Plasma's own password dialog (pkexec) from the installer window.
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --channel dev   # follow dev instead of releases
+curl -fsSL .../install.sh | bash -s -- --yes           # ask nothing, take every default
+```
+
+Run again, it brings the same source up to date and sets up again;
+`rmpr update` does the same without the questions. When it finishes the shell
+is running, drawing the panel, and starts at login -- there is nothing left to
+run by hand.
+
+From a checkout of your own, the guided install on its own:
+
+```bash
+make setup          # the guided install: every choice asked once, then applied
+```
+
+One pass over everything an install decides -- the packages it needs, the restore
+point, whether the files are copied or symlinked, what draws the panel, the window
+list the taskbar reads, the window previews (built, with the compiler and Qt
+development files they need), which keys this shell takes, who switches windows,
+the look and feel, and whether it starts at login. Each step runs
+the command you would otherwise run by hand (`install.sh`, `renderer set`,
+`theme apply`, `shortcuts set`, `switcher use`), so the guided path and the manual
+one cannot drift apart.
+
+Nothing is written until the summary is confirmed: the questions come first, the plan
+is shown, and one answer applies it. A restore point is taken before the first change,
+and `rmpr restore` undoes the lot.
+
+It asks in whatever front end the machine has -- the installer window in a
+graphical session, `whiptail` in a terminal, numbered prompts when there is
+neither, and none at all when nobody is attached. KDE's one-question-at-a-time
+dialogs are still there with `--ui kdialog`:
+
+```bash
+rmpr setup --dry-run        # the plan, and the commands it would run
+rmpr setup --unattended     # ask nothing, take every default
+rmpr setup --ui whiptail    # gui | kdialog | whiptail | dialog | plain | none
+rmpr setup --no-snapshot    # skip the restore point (not advised)
+rmpr setup --no-preflight   # skip the machine check
+```
+
+The defaults are the setup this project is developed against: the files copied, this
+shell drawing the panel, `Meta` for the application menu and `Meta+Space` for search,
+Alt+Tab left with KWin drawing our switcher layout, the look and feel applied, and the
+user service enabled so it starts at login. A key another shell already holds is taken
+from it and said so; `rmpr shortcuts revert` gives it back.
+
+## Removing it
+
+```bash
+rmpr uninstall              # Plasma's own panel, keys, Alt+Tab and look back; the shell's files gone
+rmpr uninstall --purge      # and your settings, restore points and the fetched source with them
+rmpr uninstall --dry-run    # what it would do
+```
+
+Each change is undone by the script that made it, from what it recorded -- so
+what comes back is what was there, key by key, and nothing another program
+changed since is overwritten. Your settings and restore points stay unless
+`--purge` says otherwise, so a reinstall picks up where you left off. Packages
+are left installed: jq, git and Qt are not this shell's to remove. Log out and
+back in afterwards.
+
+`rmpr restore --preinstall` is the blunter way back: whole files as they were
+before the first install.
+
+## Reinstalling it
+
+```bash
+rmpr reinstall              # uninstall, then the guided setup again
+rmpr reinstall --yes        # the same, taking every default
+rmpr reinstall --fresh      # and start from no settings (restore points are kept)
+curl -fsSL .../install.sh | bash -s -- --reinstall        # the latest source first
+```
+
+The uninstall and the setup, run in turn, from the source already here -- or,
+through the one-line install, from the latest one. It ends with the shell
+running, as an install does. The setup's questions come after the uninstall,
+so answering no at its summary leaves the shell uninstalled; it says so, and
+how to finish.
 
 ## Development
 
@@ -93,7 +210,8 @@ make link     # symlink into ~/.config/quickshell/<slug>; most edits reload live
 make run      # run in the foreground against the working tree
 make lint     # slug, layer and QML lints
 make test     # QML tests, plus shell tests in a throwaway HOME
-make uninstall
+make uninstall  # the whole uninstall, as `rmpr uninstall`
+make reinstall  # uninstall, then set up again from this tree
 ```
 
 `make help` lists every target.
@@ -120,6 +238,7 @@ that looks right and still has a real name in it.
 ### Command line
 
 ```bash
+rmpr setup              # the guided install (see above)
 rmpr preflight          # what would change, and whether this machine is ready
 rmpr snapshot create    # take a restore point now
 rmpr snapshot list      # what exists, with sizes
@@ -254,6 +373,19 @@ new try after a kscreenlocker update. `enable` also prints the way back, for
 the case that matters: from a text console (Ctrl+Alt+F3),
 `loginctl unlock-session <id>`, then `rmpr lockscreen disable`, which needs no
 desktop to run.
+
+It comes in twelve styles, picked on the settings window's Lock page or with
+`rmpr lockscreen set style <name>`: glass (the default), editorial, console,
+ambient, board, poster, seats, minimal, dayahead, secure, accessible and kiosk.
+Every one draws the same few things over itself: a countdown while PAM has the
+account locked out, a battery running out (a pill, then a banner, then a
+minute's countdown to hibernating -- `set hibernateAt 0` leaves that to
+Plasma), the screen dimming to a clock after `set dim <seconds>`, and the
+shutter lifting on the way out (`set unlockAnimation false` for none). `set
+accent` picks the one colour they all share. Nothing a lock screen cannot know
+is drawn -- no weather, calendar or notifications: the greeter is a separate,
+sandboxed program with none of the session's memory. `rmpr lockscreen check
+--all` loads every style in the real greeter.
 
 Plasma 6 reads the lock screen from the shell package plasmashell is on, so
 ours lives in this project's own shell packages, and no KDE setting is

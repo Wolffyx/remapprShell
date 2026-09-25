@@ -91,7 +91,8 @@
                 "scrollToSwitch": true
             },
             "clock": {
-                "format": "HH:mm",
+                "hour12": false,
+                "showSeconds": false,
                 "showDate": true
             }
         }

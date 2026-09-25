@@ -36,6 +36,9 @@ QtObject {
             desktopFile: String(entry.desktopFile ?? ""),
             minimized: entry.minimized === true,
             active: entry.active === true,
+            // Asked for the whole screen. False from a script older than the
+            // field, which only means no panel steps aside for it.
+            fullScreen: entry.fullScreen === true,
             // KWin's "this window wants you": an X11 urgency hint, or a
             // Wayland client asking to be activated while it is not. KWin
             // clears it when the window is activated.
@@ -45,9 +48,23 @@ QtObject {
             output: String(entry.output ?? ""),
             // KWin's stacking position, higher on top; -1 when not sent.
             stacking: typeof entry.stacking === "number" ? entry.stacking : -1,
-            // A PNG the daemon lifted out of the window itself, for windows
-            // that match no installed application. Empty for the rest.
+            // A PNG the daemon lifted out of the window itself -- the icon it
+            // carries, drawn when its application has none to offer (see
+            // AppMatch.icon). Empty for a window with no X11 icon to copy.
             iconPath: String(entry.iconPath ?? ""),
+            // What AppMatch finds the window's application by, beyond its app
+            // id: the instance half of an X11 class (a Wayland window's
+            // executable), and what the daemon read about the process and
+            // the desktop files named by it. All empty from a script or a
+            // daemon older than the fields, which only means fewer steps
+            // can match.
+            resourceName: String(entry.resourceName ?? ""),
+            pid: typeof entry.pid === "number" ? entry.pid : 0,
+            cmdline: String(entry.cmdline ?? ""),
+            processName: String(entry.processName ?? ""),
+            executables: Array.isArray(entry.executables) ? entry.executables.map(w => String(w)) : [],
+            desktopHint: root._desktopFile(entry.desktopHint),
+            appIdFile: root._desktopFile(entry.appIdFile),
             // The virtual desktops it is on, as KWin's uuids. An empty list is
             // KWin's "on all of them", and so is a script too old to send the
             // field -- which is why anything filtering on this must treat
@@ -61,7 +78,28 @@ QtObject {
             // stream with. 0 from a script older than the field, which is why
             // anything using it needs a sensible aspect of its own.
             width: typeof entry.width === "number" ? entry.width : 0,
-            height: typeof entry.height === "number" ? entry.height : 0
+            height: typeof entry.height === "number" ? entry.height : 0,
+            // Where it is, in the global coordinates Quickshell gives a
+            // screen. 0 from a script older than the fields -- and with them
+            // no size either, so nothing reads such a window as reaching an
+            // edge.
+            x: typeof entry.x === "number" ? entry.x : 0,
+            y: typeof entry.y === "number" ? entry.y : 0
+        };
+    }
+
+    // A desktop file the daemon read, as {variable, path, id, name, icon,
+    // iconFile}, or null. Without a path it names nothing.
+    function _desktopFile(value) {
+        if (!value || typeof value !== "object" || String(value.path ?? "").length === 0)
+            return null;
+        return {
+            variable: String(value.variable ?? ""),
+            path: String(value.path),
+            id: String(value.id ?? ""),
+            name: String(value.name ?? ""),
+            icon: String(value.icon ?? ""),
+            iconFile: String(value.iconFile ?? "")
         };
     }
 
@@ -172,6 +210,55 @@ QtObject {
         return out;
     }
 
+    // Whether the window on top of `output`, on the desktop `desktopId`, is
+    // full screen. Only windows that are actually showing count: a minimised
+    // one, or one on another virtual desktop, covers nothing. A window on no
+    // desktop in particular is on all of them. Ties in stacking -- a script too
+    // old to send it -- go to whichever came first, as in the list.
+    function fullScreenOn(windows, output, desktopId) {
+        let top = null;
+        for (const w of windows ?? []) {
+            if (!w || w.minimized || w.output !== output)
+                continue;
+            const on = w.desktops ?? [];
+            if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)
+                continue;
+            if (!top || (w.stacking ?? -1) > (top.stacking ?? -1))
+                top = w;
+        }
+        return top !== null && top.fullScreen === true;
+    }
+
+    // Whether a window on the desktop `desktopId` reaches into the strip
+    // `depth` pixels deep along `edge` of `screen` ({x, y, width, height}).
+    // A floating panel fills its edge while one does, as Plasma's does.
+    //
+    // The strip is a pixel deeper than asked: a maximised window stops where
+    // the panel's reserved space begins, which is touching it, not inside it.
+    // By geometry rather than by `output`, so a window hanging over from the
+    // next monitor counts on the monitor it reaches into.
+    function reachesEdge(windows, desktopId, screen, edge, depth) {
+        if (!screen || !(depth > 0))
+            return false;
+        const d = depth + 1;
+        const sx = screen.x, sy = screen.y, sw = screen.width, sh = screen.height;
+        const strip = edge === "top" ? { x: sx, y: sy, w: sw, h: d }
+                    : edge === "left" ? { x: sx, y: sy, w: d, h: sh }
+                    : edge === "right" ? { x: sx + sw - d, y: sy, w: d, h: sh }
+                    : { x: sx, y: sy + sh - d, w: sw, h: d };
+        for (const w of windows ?? []) {
+            if (!w || w.minimized || !(w.width > 0) || !(w.height > 0))
+                continue;
+            const on = w.desktops ?? [];
+            if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)
+                continue;
+            if (w.x < strip.x + strip.w && w.x + w.width > strip.x
+                && w.y < strip.y + strip.h && w.y + w.height > strip.y)
+                return true;
+        }
+        return false;
+    }
+
     // The application a task item stands for, as a desktop entry id ("org.kde.
     // dolphin"). Empty for windows no installed application matched, which
     // are grouped by class and cannot be pinned or started again.
@@ -236,23 +323,32 @@ QtObject {
         return window.title.length > 0 ? window.title : window.appId;
     }
 
-    // The icon name to try when no installed application matched the window.
+    // The icon name to try when neither the window's application nor the
+    // window itself has an icon to draw (see AppMatch.icon).
     //
     // A desktop file id is the reliable one; the resource class is the
-    // fallback, and lower-casing it is what turns "Google-chrome" into an icon
-    // that exists.
+    // fallback, and lower-casing it is what turns "Example-Viewer" into an
+    // icon that exists. The same rule for every window, whoever started it: a class
+    // that names no icon in the theme gets the theme's generic application
+    // icon where it is drawn, not another program's.
     function iconName(window) {
         if (!window)
             return "";
-
-        // A game launched through Steam has no desktop entry of its own -- its
-        // class is the numeric app id -- so nothing above can have matched and
-        // the only honest answer is Steam's icon rather than a blank square.
-        if (/^steam_app_\d+$/.test(window.appId))
-            return "steam";
-
         if (window.desktopFile.length > 0)
             return window.desktopFile;
         return window.appId.toLowerCase();
+    }
+
+    // A hue per application, 0 to 1, for Qt.hsla: two windows of one program
+    // are tinted alike and two programs apart. The window switcher and the
+    // overview both tint their cards this way, so the same program looks the
+    // same in both. A hash of the id, not a table -- any application gets
+    // one, and always the same one.
+    function tintHue(appId) {
+        const s = String(appId ?? "");
+        let h = 0;
+        for (let i = 0; i < s.length; i++)
+            h = (h * 31 + s.charCodeAt(i)) % 360;
+        return h / 360;
     }
 }

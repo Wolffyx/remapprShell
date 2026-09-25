@@ -121,12 +121,21 @@ lockscreen_package() {   # <dest dir> <lockscreen dir>
 # the lock screen with the real authenticator while a bug woke its prompt
 # with nobody there. So now nothing in a check can reach PAM, and the stand-in
 # reports that bug instead of paying for it.
-lockscreen_probe_package() {   # <dest dir> <lockscreen dir>
+#
+# The probe -- the LockScreen.qml the greeter loads, holding the stand-in and
+# the lock screen under test -- is the one below unless another is given:
+# dev/preview/lock.sh gives one that takes a picture.
+lockscreen_probe_package() {   # <dest dir> <lockscreen dir> [probe QML]
     local dir="$1/contents/lockscreen"
     lockscreen_package "$1" "$2" || return 1
     mv "$dir/LockScreen.qml" "$dir/LockScreenUnderTest.qml" || return 1
     printf 'LockScreenUnderTest 1.0 LockScreenUnderTest.qml\n' >> "$dir/qmldir"
-    cat > "$dir/LockScreen.qml" <<'QML'
+    if [ $# -ge 3 ]; then
+        printf '%s\n' "$3" > "$dir/LockScreen.qml"
+        return
+    fi
+    {
+        cat <<'QML'
 // Written by `lockscreen check`; never installed. See lockscreen_probe_package.
 // qmllint disable unqualified
 import QtQuick
@@ -135,23 +144,9 @@ Item {
     id: probe
     property bool viewVisible: false
 
-    QtObject {
-        id: stand
-        property int state: 0
-        property bool hadPrompt: false
-        property string prompt: ""
-        property string promptForSecret: ""
-        property string infoMessage: ""
-        property string errorMessage: ""
-        property int authenticatorTypes: 0
-        signal succeeded()
-        signal failed(int kind, var source)
-        signal noninteractiveError(int kind, var source)
-        function startAuthenticating() { console.warn("lock screen: started authenticating with nobody there"); }
-        function stopAuthenticating() {}
-        function respond(response) { console.warn("lock screen: sent a password with nobody there"); }
-        function cancel() {}
-    }
+QML
+        lockscreen_stand_qml "lock screen"
+        cat <<'QML'
 
     LockScreenUnderTest {
         id: under
@@ -169,14 +164,51 @@ Item {
     }
 }
 QML
+    } > "$dir/LockScreen.qml"
+}
+
+# The stand-in for the greeter's authenticator, as QML for a probe to hold:
+# everything the lock screen asks of the real one, answered by nothing, and
+# a complaint -- led by <who> -- for the two calls that would have reached PAM.
+lockscreen_stand_qml() {   # <who>
+    cat <<QML
+    QtObject {
+        id: stand
+        property int state: 0
+        property bool hadPrompt: false
+        property string prompt: ""
+        property string promptForSecret: ""
+        property string infoMessage: ""
+        property string errorMessage: ""
+        property int authenticatorTypes: 0
+        signal succeeded()
+        signal failed(int kind, var source)
+        signal noninteractiveError(int kind, var source)
+        function startAuthenticating() { console.warn("$1: started authenticating with nobody there"); }
+        function stopAuthenticating() {}
+        function respond(response) { console.warn("$1: sent a password with nobody there"); }
+        function cancel() {}
+    }
+QML
 }
 
 # The greeter with no display, no session bus and no runtime directory.
 # Nothing it does can reach the desktop, and it still loads the lock screen,
 # its wallpaper and every context property -- measured.
+# `LOCKSCREEN_PLATFORM` lets a caller ask for the offscreen platform with
+# arguments -- `offscreen:configfile=...`, which is how dev/preview/lock.sh
+# gets a 1920x1080 screen instead of the 800x800 one Qt invents. It is not a
+# way to reach a real display: anything but offscreen is refused, because the
+# whole point of this function is that nothing it runs can touch one.
 lockscreen_offscreen() {
+    local platform=${LOCKSCREEN_PLATFORM:-offscreen}
+    case "$platform" in
+        offscreen|offscreen:*) ;;
+        *) log_warn "ignoring LOCKSCREEN_PLATFORM='$platform': this runs offscreen only"
+           platform=offscreen ;;
+    esac
     env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u XDG_RUNTIME_DIR \
-        QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 "$@"
+        QT_QPA_PLATFORM="$platform" QT_FORCE_STDERR_LOGGING=1 "$@"
 }
 
 # Loads a lock screen in Plasma's greeter, offscreen, and prints what went
@@ -187,8 +219,8 @@ lockscreen_offscreen() {
 # a type that is not installed, and the greeter refused it and drew its
 # built-in locker. The greeter's testing mode never locks anything, and the
 # lock screen gets a stand-in authenticator, so PAM is never reached.
-lockscreen_check() {   # <lockscreen dir> [seconds]
-    local src=$1 limit=${2:-15} greeter work pkg log pid i rc settled=0 problems=0 ours lacks
+lockscreen_check() {   # <lockscreen dir> [seconds] [style]
+    local src=$1 limit=${2:-15} style=${3:-} greeter work pkg log pid i rc settled=0 problems=0 ours lacks
     greeter=$(lockscreen_greeter) || { echo "Plasma's greeter (kscreenlocker_greet) was not found"; return 1; }
     [ -f "$src/LockScreen.qml" ] || { echo "no LockScreen.qml in $src"; return 1; }
 
@@ -196,6 +228,14 @@ lockscreen_check() {   # <lockscreen dir> [seconds]
     pkg="$work/package"
     log="$work/greeter.log"
     lockscreen_probe_package "$pkg" "$src" || { rm -rf "$work"; echo "could not build a package to load"; return 1; }
+    # A style named here is drawn instead of the one the person picked: the
+    # copy's Options.qml is pointed at a settings file saying so, and theirs
+    # is never read or written.
+    if [ -n "$style" ]; then
+        printf '[Lock]\nstyle=%s\n' "$style" > "$work/lockscreen.conf"
+        sed -i "s|location: \"file://[^\"]*\"|location: \"file://$work/lockscreen.conf\"|" \
+            "$pkg/contents/lockscreen/Options.qml"
+    fi
 
     lockscreen_offscreen timeout "$limit" "$greeter" --testing --shell "$pkg" > "$log" 2>&1 &
     pid=$!

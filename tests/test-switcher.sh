@@ -6,36 +6,20 @@
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
+source "$REPO_ROOT/tests/lib/harness.sh"
+harness_init
 export XDG_DATA_DIRS="$SANDBOX/sys"
 # kreadconfig6 falls back to the system's kwinrc for an unset key, and the one
 # here names a different Alt+Tab layout from KWin's own default.
 export XDG_CONFIG_DIRS="$SANDBOX/etc"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
-source "$REPO_ROOT/scripts/lib/log.sh"
-source "$REPO_ROOT/scripts/lib/brand.sh"
+CALLS="$SANDBOX/session-calls"
+fake_recorders "$CALLS" qdbus6 busctl systemctl kquitapp6
 
-FAKEBIN="$SANDBOX/bin"; mkdir -p "$FAKEBIN"
-CALLS="$SANDBOX/session-calls"; : > "$CALLS"
-for t in qdbus6 busctl systemctl kquitapp6; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> "%s"\n' "$t" "$CALLS" > "$FAKEBIN/$t"
-    chmod +x "$FAKEBIN/$t"
-done
-export PATH="$FAKEBIN:$PATH"
-export "$NO_SESSION_VAR=1"
-
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
 sw() { "$REPO_ROOT/scripts/switcher.sh" "$@" >/dev/null 2>&1; }
-js() { "$REPO_ROOT/scripts/switcher.sh" status --json 2>/dev/null | jq -r "$1"; }
-sc() { kreadconfig6 --file kglobalshortcutsrc --group "$1" --key "$2" --default '<unset>'; }
+status() { "$REPO_ROOT/scripts/switcher.sh" status --json 2>/dev/null; }
+js() { status | jq -r "$1"; }
+sc() { kread kglobalshortcutsrc "$1" "$2"; }
 T=$'\t'
 
 layout() {   # <dir> <id> <name>
@@ -57,13 +41,15 @@ kwriteconfig6 --file kglobalshortcutsrc --group services --group foo.desktop --k
 before=$(sha256sum < "$XDG_CONFIG_HOME/kglobalshortcutsrc")
 
 echo "== status =="
-check "unset layout reads as KWin's default" "$(js .layout)" "thumbnail_grid"
-check "layouts from every data directory"    "$(js '[.layouts[].id] | sort | join(",")')" "big_icons,mine,thumbnail_grid"
-check "the user's copy wins a duplicate"     "$(js '.layouts[] | select(.id == "big_icons") | .name')" "My Large Icons"
-check "Alt+Tab held by caelestia"            "$(js '.keys[0].holders | map(.group + ":" + .name) | join(",")')" "caelestia-shell:Open window switcher"
-check "and not by KWin"                      "$(js .keys[0].kwin)" "false"
-check "Meta+Tab held twice, second in a list" "$(js '.keys[1].holders | map(.group) | join(",")')" "caelestia-shell,services/foo.desktop"
-check "not customised"                       "$(js .customised)" "false"
+# One read for the checks against one state: each read is a third of a second.
+s=$(status)
+check "unset layout reads as KWin's default" "$(jq -r .layout <<<"$s")" "thumbnail_grid"
+check "layouts from every data directory"    "$(jq -r '[.layouts[].id] | sort | join(",")' <<<"$s")" "big_icons,mine,thumbnail_grid"
+check "the user's copy wins a duplicate"     "$(jq -r '.layouts[] | select(.id == "big_icons") | .name' <<<"$s")" "My Large Icons"
+check "Alt+Tab held by caelestia"            "$(jq -r '.keys[0].holders | map(.group + ":" + .name) | join(",")' <<<"$s")" "caelestia-shell:Open window switcher"
+check "and not by KWin"                      "$(jq -r .keys[0].kwin <<<"$s")" "false"
+check "Meta+Tab held twice, second in a list" "$(jq -r '.keys[1].holders | map(.group) | join(",")' <<<"$s")" "caelestia-shell,services/foo.desktop"
+check "not customised"                       "$(jq -r .customised <<<"$s")" "false"
 
 echo "== layout =="
 sw layout mine
@@ -99,12 +85,12 @@ check "not customised"           "$(js .customised)" "false"
 # a choice a person made.
 echo "== who draws Meta+Tab =="
 sw desktops shell
-check "the setting says ours"     "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "shell"
+check "the setting says ours"     "$(jq -r '.switching.desktops' "$profile")" "shell"
 check "and it holds Meta+Tab"     "$(sc "$SLUG" overview)" "Meta+Tab,none,Desktops"
 check "taken from caelestia"      "$(sc caelestia-shell caelestia-shortcut-overview)" "none,none,Toggle overview"
 
 sw desktops plasma
-check "back to KWin's Overview"   "$(jq -r '.switching.desktops' "$CONFIG_DIR/profiles/default/shell.json")" "plasma"
+check "back to KWin's Overview"   "$(jq -r '.switching.desktops' "$profile")" "plasma"
 # The fixture below gives KWin's Overview its own default and name, and taking
 # a key keeps both -- which is what makes giving it back possible.
 check "KWin holds the key"        "$(sc kwin Overview)" "Meta+Tab,Meta+W,Toggle Overview"
@@ -132,11 +118,12 @@ rm -f "$FAKEBIN/quickshell"
 # Both switcher keys are held rather than tapped, so the daemon has to run
 # something when each is released -- or the fix above reaches only Alt+Tab.
 echo "== the daemon runs a release =="
-check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "the overview has a key"    "$(grep -c '"overview":  ("Desktops"' "$REPO_ROOT/bin/windowsd.py.in")" "1"
-check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd.py.in")" "1"
+check "switcher releases"         "$(grep -c '"switcher": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
+check "and so does backwards"     "$(grep -c '"switcher-reverse": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
+check "it subscribes to releases" "$(grep -c 'globalShortcutReleased' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
+# The actions themselves are one list, which the daemon is rendered from.
+check "the overview has a key"    "$(grep -c "^overview$(printf '\t')Desktops$(printf '\t')" "$REPO_ROOT/scripts/lib/shortcut-actions.tsv")" "1"
+check "and its key releases too"  "$(grep -c '"overview": \[CTL, "switcher", "commit"\]' "$REPO_ROOT/bin/windowsd/shortcuts.py")" "1"
 
 echo "== the live session =="
 check "no call reached the session" "$(wc -l < "$CALLS")" "0"
@@ -144,6 +131,4 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/switcher.sh" revert >/dev/null 2>&1
 check "with one, kglobalaccel restarts" "$(grep -c 'restart plasma-kglobalaccel' "$CALLS")" "1"
 check "and KWin reloads"                "$(grep -c reconfigure "$CALLS")" "1"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

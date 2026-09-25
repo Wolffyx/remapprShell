@@ -16,7 +16,8 @@ RUNNER=${QMLTESTRUNNER_BIN:-/usr/lib/qt6/bin/qmltestrunner}
 scripts/gen-qmldir.sh >/dev/null
 
 IMPORT_ROOT=$(mktemp -d)
-trap 'rm -rf "$IMPORT_ROOT"' EXIT
+LOGS=$(mktemp -d)
+trap 'rm -rf "$IMPORT_ROOT" "$LOGS"' EXIT
 ln -s "$REPO_ROOT/shell" "$IMPORT_ROOT/qs"
 
 # The redaction test reads its fixture corpus with XMLHttpRequest, and Qt 6
@@ -46,10 +47,45 @@ export "$NO_SESSION_VAR=1"
 # reading an unset key was reading the real desktop's answer.
 export XDG_CONFIG_DIRS=/etc/xdg
 
-for t in test-snapshot test-kconfig test-theme test-edges test-shortcuts test-switcher test-lockscreen test-update test-renderer test-redact test-report test-windows test-ask test-crash test-ctl test-config test-profiles; do
-    log_step "$t"
-    "$REPO_ROOT/tests/$t.sh" || exit 1
+# Every suite in tests/, found rather than listed: a list is a place for a new
+# suite to be forgotten.
+#
+# They run side by side. Each has a HOME of its own, and most of their time is
+# spent waiting rather than working -- test-theme's on Night Light, which no
+# sandbox has -- so one after another they took three minutes, and side by
+# side they take as long as the slowest. Each writes a log of its own, and the
+# logs are printed in the order the suites are named, each as soon as it and
+# the ones before it are done: the output reads as it did when they ran in
+# turn. TEST_JOBS=1 runs them in turn.
+suites=("$REPO_ROOT"/tests/test-*.sh)
+max_jobs=${TEST_JOBS:-$(nproc 2>/dev/null || echo 4)}
+
+run_suite() {   # <suite>: its output to its log, then its status beside it
+    local name rc=0
+    name=$(basename "$1" .sh)
+    "$1" > "$LOGS/$name.log" 2>&1 || rc=$?
+    echo "$rc" > "$LOGS/$name.rc.new" && mv "$LOGS/$name.rc.new" "$LOGS/$name.rc"
+}
+
+(
+    for t in "${suites[@]}"; do
+        while [ "$(jobs -rp | wc -l)" -ge "$max_jobs" ]; do wait -n || true; done
+        run_suite "$t" &
+    done
+    wait
+) &
+pool=$!
+
+failed=()
+for t in "${suites[@]}"; do
+    name=$(basename "$t" .sh)
+    while [ ! -f "$LOGS/$name.rc" ] && kill -0 "$pool" 2>/dev/null; do sleep 0.1; done
+    log_step "$name"
+    cat "$LOGS/$name.log" 2>/dev/null || true
+    [ "$(cat "$LOGS/$name.rc" 2>/dev/null)" = 0 ] || failed+=("$name")
 done
+wait "$pool" || true
+[ ${#failed[@]} -eq 0 ] || die "failed: ${failed[*]}"
 
 # The lock screen in Plasma's real greeter. The suites above use a stand-in;
 # this is the check that catches what qmllint does not -- a type that is not

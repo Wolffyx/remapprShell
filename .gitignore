@@ -9,8 +9,11 @@ theme/lockscreen/Options.qml
 
 # Build / scratch
 # The preview harness copies the whole shell per run and removes it on exit;
-# a run killed before its trap leaves one behind.
+# a run killed before its trap leaves one behind. switcher.sh does the same
+# with a directory of its own -- a directory, so the pattern cannot hide a
+# file named switcher.anything.
 dev/preview/root.*
+dev/preview/switcher.*/
 /build/
 # `make plugin` builds here; the installed module lives in the user's Qt
 # import path and is removed by `make plugin-clean`.

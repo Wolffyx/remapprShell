@@ -2,14 +2,15 @@
 # The lock screen: ours, drawn by Plasma's own greeter, and off by default.
 #
 #   status [--json]   what is installed, what was tried, what will be drawn
-#   check             load it in Plasma's greeter, offscreen and off the bus,
-#                     and say what the greeter said
+#   check [--all]     load it in Plasma's greeter, offscreen and off the bus,
+#                     and say what the greeter said; --all loads every style
 #   try               show it for real, in the greeter's testing mode, and
 #                     unlock it with your password -- that is the test
 #   enable            put it in this shell's packages; refused until `try`
 #                     has unlocked this exact build, in this greeter
 #   disable           take it out; Plasma's lock screen from the next lock
-#   set <key> <value> how it looks: clock, blur, media, session, idleClock
+#   set <key> <value> how it looks: style, clock, blur, media, session, idleClock,
+#                     accent, dim, unlockAnimation, hibernateAt, kioskName, kioskNote
 #
 # The look settings go into kscreenlockerrc under the greeter's own group,
 # because the greeter is where they are read: it runs as its own process with
@@ -35,16 +36,13 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/lockscreen.sh"
+source "$REPO_ROOT/scripts/lib/renderers.sh"
 
 # How long `try` leaves the lock screen up. The greeter covers every screen
 # and takes the keyboard, test or not, so a lock screen that cannot unlock
 # would trap its own test; this is what ends it.
 TRY_SECONDS_VAR="${ENV_PREFIX}_LOCKSCREEN_TRY_SECONDS"
 TRY_SECONDS=${!TRY_SECONDS_VAR:-90}
-
-live_shell_package() {
-    kreadconfig6 --file plasmashellrc --group Shell --key ShellPackage --default 'org.kde.plasma.desktop' 2>/dev/null
-}
 
 is_ours() {
     local p
@@ -87,9 +85,16 @@ EOF
 #
 # id | key | kind | choices | default | store | inverted
 LOOK_KEYS=(
+    "style|style|enum|glass editorial console ambient board poster seats minimal dayahead secure accessible kiosk|glass|ours|"
     "clock|clockPosition|enum|left center|left|ours|"
     "blur|wallpaperBlur|int|0 40|26|ours|"
     "session|showSessionButtons|bool||true|ours|"
+    "accent|accent|enum|indigo terracotta green violet|indigo|ours|"
+    "dim|dimSeconds|int|0 600|20|ours|"
+    "unlockAnimation|unlockAnimation|bool||true|ours|"
+    "hibernateAt|hibernateAt|int|0 10|3|ours|"
+    "kioskName|kioskName|text|||ours|"
+    "kioskNote|kioskNote|text|||ours|"
     "media|showMediaControls|bool||true|plasma|"
     "idleClock|hideClockWhenIdle|bool||true|plasma|invert"
 )
@@ -194,28 +199,46 @@ case "$cmd" in
             echo
             exit 0
         fi
-        s=$(status_json)
-        printf 'drawn at the next lock: %s\n' \
-            "$(jq -r 'if .drawn == "ours" then "ours" else "Plasma'"'"'s" end' <<< "$s")"
-        printf 'enabled:                %s\n' "$(jq -r 'if .enabled then "yes" else "no" end' <<< "$s")"
-        printf 'plasmashell is on:      %s%s\n' "$(jq -r .live <<< "$s")" \
-            "$(jq -r 'if .liveIsOurs then " (ours)" else " (not ours: its own lock screen is drawn)" end' <<< "$s")"
-        jq -r '.packages[] | "  \(.id): " + (if .installed then "installed (\(.hash))"
-                                              elif .foreign then "a lock screen that is not ours"
-                                              elif .present then "not installed" else "package not installed" end)' <<< "$s"
-        if jq -e '.tried' <<< "$s" >/dev/null; then
-            printf 'tried:                  %s, build %s%s\n' "$(jq -r .tried.at <<< "$s")" "$(jq -r .tried.hash <<< "$s")" \
-                "$(jq -r 'if .tried.release != "" then " (kscreenlocker \(.tried.release))" else "" end' <<< "$s")"
-            jq -e '.triedWithThisGreeter' <<< "$s" >/dev/null \
-                || echo "                        with a different greeter from this one: try it again before enabling"
-            jq -e '.triedIsSource' <<< "$s" >/dev/null \
-                || echo "                        the source has changed since: try it again to use the change"
-        else
-            echo "tried:                  never ($ALIAS lockscreen try)"
-        fi
+        # The same JSON the settings page reads, said in words -- by one jq
+        # rather than one for every line.
+        status_json | jq -r --arg alias "$ALIAS" '
+            "drawn at the next lock: " + (if .drawn == "ours" then "ours" else "Plasma'"'"'s" end),
+            "enabled:                " + (if .enabled then "yes" else "no" end),
+            "plasmashell is on:      \(.live)"
+                + (if .liveIsOurs then " (ours)" else " (not ours: its own lock screen is drawn)" end),
+            (.packages[] | "  \(.id): " + (if .installed then "installed (\(.hash))"
+                                         elif .foreign then "a lock screen that is not ours"
+                                         elif .present then "not installed" else "package not installed" end)),
+            (if .tried then
+                "tried:                  \(.tried.at), build \(.tried.hash)"
+                    + (if .tried.release != "" then " (kscreenlocker \(.tried.release))" else "" end),
+                (if .triedWithThisGreeter then empty
+                 else "                        with a different greeter from this one: try it again before enabling" end),
+                (if .triedIsSource then empty
+                 else "                        the source has changed since: try it again to use the change" end)
+             else "tried:                  never (\($alias) lockscreen try)" end)'
         ;;
 
     check)
+        # --all loads every style in turn, not only the one picked: a style
+        # nobody has chosen yet is still one somebody can choose.
+        if [ "${1:-}" = "--all" ]; then
+            src=${2:-$LOCKSCREEN_SRC}
+            spec=$(look_spec style)
+            IFS='|' read -r _ _ _ styles _ <<< "$spec"
+            failed=0
+            for st in $styles; do
+                if out=$(lockscreen_check "$src" 15 "$st"); then
+                    log_step "$st: loads"
+                else
+                    log_warn "$st: does not load cleanly"
+                    printf '%s\n' "$out" | sed 's/^/    /' >&2
+                    failed=1
+                fi
+            done
+            [ "$failed" = 0 ] || die "not every style loads cleanly"
+            exit 0
+        fi
         src=${1:-$LOCKSCREEN_SRC}
         if out=$(lockscreen_check "$src"); then
             log_step "it loads in Plasma's greeter and found everything it needs"
@@ -327,6 +350,10 @@ EOF
                   lo=${choices%% *}; hi=${choices##* }
                   [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
             enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
+            # One line, drawn as it is written: a newline would be a second
+            # key to KConfig, and a lock screen is no place for an essay.
+            text) [[ "$value" != *$'\n'* ]] || die "$id takes one line"
+                  [ "${#value}" -le 120 ] || die "$id takes at most 120 characters" ;;
         esac
 
         if [ "$(look_read "$spec")" = "$value" ]; then

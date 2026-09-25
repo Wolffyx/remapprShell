@@ -1,0 +1,45 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+[Unit]
+Description=@DISPLAY_NAME@ day and night, settled before the session's applications
+Documentation=@REPO_FETCH@
+
+# Why the shell does not do this itself.
+#
+# kdeglobals keeps whatever the last switch wrote, so a machine shut down at
+# night boots dark and stays dark until something says otherwise. The shell
+# does say so -- but only once quickshell has loaded, the profile has been
+# read, Night Light has answered and a one-second debounce has passed. That
+# measured eight seconds into the session, and the session does not wait:
+# every application started by XDG autostart -- session restore included --
+# comes up inside that window and reads the desktop's colours exactly once.
+# Electron applications ask the portal at startup and never ask again, so one
+# of them started in those eight seconds spends the whole day dark on a light
+# desktop, and no amount of repainting afterwards reaches it.
+#
+# So the variant is settled here, before a single application starts.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+# Night Light is the schedule this follows, and it lives in KWin.
+After=plasma-kwin_wayland.service
+
+# The whole point: the applications start after this has finished.
+Before=xdg-desktop-autostart.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@BIN_DIR@/@CTL_BIN@ theme variant auto --if-following
+
+# The applications are waiting on this, so it must end. Night Light is given
+# five seconds to answer inside the command; the rest is the write itself.
+TimeoutStartSec=20s
+
+# A desktop that cannot be themed must not hold up the session. The colours
+# are wrong for a moment either way; a session that will not start is worse.
+SuccessExitStatus=0 1
+
+Slice=session.slice
+
+[Install]
+WantedBy=graphical-session.target

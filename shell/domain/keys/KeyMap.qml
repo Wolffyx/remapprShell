@@ -11,32 +11,24 @@ pragma Singleton
 // "\t".
 
 import QtQuick
+import qs.core
 
 QtObject {
     id: root
 
     // { "group": { "action": { keys: ["Meta+W"], label: "Toggle Overview" } } }
     function parse(text) {
+        const ini = Ini.parse(text);
         const out = {};
-        let group = "";
-        for (const raw of String(text ?? "").split("\n")) {
-            const line = raw.trim();
-            if (line.length === 0 || line.startsWith("#"))
-                continue;
-            if (line.startsWith("[")) {
-                group = line.slice(1, -1);
-                out[group] = out[group] ?? {};
-                continue;
+        for (const group of Object.keys(ini)) {
+            out[group] = {};
+            for (const action of Object.keys(ini[group])) {
+                const fields = ini[group][action].split(",");
+                const current = (fields[0] ?? "").trim();
+                const keys = current === "none" || current.length === 0 ? []
+                    : current.split("\\t").map(k => k.trim()).filter(k => k.length > 0 && k !== "none");
+                out[group][action] = { keys: keys, label: fields.slice(2).join(",").trim() };
             }
-            const eq = line.indexOf("=");
-            if (eq < 0 || !group)
-                continue;
-            const action = line.slice(0, eq);
-            const fields = line.slice(eq + 1).split(",");
-            const current = (fields[0] ?? "").trim();
-            const keys = current === "none" || current.length === 0 ? []
-                : current.split("\\t").map(k => k.trim()).filter(k => k.length > 0 && k !== "none");
-            out[group][action] = { keys: keys, label: fields.slice(2).join(",").trim() };
         }
         return out;
     }
@@ -49,6 +41,10 @@ QtObject {
     // The sheet: what is worth a line, in the order a person looks for it,
     // each with the keys actually bound. A line with no keys is left out, and
     // so is a section left empty.
+    //
+    // Plasma's own keys and this shell's, and no application's: what another
+    // program binds is that program's to show. A screenshot key is on the
+    // sheet when it is the shell's own action, with the rest of shellRows.
     readonly property var wanted: [
         { title: "Shell", rows: [
             ["plasmashell", "activate application launcher", "Application menu"],
@@ -58,7 +54,6 @@ QtObject {
             ["kwin", "Show Desktop", "Show the desktop"],
             ["ksmserver", "Lock Session", "Lock"],
             ["ksmserver", "Log Out", "Log out"],
-            ["services][org.kde.spectacle.desktop", "RectangularRegionScreenShot", "Screenshot of a region"],
             ["kwin", "Toggle Night Color", "Night Light"]
         ] },
         { title: "Windows and desktops", rows: [

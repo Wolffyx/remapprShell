@@ -105,6 +105,21 @@ install_template() {
     log_info "  gen   $dest"
 }
 
+# Rendered and copied in every mode, --link too. It is half of what a running
+# process was started from -- the session daemon's modules, beside its
+# template -- and a link would change it under that process with every edit
+# in the checkout, while the template beside it stayed as it was installed:
+# the doctor, asking whether the daemon running is the one installed, would
+# be comparing against only half. Marked like a copied directory, which is
+# what it is.
+install_package() {
+    local src=$1 dest=$2
+    remove_dest "$dest" || return 0
+    render_package "$src" "$dest" || return 1
+    printf '%s %s\n' "$SLUG" "$VERSION" > "$dest/.rmpr-owned"
+    log_info "  gen   $dest"
+}
+
 log_step "$MODE ($DISPLAY_NAME $VERSION)"
 
 # The generated singleton must exist before shell/ is linked or copied.
@@ -124,6 +139,7 @@ while IFS='|' read -r kind src dest; do
             case "$kind" in
                 dir)      install_dir      "$REPO_ROOT/$src" "$dest" || failed=1 ;;
                 template) install_template "$REPO_ROOT/$src" "$dest" || failed=1 ;;
+                package)  install_package  "$REPO_ROOT/$src" "$dest" || failed=1 ;;
                 symlink)  install_symlink  "$src" "$dest" || failed=1 ;;
                 *) die "unknown manifest kind: $kind" ;;
             esac ;;
@@ -131,26 +147,48 @@ while IFS='|' read -r kind src dest; do
 done < <(manifest_entries)
 
 # Both of these reach the user's real session whatever $HOME says, so neither
-# runs for an install into a throwaway HOME (the update suite makes one).
-in_session() { [ -z "${!NO_SESSION_VAR:-}" ]; }
+# runs for an install into a throwaway HOME (the update suite makes one) --
+# session_available, in brand.sh, is the switch.
 
 # systemd caches unit files; without this the unit is invisible until the next
 # login, and `rmpr start` fails with a confusing "unit not found".
-if in_session && command -v systemctl >/dev/null 2>&1; then
+if session_available && command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload 2>/dev/null || true
+
+    # Enabling is a symlink in whichever target [Install] named at the time.
+    # When that target changes, an enabled unit keeps the old link until it
+    # is re-enabled -- and keeps starting as late as it used to.
+    if [ "$MODE" != uninstall ] && systemctl --user is-enabled "$SYSTEMD_UNIT" >/dev/null 2>&1; then
+        systemctl --user reenable "$SYSTEMD_UNIT" >/dev/null 2>&1 || true
+    fi
 fi
 
 # The bus caches its list of activatable names the same way. Without this the
 # window daemon is "not activatable" until the next login, which looks exactly
 # like the daemon being broken.
-if in_session && [ "$MODE" != uninstall ] && command -v busctl >/dev/null 2>&1; then
+if session_available && [ "$MODE" != uninstall ] && command -v busctl >/dev/null 2>&1; then
     busctl --user call org.freedesktop.DBus / org.freedesktop.DBus ReloadConfig 2>/dev/null || true
 fi
 
-if [ "$MODE" != uninstall ]; then
+# The commands live in $BIN_DIR, which Arch, for one, does not put on PATH:
+# the first real install (2026-09-25) finished by naming `rmpr doctor` to a
+# shell that could not find it. environment.d is read by the user's systemd,
+# and the Plasma session and every terminal it opens inherit from that --
+# from the next login. The unit never needed it: it names the full path.
+PATH_CONF="$XDG_CONFIG_HOME/environment.d/60-$SLUG-path.conf"
+if [ "$MODE" = uninstall ]; then
+    rm -f "$PATH_CONF"
+else
     case ":$PATH:" in
         *":$BIN_DIR:"*) : ;;
-        *) log_warn "$BIN_DIR is not on PATH; $SESSION_BIN will not be found" ;;
+        *)
+            if [ ! -f "$PATH_CONF" ]; then
+                mkdir -p "$(dirname "$PATH_CONF")"
+                printf '# GENERATED FILE -- DO NOT EDIT. Removed by uninstalling %s.\nPATH=%s:${PATH}\n' \
+                    "$DISPLAY_NAME" "$BIN_DIR" > "$PATH_CONF"
+                log_step "$BIN_DIR goes on PATH from the next login ($PATH_CONF)"
+            fi
+            log_info "until then: $BIN_DIR/$ALIAS" ;;
     esac
 fi
 

@@ -14,7 +14,8 @@
 # changing a machine's snapshot policy is precisely the surprise this whole
 # mechanism exists to prevent.
 #
-# Requires brand.sh, log.sh, protected.sh.
+# Requires brand.sh, log.sh, protected.sh -- and config.sh, for the one setting
+# snapshot_autoprune reads.
 
 # Deliberately NOT inside STATE_DIR. The state directory is part of what a
 # snapshot captures and therefore part of what a restore overwrites, so an
@@ -128,14 +129,18 @@ _snapshot_copy() {
 # Echoes the snapshot directory on success.
 snapshot_create() {
     local label=${1:-manual}
+    # The label is part of a directory name. A slash in it made directories
+    # inside the root -- or, with `..`, outside it -- and a leading dash made
+    # a name that reads as a flag to every command given it afterwards. So
+    # both become a dash and are trimmed off the front; spaces are kept.
+    label=${label//\//-}
+    label=$(printf '%s' "$label" | tr -d '\000-\037' | sed -E 's/^[-. ]+//; s/[ ]+$//')
+    [ -n "$label" ] || label=manual
     # Two snapshots taken in the same second with the same label would share a
     # directory and merge into each other -- a restore point that is quietly
     # half of one state and half of another is worse than no restore point.
-    local base dir n
-    base="$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}"
-    dir=$base
-    n=2
-    while [ -e "$dir" ]; do dir="$base-$n"; n=$((n + 1)); done
+    local dir
+    dir=$(unique_path "$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}")
 
     mkdir -p "$dir/files" || { log_error "cannot create $dir"; return 1; }
 
@@ -167,12 +172,17 @@ snapshot_create() {
     printf '%s\n' "$dir"
 }
 
+# Every snapshot's name, oldest first: names begin with a sortable timestamp.
+snapshot_names() { ls -1 "$(snapshot_root)" 2>/dev/null | sort; }
+
+# The oldest -- the pre-install state, which pruning never takes -- by name.
+snapshot_oldest() { snapshot_names | head -1; }
+
 snapshot_latest() {
     local root
     root=$(snapshot_root)
     [ -d "$root" ] || return 1
-    # Names begin with a sortable timestamp, so the last one is the newest.
-    ls -1 "$root" 2>/dev/null | sort | tail -1 | sed "s|^|$root/|"
+    snapshot_names | tail -1 | sed "s|^|$root/|"
 }
 
 # Restores a snapshot.
@@ -329,9 +339,7 @@ snapshot_remove() {
     [ -d "$dir" ] || { log_error "no such snapshot: $name"; return 1; }
     # Removing the oldest means losing the pre-install state, which is the one
     # most likely to be wanted and the least likely to be missed until then.
-    local oldest
-    oldest=$(ls -1 "$root" 2>/dev/null | sort | head -1)
-    if [ "$(basename "$dir")" = "$oldest" ]; then
+    if [ "$(basename "$dir")" = "$(snapshot_oldest)" ]; then
         log_warn "this is the oldest snapshot -- usually the pre-install state"
     fi
 
@@ -366,13 +374,14 @@ snapshot_lock() {   # <name> <on|off>
 # point that can put the machine back the way it was found -- and it is worth
 # more than any number of recent ones.
 snapshot_prunable() {
-    local root d first=1
+    local root d oldest
     root=$(snapshot_root)
-    for d in $(ls -1 "$root" 2>/dev/null | sort); do
-        if [ "$first" = 1 ]; then first=0; continue; fi
+    oldest=$(snapshot_oldest)
+    while IFS= read -r d; do
+        [ "$d" = "$oldest" ] && continue
         snapshot_is_locked "$root/$d" && continue
         printf '%s\n' "$d"
-    done
+    done < <(snapshot_names)
 }
 
 snapshot_prune() {
@@ -384,7 +393,7 @@ snapshot_prune() {
     [ "$keep" -ge 1 ] || { log_error "keep must be at least 1"; return 1; }
 
     local total
-    total=$(ls -1 "$root" 2>/dev/null | wc -l)
+    total=$(snapshot_names | wc -l)
     [ "$total" -gt "$keep" ] || { log_info "$total snapshot(s), keeping $keep: nothing to do"; return 0; }
 
     # `keep` means the newest N are kept, so they are taken out of the running
@@ -397,7 +406,7 @@ snapshot_prune() {
     # what is left is what goes. A machine can therefore end up holding more
     # than `keep` -- that is the protection working, not the count failing.
     local newest removed=0 n
-    newest=$(ls -1 "$root" | sort | tail -n "$keep")
+    newest=$(snapshot_names | tail -n "$keep")
 
     while IFS= read -r n; do
         grep -qxF -- "$n" <<< "$newest" && continue
@@ -414,9 +423,13 @@ snapshot_prune() {
 
 # Called after taking one. Off unless `snapshots.keep` says otherwise, because
 # deleting restore points is not a thing to start doing to somebody quietly.
+#
+# Its errors are not hidden. `snapshot create` once called this without
+# config.sh sourced: the lookup was "command not found", which a `2>/dev/null`
+# here swallowed, so keep read as 0 and nothing was pruned however it was set.
 snapshot_autoprune() {
     local keep
-    keep=$(config_get '.snapshots.keep' 0 2>/dev/null) || keep=0
+    keep=$(config_get '.snapshots.keep' 0) || keep=0
     case "$keep" in ''|*[!0-9]*) return 0 ;; esac
     [ "$keep" -ge 1 ] || return 0
     snapshot_prune "$keep"

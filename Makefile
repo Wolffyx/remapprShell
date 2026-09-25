@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults docs brand test clean plugin plugin-clean
+.PHONY: help setup link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults lint-launch docs brand test clean plugin plugin-clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -19,14 +19,20 @@ brand: ## Regenerate all generated files (branding, qmldir, widget index)
 	@scripts/gen-widget-index.sh
 	@scripts/gen-colors.sh
 
+setup: ## Guided install: ask every install-time choice, then apply them
+	@scripts/setup.sh
+
 link: ## Symlink the shell into place (development; widget edits need `rmpr reload`)
 	@scripts/install.sh --link
 
 install: ## Copy the shell into place (frozen install)
 	@scripts/install.sh --copy
 
-uninstall: ## Remove everything the manifest owns
-	@scripts/install.sh --uninstall
+uninstall: ## Take the shell off: every change reverted, then its files removed
+	@scripts/uninstall.sh
+
+reinstall: ## Uninstall, then the guided setup again, from this tree
+	@scripts/reinstall.sh
 
 run: brand ## Run the shell in the foreground against the working tree
 # The absolute path is what makes the process say where it came from: every
@@ -41,7 +47,7 @@ restart: ## Restart the installed systemd user unit
 log: ## Follow the shell's journal
 	@journalctl --user -u $(UNIT) -f
 
-lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults ## Run every lint
+lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch ## Run every lint
 
 lint-slug: ## Fail if the project name is hardcoded anywhere
 	@scripts/lint-slug.sh
@@ -64,18 +70,21 @@ lint-docs: ## Fail if the configuration reference is out of date
 lint-tests: ## Fail if a QML test imports a module needing a running shell
 	@scripts/lint-tests.sh
 
+lint-launch: ## Fail if the shell starts an application anywhere but through Launch
+	@scripts/lint-launch.sh
+
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh
 
-plugin: ## Build and install the window-preview plugin (needs Qt6 dev + cmake)
+plugin: ## Build and install the compiled modules: window previews, held and lock keys (needs Qt6 dev + cmake)
 	@cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release
 	@cmake --build build/plugin
 	@cmake --install build/plugin
-	@printf '\033[32m==>\033[0m window previews installed; restart the shell to pick them up\n'
+	@printf '\033[32m==>\033[0m window previews and the input module installed; restart the shell to pick them up\n'
 
-plugin-clean: ## Remove the plugin's build directory and installed module
-	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast"
-	@printf '\033[32m==>\033[0m window previews removed\n'
+plugin-clean: ## Remove the plugin's build directory and both installed modules
+	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast" "$(HOME)/.local/lib/qt6/qml/ShellInput"
+	@printf '\033[32m==>\033[0m window previews and the input module removed\n'
 
 clean: ## Remove generated files
 	@rm -f shell/core/Branding.qml theme/colors/*.colors

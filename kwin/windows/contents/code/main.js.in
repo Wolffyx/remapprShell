@@ -34,17 +34,45 @@ function isTaskbarWindow(window) {
         && window.deleted !== true;
 }
 
+// How many times KWin has said each window's icon changed, by uuid.
+//
+// The icon itself cannot be sent: it is a QIcon, and nothing in it survives
+// the trip to JSON. What can be sent is that it changed, which is what the
+// daemon needs to know to read it again -- a program often sets its own icon
+// a moment after its window appears, over whatever its toolkit put there
+// first, and a copy taken in between would otherwise be kept for the life of
+// the window. Plasma's own task list redraws on this same signal.
+const iconSerials = new Map();
+
+function uuidOf(window) {
+    return String(window.internalId).replace(/[{}]/g, "");
+}
+
 function describe(window) {
+    const uuid = uuidOf(window);
     return {
-        uuid: String(window.internalId).replace(/[{}]/g, ""),
+        uuid: uuid,
         title: window.caption || "",
         appId: window.resourceClass || "",
         desktopFile: window.desktopFileName || "",
-        // Only used to find the window's own icon, for the windows that have
-        // no application to match against.
+        // The other half of an X11 window's class -- the instance name -- and
+        // for a Wayland window the name of the program's executable. Plasma's
+        // task manager matches desktop entries' StartupWMClass against this
+        // before anything else, so the shell does too; the daemon tells one
+        // X11 window of a process from another by it.
+        resourceName: window.resourceName || "",
+        // The process: what the daemon reads the command line and two
+        // environment variables of, for the windows that match no
+        // application by themselves, and whose X11 windows it looks through
+        // for this one's own icon.
         pid: window.pid || 0,
+        iconSerial: iconSerials.get(uuid) || 0,
         minimized: window.minimized === true,
         active: window.active === true,
+        // Asked for the whole screen. Read with `stacking` and `output`: a
+        // panel steps aside on a monitor whose top window is full screen,
+        // which KWin's layers alone do not do once that window loses focus.
+        fullScreen: window.fullScreen === true,
         // A message arrived, a dialog wants an answer: the window asked for
         // attention (an X11 urgency hint, or activation requested while it
         // was not allowed focus). KWin clears it when the window is activated.
@@ -58,12 +86,14 @@ function describe(window) {
         // Which virtual desktop, so the panel can show only the current one if
         // asked to. `desktops` is a list; a window on all of them has none.
         desktops: (window.desktops || []).map(d => String(d.id)),
-        // How big it is on screen, for anything drawing a picture of it: a
-        // window's stream fills whatever it is given, so a 4:3 window
-        // letterboxed as 16:9 is a worse picture than none. Only the shape is
-        // wanted, which is why this is not watched for changes -- a window
-        // resized while a preview is open is a slightly wrong shape until the
-        // next update, and that is cheaper than a message per drag.
+        // Where it is and how big, in KWin's global coordinates -- the ones
+        // Quickshell gives a screen. The shape is for anything drawing a
+        // picture of it (a 4:3 window letterboxed as 16:9 is a worse picture
+        // than none); the place is for a floating panel, which fills its
+        // edge while a window reaches into it. Sent when a move or resize
+        // ends, not on every step of one: see watch().
+        x: Math.round((window.frameGeometry && window.frameGeometry.x) || 0),
+        y: Math.round((window.frameGeometry && window.frameGeometry.y) || 0),
         width: Math.round((window.frameGeometry && window.frameGeometry.width) || 0),
         height: Math.round((window.frameGeometry && window.frameGeometry.height) || 0)
     };
@@ -83,6 +113,21 @@ function publish() {
     callDBus(SERVICE, PATH, IFACE, "Update", JSON.stringify(snapshot()));
 }
 
+// For signals that come in bursts and before KWin has finished: one raise
+// restacks every window above the one raised, a signal each, and a window
+// going full screen says so before KWin has moved it to the layer it will
+// sit in -- a list sent at once carried the old stacking, with the
+// full-screen window below the ones it now covered. One list, a moment
+// after the last of them, is right and is one call.
+const settle = new QTimer();
+settle.singleShot = true;
+settle.interval = 50;
+settle.timeout.connect(publish);
+
+function publishSoon() {
+    settle.start();
+}
+
 // Per-window signals matter as much as the list changing: a title changing or
 // a window being minimised leaves the set identical, and a task manager that
 // only watched the set would show a stale title until something else happened.
@@ -91,10 +136,32 @@ function watch(window) {
         return;
     window.captionChanged.connect(publish);
     window.minimizedChanged.connect(publish);
+    window.fullScreenChanged.connect(publishSoon);
+    // `stacking` is only worth sending if it is current: what is on top of a
+    // monitor decides whether its panel steps aside for a full-screen window.
+    window.stackingOrderChanged.connect(publishSoon);
+    // Maximised, tiled, placed or resized by the program: sent. Dragged by
+    // the user: sent once, when the drag ends -- a list per frame of a drag
+    // would rebuild the task list twenty times a second for nothing.
+    window.frameGeometryChanged.connect(() => {
+        if (!window.move && !window.resize)
+            publishSoon();
+    });
+    window.interactiveMoveResizeFinished.connect(publishSoon);
     window.desktopsChanged.connect(publish);
     window.skipTaskbarChanged.connect(publish);
     window.demandsAttentionChanged.connect(publish);
     window.outputChanged.connect(publish);
+    // What the application is matched by can change after the window
+    // appears -- a desktop file named late, a class set again -- and Plasma
+    // matches such a window again when it does.
+    window.windowClassChanged.connect(publish);
+    window.desktopFileNameChanged.connect(publish);
+    window.iconChanged.connect(() => {
+        const uuid = uuidOf(window);
+        iconSerials.set(uuid, (iconSerials.get(uuid) || 0) + 1);
+        publish();
+    });
 }
 
 workspace.windowList().forEach(watch);
@@ -103,7 +170,11 @@ workspace.windowAdded.connect(window => {
     watch(window);
     publish();
 });
-workspace.windowRemoved.connect(publish);
+workspace.windowRemoved.connect(window => {
+    if (window)
+        iconSerials.delete(uuidOf(window));
+    publish();
+});
 workspace.windowActivated.connect(publish);
 
 // The daemon starts empty, and the shell may have been running for hours

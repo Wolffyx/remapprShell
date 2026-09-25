@@ -12,6 +12,10 @@ pragma ComponentBehavior: Bound
 // The compatibility matrix is shown before the switch, not after: the Plasma
 // renderer is second-class by design, and a person choosing it deserves to see
 // exactly which of their widgets it cannot draw.
+//
+// The list itself is the CLI's (`renderer list --json`), because it includes
+// every other Quickshell configuration on the machine and only the CLI looks
+// for them. Until it answers, or if it cannot, the three that always exist.
 
 import QtQuick
 import Quickshell.Io
@@ -36,7 +40,7 @@ CardGrid {
     property string status: ""
     property bool busy: false
 
-    readonly property var options: [
+    readonly property var builtin: [
         {
             id: "quickshell",
             label: "This shell",
@@ -48,20 +52,40 @@ CardGrid {
             note: "Drawn by plasmashell from this same configuration, using stock applets. No shaders, no blur, and any widget without a Plasma equivalent is left out."
         },
         {
-            id: "caelestia",
-            label: "caelestia",
-            note: "caelestia's own bar, started as a service. None of its code runs inside this shell."
-        },
-        {
             id: "none",
             label: "Nothing",
             note: "Your stock Plasma panels, exactly as they were. Nothing of ours is drawn."
         }
     ]
+    property var discovered: []
+    readonly property var options: root.discovered.length > 0 ? root.discovered : root.builtin
 
-    count: 1
+    readonly property Process _list: Process {
+        id: listProc
+        command: [Branding.ctlBin, "renderer", "list", "--json"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const rows = JSON.parse(text);
+                    if (Array.isArray(rows) && rows.length > 0)
+                        root.discovered = rows;
+                } catch (e) {
+                    Log.warn("settings", `renderer list did not parse: ${e}`);
+                }
+            }
+        }
+    }
+
+    // Another Quickshell shell draws nothing of ours, so there is nothing of
+    // ours for it to leave out.
+    function isForeign(rendererId) {
+        return rendererId.startsWith("quickshell:");
+    }
 
     function unsupportedBy(rendererId) {
+        if (root.isForeign(rendererId))
+            return [];
         return WidgetRegistry.unsupportedBy(rendererId, root.enabledIds);
     }
 
@@ -69,8 +93,10 @@ CardGrid {
         id: switchProc
         onRunningChanged: {
             root.busy = running;
-            if (!running)
+            if (!running) {
                 root.status = "Done. If the panel has not changed, check: rmpr renderer status";
+                listProc.running = true;
+            }
         }
         stderr: StdioCollector {
             onStreamFinished: if (text.trim().length > 0) root.status = text.trim().split("\n").pop()
@@ -102,10 +128,14 @@ CardGrid {
 
                 required property var modelData
 
-                readonly property bool active: option.modelData.id === root.current
+                // The CLI's answer once there is one: it reads the profile
+                // the same way a switch would.
+                readonly property bool active: root.discovered.length > 0
+                                               ? option.modelData.current === true
+                                               : option.modelData.id === root.current
                 readonly property var missing: root.unsupportedBy(option.modelData.id)
 
-                width: card.width - 2 * card.padding
+                width: card.contentWidth
                 height: body.implicitHeight + 20
                 radius: Theme.radiusOf(12)
                 color: option.active ? Theme.accC : Theme.s1
@@ -158,26 +188,22 @@ CardGrid {
                     }
                 }
 
-                HoverHandler { enabled: !option.active && !root.busy }
+                HoverHandler { enabled: !option.active && !root.busy && !option.modelData.absent }
                 TapHandler {
-                    enabled: !option.active && !root.busy
+                    enabled: !option.active && !root.busy && !option.modelData.absent
                     onTapped: root.apply(option.modelData.id)
                 }
             }
         }
 
-        PanelText {
-            width: card.width - 2 * card.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+        Hint {
+            width: card.contentWidth
             text: "Only one of these draws a panel at a time. Switching takes a restore point first, and puts everything back if it does not work."
         }
 
         PanelText {
             visible: root.status.length > 0
-            width: card.width - 2 * card.padding
+            width: card.contentWidth
             wrapMode: Text.WordWrap
             text: root.status
             font.pixelSize: 12

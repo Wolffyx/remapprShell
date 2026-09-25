@@ -11,20 +11,24 @@ usage() {
 
 usage: @ALIAS@ <command> [options]
 
+  setup [--unattended|--dry-run]    the guided install: ask, then apply
   preflight [--suggest-snapshots]   check this machine, report what may change
   snapshot create|list|remove|prune  manage restore points
   restore [--preinstall|--list]     put KDE back the way it was
+  uninstall [--purge|--dry-run]     take the shell off, and give Plasma back its own
+  reinstall [--fresh|--yes|--dry-run]  take it off and set it up again, running at the end
   renderer status|list|set|revert   choose what draws the panel
   theme apply|revert|variant|osd|style|status  the look and feel, light or dark, which OSD draws
   report create|list|show|remove    write a local diagnostic report
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
-  windows enable|disable|status     the open-window list (needs a KWin script)
-  edges status|set|snap|disable-all the screen's corners and edges (KWin's)
+  windows enable|disable|status|restart  the open-window list (needs a KWin script)
+  edges status|set|shell|snap|disable-all  the screen's corners and edges
   switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)
   shortcuts status|set|clear        global shortcuts for this shell's own actions
   settings [page|pages]             open the settings window on a page; list the pages
+  screenshot region|screen|window   take a screenshot through the desktop portal
   clipboard                         open the clipboard history (bind: shortcuts set clipboard)
   sidebar                           open or close the sidebar (bind: shortcuts set sidebar)
   keys                              open or close the key sheet (bind: shortcuts set keys)
@@ -103,6 +107,7 @@ cmd=${1:-help}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
+    setup)     require_repo; exec "$REPO_ROOT/scripts/setup.sh" "$@" ;;
     preflight) require_repo; exec "$REPO_ROOT/scripts/preflight.sh" "$@" ;;
     restore)   require_repo; exec "$REPO_ROOT/scripts/restore.sh" "$@" ;;
     theme)     require_repo; exec "$REPO_ROOT/scripts/theme.sh" "$@" ;;
@@ -114,11 +119,14 @@ case "$cmd" in
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;
     update)    require_repo; exec "$REPO_ROOT/scripts/update.sh" "$@" ;;
+    uninstall) require_repo; exec "$REPO_ROOT/scripts/uninstall.sh" "$@" ;;
+    reinstall) require_repo; exec "$REPO_ROOT/scripts/reinstall.sh" "$@" ;;
     profile)   require_repo; exec "$REPO_ROOT/scripts/profile.sh" "$@" ;;
     edges)     require_repo; exec "$REPO_ROOT/scripts/edges.sh" "$@" ;;
     switcher)  require_repo; exec "$REPO_ROOT/scripts/switcher.sh" "$@" ;;
     lockscreen) require_repo; exec "$REPO_ROOT/scripts/lockscreen.sh" "$@" ;;
     shortcuts) require_repo; exec "$REPO_ROOT/scripts/shortcuts.sh" "$@" ;;
+    screenshot) require_repo; exec "$REPO_ROOT/scripts/screenshot.sh" "$@" ;;
 
     # Both talk to the running shell rather than reimplementing the choice, so
     # a keybinding and the panel button always open the same thing.
@@ -126,16 +134,39 @@ case "$cmd" in
         exec quickshell ipc --path "$(shell_ipc_path)" call launcher toggle
         ;;
 
-    # The clipboard widget's popout. Meta+V is Klipper's, and under our own
-    # renderer Klipper is not running, so this is what to bind it to instead.
+    # The clipboard history. Meta+V is Klipper's, and under our own renderer
+    # Klipper is not running, so this is what to bind it to instead.
+    #
+    # Where the pointer is, when KWin can say -- which is a one-shot KWin
+    # script, because Wayland tells a client the pointer's position only over
+    # its own windows. Without a session, or with the window-list script not
+    # installed, it falls back to the panel widget's popout, which opens
+    # against the panel: the right answer in the wrong place beats nothing.
     clipboard)
+        # Not require_repo: that exits, and a missing tree here is a reason to
+        # fall back rather than to fail.
+        if [ -d "$REPO_ROOT/scripts" ] \
+           && "$REPO_ROOT/scripts/windows.sh" pointer clipboard >/dev/null 2>&1; then
+            exit 0
+        fi
         exec quickshell ipc --path "$(shell_ipc_path)" call clipboard toggle
         ;;
 
-    # The sidebar and the key sheet: each opens on the first screen, and a
-    # second press closes it.
-    sidebar|keys)
+    # The key sheet: opens on the first screen, and a second press closes it.
+    keys)
         exec quickshell ipc --path "$(shell_ipc_path)" call surfaces "$cmd"
+        ;;
+
+    # The sidebar, on the screen the pointer is on -- which is the one the
+    # person pressing the key is looking at, and not the first screen, which
+    # is what it used to be. Same one-shot KWin script as the clipboard; the
+    # IPC is the fallback when there is no session to ask.
+    sidebar)
+        if [ -d "$REPO_ROOT/scripts" ] \
+           && "$REPO_ROOT/scripts/windows.sh" pointer sidebar >/dev/null 2>&1; then
+            exit 0
+        fi
+        exec quickshell ipc --path "$(shell_ipc_path)" call surfaces sidebar
         ;;
 
     # The session screen: log out, restart, sleep, shut down. The kind picks
@@ -190,13 +221,12 @@ case "$cmd" in
         # checkout, whose command line names the source tree instead. Saying
         # "no" to a shell that is plainly on screen is how an afternoon goes
         # missing.
-        if pgrep -a -x quickshell 2>/dev/null | grep -qF "@QS_CONFIG_DIR@"; then
-            echo "yes"
-        elif pgrep -a -x quickshell 2>/dev/null | grep -qF "@REPO_ROOT@/shell/shell.qml"; then
-            echo "yes (from the working tree at @REPO_ROOT@)"
-        else
-            echo "no"
-        fi
+        procs=$(pgrep -a -x quickshell 2>/dev/null) || true
+        case "$procs" in
+            *"@QS_CONFIG_DIR@"*)             echo "yes" ;;
+            *"@REPO_ROOT@/shell/shell.qml"*) echo "yes (from the working tree at @REPO_ROOT@)" ;;
+            *)                               echo "no" ;;
+        esac
         printf 'service:    '
         systemctl --user is-active "@SYSTEMD_UNIT@" 2>/dev/null || true
         printf 'config:     %s\n' "@CONFIG_DIR@"

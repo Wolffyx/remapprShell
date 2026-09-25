@@ -4,9 +4,17 @@
 #   enable    install and load the KWin script
 #   disable   unload and remove it
 #   status    what is installed, loaded and reporting
+#   restart   start the daemon again, so it is the copy on disk
 #   show      the windows as the daemon currently has them
 #   close ID  close one window, by the uuid the list reports -- what the task
 #             list's "Close window" runs
+#   pointer ACTION
+#             open one of this shell's surfaces where the pointer is --
+#             clipboard, or sidebar, which then comes out of the screen the
+#             pointer is on rather than the first one. Wayland tells a client
+#             the pointer's position only over its own windows, so KWin is
+#             asked: a one-shot script reads workspace.cursorPos and hands it
+#             to the session daemon, which passes it to the shell
 #
 #   behaviour status [--json]     what KWin does with windows: how focus is
 #                                 given, whether hovering raises, whether a
@@ -40,18 +48,8 @@ source "$REPO_ROOT/scripts/lib/kwin.sh"
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_SCRIPT_ID"
 
-kwin_script() {
-    session_available || return 1
-    qdbus6 org.kde.KWin /Scripting "org.kde.kwin.Scripting.$1" "${@:2}" 2>/dev/null
-}
-
 install_script() {
-    mkdir -p "$SCRIPT_DEST/contents/code"
-    render_template "$SCRIPT_SRC/metadata.json.in" "$SCRIPT_DEST/metadata.json" \
-        || { log_error "could not render the script metadata"; return 1; }
-    render_template "$SCRIPT_SRC/contents/code/main.js.in" "$SCRIPT_DEST/contents/code/main.js" \
-        || { log_error "could not render the script"; return 1; }
-    chmod 644 "$SCRIPT_DEST/metadata.json" "$SCRIPT_DEST/contents/code/main.js"
+    kwin_script_render "$SCRIPT_SRC" "$SCRIPT_DEST" "the script" || return 1
     log_step "installed $SCRIPT_DEST"
 }
 
@@ -72,25 +70,15 @@ case "$cmd" in
             exit 0
         fi
 
-        # Unloaded first, because KWin ignores loading a script it already has
-        # -- so without this, re-running `enable` after changing the script
-        # silently keeps running the old one, which is a confusing thing to
-        # debug.
-        kwin_script unloadScript "$KWIN_SCRIPT_ID" >/dev/null
-        kwin_script loadScript "$SCRIPT_DEST/contents/code/main.js" "$KWIN_SCRIPT_ID" >/dev/null
-        kwin_script start >/dev/null
-
-        if [ "$(kwin_script isScriptLoaded "$KWIN_SCRIPT_ID")" = "true" ]; then
-            log_step "the window list is running"
-        else
-            log_warn "KWin did not report the script as loaded"
-            log_info "  it is enabled in kwinrc and will load at the next login"
-            log_info "  see why: journalctl --user -u plasma-kwin_wayland.service -n 30"
-        fi
+        # Reloaded rather than loaded: re-running `enable` after changing the
+        # script must run the new one (kwin_script_reload says why).
+        kwin_script_reload "$KWIN_SCRIPT_ID" "$SCRIPT_DEST/contents/code/main.js"
+        kwin_script_check_loaded "$KWIN_SCRIPT_ID" "the script" \
+            && log_step "the window list is running"
         ;;
 
     disable)
-        kwin_script unloadScript "$KWIN_SCRIPT_ID" >/dev/null
+        kwin_scripting unloadScript "$KWIN_SCRIPT_ID" >/dev/null
         kconfig_revert windows
         if [ -d "$SCRIPT_DEST" ]; then
             rm -rf "$SCRIPT_DEST"
@@ -104,16 +92,63 @@ case "$cmd" in
 
     status)
         printf 'script:    %s\n' "$([ -d "$SCRIPT_DEST" ] && echo "installed ($SCRIPT_DEST)" || echo "not installed")"
-        printf 'in kwinrc: %s\n' "$(kreadconfig6 --file kwinrc --group Plugins --key "${KWIN_SCRIPT_ID}Enabled" --default '<unset>')"
-        printf 'loaded:    %s\n' "$(kwin_script isScriptLoaded "$KWIN_SCRIPT_ID" 2>/dev/null || echo 'unknown')"
+        printf 'in kwinrc: %s\n' "$(kwin_plugin_state "$KWIN_SCRIPT_ID" '<unset>')"
+        printf 'loaded:    %s\n' "$(kwin_scripting isScriptLoaded "$KWIN_SCRIPT_ID" || echo 'unknown')"
         printf 'daemon:    %s\n' "$(busctl --user --json=short list 2>/dev/null | grep -c "$DBUS_NAME" >/dev/null && echo 'on the bus' || echo 'not running (it starts when something calls it)')"
         printf 'windows:   %s\n' "$("$0" show 2>/dev/null | wc -l)"
+        ;;
+
+    # The daemon is started by the bus, not by the shell's unit, so it outlives
+    # `systemctl --user restart` and every other way of restarting the shell.
+    # That is right -- the KWin script must be able to reach it before the
+    # shell exists -- and it is a trap after an update: the file on disk is new
+    # and the process is the one that started with the session. Found on
+    # 2026-09-23, when an icon fix appeared to do nothing three times over.
+    #
+    # Killed rather than stopped: there is no unit to stop. The next call on
+    # the bus starts it again, which is what the List below is for -- without
+    # it the daemon comes back only at the next window change, and the task
+    # list is empty until then.
+    restart)
+        pkill -f "$BIN_DIR/$WINDOWSD_BIN" 2>/dev/null || true
+        sleep 1
+        busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List >/dev/null 2>&1 || true
+        log_step "the window daemon is the one on disk now"
+        log_info "its window list fills in at the next window change; open and close something to hurry it"
         ;;
 
     show)
         busctl --user --json=short call "$DBUS_NAME" /Windows "$DBUS_NAME.Windows" List 2>/dev/null \
             | jq -r '.data[0] | fromjson | .[] | "\(if .active then "*" else " " end) \(if .minimized then "_" else " " end) \(.appId)  \(.title)"' \
             || log_info "nothing yet"
+        ;;
+
+    # The pointer, from the only process that knows where it is. The action
+    # name goes into the script's source, so it is checked against the list
+    # the daemon accepts rather than passed through.
+    pointer)
+        action=${1:-}
+        case "$action" in
+            clipboard|sidebar) ;;
+            *) die "not an action that opens under the pointer: '${action:-}' (one of: clipboard sidebar)" ;;
+        esac
+        session_available || die "no session to read the pointer in"
+
+        # Long enough for the call to leave KWin, short enough not to be felt
+        # on a key press.
+        kwin_script_oneshot "${KWIN_SCRIPT_ID}-pointer" 0.2 <<JS || exit 1
+const pos = workspace.cursorPos;
+let output = "";
+for (const screen of workspace.screens) {
+    const g = screen.geometry;
+    if (pos.x >= g.x && pos.x < g.x + g.width && pos.y >= g.y && pos.y < g.y + g.height) {
+        output = String(screen.name);
+        break;
+    }
+}
+callDBus("$DBUS_NAME", "/Pointer", "$DBUS_NAME.Pointer", "At",
+         "$action", Math.round(pos.x), Math.round(pos.y), output);
+JS
         ;;
 
     close)
@@ -127,11 +162,7 @@ case "$cmd" in
             || die "not a window id: '$uuid'"
         session_available || die "no session to close a window in"
 
-        name="${KWIN_SCRIPT_ID}-close-$uuid"
-        file=$(mktemp --suffix=.js "${XDG_RUNTIME_DIR:-/tmp}/${KWIN_SCRIPT_ID}-close.XXXXXX") \
-            || die "could not write the script"
-        trap 'rm -f "$file"' EXIT
-        cat > "$file" <<JS
+        kwin_script_oneshot "${KWIN_SCRIPT_ID}-close-$uuid" 0.3 <<JS || exit 1
 const id = "$uuid";
 for (const w of workspace.windowList()) {
     if (String(w.internalId).replace(/[{}]/g, "") === id) {
@@ -140,12 +171,6 @@ for (const w of workspace.windowList()) {
     }
 }
 JS
-        kwin_script unloadScript "$name" >/dev/null
-        kwin_script loadScript "$file" "$name" >/dev/null || die "KWin did not load the script"
-        kwin_script start >/dev/null
-        # Let it run before it is taken away again.
-        sleep 0.3
-        kwin_script unloadScript "$name" >/dev/null
         ;;
 
 
@@ -153,6 +178,10 @@ JS
     # the ledger so every one of them can be put back.
     #
     # id | group | key | kind | choices (for an enum) | default when unset
+    #
+    # The defaults are KWin's own, from kwin.kcfg. Placement's is Centered:
+    # it said Smart here, so the settings page showed Smart chosen while KWin
+    # was centring every window.
     behaviour)
         BEHAVIOUR_KEYS=(
             "focus|Windows|FocusPolicy|enum|ClickToFocus FocusFollowsMouse FocusUnderMouse FocusStrictlyUnderMouse|ClickToFocus"
@@ -160,7 +189,7 @@ JS
             "autoRaise|Windows|AutoRaise|bool||false"
             "autoRaiseDelay|Windows|AutoRaiseInterval|int|0 3000|750"
             "borderlessMaximized|Windows|BorderlessMaximizedWindows|bool||false"
-            "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Smart"
+            "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Centered"
         )
 
         behaviour_spec() {

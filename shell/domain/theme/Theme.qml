@@ -49,9 +49,38 @@ QtObject {
 
     // "auto" follows Night Light's day and night when Night Light is on, and
     // the Plasma colour scheme's own darkness when it is not.
-    readonly property string mode: Scheme.resolveMode(root.modeSetting,
-                                                      PlasmaColors.background.toString(),
-                                                      NightLight.known ? NightLight.daylight : undefined)
+    //
+    // Neither has answered in the first moments of a session: Night Light's
+    // reply is still on its way, and kdeglobals has not been read. The
+    // fallback palette in PlasmaColors is a dark one -- chosen so a shell that
+    // cannot read the desktop is still legible -- so resolving "auto" against
+    // it before it is real answers "dark" every single start.
+    //
+    // That was not merely a flash. With `theme.desktop.followMode` on, the
+    // shell writes its own answer back to the desktop's colour scheme, and
+    // then reads that scheme to answer again: a first frame of dark could be
+    // written out and read back as the desktop's own darkness, and auto had
+    // latched. Night Light answering in time was all that hid it.
+    //
+    // So "auto" does not answer until something has: the last mode stands
+    // until then, rather than a placeholder getting a vote.
+    readonly property bool modeKnown: root.modeSetting !== "auto"
+                                      || PlasmaColors.loaded || NightLight.known
+
+    readonly property string _resolvedMode: root.modeKnown
+        ? Scheme.resolveMode(root.modeSetting,
+                             PlasmaColors.background.toString(),
+                             NightLight.known ? NightLight.daylight : undefined)
+        : ""
+
+    // Light while nothing is known, and not arbitrarily: of the two guesses
+    // only this one is safe to write to a desktop. A wrong light is corrected
+    // a moment later by the real answer; a wrong dark can be the answer.
+    property string mode: "light"
+
+    on_ResolvedModeChanged: if (root._resolvedMode.length > 0)
+        root.mode = root._resolvedMode;
+
     readonly property bool dark: root.mode === "dark"
     readonly property string seed: Scheme.seed(root.accentSetting, PlasmaColors.accent.toString())
     readonly property var roles: Scheme.scheme(root.seed, root.dark)

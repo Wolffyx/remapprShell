@@ -62,12 +62,12 @@ QtObject {
         };
     }
 
+    // Sent, not waited for: the layout that results comes back through the
+    // watch below, and a second press while the first call is still running
+    // is a second switch, not one to drop.
     function _call(method, signature, args) {
-        act.command = Dbus.callArgs(root.service, root.path, root.iface, method, signature, args);
-        act.running = true;
+        Dbus.send(root.service, root.path, root.iface, method, signature, args);
     }
-
-    readonly property Process _act: Process { id: act }
 
     readonly property Process _list: Process {
         id: list
