@@ -36,6 +36,9 @@ QtObject {
             desktopFile: String(entry.desktopFile ?? ""),
             minimized: entry.minimized === true,
             active: entry.active === true,
+            // Asked for the whole screen. False from a script older than the
+            // field, which only means no panel steps aside for it.
+            fullScreen: entry.fullScreen === true,
             // KWin's "this window wants you": an X11 urgency hint, or a
             // Wayland client asking to be activated while it is not. KWin
             // clears it when the window is activated.
@@ -199,6 +202,25 @@ QtObject {
         for (const output of Object.keys(top))
             out[output] = top[output].uuid;
         return out;
+    }
+
+    // Whether the window on top of `output`, on the desktop `desktopId`, is
+    // full screen. Only windows that are actually showing count: a minimised
+    // one, or one on another virtual desktop, covers nothing. A window on no
+    // desktop in particular is on all of them. Ties in stacking -- a script too
+    // old to send it -- go to whichever came first, as in the list.
+    function fullScreenOn(windows, output, desktopId) {
+        let top = null;
+        for (const w of windows ?? []) {
+            if (!w || w.minimized || w.output !== output)
+                continue;
+            const on = w.desktops ?? [];
+            if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)
+                continue;
+            if (!top || (w.stacking ?? -1) > (top.stacking ?? -1))
+                top = w;
+        }
+        return top !== null && top.fullScreen === true;
     }
 
     // The application a task item stands for, as a desktop entry id ("org.kde.

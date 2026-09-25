@@ -115,6 +115,10 @@ QtObject {
     function autoHideFor(name) { return ConfigStore.valueFor(name, "panel.autoHide", false) === true; }
     function revealOnHoverFor(name) { return ConfigStore.valueFor(name, "panel.revealOnHover", true) !== false; }
 
+    // Whether the panel steps aside for a full-screen window on its monitor
+    // (ours), or is left to KWin's stacking ("kwin"). Anything else is ours.
+    function hidesForFullScreen(name) { return ConfigStore.valueFor(name, "panel.fullScreen", "hide") !== "kwin"; }
+
     // How it is drawn: a strip along the whole edge, a bar floating clear
     // of it, or each zone as an island of its own. Anything else is "full".
     function styleFor(name) {

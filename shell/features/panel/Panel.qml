@@ -10,7 +10,10 @@ import Quickshell
 import Quickshell.Wayland
 import qs.core
 import qs.features.panel.model
+import qs.domain.desktops
 import qs.domain.theme
+import qs.domain.windows
+import qs.domain.windows.events
 
 PanelWindow {
     id: root
@@ -82,6 +85,33 @@ PanelWindow {
         }
     }
 
+    // ---- a full-screen window ------------------------------------------
+    //
+    // KWin keeps a full-screen window above the panel only while it is the
+    // window last activated on its monitor. Focus going anywhere else there
+    // -- an applet, a dialog, one of our own surfaces, or nothing at all --
+    // drops it to the ordinary layer, beneath this one, and the panel is
+    // drawn over the game or the video. So the panel steps aside on its own
+    // account while the window on top of its monitor is full screen, unless
+    // `panel.fullScreen` leaves that to KWin.
+    //
+    // Stepping aside is drawing nothing and taking no clicks, not unmapping:
+    // the surface keeps its exclusive zone, so the maximised windows behind
+    // the full-screen one are not resized away and back.
+    readonly property bool fullScreenBelow: PanelModel.hidesForFullScreen(root.screenName)
+                                            && WindowEvents.fullScreenOn(WindowsService.windows, root.screenName,
+                                                                         Desktops.currentId)
+
+    onFullScreenBelowChanged: {
+        if (!root.fullScreenBelow)
+            return;
+        root.menuOpen = false;
+        if (PanelModel.openPopoutSlot?.screenName === root.screenName)
+            PanelModel.closeOpenPopout();
+    }
+
+    readonly property Region _deaf: Region {}
+
     anchors {
         top: root.position !== "bottom"
         bottom: root.position !== "top"
@@ -110,12 +140,13 @@ PanelWindow {
     // Only what is drawn takes the pointer. The margin a floating bar keeps
     // from the edge, and the gaps between islands, let a click through to the
     // window beneath. While hidden, the whole sliver is the target.
-    mask: root.revealed && root.style !== "full" ? surface.shape : null
+    mask: root.fullScreenBelow ? root._deaf
+        : root.revealed && root.style !== "full" ? surface.shape : null
 
     // Blurred behind, where the compositor offers it -- KWin does, through
     // ext-background-effect -- so a translucent panel reads as frosted glass
     // rather than as a tinted hole.
-    BackgroundEffect.blurRegion: Theme.translucent && root.revealed ? surface.shape : null
+    BackgroundEffect.blurRegion: Theme.translucent && root.revealed && !root.fullScreenBelow ? surface.shape : null
 
     // Only while a popout that wants the keyboard is open.
     //
@@ -141,6 +172,7 @@ PanelWindow {
         // reveal, for something nobody sees.
         width: root.horizontal ? parent.width : root.extent
         height: root.horizontal ? root.extent : parent.height
+        visible: !root.fullScreenBelow
 
         // Positioned, not anchored. Anchors switched by bindings do not
         // survive the panel changing edge while it runs: the new anchor can be

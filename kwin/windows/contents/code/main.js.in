@@ -69,6 +69,10 @@ function describe(window) {
         iconSerial: iconSerials.get(uuid) || 0,
         minimized: window.minimized === true,
         active: window.active === true,
+        // Asked for the whole screen. Read with `stacking` and `output`: a
+        // panel steps aside on a monitor whose top window is full screen,
+        // which KWin's layers alone do not do once that window loses focus.
+        fullScreen: window.fullScreen === true,
         // A message arrived, a dialog wants an answer: the window asked for
         // attention (an X11 urgency hint, or activation requested while it
         // was not allowed focus). KWin clears it when the window is activated.
@@ -107,6 +111,21 @@ function publish() {
     callDBus(SERVICE, PATH, IFACE, "Update", JSON.stringify(snapshot()));
 }
 
+// For signals that come in bursts and before KWin has finished: one raise
+// restacks every window above the one raised, a signal each, and a window
+// going full screen says so before KWin has moved it to the layer it will
+// sit in -- a list sent at once carried the old stacking, with the
+// full-screen window below the ones it now covered. One list, a moment
+// after the last of them, is right and is one call.
+const settle = new QTimer();
+settle.singleShot = true;
+settle.interval = 50;
+settle.timeout.connect(publish);
+
+function publishSoon() {
+    settle.start();
+}
+
 // Per-window signals matter as much as the list changing: a title changing or
 // a window being minimised leaves the set identical, and a task manager that
 // only watched the set would show a stale title until something else happened.
@@ -115,6 +134,10 @@ function watch(window) {
         return;
     window.captionChanged.connect(publish);
     window.minimizedChanged.connect(publish);
+    window.fullScreenChanged.connect(publishSoon);
+    // `stacking` is only worth sending if it is current: what is on top of a
+    // monitor decides whether its panel steps aside for a full-screen window.
+    window.stackingOrderChanged.connect(publishSoon);
     window.desktopsChanged.connect(publish);
     window.skipTaskbarChanged.connect(publish);
     window.demandsAttentionChanged.connect(publish);

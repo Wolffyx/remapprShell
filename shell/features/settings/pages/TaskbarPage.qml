@@ -60,6 +60,16 @@ Column {
             enabled: root.autoHide
             path: "panel.revealOnHover"
         }
+
+        SectionLabel { text: "Over a full-screen window" }
+
+        ConfigSegmented {
+            width: parent.width
+            values: ["hide", "kwin"]
+            labels: ["Step aside", "KWin's stacking"]
+            fallback: "hide"
+            path: "panel.fullScreen"
+        }
     }
 
     Card {

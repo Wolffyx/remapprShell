@@ -213,6 +213,16 @@
                     "label": "Hide until pointed at",
                     "description": "The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen."
                 },
+                "panel.fullScreen": {
+                    "type": "enum",
+                    "values": [
+                        "hide",
+                        "kwin"
+                    ],
+                    "default": "hide",
+                    "label": "Over a full-screen window",
+                    "description": "hide draws nothing on a monitor whose top window is full screen, and takes no clicks there, until that window leaves full screen or another is raised over it. kwin leaves it to KWin's stacking, as Plasma's own panel does: a full-screen window stays above the panel only while it has focus, so the panel shows over a game or a video once focus has gone elsewhere on that monitor. Either way the panel keeps the space it reserves, so no other window is resized."
+                },
                 "panel.menu.systemMonitor": {
                     "type": "string",
                     "default": "auto",

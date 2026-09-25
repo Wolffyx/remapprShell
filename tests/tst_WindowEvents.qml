@@ -266,6 +266,48 @@ TestCase {
         compare(m["DP-3"], "a");
     }
 
+    // ---- a full-screen window on a monitor ------------------------------
+
+    function test_full_screen_is_read() {
+        compare(WindowEvents.parseList(JSON.stringify([windowJson({ fullScreen: true })]))[0].fullScreen, true);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].fullScreen, false);
+    }
+
+    // The case that was reported: a game full screen, focus gone elsewhere,
+    // and the panel drawn over it. What counts is that it is on top there.
+    function test_the_top_window_full_screen_covers_its_monitor() {
+        const ws = [on("game", "DP-2", { stacking: 9, fullScreen: true }), on("ed", "DP-2", { stacking: 3 }),
+                    on("chat", "DP-3", { stacking: 12, active: true })];
+        compare(WindowEvents.fullScreenOn(ws, "DP-2", "d1"), true);
+        compare(WindowEvents.fullScreenOn(ws, "DP-3", "d1"), false);
+    }
+
+    // A window raised over it is what the user is looking at, so the panel
+    // is wanted again.
+    function test_a_window_above_it_uncovers_the_monitor() {
+        const ws = [on("game", "DP-2", { stacking: 9, fullScreen: true }), on("ed", "DP-2", { stacking: 11 })];
+        compare(WindowEvents.fullScreenOn(ws, "DP-2", "d1"), false);
+    }
+
+    // Minimised, or on another virtual desktop: not on screen, covers nothing
+    // -- and does not hide the ordinary window below it either.
+    function test_a_hidden_full_screen_window_covers_nothing() {
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, minimized: true }),
+                                           on("ed", "DP-2", { stacking: 3 })], "DP-2", "d1"), false);
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: ["d2"] }),
+                                           on("ed", "DP-2", { stacking: 3 })], "DP-2", "d1"), false);
+        // On every desktop, or on this one, it does.
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: [] })],
+                                          "DP-2", "d1"), true);
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: ["d2", "d1"] })],
+                                          "DP-2", "d1"), true);
+    }
+
+    function test_no_windows_cover_nothing() {
+        compare(WindowEvents.fullScreenOn([], "DP-2", "d1"), false);
+        compare(WindowEvents.fullScreenOn(undefined, "DP-2", "d1"), false);
+    }
+
     function group(key, count) {
         const windows = [];
         for (let i = 0; i < (count ?? 1); ++i)
