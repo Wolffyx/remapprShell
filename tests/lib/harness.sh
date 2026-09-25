@@ -64,6 +64,13 @@ harness_init() {
     # user's running shell on every run until 2026-09-11.
     export "$NO_SESSION_VAR=1"
 
+    # No front end that opens a window. In a graphical session the scripts
+    # ask in kdialog, and the uninstall and reinstall suites' "nobody to ask"
+    # checks put a real dialog on the developer's screen at every `make test`
+    # (2026-09-25). "none" asks nobody and takes each question's default; a
+    # suite that tests a front end sets its own for the call it makes.
+    export "${ENV_PREFIX}_UI=none"
+
     # Stand-ins go here, and are found before anything real.
     FAKEBIN="$SANDBOX/bin"
     mkdir -p "$FAKEBIN"
