@@ -82,8 +82,13 @@ and there is none offscreen — the windows in it were opened for the photograph
 
 ## Requirements
 
-- KDE Plasma 6, Wayland
-- `quickshell`, `qt6-declarative`, `jq`
+- KDE Plasma 6 on Wayland, with NetworkManager (the network status reads it
+  through `nmcli`)
+- Everything else the installer fetches for you: Quickshell, `jq`, `git`,
+  `make`, `wl-clipboard`, `libnotify`, `kdialog`, Python's GObject bindings and
+  Pillow, and the Material Symbols and Rubik fonts -- the icons and the type.
+  The window previews need a C++ compiler, CMake and the Qt and KF6 development
+  files as well, installed only if you ask for the previews.
 
 ## Installing it
 
@@ -91,6 +96,12 @@ One line, on a machine running Plasma 6 on Wayland:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/main/install.sh | bash
+```
+
+The installer reaches `main` with the next release; until then, from `dev`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/dev/install.sh | bash -s -- --channel dev
 ```
 
 It fetches the source into the shell's data directory, installs what the
@@ -103,7 +114,12 @@ family (CachyOS, EndeavourOS, Manjaro), Fedora and Ubuntu are known to it;
 Quickshell comes from the distribution on Arch, from the
 `errornointernet/quickshell` COPR on Fedora and from the
 `avengemedia/danklinux` PPA on Ubuntu, each added only when Quickshell is
-missing. Anything else is told which packages to install first.
+missing. The fonts are packages where the distribution has them and are
+fetched into `~/.local/share/fonts` where it does not (Rubik everywhere, Material
+Symbols outside Arch); a font that cannot be had is warned about, not a reason to
+stop -- the desktop's own stand in. Anything else is told which packages to
+install first. Packages are installed with `sudo` at a terminal, and through
+Plasma's own password dialog (pkexec) from the installer window.
 
 ```bash
 curl -fsSL .../install.sh | bash -s -- --channel dev   # follow dev instead of releases
@@ -134,14 +150,15 @@ Nothing is written until the summary is confirmed: the questions come first, the
 is shown, and one answer applies it. A restore point is taken before the first change,
 and `rmpr restore` undoes the lot.
 
-It asks in whatever front end the machine has -- KDE's own dialogs in a graphical
-session, `whiptail` in a terminal, numbered prompts when there is neither, and none
-at all when nobody is attached:
+It asks in whatever front end the machine has -- the installer window in a
+graphical session, `whiptail` in a terminal, numbered prompts when there is
+neither, and none at all when nobody is attached. KDE's one-question-at-a-time
+dialogs are still there with `--ui kdialog`:
 
 ```bash
 rmpr setup --dry-run        # the plan, and the commands it would run
 rmpr setup --unattended     # ask nothing, take every default
-rmpr setup --ui whiptail    # kdialog | whiptail | dialog | plain | none
+rmpr setup --ui whiptail    # gui | kdialog | whiptail | dialog | plain | none
 rmpr setup --no-snapshot    # skip the restore point (not advised)
 rmpr setup --no-preflight   # skip the machine check
 ```
