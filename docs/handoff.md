@@ -1,7 +1,8 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-25**, two things
+sessions, and added to since -- most recently on **2026-09-25**: in the afternoon a one-line
+installer ("The afternoon of 2026-09-25"); in the morning, two things
 seen in use: a slow start at login and a panel over a full-screen window
 ("The morning of 2026-09-25"). Before that, **2026-09-24**, a cleanup
 of the whole tree for duplicated and wasteful code that found a dozen bugs in
@@ -380,6 +381,43 @@ mid-run (a cut-short run would hand over half a list). Seen on the bus: the
 Id reads run at reload, before any click. Widget edits need `rmpr reload` --
 they are not hot-reloaded, which is why the flyout fix first "did not
 happen".
+
+### The afternoon of 2026-09-25: a one-line installer
+
+Asked for: an install as smooth as Caelestia KDE's (ladybug-me/caelestia-kde,
+read from a clone). Kept from it: a curl-able `install.sh` at the top of the
+tree, the same three families, and the same places for Quickshell -- the
+`errornointernet/quickshell` COPR on Fedora, the `avengemedia/danklinux` PPA
+on Ubuntu. Not taken: its C++ TUI, SDDM theme, wallpapers and app bundle; our
+guided setup already asks in kdialog, whiptail or plain prompts.
+
+- `install.sh` (top level): needs a terminal or `--yes`, refuses root, gets
+  git, clones the channel (`main`, or `--channel dev`) to a temporary place,
+  reads the slug from the clone's branding.json -- it names nothing itself but
+  the repository -- and moves it to `$DATA_DIR/source`, or updates the clone
+  already there. Then deps, then setup, with the terminal as stdin.
+- `scripts/deps.sh`: standalone (brand.sh needs jq, which this installs).
+  Checks by what is provided -- command, Python module, CMake package -- and
+  installs by family. `--build` adds what `make plugin` needs.
+- `setup.sh`: deps before brand.sh; two new questions, the window list
+  (`windows.sh enable` -- without it a fresh taskbar was empty) and the
+  previews (build deps, then `make plugin`); the finish names `lockscreen try`
+  and `update`.
+- `update.sh`: installs what a new version needs, and its QML lint is
+  skipped with a warning where qmllint is not installed (a -devel package
+  outside Arch), instead of rolling every update back.
+
+Proven in containers, not assumed: Arch, Fedora and Ubuntu each installed
+every dependency, Quickshell included, and built the plugin. Two package
+names were wrong until then (Fedora's Qt WaylandClient needs
+qt6-qtbase-private-devel for a metatypes file; Ubuntu's qtwaylandscanner is
+in qt6-base-dev-tools), and Ubuntu needed `apt-get update` before the PPA's
+own helper could be found. The bootstrap ran as a user, piped with no
+terminal, in an Arch container, and stopped where it should: preflight, no
+Plasma, nothing changed. It has not run on a machine with Plasma yet.
+
+The one-liner in the README fetches `main`; until a release carries this,
+`--channel dev` is the one that works.
 
 ### The sunset of 2026-09-24, watched
 
