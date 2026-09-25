@@ -35,6 +35,7 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import qs.core
 import qs.domain.theme
+import qs.domain.tray.activation
 import qs.domain.tray.layout
 import qs.ui.primitives
 import qs.ui.controls
@@ -178,14 +179,44 @@ BarWidget {
         root.requestPopout("tray", centre);
     }
 
+    // Made now rather than at the first click: it reads the tray's bus
+    // addresses when it is made, and a click that has to wait for that is a
+    // click that feels slow.
+    Component.onCompleted: TrayActivation.addresses
+
     function closePopout() {
         root.popoutVisible = false;
         root.menuItem = null;
         root.popoutMode = "overflow";
     }
 
+    // Where on the screen a click `along` this widget was, as the tray spec's
+    // Activate wants it: the icon's place along the panel, at the panel's
+    // inner edge -- which is where Plasma says too, and where an application
+    // that opens beside its icon puts its window. The panel spans its screen
+    // edge to edge, so a position in the panel's window is one on the screen.
+    function screenPoint(along) {
+        const bar = root.bar;
+        const s = bar?.screenObject;
+        if (!bar || !s)
+            return { x: 0, y: 0 };
+        const p = root.mapToItem(null, bar.horizontal ? along : 0, bar.horizontal ? 0 : along);
+        switch (bar.position) {
+        case "top":
+            return { x: s.x + p.x, y: s.y + bar.extent };
+        case "left":
+            return { x: s.x + bar.extent, y: s.y + p.y };
+        case "right":
+            return { x: s.x + s.width - bar.extent, y: s.y + p.y };
+        default:
+            return { x: s.x + p.x, y: s.y + s.height - bar.extent };
+        }
+    }
+
     // What a click does, in one place, so an icon behaves the same on the
-    // panel and in the flyout.
+    // panel and in the flyout. `offset` is the icon's cell along the tray; an
+    // icon in the flyout is given the chevron's, the nearest place on the
+    // panel to it.
     //
     // The menu is drawn by TrayMenu rather than handed to Qt: see the note at
     // the top of that file for why `display()` cannot be used over layer-shell.
@@ -198,19 +229,30 @@ BarWidget {
             return;
         }
 
+        const at = root.screenPoint(offset + root.cell / 2);
+
         if (button === Qt.MiddleButton) {
-            item.secondaryActivate();
+            TrayActivation.secondaryActivate(item, at.x, at.y);
+            root._closeAfterActivating();
             return;
         }
 
         // Some items have no activate action at all and say so; for those a
         // left click is the menu, which is what the application intends.
-        if (item.onlyMenu)
+        if (item.onlyMenu) {
             root.showMenu(item, offset + root.cell / 2);
-        else
-            item.activate();
+            return;
+        }
+        TrayActivation.activate(item, at.x, at.y);
+        root._closeAfterActivating();
+    }
 
-        if (root.popoutVisible && root.popoutMode === "menu")
+    // An activated icon usually opens a window beside the tray, and the
+    // flyout is a panel surface: it stays drawn over that window. Toolbox
+    // opened behind it (2026-09-25). So the flyout goes, as Plasma's does,
+    // and so does a menu left open from another icon.
+    function _closeAfterActivating() {
+        if (root.popoutVisible)
             root.closePopout();
     }
 
@@ -376,7 +418,7 @@ BarWidget {
                         MouseArea {
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-                            onClicked: event => root.act(hiddenEntry.modelData, event.button, 0)
+                            onClicked: event => root.act(hiddenEntry.modelData, event.button, root.chevronCell * root.stride)
                             onWheel: event => {
                                 const delta = event.angleDelta.y !== 0 ? event.angleDelta.y
                                                                        : event.pixelDelta.y * 2.4;
