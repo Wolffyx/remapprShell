@@ -20,7 +20,7 @@ Rectangle {
                     { label: "the window list", state: "done" },
                     { label: "window previews and the key module", state: "running" }
                 ];
-                view.log = "==> installing\n  copy  ~/.config/quickshell/remappr-shell\n==> the window list is running\n-- Configuring done\n";
+                view.log = "==> installing\n  copy  ~/.config/quickshell/<the shell>\n==> the window list is running\n-- Configuring done\n";
             }
         }
     }
