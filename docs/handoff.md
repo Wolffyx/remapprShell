@@ -454,6 +454,66 @@ and its closing words say it is running and nothing is left; the uninstall no
 longer asks for a log-out. `tests/test-reinstall.sh` checks the order, the
 question and `--fresh`, in dry runs.
 
+**The installer window** (`shell/installer.qml`, `qs.features.installer`),
+asked for after kdialog cut every long choice off mid-sentence. Six steps --
+check, panel, keys, look, review, install -- under a `Stepper`
+(`qs.ui.primitives`, reusable: done green with a tick, current bold). It runs
+from the source tree before anything is installed (`quickshell -p`), started
+by setup.sh in a graphical session when nothing was answered in advance and
+no front end was named (`--ui kdialog` still gives the old dialogs). It asks,
+then runs setup.sh with every answer as a flag (`--mode --renderer --keys
+--alttab --window-list --previews --theme --autostart`, see setup.sh's
+header) plus `--progress`, whose `::step/::ok/::fail/::done` lines it draws;
+the key list comes from `setup.sh --describe`. setup.sh runs under `setsid`
+into `$XDG_RUNTIME_DIR/<slug>-install.log`, which the window tails, so
+closing the window mid-install does not kill the install. Without a terminal
+deps.sh asks for the password through pkexec. `InstallerEvents`
+(`qs.domain.installer`) is the tested half. Three things learnt:
+`Process.exited` is not usable from QML (preflight's code comes back as an
+`::rc` line); Material's *filled* symbols draw a second contour over the
+tick in a real window though not offscreen (`StatusMark` is a circle and an
+outline glyph instead); and `state` is Item's own property -- do not name one
+that. `dev/preview/installer.qml` draws any page (`PREVIEW_STEP=0..5`, with
+`<PREFIX>_INSTALLER_SOURCE` pointing at the checkout). Not yet run for real:
+an install from the window, and pkexec.
+
+**Still to do, asked for with it:** the first-run welcome should make each
+choice visible live as it is made (today it holds every answer until Finish).
+
+**Two bugs from the VM and from a system update.**
+
+- *The lock screen printed icon names* ("lock", "bedtime", "group") on the
+  fresh install: every icon is Material Symbols drawing a name, and nothing
+  installed the font. deps.sh now checks fonts (`font:<family>` via
+  fc-list) and installs Material Symbols and Rubik -- packages on Arch, and
+  fetched into ~/.local/share/fonts on Fedora and Ubuntu, which package
+  neither. And the lock screen draws icons through `SymbolText`, which draws
+  nothing without the font (`Options.hasSymbols`); `LockActions` falls back
+  to its word buttons. 28 files converted by script. Trap on the way:
+  `grep -q` under `pipefail` fails the producer with SIGPIPE -- an installed
+  font read as missing.
+- *No network after a system update*: NetworkManager restarted, and
+  Quickshell 0.3.1's backend (Quickshell.Networking) kept the connectivity
+  and lost every device, for good -- a QML reload does not fix it, only a
+  new process. A first fix restarted the shell's unit when that happened;
+  the user rightly found a whole-shell restart too much for an icon. So the
+  shell no longer uses Quickshell.Networking at all: NetworkStatus reads
+  NetworkManager with nmcli (one sectioned read, ~60 ms, parsed by the
+  tested `NmcliState`), again on any NetworkManager signal (system-bus
+  DbusWatch), when it vanishes or reappears, and every 30 s for signal
+  strength. A read is never cut short (half a read said offline). The Wi-Fi
+  page joins through nmcli too -- a new secured network's password goes in a
+  0600 file under $XDG_RUNTIME_DIR, never argv, and a failed join deletes
+  the half-made profile; 802.1X opens Plasma's applet. DbusWatch now also
+  reports a service going away (as `changed`, not `appeared`). Not yet seen
+  end to end: a real `systemctl restart NetworkManager`, and joining a new
+  network. Dropping Quickshell.Networking also sidesteps
+  quickshell-mirror/quickshell#1195, a 0.3.1 crash on Wi-Fi rfkill.
+- *Dialogs on the screen at every `make test`*: the uninstall and reinstall
+  suites' "nobody to ask" checks ran in kdialog, which the scripts pick in a
+  graphical session. The harness now exports `<PREFIX>_UI=none` for every
+  suite; a suite testing a front end sets its own per call.
+
 ### The sunset of 2026-09-24, watched
 
 **Plasma's day and night switch worked on its own**: at sunset it moved the
