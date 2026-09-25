@@ -110,10 +110,17 @@ Column {
 
         Segmented {
             width: parent.width
-            values: ["Smart", "Centered", "Maximizing", "UnderMouse"]
-            labels: ["Smart", "Centred", "Maximised", "Under the mouse"]
-            current: root.valueOf("placement", "Smart")
+            values: ["Centered", "Smart", "Maximizing", "UnderMouse"]
+            labels: ["Centred", "Least overlap", "Maximised", "Under the mouse"]
+            current: root.valueOf("placement", "Centered")
             onPicked: value => root.set("placement", value)
+        }
+
+        // KWin calls it Smart, and it is the one that surprises: measured
+        // here, with the screen full of large windows, every new window went
+        // to the bottom right corner.
+        Hint {
+            text: "Least overlap puts a new window where it covers the fewest others -- which, on a screen already full of large windows, is a corner."
         }
     }
 

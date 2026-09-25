@@ -178,6 +178,10 @@ JS
     # the ledger so every one of them can be put back.
     #
     # id | group | key | kind | choices (for an enum) | default when unset
+    #
+    # The defaults are KWin's own, from kwin.kcfg. Placement's is Centered:
+    # it said Smart here, so the settings page showed Smart chosen while KWin
+    # was centring every window.
     behaviour)
         BEHAVIOUR_KEYS=(
             "focus|Windows|FocusPolicy|enum|ClickToFocus FocusFollowsMouse FocusUnderMouse FocusStrictlyUnderMouse|ClickToFocus"
@@ -185,7 +189,7 @@ JS
             "autoRaise|Windows|AutoRaise|bool||false"
             "autoRaiseDelay|Windows|AutoRaiseInterval|int|0 3000|750"
             "borderlessMaximized|Windows|BorderlessMaximizedWindows|bool||false"
-            "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Smart"
+            "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Centered"
         )
 
         behaviour_spec() {
