@@ -64,10 +64,9 @@ Item {
             }
         }
 
-        Text {
+        SymbolText {
             anchors.centerIn: parent
-            text: panel.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: panel.glyph
             font.pixelSize: panel.px(58)
             color: "#c9ced4"
         }

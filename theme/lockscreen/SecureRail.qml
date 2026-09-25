@@ -69,11 +69,10 @@ Rectangle {
         width: parent?.width ?? 0
         height: rail.px(44)
 
-        Text {
+        SymbolText {
             id: wayGlyph
             anchors.verticalCenter: parent.verticalCenter
-            text: way.offered ? "check_circle" : "do_not_disturb_on"
-            font.family: "Material Symbols Rounded"
+            symbol: way.offered ? "check_circle" : "do_not_disturb_on"
             font.pixelSize: rail.px(20)
             color: way.offered ? rail.colours.good : "#5d646c"
         }
@@ -89,11 +88,10 @@ Rectangle {
             color: way.offered ? rail.colours.ink : rail.colours.mut
         }
 
-        Text {
+        SymbolText {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            text: way.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: way.glyph
             font.pixelSize: rail.px(18)
             color: rail.colours.faint
         }
@@ -245,10 +243,9 @@ Rectangle {
         y: parent.height - height - rail.px(60)
         spacing: rail.px(12)
 
-        Text {
+        SymbolText {
             id: policyGlyph
-            text: "policy"
-            font.family: "Material Symbols Rounded"
+            symbol: "policy"
             font.pixelSize: rail.px(18)
             color: rail.colours.mut
         }

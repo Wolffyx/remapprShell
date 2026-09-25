@@ -123,10 +123,9 @@ Rectangle {
         color: pill.ui.accent
         opacity: pill.ui.unlock.resting ? 0.5 : (goHover.hovered ? 0.88 : 1)
 
-        Text {
+        SymbolText {
             anchors.centerIn: parent
-            text: LayoutMirroring.enabled ? "arrow_back" : "arrow_forward"
-            font.family: "Material Symbols Rounded"
+            symbol: LayoutMirroring.enabled ? "arrow_back" : "arrow_forward"
             font.pixelSize: pill.px(26)
             color: "#ffffff"
         }

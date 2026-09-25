@@ -59,10 +59,9 @@ Column {
         visible: ways.length > 0 && !message.unlock.unlockedWithoutPassword
         spacing: Math.round(10 * message.unit)
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
-            text: parent.ways[0] ?? ""
-            font.family: "Material Symbols Rounded"
+            symbol: parent.ways[0] ?? ""
             font.pixelSize: Math.round(18 * message.unit)
             color: Qt.alpha(message.ink, 0.82)
         }

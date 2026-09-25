@@ -76,13 +76,12 @@ Column {
         radius: Math.round(26 * welcome.unit)
         color: guestHover.hovered ? Qt.lighter(welcome.accent, 1.1) : welcome.accent
 
-        Text {
+        SymbolText {
             id: guestGlyph
 
             x: Math.round(36 * welcome.unit)
             anchors.verticalCenter: parent.verticalCenter
-            text: "play_arrow"
-            font.family: "Material Symbols Rounded"
+            symbol: "play_arrow"
             font.pixelSize: Math.round(36 * welcome.textUnit)
             color: "#ffffff"
         }
@@ -148,12 +147,11 @@ Column {
             width: parent.width - 2 * x
             spacing: Math.round(16 * welcome.unit)
 
-            Text {
+            SymbolText {
                 id: noteGlyph
 
                 anchors.verticalCenter: parent.verticalCenter
-                text: "info"
-                font.family: "Material Symbols Rounded"
+                symbol: "info"
                 font.pixelSize: Math.round(26 * welcome.textUnit)
                 color: welcome.accent
             }

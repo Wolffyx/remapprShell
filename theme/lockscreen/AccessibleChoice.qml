@@ -41,11 +41,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: Math.round(10 * choice.look.s)
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
             visible: choice.glyph !== ""
-            text: choice.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: choice.glyph
             font.pixelSize: Math.round(24 * choice.look.s)
             color: choice.on ? choice.look.accentFg : choice.look.fg
         }

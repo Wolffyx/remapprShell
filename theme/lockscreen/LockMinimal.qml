@@ -100,10 +100,9 @@ LockStyle {
         Accessible.role: Accessible.Button
         Accessible.name: minimal.dark ? "Use light colours" : "Use dark colours"
 
-        Text {
+        SymbolText {
             anchors.centerIn: parent
-            text: minimal.dark ? "light_mode" : "dark_mode"
-            font.family: "Material Symbols Rounded"
+            symbol: minimal.dark ? "light_mode" : "dark_mode"
             font.pixelSize: Math.round(20 * minimal.unit)
             color: minimal.ink
         }

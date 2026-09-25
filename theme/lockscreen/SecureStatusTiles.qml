@@ -56,10 +56,9 @@ Row {
             Row {
                 spacing: machine.px(8)
 
-                Text {
+                SymbolText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: tile.glyph
-                    font.family: "Material Symbols Rounded"
+                    symbol: tile.glyph
                     font.pixelSize: machine.px(18)
                     color: tile.tint
                 }

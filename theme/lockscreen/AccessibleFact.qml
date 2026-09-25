@@ -31,13 +31,12 @@ Rectangle {
     border.color: fact.look.bdSoft
     activeFocusOnTab: fact.pressable
 
-    Text {
+    SymbolText {
         id: factGlyph
 
         x: Math.round(22 * fact.look.s)
         anchors.verticalCenter: parent.verticalCenter
-        text: fact.glyph
-        font.family: "Material Symbols Rounded"
+        symbol: fact.glyph
         font.pixelSize: Math.round(34 * fact.look.s)
         color: fact.look.acc
     }

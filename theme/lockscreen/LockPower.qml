@@ -176,10 +176,9 @@ Item {
             anchors.centerIn: parent
             spacing: Math.round(10 * power.unit)
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "battery_3_bar"
-                font.family: "Material Symbols Rounded"
+                symbol: "battery_3_bar"
                 font.pixelSize: Math.round(19 * power.unit)
                 color: "#e0c98a"
             }
@@ -211,10 +210,9 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Math.round(14 * power.unit)
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "battery_alert"
-                font.family: "Material Symbols Rounded"
+                symbol: "battery_alert"
                 font.pixelSize: Math.round(26 * power.unit)
                 color: "#211b0e"
             }

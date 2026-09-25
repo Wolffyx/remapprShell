@@ -87,10 +87,9 @@ Item {
                 visible: art.status !== Image.Ready
                 color: card.placeholderColor
 
-                Text {
+                SymbolText {
                     anchors.centerIn: parent
-                    text: "music_note"
-                    font.family: "Material Symbols Rounded"
+                    symbol: "music_note"
                     font.pixelSize: Math.round(30 * card.unit)
                     color: card.textColor
                 }
@@ -146,10 +145,9 @@ Item {
                         width: Math.round(26 * card.unit)
                         height: Math.round(26 * card.unit)
 
-                        Text {
+                        SymbolText {
                             anchors.centerIn: parent
-                            text: button.modelData.glyph
-                            font.family: "Material Symbols Rounded"
+                            symbol: button.modelData.glyph
                             font.pixelSize: Math.round(22 * card.unit)
                             color: card.textColor
                             opacity: press.pressed ? 0.6 : 1

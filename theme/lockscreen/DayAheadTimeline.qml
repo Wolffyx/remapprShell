@@ -116,10 +116,9 @@ Item {
                 Row {
                     spacing: ruler.px(10)
 
-                    Text {
+                    SymbolText {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: bandRow.modelData.glyph
-                        font.family: "Material Symbols Rounded"
+                        symbol: bandRow.modelData.glyph
                         font.pixelSize: ruler.px(18)
                         color: ruler.colours.ink
                     }

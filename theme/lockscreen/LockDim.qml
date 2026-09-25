@@ -62,10 +62,9 @@ Rectangle {
                 property string text
                 spacing: Math.round(8 * dim.unit)
 
-                Text {
+                SymbolText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: parent.glyph
-                    font.family: "Material Symbols Rounded"
+                    symbol: parent.glyph
                     font.pixelSize: Math.round(18 * dim.unit)
                     color: "#8f877d"
                 }

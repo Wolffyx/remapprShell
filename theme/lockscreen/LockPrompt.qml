@@ -133,14 +133,13 @@ Item {
 
     // --- the field -------------------------------------------------------
 
-    Text {
+    SymbolText {
         id: pwGlyph
 
         x: prompt.chrome === "pill" ? Math.round(20 * prompt.unit) : 0
         anchors.verticalCenter: parent.verticalCenter
         visible: prompt.takesPassword && prompt.glyph !== ""
-        text: prompt.glyph
-        font.family: "Material Symbols Rounded"
+        symbol: prompt.glyph
         font.pixelSize: Math.round(20 * prompt.unit)
         color: prompt.dim
     }

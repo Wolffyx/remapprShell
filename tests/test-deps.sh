@@ -52,6 +52,15 @@ case " ${NO_PY:-} " in *" $mod "*) exit 1 ;; esac
 exit 0
 STUB
 chmod +x "$STUBS/python3"
+cat > "$STUBS/fc-list" <<'STUB'
+#!/bin/sh
+# fc-list : family -- every family but the ones named in NO_FONT.
+for f in "Material Symbols Rounded" "Rubik,Rubik Light" "Noto Sans"; do
+    case ",${NO_FONT:-}," in *",${f%%,*},"*) continue ;; esac
+    printf '%s\n' "$f"
+done
+STUB
+chmod +x "$STUBS/fc-list"
 for p in Qt6Gui Qt6Qml Qt6WaylandClient KF6GuiAddons; do mkdir -p "$CMAKE/$p"; done
 
 # Nothing else on PATH but the few tools deps.sh itself uses: with /usr/bin
@@ -59,7 +68,7 @@ for p in Qt6Gui Qt6Qml Qt6WaylandClient KF6GuiAddons; do mkdir -p "$CMAKE/$p"; d
 # away.
 CORE="$SANDBOX/core"
 mkdir -p "$CORE"
-for t in bash env sh sed head tr cut id dirname cat; do
+for t in bash env sh sed head tr cut id dirname cat grep; do
     ln -s "$(command -v "$t")" "$CORE/$t"
 done
 deps() { PATH="$STUBS:$CORE" "$DEPS" "$@"; }
@@ -74,6 +83,9 @@ check "and non-zero" "$(deps check >/dev/null; echo $?)" 1
 printf '#!/bin/sh\nexit 0\n' > "$STUBS/jq"; chmod +x "$STUBS/jq"
 
 check "a Python module gone is missing" "$(NO_PY=gi deps check)" python-gobject
+
+check "a font gone is missing" "$(NO_FONT="Material Symbols Rounded" deps check)" material-symbols
+check "a family's other names do not hide it" "$(NO_FONT=Rubik deps check)" rubik
 
 rmdir "$CMAKE/KF6GuiAddons"
 check "a CMake package gone matters to a build" "$(deps check --build)" kguiaddons
@@ -118,5 +130,16 @@ check "an unknown family installs nothing" "$(deps install --yes >/dev/null 2>&1
 printf '#!/bin/sh\nexit 0\n' > "$STUBS/jq"; chmod +x "$STUBS/jq"
 os ID=arch
 check "nothing missing, nothing run" "$(install_says)" ""
+
+echo "== fonts =="
+os ID=arch
+got=$(NO_FONT="Material Symbols Rounded" deps install --yes 2>/dev/null)
+contains "Arch: the font is a package" "$got" "pacman -S --needed --noconfirm ttf-material-symbols-variable"
+os ID=fedora
+got=$(NO_FONT="Material Symbols Rounded" deps install --yes 2>/dev/null)
+contains "Fedora: fetched, not installed" "$got" "curl -fsSL -o $HOME/.local/share/fonts/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf"
+case "$got" in *"dnf install"*) check "Fedora: no dnf for a font alone" "$got" "(no dnf)" ;; *) check "Fedora: no dnf for a font alone" yes yes ;; esac
+contains "and the cache refreshed" "$got" "fc-cache -f"
+
 
 harness_done

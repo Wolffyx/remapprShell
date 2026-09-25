@@ -63,10 +63,9 @@ LockStyle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Math.round(12 * board.unit)
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "lock"
-                font.family: "Material Symbols Rounded"
+                symbol: "lock"
                 font.pixelSize: Math.round(20 * board.unit)
                 color: board.ink
             }

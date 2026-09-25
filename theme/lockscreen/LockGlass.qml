@@ -57,10 +57,9 @@ LockStyle {
             anchors.centerIn: parent
             spacing: 10
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "lock"
-                font.family: "Material Symbols Rounded"
+                symbol: "lock"
                 font.pixelSize: 17
                 color: glass.ui.fg
             }

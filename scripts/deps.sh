@@ -35,8 +35,13 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 
 # id | kind | provides | arch | fedora | debian
 #
-# `provides` is cmd:<command>, py:<module> or cmake:<package>. A family's
-# column may name several packages, space-separated. Qt's Wayland client is
+# `provides` is cmd:<command>, py:<module>, cmake:<package> or font:<family>.
+# A family's column may name several packages, space-separated; one written
+# @<url> is not a package but a file fetched into ~/.local/share/fonts, for
+# the two fonts neither Fedora nor Ubuntu packages -- Material Symbols, which
+# draws every icon in the shell and on its lock screen by name (without it
+# the lock screen said "bedtime" and "group" where its buttons were, on the
+# first fresh install), and Rubik, its type. Qt's Wayland client is
 # the one that needs two, found by building in containers (2026-09-25): on
 # Fedora its CMake files name a metatypes file that qt6-qtbase-private-devel
 # ships, and on Ubuntu qtwaylandscanner moved to qt6-base-dev-tools.
@@ -51,6 +56,8 @@ DEPS=(
     "kdialog|run|cmd:kdialog|kdialog|kdialog|kdialog"
     "python-gobject|run|py:gi|python-gobject|python3-gobject|python3-gi"
     "pillow|run|py:PIL|python-pillow|python3-pillow|python3-pil"
+    "material-symbols|run|font:Material Symbols Rounded|ttf-material-symbols-variable|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf|@https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf"
+    "rubik|run|font:Rubik|ttf-rubik-vf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf|@https://github.com/google/fonts/raw/main/ofl/rubik/Rubik%5Bwght%5D.ttf"
     "cmake|build|cmd:cmake|cmake|cmake|cmake"
     "c++|build|cmd:c++|gcc|gcc-c++|g++"
     "wayland-scanner|build|cmd:wayland-scanner|wayland|wayland-devel|libwayland-bin"
@@ -106,6 +113,9 @@ provided() {
     case "$what" in
         cmd:*)   command -v "${what#cmd:}" >/dev/null 2>&1 ;;
         py:*)    python3 -c "import ${what#py:}" >/dev/null 2>&1 ;;
+        # Not grep -q: under pipefail its early exit fails fc-list with
+        # SIGPIPE, and an installed font read as missing.
+        font:*)  fc-list : family 2>/dev/null | tr ',' '\n' | grep -xF "${what#font:}" >/dev/null ;;
         cmake:*)
             while IFS= read -r dir; do
                 [ -d "$dir/${what#cmake:}" ] && return 0
@@ -151,10 +161,14 @@ run() {
 }
 
 # Root needs nothing; anyone else goes through sudo, which asks for the
-# password itself.
+# password itself -- at a terminal. The installer window has none, so there
+# pkexec asks, in Plasma's own password dialog; sudo is still used when it
+# needs no password at all.
 as_root() {
     if [ "$(id -u)" = 0 ]; then
         run "$@"
+    elif [ ! -t 0 ] && ! sudo -n true 2>/dev/null && command -v pkexec >/dev/null 2>&1; then
+        run pkexec "$@"
     elif command -v sudo >/dev/null 2>&1 || [ "${DEPS_DRY:-0}" = 1 ]; then
         run sudo "$@"
     else
@@ -195,10 +209,25 @@ install_missing() {
         return 1
     fi
 
-    mapfile -t pkgs < <(packages_for "$fam" "${ids[@]}")
+    local all fetch=() entry
+    mapfile -t all < <(packages_for "$fam" "${ids[@]}")
+    pkgs=()
+    for entry in "${all[@]}"; do
+        case "$entry" in
+            @*) fetch+=("${entry#@}") ;;
+            *)  pkgs+=("$entry") ;;
+        esac
+    done
     log_step "missing: ${ids[*]}"
-    log_info "  packages ($fam): ${pkgs[*]}"
+    [ ${#pkgs[@]} -eq 0 ] || log_info "  packages ($fam): ${pkgs[*]}"
+    [ ${#fetch[@]} -eq 0 ] || log_info "  fonts, into ~/.local/share/fonts: $(for u in "${fetch[@]}"; do font_name "$u"; printf ' '; done)"
     ask "Install them now?" || { log_info "nothing was installed."; return 1; }
+
+    fetch_fonts "${fetch[@]}" || return 1
+    if [ ${#pkgs[@]} -eq 0 ]; then
+        finish_check "$build"
+        return
+    fi
 
     local quickshell=0 id
     for id in "${ids[@]}"; do [ "$id" = quickshell ] && quickshell=1; done
@@ -229,16 +258,40 @@ install_missing() {
             as_root apt-get install -y "${pkgs[@]}" ;;
     esac || { log_error "the package manager failed"; return 1; }
 
-    [ "${DEPS_DRY:-0}" = 1 ] && return 0
+    finish_check "$build"
+}
 
-    # Said again rather than trusted: a package that installed but did not
-    # provide what it was for is a wrong name in the table above.
+# Said again rather than trusted: a package that installed but did not
+# provide what it was for is a wrong name in the table above.
+finish_check() {
+    local build=$1 ids
+    [ "${DEPS_DRY:-0}" = 1 ] && return 0
     mapfile -t ids < <(missing "$build")
     if [ ${#ids[@]} -gt 0 ]; then
         log_error "still missing after the install: ${ids[*]}"
         return 1
     fi
     log_step "everything needed is installed"
+}
+
+# A font file's name, from its URL: the last part, with [ and ] back.
+font_name() {
+    local base=${1##*/}
+    base=${base//%5B/[}
+    printf '%s' "${base//%5D/]}"
+}
+
+# Into the user's own fonts, which needs no root and which the lock screen,
+# running as the user, reads as well as the shell.
+fetch_fonts() {
+    [ $# -gt 0 ] || return 0
+    local dir="${XDG_DATA_HOME:-$HOME/.local/share}/fonts" url
+    run mkdir -p "$dir" || return 1
+    for url in "$@"; do
+        run curl -fsSL -o "$dir/$(font_name "$url")" "$url" \
+            || { log_error "could not fetch $(font_name "$url")"; return 1; }
+    done
+    run fc-cache -f "$dir"
 }
 
 # --- the command ------------------------------------------------------------

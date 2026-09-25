@@ -33,10 +33,9 @@ Rectangle {
         anchors.centerIn: parent
         spacing: tab.px(8)
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
-            text: tab.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: tab.glyph
             font.pixelSize: tab.px(18)
             color: tab.active ? "#ffffff" : tab.colours.sub
         }

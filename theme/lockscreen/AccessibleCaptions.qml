@@ -22,13 +22,12 @@ Rectangle {
     height: Math.round(76 * strip.look.s)
     color: strip.look.acc
 
-    Text {
+    SymbolText {
         id: stripGlyph
 
         x: strip.margin
         anchors.verticalCenter: parent.verticalCenter
-        text: "closed_caption"
-        font.family: "Material Symbols Rounded"
+        symbol: "closed_caption"
         font.pixelSize: Math.round(28 * strip.look.s)
         color: strip.look.accentFg
     }

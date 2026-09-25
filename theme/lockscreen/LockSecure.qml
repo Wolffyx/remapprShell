@@ -102,10 +102,9 @@ LockStyle {
             radius: secure.px(8)
             color: secure.ui.accent
 
-            Text {
+            SymbolText {
                 anchors.centerIn: parent
-                text: "shield_lock"
-                font.family: "Material Symbols Rounded"
+                symbol: "shield_lock"
                 font.pixelSize: secure.px(17)
                 color: "#ffffff"
             }
@@ -253,10 +252,9 @@ LockStyle {
             visible: secure.ui.keyboardAvailable
             spacing: secure.px(12)
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: secure.ui.keyboardShown ? "keyboard_hide" : "keyboard"
-                font.family: "Material Symbols Rounded"
+                symbol: secure.ui.keyboardShown ? "keyboard_hide" : "keyboard"
                 font.pixelSize: secure.px(22)
                 color: oskHover.hovered ? secure.colours.ink : secure.colours.sub
             }

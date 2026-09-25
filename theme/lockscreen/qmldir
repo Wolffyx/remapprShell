@@ -17,6 +17,7 @@ LockMessage 1.0 LockMessage.qml
 LockActions 1.0 LockActions.qml
 LockStatus 1.0 LockStatus.qml
 LockRing 1.0 LockRing.qml
+SymbolText 1.0 SymbolText.qml
 
 # Drawn by the frame over every style.
 LockLockout 1.0 LockLockout.qml

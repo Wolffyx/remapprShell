@@ -163,10 +163,9 @@ Column {
             anchors.centerIn: parent
             spacing: Math.round(12 * prompt.look.s)
 
-            Text {
+            SymbolText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "lock_open"
-                font.family: "Material Symbols Rounded"
+                symbol: "lock_open"
                 font.pixelSize: Math.round(28 * prompt.look.s)
                 color: prompt.look.accentFg
             }

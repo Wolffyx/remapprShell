@@ -94,10 +94,9 @@ LockStyle {
             radius: Math.round(13 * kiosk.unit)
             color: kiosk.accent
 
-            Text {
+            SymbolText {
                 anchors.centerIn: parent
-                text: "local_library"
-                font.family: "Material Symbols Rounded"
+                symbol: "local_library"
                 font.pixelSize: Math.round(24 * kiosk.unit)
                 color: "#ffffff"
             }

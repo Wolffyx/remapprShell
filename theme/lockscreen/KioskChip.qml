@@ -43,10 +43,9 @@ Rectangle {
         anchors.centerIn: parent
         spacing: Math.round(9 * chip.textUnit)
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
-            text: chip.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: chip.glyph
             font.pixelSize: Math.round(20 * chip.textUnit)
             color: chip.checked ? chip.card : chip.plain ? chip.sub : chip.ink
         }

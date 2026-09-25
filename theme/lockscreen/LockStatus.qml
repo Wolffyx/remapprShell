@@ -47,11 +47,10 @@ Row {
 
     spacing: 14
 
-    Text {
+    SymbolText {
         anchors.verticalCenter: parent.verticalCenter
         visible: LockKeys.caps
-        text: "keyboard_capslock"
-        font.family: "Material Symbols Rounded"
+        symbol: "keyboard_capslock"
         font.pixelSize: Math.round(status.textSize * 1.5)
         color: status.warn
         Accessible.name: "Caps Lock is on"

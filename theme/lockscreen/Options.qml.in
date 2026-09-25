@@ -42,6 +42,13 @@ QtObject {
     readonly property int wallpaperBlur: Math.max(0, Math.min(40, Number(settings.value("wallpaperBlur", 26))))
     readonly property bool showSessionButtons: String(settings.value("showSessionButtons", "true")) !== "false"
 
+    // Whether Material Symbols is installed. Every icon here is that font
+    // drawing a name as a ligature; without it the name is drawn as the
+    // word -- "bedtime", "group", "lock", on the first fresh install. So
+    // SymbolText draws nothing without it, and LockActions draws its buttons
+    // as words that were meant to be read. Not a setting: a fact.
+    readonly property bool hasSymbols: Qt.fontFamilies().indexOf("Material Symbols Rounded") >= 0
+
     // The one colour every style draws its focus and its primary button in.
     // Four, by name, as the design offers them -- a name rather than a hex
     // string so that a typo is the default rather than an invisible focus

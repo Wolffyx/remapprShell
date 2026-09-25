@@ -51,10 +51,9 @@ LockStyle {
 
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
-            text: "music_note"
-            font.family: "Material Symbols Rounded"
+            symbol: "music_note"
             font.pixelSize: Math.round(19 * ambient.unit)
             color: ambient.dim
         }

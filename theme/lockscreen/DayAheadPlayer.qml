@@ -39,11 +39,10 @@ DayAheadCard {
             GradientStop { position: 1; color: "#e0b9a8" }
         }
 
-        Text {
+        SymbolText {
             anchors.centerIn: parent
             visible: art.status !== Image.Ready
-            text: "graphic_eq"
-            font.family: "Material Symbols Rounded"
+            symbol: "graphic_eq"
             font.pixelSize: player.px(28)
             color: Qt.rgba(1, 1, 1, 0.8)
         }
@@ -90,14 +89,13 @@ DayAheadCard {
         }
     }
 
-    Text {
+    SymbolText {
         id: playButton
 
         anchors.right: parent.right
         anchors.rightMargin: player.px(22)
         anchors.verticalCenter: parent.verticalCenter
-        text: player.model.playbackStatus === Mpris.PlaybackStatus.Playing ? "pause_circle" : "play_circle"
-        font.family: "Material Symbols Rounded"
+        symbol: player.model.playbackStatus === Mpris.PlaybackStatus.Playing ? "pause_circle" : "play_circle"
         font.pixelSize: player.px(40)
         color: player.colours.ink
         opacity: playTap.pressed ? 0.6 : 1

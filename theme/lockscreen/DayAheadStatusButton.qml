@@ -35,11 +35,10 @@ Rectangle {
         anchors.centerIn: parent
         spacing: button.px(8)
 
-        Text {
+        SymbolText {
             anchors.verticalCenter: parent.verticalCenter
             visible: button.glyph !== ""
-            text: button.glyph
-            font.family: "Material Symbols Rounded"
+            symbol: button.glyph
             font.pixelSize: button.px(20)
             color: button.tint
         }

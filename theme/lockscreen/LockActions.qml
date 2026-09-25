@@ -23,8 +23,10 @@ Row {
     // SessionManagement.
     required property var session
 
-    // "round", "square", or "text".
+    // "round", "square", or "text": the style's choice, and what is drawn --
+    // except without the icon font, when every style's buttons are words.
     property string shape: "round"
+    readonly property string drawn: Options.hasSymbols ? actions.shape : "text"
 
     property color ink: "#ffffff"
     property color fill: Qt.rgba(1, 1, 1, 0.14)
@@ -49,8 +51,8 @@ Row {
         property string label: ""
         signal activated
 
-        width: actions.shape === "text" ? word.implicitWidth : actions.size
-        height: actions.shape === "text" ? word.implicitHeight : actions.size
+        width: actions.drawn === "text" ? word.implicitWidth : actions.size
+        height: actions.drawn === "text" ? word.implicitHeight : actions.size
 
         // Reachable with Tab, and pressed with Space or Enter, like any
         // button -- the accessible style's rule, and nobody else's loss.
@@ -63,7 +65,7 @@ Row {
             anchors.fill: parent
             anchors.margins: -Math.round(4 * actions.unit)
             visible: action.activeFocus
-            radius: actions.shape === "round" ? width / 2 : Math.round(8 * actions.unit)
+            radius: actions.drawn === "round" ? width / 2 : Math.round(8 * actions.unit)
             color: "transparent"
             border.width: Math.max(2, Math.round(2 * actions.unit))
             border.color: Options.accent
@@ -71,16 +73,15 @@ Row {
 
         Rectangle {
             anchors.fill: parent
-            visible: actions.shape !== "text"
-            radius: actions.shape === "round" ? width / 2 : Math.round(width * 0.28)
+            visible: actions.drawn !== "text"
+            radius: actions.drawn === "round" ? width / 2 : Math.round(width * 0.28)
             color: hover.hovered ? actions.hot : actions.fill
             border.width: 1
             border.color: actions.stroke
 
-            Text {
+            SymbolText {
                 anchors.centerIn: parent
-                text: action.glyph
-                font.family: "Material Symbols Rounded"
+                symbol: action.glyph
                 font.pixelSize: Math.round(21 * actions.unit)
                 color: actions.ink
             }
@@ -90,7 +91,7 @@ Row {
             id: word
 
             anchors.centerIn: parent
-            visible: actions.shape === "text"
+            visible: actions.drawn === "text"
             text: action.label
             textFormat: Text.PlainText
             font.family: "Rubik"

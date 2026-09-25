@@ -149,10 +149,9 @@ LockStyle {
                 visible: media.hasPlayer && poster.ui.setting("showMediaControls", true)
                 spacing: Math.round(8 * poster.unit)
 
-                Text {
+                SymbolText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "music_note"
-                    font.family: "Material Symbols Rounded"
+                    symbol: "music_note"
                     font.pixelSize: Math.round(19 * poster.unit)
                     color: poster.ink
                 }
