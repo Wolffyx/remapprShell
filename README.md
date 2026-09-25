@@ -87,13 +87,39 @@ and there is none offscreen — the windows in it were opened for the photograph
 
 ## Installing it
 
+One line, on a machine running Plasma 6 on Wayland:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/main/install.sh | bash
+```
+
+It fetches the source into the shell's data directory, installs what the
+distribution has to provide, and starts the guided setup below. Arch and its
+family (CachyOS, EndeavourOS, Manjaro), Fedora and Ubuntu are known to it;
+Quickshell comes from the distribution on Arch, from the
+`errornointernet/quickshell` COPR on Fedora and from the
+`avengemedia/danklinux` PPA on Ubuntu, each added only when Quickshell is
+missing. Anything else is told which packages to install first.
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --channel dev   # follow dev instead of releases
+curl -fsSL .../install.sh | bash -s -- --yes           # ask nothing, take every default
+```
+
+Run again, it brings the same source up to date and sets up again;
+`rmpr update` does the same without the questions.
+
+From a checkout of your own, the guided install on its own:
+
 ```bash
 make setup          # the guided install: every choice asked once, then applied
 ```
 
-One pass over everything an install decides -- the restore point, whether the files
-are copied or symlinked, what draws the panel, which keys this shell takes, who
-switches windows, the look and feel, and whether it starts at login. Each step runs
+One pass over everything an install decides -- the packages it needs, the restore
+point, whether the files are copied or symlinked, what draws the panel, the window
+list the taskbar reads, the window previews (built, with the compiler and Qt
+development files they need), which keys this shell takes, who switches windows,
+the look and feel, and whether it starts at login. Each step runs
 the command you would otherwise run by hand (`install.sh`, `renderer set`,
 `theme apply`, `shortcuts set`, `switcher use`), so the guided path and the manual
 one cannot drift apart.

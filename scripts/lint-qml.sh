@@ -40,7 +40,16 @@ if [ -z "$QMLLINT" ] && command -v qmllint >/dev/null 2>&1; then
         QMLLINT=$(command -v qmllint)
     fi
 fi
-[ -n "$QMLLINT" ] || die "Qt6 qmllint not found (install qt6-declarative, or set QMLLINT_BIN)"
+# An update verifying itself on a user's machine sets LINT_QML_OPTIONAL: qmllint
+# is a development tool there, in a -devel or -dev-tools package outside Arch,
+# and a machine without it is no reason to roll an update back.
+if [ -z "$QMLLINT" ]; then
+    if [ -n "${LINT_QML_OPTIONAL:-}" ]; then
+        log_warn "Qt6 qmllint not found; the QML lint is skipped"
+        exit 0
+    fi
+    die "Qt6 qmllint not found (install qt6-declarative, or set QMLLINT_BIN)"
+fi
 log_debug "using $QMLLINT ($("$QMLLINT" --version 2>&1))"
 
 # The generated singleton must exist or every import of it is a false positive.

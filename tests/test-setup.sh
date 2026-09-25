@@ -76,6 +76,9 @@ check "Alt+Tab stays KWin's"    "$(printf '%s' "$plan" | grep -c 'switcher.sh us
 check "themes the desktop"      "$(printf '%s' "$plan" | grep -c 'theme.sh apply')" "1"
 check "enables the unit"        "$(printf '%s' "$plan" | grep -c "systemctl --user enable --now $SYSTEMD_UNIT")" "1"
 check "takes a restore point"   "$(printf '%s' "$plan" | grep -c 'snapshot.sh create before-setup')" "1"
+check "lists the windows"       "$(printf '%s' "$plan" | grep -c 'windows.sh enable')" "1"
+check "builds the previews"     "$(printf '%s' "$plan" | grep -c 'plugin$')" "1"
+check "with what they need"     "$(printf '%s' "$plan" | grep -c 'deps.sh install --build --yes')" "1"
 check "a dry run changes nothing" "$(ls "$XDG_DATA_HOME" | wc -l)" "0"
 
 echo "== --no-snapshot is the only way to skip the restore point =="
@@ -84,9 +87,9 @@ check "no snapshot"             "$(printf '%s' "$plan" | grep -c 'snapshot.sh cr
 check "still installs"          "$(printf '%s' "$plan" | grep -c 'install.sh --copy')" "1"
 
 echo "== answered at a terminal =="
-# link, plasma, two other keys, Alt+Tab left alone, no theme, no autostart,
-# and yes to the summary.
-plan=$(printf 'link\nplasma\nsettings sidebar\nnone\nn\nn\ny\n' \
+# link, plasma, two other keys, Alt+Tab left alone, no window list, no
+# previews, no theme, no autostart, and yes to the summary.
+plan=$(printf 'link\nplasma\nsettings sidebar\nnone\nn\nn\nn\nn\ny\n' \
        | (export "$UI_VAR=plain"; setup --dry-run --no-preflight --no-snapshot))
 check "links the checkout"      "$(printf '%s' "$plan" | grep -c 'install.sh --link')" "1"
 check "Plasma draws"            "$(printf '%s' "$plan" | grep -c 'renderer.sh set plasma')" "1"
@@ -94,10 +97,13 @@ check "binds what was ticked"   "$(printf '%s' "$plan" | grep -cE 'shortcuts.sh 
 check "leaves Alt+Tab alone"    "$(printf '%s' "$plan" | grep -c 'switcher.sh use')" "0"
 check "leaves the theme alone"  "$(printf '%s' "$plan" | grep -c 'theme.sh apply')" "0"
 check "does not enable the unit" "$(printf '%s' "$plan" | grep -c 'systemctl --user enable')" "0"
+check "no window list"          "$(printf '%s' "$plan" | grep -c 'windows.sh enable')" "0"
+check "builds nothing"          "$(printf '%s' "$plan" | grep -cE 'deps.sh install|plugin$')" "0"
 
 echo "== the summary is the one-way door =="
-# Everything answered, then no at the summary: nothing is applied at all.
-plan=$(printf '\n\n\n\n\n\nn\n' \
+# Everything answered -- eight questions -- then no at the summary: nothing
+# is applied at all.
+plan=$(printf '\n\n\n\n\n\n\n\nn\n' \
        | (export "$UI_VAR=plain"; setup --dry-run --no-preflight))
 check "nothing would run"       "$(printf '%s' "$plan" | grep -c 'would run')" "0"
 check "and it says so"          "$(printf '%s' "$plan" | grep -c 'nothing was changed')" "1"

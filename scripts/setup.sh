@@ -9,8 +9,9 @@
 #   --ui <front end>    kdialog | whiptail | dialog | plain | none
 #
 # The steps are the commands a person would otherwise run by hand, in the order
-# the handbook gives them: preflight, a restore point, install, renderer,
-# theme, shortcuts, Alt+Tab, start at login. Nothing here reimplements any of
+# the handbook gives them: what the distribution provides, preflight, a
+# restore point, install, renderer, the window list, window previews, theme,
+# shortcuts, Alt+Tab, start at login. Nothing here reimplements any of
 # them -- each step shells out to the script that owns it, so the guided path
 # and the manual one cannot drift.
 #
@@ -23,6 +24,27 @@ set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
+
+# What the distribution provides comes first, before brand.sh: that needs jq,
+# which is one of the things deps.sh installs. The bootstrap (install.sh at
+# the top of the tree) has usually done this already, and then it is one
+# quiet check. A dry run only says what is missing.
+_dry=0; _yes=()
+for _a in "$@"; do
+    case "$_a" in
+        --dry-run)    _dry=1 ;;
+        --unattended) _yes=(--yes) ;;
+    esac
+done
+if ! _missing=$("$REPO_ROOT/scripts/deps.sh" check); then
+    if [ $_dry = 1 ]; then
+        log_warn "dry run: missing, and not installed: $(printf '%s ' $_missing)"
+    else
+        "$REPO_ROOT/scripts/deps.sh" install "${_yes[@]}" \
+            || die "the shell cannot run without those; nothing else was changed"
+    fi
+fi
+
 source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/dialog.sh"
 
@@ -135,6 +157,18 @@ alttab=$(ui_menu "Alt+Tab" "Who switches windows?" plasma \
     shell  "This shell's own switcher takes the key" \
     none   "Leave Alt+Tab alone") || cancelled
 
+# KWin knows what windows are open and the shell cannot ask it directly: a
+# small KWin script tells it. Without that the taskbar is empty, which is why
+# the answer is yes unless someone says otherwise.
+ui_yesno "Show the open windows on the taskbar? (a small KWin script tells the shell about them)" yes
+windowlist=$?; [ $windowlist -gt 1 ] && cancelled
+
+# Compiled, and the one step that needs development packages -- a compiler,
+# CMake, Qt's and KF6's headers -- which are installed with it. Without it
+# the shell runs, with no live previews and no held-key detection.
+ui_yesno "Build the window previews and the key module? (installs a compiler and Qt's development files, if missing)" yes
+plugin=$?; [ $plugin -gt 1 ] && cancelled
+
 ui_yesno "Apply the $DISPLAY_NAME look and feel? (colours, icons, splash, Alt+Tab's look)" yes
 theme=$?; [ $theme -gt 1 ] && cancelled
 
@@ -147,6 +181,8 @@ plan=$(
     printf '%s\n' "install:    $mode"
     printf '%s\n' "panel:      $renderer"
     printf '%s\n' "keys:       $(printf '%s ' $keys_chosen | sed 's/ $//'; [ -n "$keys_chosen" ] || printf none)"
+    printf '%s\n' "windows:    $([ $windowlist = 0 ] && echo 'listed on the taskbar' || echo 'not listed')"
+    printf '%s\n' "previews:   $([ $plugin = 0 ] && echo 'built' || echo 'not built')"
     printf '%s\n' "Alt+Tab:    $alttab"
     printf '%s\n' "theme:      $([ $theme = 0 ] && echo 'apply' || echo 'leave alone')"
     printf '%s\n' "at login:   $([ $autostart = 0 ] && echo 'enabled' || echo 'not enabled')"
@@ -172,6 +208,15 @@ case "$mode" in
 esac
 
 [ "$renderer" != none ] && step "the panel" "$REPO_ROOT/scripts/renderer.sh" set "$renderer"
+
+[ $windowlist = 0 ] && step "the window list" "$REPO_ROOT/scripts/windows.sh" enable
+
+# --yes: the plan that said "built" was the question. deps.sh returns at once
+# when everything is there.
+if [ $plugin = 0 ]; then
+    step "build dependencies" "$REPO_ROOT/scripts/deps.sh" install --build --yes \
+        && step "window previews and the key module" make -C "$REPO_ROOT" --no-print-directory plugin
+fi
 
 [ $theme = 0 ] && step "the look and feel" "$REPO_ROOT/scripts/theme.sh" apply
 
@@ -214,6 +259,8 @@ fi
 ui_info "$DISPLAY_NAME" \
 "Set up.
 
-  $ALIAS doctor     check everything
-  $ALIAS settings   change any of this
-  $ALIAS restore    put KDE back the way it was"
+  $ALIAS doctor           check everything
+  $ALIAS settings         change any of this
+  $ALIAS lockscreen try   try our lock screen, before '$ALIAS lockscreen enable'
+  $ALIAS update           bring it up to date
+  $ALIAS restore          put KDE back the way it was"

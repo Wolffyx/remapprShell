@@ -10,7 +10,7 @@
 # the migration and verification steps would mean the path most used during
 # development is the one least tested.
 #
-#   preflight -> snapshot -> record -> apply -> migrate -> verify -> restart
+#   preflight -> snapshot -> record -> apply -> packages -> migrate -> verify -> restart
 #
 # and if verification fails, back to where it started.
 set -uo pipefail
@@ -194,6 +194,18 @@ fi
 
 new_version=$(cat "$REPO_ROOT/VERSION" 2>/dev/null || echo "0.0.0")
 
+# ----------------------------------------------------------------- packages
+
+# A new version can need something the old one did not. Asked for here, from
+# the new version's own list, before anything of it is verified or run.
+if ! "$REPO_ROOT/scripts/deps.sh" check >/dev/null; then
+    "$REPO_ROOT/scripts/deps.sh" install || {
+        log_error "the new version needs packages that were not installed"
+        "$0" --rollback
+        exit 1
+    }
+fi
+
 # -------------------------------------------------------------------- migrate
 
 # Configuration migrations run inside the shell when it next reads the profile,
@@ -227,7 +239,7 @@ log_step "verifying"
 "$REPO_ROOT/scripts/gen-qmldir.sh"       >/dev/null || true
 "$REPO_ROOT/scripts/gen-widget-index.sh" >/dev/null || true
 
-if ! "$REPO_ROOT/scripts/lint-qml.sh" >/dev/null 2>&1; then
+if ! LINT_QML_OPTIONAL=1 "$REPO_ROOT/scripts/lint-qml.sh" >/dev/null 2>&1; then
     log_error "the new version does not pass its own QML lint"
     "$0" --rollback
     exit 1
