@@ -25,11 +25,19 @@ Item {
     readonly property bool horizontal: root.bar.horizontal
     readonly property string position: root.bar.position
     readonly property int thickness: root.bar.thickness
-    readonly property int gap: root.bar.edgeGap
     readonly property real unit: root.thickness / 64
 
+    // How far off the edge it is drawn: 1 floating, 0 against it. The panel
+    // animates this between the two when a floating bar or islands fill the
+    // edge for a window (Panel.defloated); anything else holding a surface
+    // has no such thing, and gets its style's own.
+    readonly property real floating: root.bar.floatAmount ?? (root.style === "full" ? 0 : 1)
+
+    // The space between the bar and the screen edge, closing as it docks.
+    readonly property real gap: root.bar.edgeGap * root.floating
+
     // Along the edge, a floating bar and islands stop short of the corners.
-    readonly property int inset: root.style === "full" ? 0 : 18
+    readonly property real inset: 18 * root.floating
     // Inside the bar, before the first widget.
     readonly property int pad: root.style === "full" ? 12 : root.style === "floating" ? 10 : 0
     // Around the widgets of an island.
@@ -42,7 +50,7 @@ Item {
         root.horizontal ? root.width - 2 * root.inset : root.thickness,
         root.horizontal ? root.thickness : root.height - 2 * root.inset)
 
-    readonly property real radius: root.style === "full" ? 0 : Math.min(Theme.radius, root.thickness / 2)
+    readonly property real radius: Math.min(Theme.radius, root.thickness / 2) * root.floating
     readonly property real islandRadius: Math.min(Theme.radiusMedium, root.thickness / 2)
 
     // ---- what is drawn -----------------------------------------------------

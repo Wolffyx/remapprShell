@@ -26,6 +26,7 @@ Column {
     property var openPage: id => {}
 
     readonly property bool autoHide: ConfigStore.value("panel.autoHide", false) === true
+    readonly property bool floats: ConfigStore.value("panel.style", "full") !== "full"
 
     // The choices the shared rows and each monitor's rows both offer.
     readonly property var positionValues: ["top", "bottom", "left", "right"]
@@ -86,6 +87,15 @@ Column {
 
         Hint {
             text: "Full width is a strip along the whole edge. Floating is a rounded bar held clear of it. Islands draws no bar at all: each zone is a rounded island of its own."
+        }
+
+        ConfigToggleRow {
+            label: "Fill the edge when a window reaches it"
+            description: root.floats ? "A full-width strip while a window touches the panel's space -- a maximised one always does -- and floating again when none does."
+                                     : "Only matters for the floating bar and islands."
+            enabled: root.floats
+            fallback: true
+            path: "panel.defloat"
         }
     }
 

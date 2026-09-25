@@ -125,6 +125,10 @@ QtObject {
         const s = ConfigStore.valueFor(name, "panel.style", "full");
         return s === "floating" || s === "islands" ? s : "full";
     }
+
+    // Whether a floating bar or islands fill the edge while a window reaches
+    // it, as Plasma's floating panel does.
+    function defloatsFor(name) { return ConfigStore.valueFor(name, "panel.defloat", true) !== false; }
     function spacingFor(name) { return ConfigStore.valueFor(name, "panel.spacing", 5); }
     function iconSizeFor(name) { return ConfigStore.valueFor(name, "panel.iconSize", 18); }
     function horizontalFor(name) {

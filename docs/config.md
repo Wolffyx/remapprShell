@@ -67,6 +67,7 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.position` | `top`, `bottom`, `left`, `right` | `bottom` | Which edge the panel is anchored to. |
 | `panel.thickness` | a number, 28 to 96 | `52` | Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it. |
 | `panel.style` | `full`, `floating`, `islands` | `full` | full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own. |
+| `panel.defloat` | `true` or `false` | `true` | With the floating bar or islands, the panel becomes a full-width strip while a window on its monitor reaches into its space -- a maximised one always does -- and floats again when none does, as Plasma's floating panel does. The strip is the bar's own thickness, and the margin a floating panel keeps from the edge is given to the windows while it lasts. Off, it always floats. |
 | `panel.spacing` | a number, 2 to 16 | `5` | The gap between widgets, in pixels. |
 | `panel.iconSize` | a number, 15 to 26 | `18` | The size of the tray's and the status icons, in pixels. |
 | `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |

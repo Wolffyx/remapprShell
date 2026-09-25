@@ -78,7 +78,13 @@ QtObject {
             // stream with. 0 from a script older than the field, which is why
             // anything using it needs a sensible aspect of its own.
             width: typeof entry.width === "number" ? entry.width : 0,
-            height: typeof entry.height === "number" ? entry.height : 0
+            height: typeof entry.height === "number" ? entry.height : 0,
+            // Where it is, in the global coordinates Quickshell gives a
+            // screen. 0 from a script older than the fields -- and with them
+            // no size either, so nothing reads such a window as reaching an
+            // edge.
+            x: typeof entry.x === "number" ? entry.x : 0,
+            y: typeof entry.y === "number" ? entry.y : 0
         };
     }
 
@@ -221,6 +227,36 @@ QtObject {
                 top = w;
         }
         return top !== null && top.fullScreen === true;
+    }
+
+    // Whether a window on the desktop `desktopId` reaches into the strip
+    // `depth` pixels deep along `edge` of `screen` ({x, y, width, height}).
+    // A floating panel fills its edge while one does, as Plasma's does.
+    //
+    // The strip is a pixel deeper than asked: a maximised window stops where
+    // the panel's reserved space begins, which is touching it, not inside it.
+    // By geometry rather than by `output`, so a window hanging over from the
+    // next monitor counts on the monitor it reaches into.
+    function reachesEdge(windows, desktopId, screen, edge, depth) {
+        if (!screen || !(depth > 0))
+            return false;
+        const d = depth + 1;
+        const sx = screen.x, sy = screen.y, sw = screen.width, sh = screen.height;
+        const strip = edge === "top" ? { x: sx, y: sy, w: sw, h: d }
+                    : edge === "left" ? { x: sx, y: sy, w: d, h: sh }
+                    : edge === "right" ? { x: sx + sw - d, y: sy, w: d, h: sh }
+                    : { x: sx, y: sy + sh - d, w: sw, h: d };
+        for (const w of windows ?? []) {
+            if (!w || w.minimized || !(w.width > 0) || !(w.height > 0))
+                continue;
+            const on = w.desktops ?? [];
+            if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)
+                continue;
+            if (w.x < strip.x + strip.w && w.x + w.width > strip.x
+                && w.y < strip.y + strip.h && w.y + w.height > strip.y)
+                return true;
+        }
+        return false;
     }
 
     // The application a task item stands for, as a desktop entry id ("org.kde.

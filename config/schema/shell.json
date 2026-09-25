@@ -185,6 +185,12 @@
                     "label": "Style",
                     "description": "full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own."
                 },
+                "panel.defloat": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Fill the edge when a window reaches it",
+                    "description": "With the floating bar or islands, the panel becomes a full-width strip while a window on its monitor reaches into its space -- a maximised one always does -- and floats again when none does, as Plasma's floating panel does. The strip is the bar's own thickness, and the margin a floating panel keeps from the edge is given to the windows while it lasts. Off, it always floats."
+                },
                 "panel.spacing": {
                     "type": "int",
                     "min": 2,

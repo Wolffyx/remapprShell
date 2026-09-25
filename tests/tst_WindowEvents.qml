@@ -308,6 +308,60 @@ TestCase {
         compare(WindowEvents.fullScreenOn(undefined, "DP-2", "d1"), false);
     }
 
+    // ---- a window reaching a floating panel's edge ------------------------
+
+    // DP-2 as KWin reported it: below DP-3's top, 2560x1440. The panel is at
+    // the bottom and reserves 66 px.
+    readonly property var dp2: ({ x: 0, y: 1040, width: 2560, height: 1440 })
+
+    function at(uuid, x, y, w, h, props) {
+        return Object.assign({ uuid: uuid, output: "DP-2", minimized: false, x: x, y: y, width: w, height: h },
+                             props ?? {});
+    }
+
+    function test_position_is_read() {
+        const w = WindowEvents.parseList(JSON.stringify([windowJson({ x: 720, y: 1360 })]))[0];
+        compare(w.x, 720);
+        compare(w.y, 1360);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].x, 0);
+    }
+
+    // Maximised, it stops where the reserved space starts: touching the
+    // panel, which is what fills the edge.
+    function test_a_maximised_window_reaches_the_edge() {
+        compare(WindowEvents.reachesEdge([at("max", 0, 1040, 2560, 1374)], "d1", dp2, "bottom", 66), true);
+    }
+
+    function test_a_window_clear_of_the_panel_does_not() {
+        compare(WindowEvents.reachesEdge([at("mid", 720, 1360, 1120, 748)], "d1", dp2, "bottom", 66), false);
+        // One pixel short of touching.
+        compare(WindowEvents.reachesEdge([at("near", 0, 1040, 2560, 1373)], "d1", dp2, "bottom", 66), false);
+    }
+
+    // Minimised, on another desktop, or on the other monitor: not there.
+    function test_only_windows_on_this_screen_and_desktop_count() {
+        compare(WindowEvents.reachesEdge([at("min", 0, 1040, 2560, 1440, { minimized: true })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("away", 0, 1040, 2560, 1440, { desktops: ["d2"] })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("dp3", 2560, 0, 1440, 2560)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("all", 0, 1040, 2560, 1440, { desktops: [] })], "d1", dp2, "bottom", 66), true);
+    }
+
+    function test_each_edge() {
+        compare(WindowEvents.reachesEdge([at("t", 100, 1040, 400, 300)], "d1", dp2, "top", 66), true);
+        compare(WindowEvents.reachesEdge([at("t", 100, 1200, 400, 300)], "d1", dp2, "top", 66), false);
+        compare(WindowEvents.reachesEdge([at("l", 0, 1200, 400, 300)], "d1", dp2, "left", 66), true);
+        compare(WindowEvents.reachesEdge([at("r", 2200, 1200, 360, 300)], "d1", dp2, "right", 66), true);
+        compare(WindowEvents.reachesEdge([at("r", 2000, 1200, 300, 300)], "d1", dp2, "right", 66), false);
+    }
+
+    // A window from a script too old to send its geometry has none, and
+    // reaches nothing.
+    function test_no_geometry_reaches_nothing() {
+        compare(WindowEvents.reachesEdge([at("old", 0, 0, 0, 0)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("max", 0, 1040, 2560, 1374)], "d1", null, "bottom", 66), false);
+    }
+
     function group(key, count) {
         const windows = [];
         for (let i = 0; i < (count ?? 1); ++i)
