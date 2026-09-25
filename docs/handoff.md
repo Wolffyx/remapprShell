@@ -341,6 +341,46 @@ before KWin had moved the window, with the full-screen one below what it
 covered. Seen on a screenshot in the reproduced state; not yet seen with a
 game.
 
+**Floating that fills the edge, as Plasma's does** (`panel.defloat`, on). A
+floating bar or islands become a full strip while a window on the current
+desktop reaches into the panel's floating space (`WindowEvents.reachesEdge`,
+by geometry, tested); a maximised one always does. The strip is the bar's own
+thickness: `extent` drops to `thickness` while docked, so the maximised window
+grows into the margin -- the first cut kept the reservation and drew a strip
+14 px thicker than the setting, which the user caught. The check uses
+`floatExtent`, the undocked depth; using `extent` would bind to itself.
+`floatAmount` animates the margin, corners and depth. The windows script sends
+`x`/`y` now and publishes on geometry changes -- once when a drag ends, never
+per frame of one. Measured: DP-3 strip 2514..2559 at 46 px with krdc
+maximised to 2514; a dialog moved into DP-2's strip docked it, moved out
+floated it.
+
+**"Smart" placement.** KWin's default for an unset `Placement` is Centered
+(kwin.kcfg), but `windows.sh` said Smart, so the page showed Smart while KWin
+centred. Fixed, and Smart is labelled "Least overlap" with a hint: measured,
+it put every new window in the bottom right corner of a screen full of large
+windows. That is KWin's, not ours.
+
+**Tray apps opening in a corner.** Quickshell's `activate()` sends
+Activate(0, 0); JetBrains Toolbox opens its window at the position it is
+given, so it went to the top of the screen. `qs.domain.tray.activation`
+reads the watcher's list, maps each item's Id to its bus address, and calls
+Activate/SecondaryActivate with the icon's place at the panel's inner edge,
+as Plasma does; flyout icons use the chevron's. Clicked by the user: Toolbox
+now opens beside the tray -- and was behind the flyout, which is a panel
+surface and stayed open. Activating an icon now closes the flyout (and any
+menu), as Plasma's does. The same change mended menu-only icons: a left click
+opened their menu and the line after it closed it again.
+
+Then Toolbox went to 0,0 again: a QML singleton is made when first used, so
+the first click after a reload made TrayActivation, found no addresses yet
+and fell back. A click on an unknown item now waits for the lookup, the tray
+widget makes the singleton as it loads, and a lookup is never restarted
+mid-run (a cut-short run would hand over half a list). Seen on the bus: the
+Id reads run at reload, before any click. Widget edits need `rmpr reload` --
+they are not hot-reloaded, which is why the flyout fix first "did not
+happen".
+
 ### The sunset of 2026-09-24, watched
 
 **Plasma's day and night switch worked on its own**: at sunset it moved the
