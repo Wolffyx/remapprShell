@@ -170,10 +170,25 @@ if session_available && [ "$MODE" != uninstall ] && command -v busctl >/dev/null
     busctl --user call org.freedesktop.DBus / org.freedesktop.DBus ReloadConfig 2>/dev/null || true
 fi
 
-if [ "$MODE" != uninstall ]; then
+# The commands live in $BIN_DIR, which Arch, for one, does not put on PATH:
+# the first real install (2026-09-25) finished by naming `rmpr doctor` to a
+# shell that could not find it. environment.d is read by the user's systemd,
+# and the Plasma session and every terminal it opens inherit from that --
+# from the next login. The unit never needed it: it names the full path.
+PATH_CONF="$XDG_CONFIG_HOME/environment.d/60-$SLUG-path.conf"
+if [ "$MODE" = uninstall ]; then
+    rm -f "$PATH_CONF"
+else
     case ":$PATH:" in
         *":$BIN_DIR:"*) : ;;
-        *) log_warn "$BIN_DIR is not on PATH; $SESSION_BIN will not be found" ;;
+        *)
+            if [ ! -f "$PATH_CONF" ]; then
+                mkdir -p "$(dirname "$PATH_CONF")"
+                printf '# GENERATED FILE -- DO NOT EDIT. Removed by uninstalling %s.\nPATH=%s:${PATH}\n' \
+                    "$DISPLAY_NAME" "$BIN_DIR" > "$PATH_CONF"
+                log_step "$BIN_DIR goes on PATH from the next login ($PATH_CONF)"
+            fi
+            log_info "until then: $BIN_DIR/$ALIAS" ;;
     esac
 fi
 

@@ -74,7 +74,13 @@ check "binds the two keys"      "$(printf '%s' "$plan" | grep -cE 'shortcuts.sh 
 check "binds nothing else"      "$(printf '%s' "$plan" | grep -c 'shortcuts.sh set ')" "2"
 check "Alt+Tab stays KWin's"    "$(printf '%s' "$plan" | grep -c 'switcher.sh use plasma')" "1"
 check "themes the desktop"      "$(printf '%s' "$plan" | grep -c 'theme.sh apply')" "1"
-check "enables the unit"        "$(printf '%s' "$plan" | grep -c "systemctl --user enable --now $SYSTEMD_UNIT")" "1"
+check "enables the unit"        "$(printf '%s' "$plan" | grep -c "systemctl --user enable $SYSTEMD_UNIT$")" "1"
+check "and (re)starts it"       "$(printf '%s' "$plan" | grep -c "systemctl --user restart $SYSTEMD_UNIT$")" "1"
+# Started before the panel is handed to it: renderer.sh refuses a shell that
+# is not running, which is how the first real install failed.
+started_at=$(printf '%s\n' "$plan" | grep -n "restart $SYSTEMD_UNIT$" | cut -d: -f1)
+panel_at=$(printf '%s\n' "$plan" | grep -n "renderer.sh set" | cut -d: -f1)
+check "before the panel"        "$([ "${started_at:-0}" -gt 0 ] && [ "$started_at" -lt "${panel_at:-0}" ] && echo yes)" "yes"
 check "takes a restore point"   "$(printf '%s' "$plan" | grep -c 'snapshot.sh create before-setup')" "1"
 check "lists the windows"       "$(printf '%s' "$plan" | grep -c 'windows.sh enable')" "1"
 check "builds the previews"     "$(printf '%s' "$plan" | grep -c 'plugin$')" "1"

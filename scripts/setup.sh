@@ -113,6 +113,17 @@ step() {
 
 cancelled() { log_info "nothing was changed."; exit 0; }
 
+# The user's systemd is not sandboxed by a throwaway HOME: without a session
+# (session_available, brand.sh) a unit is neither started nor enabled. The
+# uninstall's first test run stopped the real shell for want of this.
+in_session() {
+    if session_available; then
+        "$@"
+    else
+        log_info "no session; not run: $*"
+    fi
+}
+
 # --- questions ------------------------------------------------------------
 
 ui_info "$DISPLAY_NAME $VERSION" \
@@ -207,8 +218,6 @@ case "$mode" in
     link) step "linking"         "$REPO_ROOT/scripts/install.sh" --link ;;
 esac
 
-[ "$renderer" != none ] && step "the panel" "$REPO_ROOT/scripts/renderer.sh" set "$renderer"
-
 [ $windowlist = 0 ] && step "the window list" "$REPO_ROOT/scripts/windows.sh" enable
 
 # --yes: the plan that said "built" was the question. deps.sh returns at once
@@ -230,9 +239,26 @@ case "$alttab" in
     shell)  step "Alt+Tab, ours"                  "$REPO_ROOT/scripts/switcher.sh" use shell ;;
 esac
 
+# The shell is started before the panel is handed to it: renderer.sh refuses
+# to switch to a shell that is not running, rather than leave the screen with
+# no panel -- and it was, on the first real install (2026-09-25), because
+# this step came last. Switching also restarts plasmashell, which is what
+# shows the look and feel applied above.
+#
+# Restarted, not only started: over a shell already running -- the one-line
+# install run again, a reinstall -- `enable --now` leaves the old one running
+# the old code, without the previews just built. Nothing is left for the
+# person to run afterwards; that is the point of the whole script.
 if [ $autostart = 0 ]; then
-    step "starting at login" systemctl --user enable --now "$SYSTEMD_UNIT"
+    step "starting at login" in_session systemctl --user enable "$SYSTEMD_UNIT"
+fi
+if [ $autostart = 0 ] || [ "$renderer" = quickshell ]; then
+    step "starting the shell" in_session systemctl --user restart "$SYSTEMD_UNIT"
+fi
 
+[ "$renderer" != none ] && step "the panel" "$REPO_ROOT/scripts/renderer.sh" set "$renderer"
+
+if [ $autostart = 0 ]; then
     # Separate from the shell, and enabled with it: it settles light and dark
     # before the session's applications start, which is the one moment the
     # shell itself is too late for. It writes nothing unless something is
@@ -240,7 +266,7 @@ if [ $autostart = 0 ]; then
     # `theme.desktop.followMode` -- so enabling it is not a decision about
     # whether the desktop is themed, or about who switches it.
     step "settling light and dark at login" \
-        systemctl --user enable "$SLUG-theme.service"
+        in_session systemctl --user enable "$SLUG-theme.service"
 else
     log_info "not enabled at login; '$ALIAS start' runs it by hand"
 fi
@@ -257,10 +283,10 @@ $(printf '  %s\n' "${FAILED[@]}")
 fi
 
 ui_info "$DISPLAY_NAME" \
-"Set up.
+"Set up, and running$([ $autostart = 0 ] && printf ' -- it starts at login too'). There is nothing else to do.
 
-  $ALIAS doctor           check everything
+Whenever you like:
   $ALIAS settings         change any of this
-  $ALIAS lockscreen try   try our lock screen, before '$ALIAS lockscreen enable'
+  $ALIAS lockscreen try   try the lock screen, before '$ALIAS lockscreen enable'
   $ALIAS update           bring it up to date
-  $ALIAS restore          put KDE back the way it was"
+  $ALIAS uninstall        take it off again"
