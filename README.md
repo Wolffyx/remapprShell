@@ -94,7 +94,11 @@ curl -fsSL https://raw.githubusercontent.com/Wolffyx/remapprShell/main/install.s
 ```
 
 It fetches the source into the shell's data directory, installs what the
-distribution has to provide, and starts the guided setup below. Arch and its
+distribution has to provide, and starts the guided setup below -- in a
+graphical session, as the installer window: the steps along the top (check,
+panel, keys, look, review, install), a page per step, and the install's
+progress drawn as it happens. At a terminal with no desktop it asks the same
+questions there. Arch and its
 family (CachyOS, EndeavourOS, Manjaro), Fedora and Ubuntu are known to it;
 Quickshell comes from the distribution on Arch, from the
 `errornointernet/quickshell` COPR on Fedora and from the

@@ -114,6 +114,22 @@ plan=$(printf '\n\n\n\n\n\n\n\nn\n' \
 check "nothing would run"       "$(printf '%s' "$plan" | grep -c 'would run')" "0"
 check "and it says so"          "$(printf '%s' "$plan" | grep -c 'nothing was changed')" "1"
 
+echo "== answered in advance, as the installer window does =="
+# Every question answered by a flag, and nothing on stdin: nothing is asked,
+# and the answers are what is applied.
+out=$( (export "$UI_VAR=plain"; setup --dry-run --no-preflight --no-snapshot --progress \
+        --mode link --renderer plasma --keys "clipboard" --alttab shell \
+        --window-list no --previews no --theme no --autostart no) < /dev/null 2>&1)
+check "links, as answered"        "$(printf '%s' "$out" | grep -c 'install.sh --link')" "1"
+check "Plasma draws, as answered" "$(printf '%s' "$out" | grep -c 'renderer.sh set plasma')" "1"
+check "binds only what was given" "$(printf '%s' "$out" | grep -c 'shortcuts.sh set ')" "1"
+check "Alt+Tab, as answered"      "$(printf '%s' "$out" | grep -c 'switcher.sh use shell')" "1"
+check "no window list, no build"  "$(printf '%s' "$out" | grep -cE 'windows.sh enable|plugin$')" "0"
+check "a ::step line per step"    "$(printf '%s' "$out" | grep -c '^::step linking$')" "1"
+check "and its ::ok"              "$(printf '%s' "$out" | grep -c '^::ok linking$')" "1"
+check "and ::done at the end"     "$(printf '%s' "$out" | grep -c '^::done 0$')" "1"
+check "a wrong answer is refused" "$(setup --dry-run --mode wat >/dev/null 2>&1 && echo ran || echo refused)" "refused"
+
 echo "== unknown arguments are refused =="
 check "refuses an unknown flag" "$(setup --wat >/dev/null 2>&1 && echo ran || echo refused)" "refused"
 
