@@ -419,6 +419,41 @@ Plasma, nothing changed. It has not run on a machine with Plasma yet.
 The one-liner in the README fetches `main`; until a release carries this,
 `--channel dev` is the one that works.
 
+**Then the first real install, in an Arch VM.** Everything installed and
+built, and one step failed: "the panel". Setup handed the panel to the shell
+before starting it -- `renderer.sh` rightly refuses a shell that is not
+running -- because starting came last. It now starts (or enables) the shell
+before the panel step, which also restarts plasmashell after the look and
+feel. `~/.local/bin` is not on PATH on Arch, so `rmpr` was not found:
+install.sh writes `~/.config/environment.d/60-<slug>-path.conf` when it is
+missing (from the next login) and uninstall removes it.
+
+**`rmpr uninstall`** (`scripts/uninstall.sh`, also `make uninstall`): every
+subsystem's own revert in order -- theme, renderer, units, lock screen,
+switcher, shortcuts, edges, window behaviour, window list, plugin modules --
+then the installed files. Keeps config and restore points unless `--purge`;
+never removes packages. `tests/test-uninstall.sh` runs it for real against a
+copy of the repo in a throwaway HOME. **Its first run stopped and disabled
+the real shell**: `systemctl --user` is not sandboxed by HOME, and the step
+was not behind `session_available`. Restored at once, now gated, and the
+suite checks the real units are unchanged at the end. Anything new that
+calls `systemctl --user`, KWin or plasmashell goes behind that switch --
+setup's own unit steps now are too (`in_session`).
+
+**`rmpr reinstall`** (`scripts/reinstall.sh`; `make reinstall`; the one-line
+install with `--reinstall`): one question, the uninstall (`--no-summary`,
+so no "nothing else to do" dialog halfway), then the setup. `--yes` takes the
+setup's defaults, `--fresh` removes config and state but not the restore
+points. Declining the setup's summary leaves it uninstalled, said up front
+and again with the command that finishes it.
+
+**The user's rule for all of these: no command left to run afterwards.**
+The setup now enables the unit and then *restarts* it -- `enable --now` left
+an already-running shell on the old code, without the previews just built --
+and its closing words say it is running and nothing is left; the uninstall no
+longer asks for a log-out. `tests/test-reinstall.sh` checks the order, the
+question and `--fresh`, in dry runs.
+
 ### The sunset of 2026-09-24, watched
 
 **Plasma's day and night switch worked on its own**: at sunset it moved the
