@@ -15,6 +15,7 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 cd "$REPO_ROOT"
 
 count=0
+# lint-nesting: allow -- each directory, then each file in it: the qmldir is both
 while IFS= read -r dir; do
     # Skip directories whose only QML lives deeper down.
     ls "$dir"/*.qml >/dev/null 2>&1 || continue

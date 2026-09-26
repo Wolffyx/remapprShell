@@ -47,7 +47,7 @@ restart: ## Restart the installed systemd user unit
 log: ## Follow the shell's journal
 	@journalctl --user -u $(UNIT) -f
 
-lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch ## Run every lint
+lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch lint-nesting ## Run every lint
 
 lint-slug: ## Fail if the project name is hardcoded anywhere
 	@scripts/lint-slug.sh
@@ -72,6 +72,9 @@ lint-tests: ## Fail if a QML test imports a module needing a running shell
 
 lint-launch: ## Fail if the shell starts an application anywhere but through Launch
 	@scripts/lint-launch.sh
+
+lint-nesting: ## Warn about a loop nested in a loop with a condition among them
+	@scripts/lint-nesting.sh
 
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh

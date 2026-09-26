@@ -82,6 +82,7 @@ shell_ipc_path() {
         *"@REPO_ROOT@/shell/shell.qml"*) printf '%s' "@REPO_ROOT@/shell/shell.qml"; return ;;
     esac
 
+    # lint-nesting: allow -- each process, then each word of its command line
     while IFS= read -r line; do
         # "<pid> <argv...>": the config path follows -p, and nothing else in
         # the command line ends in shell.qml.

@@ -219,6 +219,7 @@ doctor_light_dark() {
     # `colors.css`, which kde-gtk-config writes, is safe because every name in it
     # ends `_breeze` -- names only the Breeze GTK theme reads. A file that defines
     # the palette names themselves is the `gtk.css` fault wearing an @import.
+    # lint-nesting: allow -- each GTK version, then each file its gtk.css imports
     for gtk_v in 3.0 4.0; do
         gtk_css="$XDG_CONFIG_HOME/gtk-$gtk_v/gtk.css"
         [ -f "$gtk_css" ] || continue

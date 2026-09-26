@@ -34,6 +34,7 @@ quickshell_configs() {
     ours_real=$(realpath -q "$QS_CONFIG_DIR" 2>/dev/null)
     repo_real=$(realpath -q "${REPO_ROOT:-/nonexistent}/shell" 2>/dev/null)
 
+    # lint-nesting: allow -- each config root, then each config in it
     for d in "${dirs[@]}"; do
         [ -n "$d" ] || continue
         root="$d/quickshell"

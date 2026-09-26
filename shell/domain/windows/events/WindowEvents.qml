@@ -288,15 +288,15 @@ QtObject {
                 continue;
             seen.add(id);
             const mine = list.filter(i => root.appIdOf(i) === id);
-            if (mine.length > 0) {
-                for (const i of mine) {
-                    used.add(i);
-                    out.push(Object.assign({}, i, { pinned: true, launcher: false }));
-                }
-            } else {
+            if (mine.length === 0) {
                 const made = launcher ? launcher(id) : null;
                 if (made)
                     out.push(Object.assign({}, made, { pinned: true, launcher: true }));
+                continue;
+            }
+            for (const i of mine) {
+                used.add(i);
+                out.push(Object.assign({}, i, { pinned: true, launcher: false }));
             }
         }
         for (const i of list) {

@@ -1,7 +1,8 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-25**: in the evening a first-run wizard that
+sessions, and added to since -- most recently on **2026-09-27**: nested loops flattened and a lint for them
+("2026-09-27: loops in loops"). Before that, **2026-09-25**: in the evening a first-run wizard that
 draws each answer as it is given ("The evening of 2026-09-25"); in the
 afternoon a one-line installer ("The afternoon of 2026-09-25"); in the morning, two things
 seen in use: a slow start at login and a panel over a full-screen window
@@ -303,6 +304,32 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-09-27: loops in loops, flattened, and a lint for them
+
+The user found `for > if > for > if` in `NetworkIcons.nmcliRows` and asked
+for every other such place. A scanner reads the tree for them --
+`scripts/lib/nesting.py`, now `make lint-nesting` and a CI step -- and six
+were flattened, each by naming its inner loop or skipping early:
+
+- `NetworkIcons.nmcliRows`: one line's fields are `_nmcliFields(line)`.
+- `BusLine.stripByteArrays`: `_stringEnd` copies a quoted string whole,
+  `_integerRun` measures a run of numbers; the in-string flag is gone.
+- `WindowEvents.arrangeTasks`: a pin with no windows is handled first, and
+  `continue`s.
+- `KeyMap.sections`: the rows are a `map` then a `filter`.
+- `lint-tests.sh`: one module's check is `check_module`.
+- `theme/defaults.sh`: the `#` markers are one `case`, not a `case` in one.
+
+**The rule**: two loops with an `if`, `case` or `switch` anywhere in the
+chain. A `.some(x => expr)` with no braces is not a loop (nothing can nest in
+it), nor is a Python comprehension, and an `elif` is not an `if` inside an
+`if`. Shell is read with quotes, `$(...)` and heredocs blanked first -- the
+first try counted awk and jq programs' own `if`s and found a nest 20 deep in
+`config_get`. **A warning, not a failure.** A nest that is the shape of its
+data says so with `lint-nesting: allow -- why` on the outer loop's line or the
+one above; eight do (each directory then each file, and the like). The
+scanner passes its own rule, which took four helpers of its own.
 
 ### The evening of 2026-09-25: a first-run wizard that shows each answer
 

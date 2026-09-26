@@ -36,6 +36,7 @@ cmd=${1:-list}
 case "$cmd" in
     list)
         seen=""
+        # lint-nesting: allow -- each preset directory, then each preset in it
         while IFS= read -r dir; do
             [ -d "$dir" ] || continue
             for f in "$dir"/*.json; do

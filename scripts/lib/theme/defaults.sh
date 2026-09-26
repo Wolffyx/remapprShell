@@ -44,23 +44,24 @@ apply_defaults() {
         [ -n "$line" ] || continue
 
         # `# part: <id>` governs the lines beneath it, up to the next marker.
+        # Any other comment is only a comment.
         case "$line" in
+            '# variant: '*)
+                variant=${line#\# variant: }
+                continue
+                ;;
+            '# part: '*)
+                part=${line#\# part: }
+                variant="any"
+                if desktop_part_wanted "$part"; then
+                    wanted=1
+                else
+                    wanted=0
+                    log_info "leaving $part alone (theme.desktop.$part is off)"
+                fi
+                continue
+                ;;
             '#'*)
-                case "$line" in
-                    '# variant: '*)
-                        variant=${line#\# variant: }
-                        ;;
-                    '# part: '*)
-                        part=${line#\# part: }
-                        variant="any"
-                        if desktop_part_wanted "$part"; then
-                            wanted=1
-                        else
-                            wanted=0
-                            log_info "leaving $part alone (theme.desktop.$part is off)"
-                        fi
-                        ;;
-                esac
                 continue
                 ;;
         esac

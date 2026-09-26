@@ -207,6 +207,7 @@ class GlobalShortcuts:
         if self._bus is None:
             return
         bound = self.bindings()
+        # lint-nesting: allow -- each action, then each of its keys; the if only skips
         for action in SHORTCUT_ACTIONS:
             # One entry per alternative binding. The argument is a(ai) -- an
             # array of key *sequences* -- so each key is a one-element list

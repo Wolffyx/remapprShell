@@ -29,28 +29,35 @@ cd "$REPO_ROOT"
 fail=0
 checked=0
 
+# check_module <test> <module>: 1 when a singleton of the module imports
+# Quickshell, and so keeps the whole module from loading under qmltestrunner.
+check_module() {
+    local test=$1 module=$2 dir qml bad=0
+    # qs.domain.osd.events -> shell/domain/osd/events
+    dir="shell/${module#qs.}"
+    dir=${dir//./\/}
+    [ -d "$dir" ] || return 0
+    checked=$((checked + 1))
+
+    # The qmldir names the singletons: "singleton <Type> <version> <file>".
+    [ -f "$dir/qmldir" ] || return 0
+
+    while IFS= read -r qml; do
+        [ -f "$qml" ] || continue
+        grep -qE '^\s*import\s+Quickshell' "$qml" || continue
+        log_error "$test imports $module, which cannot load outside a running shell"
+        log_error "  $qml is a singleton of that module and imports Quickshell,"
+        log_error "  so qmltestrunner instantiates it and the whole module fails"
+        log_error "  move the pure code into a leaf module of its own, as qs.domain.osd.events is"
+        bad=1
+    done < <(awk '$1 == "singleton" { print "'"$dir"'/" $NF }' "$dir/qmldir" | sort)
+    return "$bad"
+}
+
 for test in tests/tst_*.qml; do
     [ -f "$test" ] || continue
     while IFS= read -r module; do
-        # qs.domain.osd.events -> shell/domain/osd/events
-        dir="shell/${module#qs.}"
-        dir=${dir//./\/}
-        [ -d "$dir" ] || continue
-        checked=$((checked + 1))
-
-        # The qmldir names the singletons: "singleton <Type> <version> <file>".
-        [ -f "$dir/qmldir" ] || continue
-
-        while IFS= read -r qml; do
-            [ -f "$qml" ] || continue
-            if grep -qE '^\s*import\s+Quickshell' "$qml"; then
-                log_error "$test imports $module, which cannot load outside a running shell"
-                log_error "  $qml is a singleton of that module and imports Quickshell,"
-                log_error "  so qmltestrunner instantiates it and the whole module fails"
-                log_error "  move the pure code into a leaf module of its own, as qs.domain.osd.events is"
-                fail=1
-            fi
-        done < <(awk '$1 == "singleton" { print "'"$dir"'/" $NF }' "$dir/qmldir" | sort)
+        check_module "$test" "$module" || fail=1
     done < <(grep -oE '^\s*import\s+qs\.[a-zA-Z0-9_.]+' "$test" | awk '{print $2}')
 done
 

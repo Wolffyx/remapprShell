@@ -98,12 +98,9 @@ QtObject {
     function sections(map, slug) {
         const out = [];
         for (const section of root.wanted) {
-            const rows = [];
-            for (const [group, action, label] of section.rows) {
-                const keys = root.keysOf(map, group, action);
-                if (keys.length > 0)
-                    rows.push({ keys: keys, label: label });
-            }
+            const rows = section.rows
+                .map(([group, action, label]) => ({ keys: root.keysOf(map, group, action), label: label }))
+                .filter(row => row.keys.length > 0);
             if (section.title === "Shell")
                 rows.push(...root.shellRows(map, slug));
             if (rows.length > 0)

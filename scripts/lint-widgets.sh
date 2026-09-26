@@ -20,6 +20,7 @@ mapfile -t signals < <(grep -oE '^\s*signal\s+[a-zA-Z_][a-zA-Z0-9_]*' "$BASE" \
                        | awk '{print $2}' | sort -u)
 
 fail=0
+# lint-nesting: allow -- each widget, then each signal it must not redefine
 while IFS= read -r file; do
     for name in "${signals[@]}"; do
         if grep -qE "^\s*function\s+${name}\s*\(" "$file"; then

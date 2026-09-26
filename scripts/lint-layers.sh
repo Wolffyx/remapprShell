@@ -19,6 +19,7 @@ cd "$REPO_ROOT/shell"
 declare -A rank=( [core]=0 [platform]=1 [domain]=2 [ui]=3 [features]=4 [widgets]=4 )
 fail=0
 
+# lint-nesting: allow -- each file, then each import in it
 while IFS= read -r file; do
     layer=${file%%/*}
     [ -n "${rank[$layer]:-}" ] || continue

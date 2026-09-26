@@ -99,27 +99,28 @@ QtObject {
     // colon inside a field -- a connection named "home:5G" -- arrives as
     // "\:", which is kept as part of the field.
     function nmcliRows(text) {
-        const rows = [];
-        for (const line of String(text ?? "").split("\n")) {
-            if (line.length === 0)
-                continue;
-            const fields = [];
-            let cur = "";
-            for (let i = 0; i < line.length; i++) {
-                const c = line[i];
-                if (c === "\\" && i + 1 < line.length) {
-                    cur += line[++i];
-                } else if (c === ":") {
-                    fields.push(cur);
-                    cur = "";
-                } else {
-                    cur += c;
-                }
+        return String(text ?? "").split("\n")
+            .filter(line => line.length > 0)
+            .map(line => root._nmcliFields(line));
+    }
+
+    // One line of `nmcli -t`, split into its fields.
+    function _nmcliFields(line) {
+        const fields = [];
+        let cur = "";
+        for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (c === "\\" && i + 1 < line.length) {
+                cur += line[++i];
+            } else if (c === ":") {
+                fields.push(cur);
+                cur = "";
+            } else {
+                cur += c;
             }
-            fields.push(cur);
-            rows.push(fields);
         }
-        return rows;
+        fields.push(cur);
+        return fields;
     }
 
     // The VPN and WireGuard connections, from rows of NAME:TYPE:ACTIVE.

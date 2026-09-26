@@ -74,6 +74,10 @@ jobs:
       - name: Docs lint
         run: ./scripts/lint-docs.sh
 
+      # Warns about a loop nested in a loop with a condition among them.
+      - name: Nesting lint
+        run: ./scripts/lint-nesting.sh
+
       - name: Tests
         run: xvfb-run -a ./scripts/test.sh
 
