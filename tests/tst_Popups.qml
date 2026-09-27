@@ -116,4 +116,92 @@ TestCase {
         compare(Popups.iconOf("", "firefox").kind, "name");
         compare(Popups.iconOf("", "").value, "dialog-information");
     }
+
+    // ---- what a click acts on ---------------------------------------------
+    //
+    // The hints in these cases were read off the session bus on 2026-09-16
+    // while Spectacle saved a screenshot, rather than made up: the array form
+    // of x-kde-urls and a "default" action called "Open" are what it sends.
+
+    function test_urls_are_local_files_only() {
+        compare(Popups.urlsOf({ "x-kde-urls": ["file:///home/a/shot.png"] }), ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": "/home/a/shot.png" }), ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": ["https://example.com/x.png"] }), []);
+        compare(Popups.urlsOf({}), []);
+        compare(Popups.urlsOf(undefined), []);
+    }
+
+    // The same hint as busctl hands it to the history: the hint wrapped as
+    // { type, data }, and an array of variants wrapped element by element.
+    // One rule reads both, so the history and the popup cannot disagree.
+    function test_urls_read_through_the_bus_wrapping() {
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "as", data: ["file:///home/a/shot.png"] } }),
+                ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "s", data: "/home/a/shot.png" } }),
+                ["file:///home/a/shot.png"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "av", data: [{ type: "s", data: "/home/a/x.pdf" },
+                                                                   { type: "s", data: "https://example.com/" }] } }),
+                ["file:///home/a/x.pdf"]);
+        compare(Popups.urlsOf({ "x-kde-urls": { type: "as", data: [] } }), []);
+        compare(Popups.urlsOf({ "x-kde-urls": [null, "", "  /home/a/y.png  "] }), ["file:///home/a/y.png"]);
+    }
+
+    function test_unwrapped_leaves_plain_values_alone() {
+        compare(Popups.unwrapped({ type: "s", data: "x" }), "x");
+        compare(Popups.unwrapped("x"), "x");
+        compare(Popups.unwrapped(["x"]), ["x"]);
+        compare(Popups.unwrapped(null), null);
+        compare(Popups.unwrapped(undefined), undefined);
+    }
+
+    function test_a_picture_is_a_file_that_looks_like_one() {
+        compare(Popups.pictureOf({ "x-kde-urls": ["file:///home/a/Screenshot.png"] }), "file:///home/a/Screenshot.png");
+        compare(Popups.pictureOf({ "image-path": "/home/a/photo.JPG" }), "file:///home/a/photo.JPG");
+        // A name, not a file: what `notify-send -i` sends.
+        compare(Popups.pictureOf({ "image-path": "dialog-information" }), "");
+        // A file that is not a picture is not drawn as one.
+        compare(Popups.pictureOf({ "x-kde-urls": ["file:///home/a/report.pdf"] }), "");
+        compare(Popups.pictureOf({}), "");
+    }
+
+    function test_a_click_prefers_the_senders_own_action() {
+        const withDefault = { actions: [{ identifier: "default", text: "Open" }], desktopEntry: "org.kde.spectacle" };
+        compare(Popups.openTarget(withDefault, { "x-kde-urls": ["file:///a/s.png"] }).kind, "action");
+
+        // No default action: the file it named, then the application itself.
+        // This is the whole of the bug -- a click used to close the popup and
+        // do nothing else.
+        const quiet = { actions: [{ identifier: "1", text: "Annotate" }], desktopEntry: "org.kde.spectacle" };
+        compare(Popups.openTarget(quiet, { "x-kde-urls": ["file:///a/s.png"] }),
+                { kind: "url", value: "file:///a/s.png" });
+        compare(Popups.openTarget(quiet, {}), { kind: "app", value: "org.kde.spectacle" });
+        compare(Popups.openTarget({ actions: [], desktopEntry: "firefox.desktop" }, {}).value, "firefox");
+        compare(Popups.openTarget({ actions: [] }, {}).kind, "none");
+        compare(Popups.openTarget(null, {}).kind, "none");
+    }
+
+    // "USB Device Detected": no actions, sent by kded, and a click started a
+    // second kded -- nothing anybody could see.
+    function test_a_device_plugged_in_opens_the_devices() {
+        const usb = { actions: [], desktopEntry: "org.kde.kded6", appIcon: "drive-removable-media-usb" };
+        compare(Popups.openTarget(usb, { "x-kde-eventId": "deviceAdded" }).kind, "devices");
+    }
+
+    function test_a_screen_plugged_in_opens_the_display_settings() {
+        const screen = { actions: [], desktopEntry: "org.kde.kded6", appIcon: "video-display" };
+        compare(Popups.openTarget(screen, { "x-kde-eventId": "deviceAdded" }).kind, "displays");
+    }
+
+    function test_a_service_is_never_started_as_an_application() {
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.kded6" }, {}).kind, "none");
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.plasmashell.desktop" }, {}).kind, "none");
+        compare(Popups.openTarget({ actions: [], desktopEntry: "org.kde.kded6" },
+                                  { "x-kde-eventId": "deviceRemoved" }).kind, "none");
+    }
+
+    function test_the_history_reads_the_same_rule() {
+        compare(Popups.targetFor({ eventId: "deviceAdded", desktopEntry: "org.kde.kded6" }).kind, "devices");
+        compare(Popups.targetFor({ url: "file:///a/b.png", eventId: "deviceAdded" }).kind, "url");
+        compare(Popups.targetFor({}).kind, "none");
+    }
 }

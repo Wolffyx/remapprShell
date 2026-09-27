@@ -10,7 +10,6 @@ pragma Singleton
 // a different piece of work -- so nothing here pretends to offer them.
 
 import QtQuick
-import Quickshell.Io
 import qs.platform.kde
 
 QtObject {
@@ -27,12 +26,13 @@ QtObject {
     readonly property int count: root.desktops.length
     readonly property int currentIndex: root.desktops.findIndex(d => d.id === root.currentId)
 
+    // Every call here is sent and not waited for (see Dbus.send): KWin's
+    // answer arrives as a signal on the watched object, and is read back
+    // from there like any other change.
     function switchTo(id) {
         if (!id || id === root.currentId)
             return;
-        setCurrent.command = ["busctl", "--user", "set-property", root.service, root.path, root.iface,
-                              "current", "s", id];
-        setCurrent.running = true;
+        Dbus.setProperty(root.service, root.path, root.iface, "current", "s", id);
     }
 
     // Wraps around, matching KWin's own default for desktop navigation.
@@ -44,28 +44,19 @@ QtObject {
         root.switchTo(root.desktops[next].id);
     }
 
-    readonly property Process _setCurrent: Process { id: setCurrent }
-
     // One more desktop, at the end. KWin names it itself when the name is
     // empty, the same as adding one in System Settings does.
     function create() {
-        createCall.command = Dbus.callArgs(root.service, root.path, root.iface, "createDesktop", "us",
-                                           [String(root.count), ""]);
-        createCall.running = true;
+        Dbus.send(root.service, root.path, root.iface, "createDesktop", "us", [String(root.count), ""]);
     }
-
-    readonly property Process _create: Process { id: createCall }
 
     // Takes one away. KWin moves whatever was on it to the desktop before, and
     // refuses to remove the last one -- a window has to be somewhere.
     function remove(id) {
         if (!id || root.count <= 1)
             return;
-        removeCall.command = Dbus.callArgs(root.service, root.path, root.iface, "removeDesktop", "s", [id]);
-        removeCall.running = true;
+        Dbus.send(root.service, root.path, root.iface, "removeDesktop", "s", [id]);
     }
-
-    readonly property Process _remove: Process { id: removeCall }
 
     // Whether KWin is showing the desktop. Read back from KWin rather than
     // remembered from our own clicks, so Meta+D, a hot corner and a window
@@ -74,13 +65,8 @@ QtObject {
     property bool showingDesktop: false
 
     function showDesktop(show) {
-        showDesktopCall.running = false;
-        showDesktopCall.command = Dbus.callArgs(root.service, "/KWin", "org.kde.KWin", "showDesktop", "b",
-                                                [show ? "true" : "false"]);
-        showDesktopCall.running = true;
+        Dbus.send(root.service, "/KWin", "org.kde.KWin", "showDesktop", "b", [show ? "true" : "false"]);
     }
-
-    readonly property Process _showDesktopCall: Process { id: showDesktopCall }
 
     readonly property DbusProperty _showing: DbusProperty {
         service: root.service

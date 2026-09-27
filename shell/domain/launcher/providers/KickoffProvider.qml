@@ -33,6 +33,8 @@
 import QtQuick
 import Quickshell.Io
 import qs.core
+import qs.platform.kde
+import qs.platform.system
 import qs.domain.launcher
 
 Provider {
@@ -63,14 +65,14 @@ Provider {
     property string _shellPackage: "org.kde.plasma.desktop"
 
     readonly property FileView _shellrc: FileView {
-        path: `${Branding.xdgConfigDir}/plasmashellrc`
+        path: `${Env.xdgConfigHome()}/plasmashellrc`
         watchChanges: true
         printErrors: false
 
         onFileChanged: reload()
+        // In [Shell], where plasmashell and every script here read it.
         onLoaded: {
-            const match = text().match(/^\s*ShellPackage\s*=\s*(.+)$/m);
-            const next = match ? match[1].trim() : "org.kde.plasma.desktop";
+            const next = Ini.value(text(), "Shell", "ShellPackage") || "org.kde.plasma.desktop";
             if (next !== root._shellPackage) {
                 root._shellPackage = next;
                 root._hostView.reload();
@@ -81,7 +83,7 @@ Provider {
 
     // That package's applet layout, which is where a launcher applet would be.
     readonly property FileView _hostView: FileView {
-        path: `${Branding.xdgConfigDir}/plasma-${root._shellPackage}-appletsrc`
+        path: `${Env.xdgConfigHome()}/plasma-${root._shellPackage}-appletsrc`
         watchChanges: true
         printErrors: false
 
@@ -109,6 +111,9 @@ Provider {
         }
     }
 
+    // The windowed menu is a process of its own, and opening it again
+    // replaces the last one rather than stacking a second window. In a scope
+    // of its own, like everything the shell opens (see Launch).
     readonly property Process _call: Process {}
 
     // Placement is not ours to control, and a menu appearing on the far side of
@@ -123,12 +128,13 @@ Provider {
         }
         root._call.running = false;
         if (root.mode === "windowed") {
-            root._call.command = ["plasmawindowed", "org.kde.plasma.kickoff"];
+            Launch.scoped(["plasmawindowed", "org.kde.plasma.kickoff"], "org.kde.plasmawindowed", argv => {
+                root._call.command = argv;
+                root._call.running = true;
+            });
         } else {
-            root._call.command = ["busctl", "--user", "call", "org.kde.plasmashell",
-                                  "/PlasmaShell", "org.kde.PlasmaShell", "activateLauncherMenu"];
+            Dbus.send("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "activateLauncherMenu");
         }
-        root._call.running = true;
     }
 
     function close() {}

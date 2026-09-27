@@ -34,26 +34,17 @@ QtObject {
         mode: ConfigStore.value("launcher.kickoffMode", "menu")
     }
 
-    readonly property ExecProvider fuzzel: ExecProvider {
-        providerId: "fuzzel"
-        label: "fuzzel"
-        command: ["fuzzel"]
-    }
-
-    readonly property ExecProvider rofi: ExecProvider {
-        providerId: "rofi"
-        label: "rofi"
-        command: ["rofi", "-show", "drun"]
-    }
-
+    // Any launcher that is its own program -- fuzzel, rofi, wofi, walker --
+    // is this, with the command line it is run with. fuzzel and rofi were
+    // providers of their own until 2026-09-24; a profile that chose one was
+    // migrated to this with the same command (MigrationSteps.toVersion2).
     readonly property ExecProvider custom: ExecProvider {
         providerId: "custom"
         label: "Custom command"
         command: ConfigStore.value("launcher.command", [])
     }
 
-    readonly property var providers: [root.builtin, root.krunner, root.kickoff,
-                                      root.fuzzel, root.rofi, root.custom]
+    readonly property var providers: [root.builtin, root.krunner, root.kickoff, root.custom]
 
     readonly property var availableProviders: root.providers.filter(p => p.available)
 

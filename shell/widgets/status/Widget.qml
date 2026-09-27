@@ -25,9 +25,7 @@ BarWidget {
     readonly property var tiles: root.widgetConfig?.tiles
         ?? ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"]
     readonly property int step: root.widgetConfig?.step ?? 5
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
     readonly property real k: Math.max(0.7, root.unit)
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
 
     // Which page of quick settings is showing. Kept here rather than in the
     // popout, so that closing it and opening it again starts at the top.
@@ -55,21 +53,9 @@ BarWidget {
     function tipFor(id) {
         switch (id) {
         case "privacy":
-            return [StatusIcons.privacyTooltip(PrivacyStatus.users, AudioStatus.micMuted),
-                    PrivacyStatus.users.microphone.length > 0
-                        ? (AudioStatus.micMuted ? "Middle-click to unmute the microphone"
-                                                : "Middle-click to mute the microphone")
-                        : ""].filter(s => s).join("\n");
-        case "network": {
-            const lines = NetworkStatus.connections.map(c => c.kind === "wired"
-                ? [c.name, StatusIcons.linkSpeed(c.speed)].filter(s => s).join(" · ")
-                : `${c.name} · ${StatusIcons.percent(c.strength)}`);
-            if (lines.length === 0)
-                return "Not connected";
-            if (StatusIcons.isLimited(NetworkStatus.connectivity))
-                lines.push(NetworkStatus.connectivity === "Portal" ? "A sign-in page is in the way" : "No internet");
-            return lines.join("\n");
-        }
+            return StatusIcons.privacyHint(PrivacyStatus.users, AudioStatus.micMuted);
+        case "network":
+            return StatusIcons.networkTooltip(NetworkStatus.connections, NetworkStatus.connectivity);
         case "bluetooth": {
             if (!BluetoothStatus.enabled)
                 return "Bluetooth is off";
@@ -93,30 +79,16 @@ BarWidget {
     property int hoveredIndex: -1
 
     tooltip: root.hoveredIndex >= 0 ? root.tipFor(root.parts[root.hoveredIndex]?.id ?? "") : "Network, sound and battery"
-    tooltipCentre: {
-        const g = glyphs.itemAt(root.hoveredIndex);
-        if (!g)
-            return -1;
-        return root.vertical ? layout.y + g.y + g.height / 2 : layout.x + g.x + g.width / 2;
-    }
+    tooltipCentre: root.centreAlong(glyphs, root.hoveredIndex, root.barVertical, root.barVertical ? layout.y : layout.x)
 
     wantsHover: true
     wantsWheel: true
 
+    // The glyphs sit in the middle of the widget, so they are measured from
+    // where their grid starts.
     function handleHover(position, horizontal) {
-        const p = position - (root.vertical ? layout.y : layout.x);
-        root.hoveredIndex = -1;
-        for (let i = 0; i < glyphs.count; i++) {
-            const g = glyphs.itemAt(i);
-            if (!g)
-                continue;
-            const start = root.vertical ? g.y : g.x;
-            const length = root.vertical ? g.height : g.width;
-            if (p >= start - layout.spacing / 2 && p < start + length + layout.spacing / 2) {
-                root.hoveredIndex = i;
-                return;
-            }
-        }
+        root.hoveredIndex = root.indexAlong(glyphs, position, layout.spacing, root.barVertical,
+                                            root.barVertical ? layout.y : layout.x);
     }
 
     onDismissPopout: root.hoveredIndex = -1
@@ -153,8 +125,8 @@ BarWidget {
         QuickSettings { widget: root }
     }
 
-    implicitWidth: root.vertical ? root.size : layout.implicitWidth + 2 * Math.round(13 * root.k)
-    implicitHeight: root.vertical ? layout.implicitHeight + 2 * Math.round(11 * root.k) : root.size
+    implicitWidth: root.barVertical ? root.tileSize : layout.implicitWidth + 2 * Math.round(13 * root.k)
+    implicitHeight: root.barVertical ? layout.implicitHeight + 2 * Math.round(11 * root.k) : root.tileSize
 
     Rectangle {
         anchors.fill: parent
@@ -167,7 +139,7 @@ BarWidget {
     Grid {
         id: layout
         anchors.centerIn: parent
-        columns: root.vertical ? 1 : Math.max(1, root.parts.length)
+        columns: root.barVertical ? 1 : Math.max(1, root.parts.length)
         spacing: Math.round(11 * root.k)
 
         Repeater {

@@ -15,6 +15,7 @@ import qs.domain.keys
 import qs.domain.surfaces
 import qs.domain.theme
 import qs.platform.kde
+import qs.platform.system
 import qs.ui.primitives
 import qs.ui.controls
 
@@ -41,7 +42,7 @@ PanelWindow {
     property var sections: []
 
     FileView {
-        path: `${Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")}/kglobalshortcutsrc`
+        path: `${Env.xdgConfigHome()}/kglobalshortcutsrc`
         printErrors: false
         onLoaded: win.sections = KeyMap.sections(KeyMap.parse(text()), Branding.slug)
     }

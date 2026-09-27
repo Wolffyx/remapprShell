@@ -11,13 +11,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.domain.status
 import qs.domain.status.icons
-import qs.domain.theme
 import qs.ui.primitives
 
 BarWidget {
     id: root
-
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
 
     present: KeyboardStatus.present
     wantsWheel: true
@@ -31,8 +28,8 @@ BarWidget {
         return next && next !== current ? `${current.long}\nClick for ${next.long}` : current.long;
     }
 
-    implicitWidth: Math.max(root.size, label.implicitWidth + 20)
-    implicitHeight: root.size
+    implicitWidth: Math.max(root.tileSize, label.implicitWidth + 20)
+    implicitHeight: root.tileSize
 
     // A touchpad reports fractions of a notch; a layout moves only once a
     // whole one has built up, or a light swipe would spin through them all.
@@ -56,9 +53,9 @@ BarWidget {
 
     BarButton {
         anchors.fill: parent
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
-        size: root.size
+        size: root.tileSize
     }
 
     PanelText {

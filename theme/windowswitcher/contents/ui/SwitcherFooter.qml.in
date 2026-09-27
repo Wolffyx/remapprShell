@@ -1,0 +1,93 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    The foot of Alt+Tab: the selected window's name, and the keys.
+
+    Part of the window switcher, and drawn inside kwin_wayland like the rest
+    of it -- main.qml places it, and hands it the caption and the colours.
+*/
+// The key hints are a delegate, and read their colours from this file's root.
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import org.kde.plasma.components as PlasmaComponents3
+import org.kde.kirigami as Kirigami
+
+Item {
+    id: footer
+
+    // The selected window's caption, or what to say when there is none.
+    required property string caption
+    required property color ink
+    required property color inkMuted
+    required property color outline
+
+    height: 40
+
+    Rectangle {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 1
+        color: footer.outline
+    }
+
+    PlasmaComponents3.Label {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        width: parent.width * 0.5
+        text: footer.caption
+        textFormat: Text.PlainText
+        elide: Text.ElideMiddle
+        font.weight: Font.Medium
+        color: footer.ink
+    }
+
+    Row {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        spacing: 8
+
+        Repeater {
+            model: [
+                { key: "Tab", what: "next" },
+                { key: "Shift+Tab", what: "back" },
+                { key: "Alt ↑", what: "focus" },
+                { key: "Esc", what: "cancel" }
+            ]
+
+            delegate: Row {
+                id: hint
+
+                required property var modelData
+                spacing: 6
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: 22
+                    width: keyLabel.implicitWidth + 18
+                    radius: 8
+                    color: Qt.rgba(footer.ink.r, footer.ink.g, footer.ink.b, 0.06)
+                    border.width: 1
+                    border.color: footer.outline
+
+                    PlasmaComponents3.Label {
+                        id: keyLabel
+                        anchors.centerIn: parent
+                        text: hint.modelData.key
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.weight: Font.Medium
+                        color: footer.ink
+                    }
+                }
+                PlasmaComponents3.Label {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: hint.modelData.what
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: footer.inkMuted
+                    rightPadding: 6
+                }
+            }
+        }
+    }
+}

@@ -22,6 +22,32 @@ profiles_dir="$CONFIG_DIR/profiles"
 
 # active_profile() comes from lib/brand.sh, so every command agrees.
 
+# How many overrides each profile directory's shell.json holds, into
+# OVERRIDES in the same order: a count, "?" for a file that is missing or does
+# not parse, and nothing for one with no value in it at all.
+#
+# One jq for every profile, where it was one a profile. Each file goes in whole
+# and is parsed on its own inside, so one that does not parse is a "?" for that
+# profile alone: jq reading them as one stream stops at the first bad one, and
+# reading them as lines runs the end of a file with no last newline into the
+# start of the next.
+OVERRIDES=()
+override_counts() {   # <profile dir>...
+    local i=0 d
+    local -a args=()
+    OVERRIDES=()
+    [ $# -gt 0 ] || return 0
+    for d in "$@"; do
+        [ -f "$d/shell.json" ] && [ -r "$d/shell.json" ] && args+=(--rawfile "p$i" "$d/shell.json")
+        i=$((i + 1))
+    done
+    mapfile -d '' -t OVERRIDES < <(jq -n --raw-output0 --argjson n $# "${args[@]}" '
+        range($n) as $i | $ARGS.named["p\($i)"]
+        | if . == null then "?"
+          elif test("\\A[ \t\r\n]*\\z") then ""
+          else try (fromjson | [paths(scalars)] | length | tostring) catch "?" end' 2>/dev/null)
+}
+
 cmd=${1:-list}
 [ $# -gt 0 ] && shift
 
@@ -29,16 +55,22 @@ case "$cmd" in
     list)
         active=$(active_profile)
         [ -d "$profiles_dir" ] || { log_info "no profiles yet"; exit 0; }
+        # The monitor files are counted by a glob, which skips the hidden ones
+        # `ls` skipped and starts nothing -- with nullglob, so none counts 0.
+        shopt -s nullglob
+        dirs=()
         for d in "$profiles_dir"/*/; do
-            [ -d "$d" ] || continue
-            name=$(basename "$d")
+            [ -d "$d" ] && dirs+=("$d")
+        done
+        override_counts "${dirs[@]}"
+        for i in "${!dirs[@]}"; do
+            d=${dirs[$i]}
+            name=${d%/}; name=${name##*/}
             mark=' '
             [ "$name" = "$active" ] && mark='*'
-            monitors=$(ls -1 "$d/monitors" 2>/dev/null | wc -l)
+            monitors=("$d"monitors/*)
             printf '%s %-16s %s override(s), %s monitor file(s)\n' \
-                "$mark" "$name" \
-                "$(jq '[paths(scalars)] | length' "$d/shell.json" 2>/dev/null || echo '?')" \
-                "$monitors"
+                "$mark" "$name" "${OVERRIDES[$i]-?}" "${#monitors[@]}"
         done
         ;;
 

@@ -11,15 +11,22 @@ pragma Singleton
 // It registers itself as a unique DBus service (`org.kde.plasmawindowed`), so
 // a second request is handed to the process already running rather than
 // starting another one.
+//
+// Both are applications somebody opened, so both go through Launch, into a
+// scope of their own: a restart of the shell must not close the mixer or the
+// settings window in front of the user. Where the shell already hosts
+// Plasma's services (PlasmaServices), plasmawindowed is that process, and the
+// window opens in it -- the scope then holds only the request, for the moment
+// it takes to hand it over.
 
 import QtQuick
-import Quickshell
+import qs.platform.system
 
 QtObject {
     function open(applet) {
         if (!applet)
             return;
-        Quickshell.execDetached(["plasmawindowed", applet]);
+        Launch.command(["plasmawindowed", applet], "org.kde.plasmawindowed");
     }
 
     // A page of System Settings, by its module name ("kcm_nightlight"), for
@@ -27,6 +34,6 @@ QtObject {
     function openSettings(kcm) {
         if (!kcm)
             return;
-        Quickshell.execDetached(["systemsettings", kcm]);
+        Launch.command(["systemsettings", kcm], "systemsettings");
     }
 }

@@ -25,7 +25,7 @@ Rectangle {
         id: column
         x: root.padding
         y: root.padding
-        width: root.width - 2 * root.padding
+        width: root.contentWidth
         spacing: 12
     }
 }

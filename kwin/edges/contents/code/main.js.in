@@ -1,0 +1,55 @@
+/*
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    Runs @DISPLAY_NAME@'s own actions from a screen edge.
+
+    KWin's screen edges run KWin's own actions and nothing else: `rmpr edges`
+    configures those, and no amount of configuring them can open a surface this
+    shell draws. A shell that wants the pointer at the left of the screen to
+    mean something has to register the edge itself, and `registerScreenEdge` is
+    the only supported way to do that without a C++ effect.
+
+    Separate from the window-list script on purpose. That one is a read -- it
+    never moves, closes or focuses anything -- and mixing an action into it
+    would make its header a lie. Two packages also mean the window list can be
+    on with no edge claimed, which is the usual case.
+
+    The bindings are rendered in rather than read from a config file. KWin
+    scripts can only read their own configuration through a KConfigXT file,
+    which is a second place for the same setting to live and drift; a script
+    that is re-rendered and reloaded whenever the setting changes has one.
+
+    Like the window list, this can only *call* DBus, never be called, so it
+    pushes to the same daemon -- which already knows how to run every action a
+    key can be bound to, and runs them detached for the same reason: the edge
+    callback is inside the compositor.
+*/
+
+const SERVICE = "@DBUS_NAME@";
+const PATH = "/Edges";
+const IFACE = "@DBUS_NAME@.Edges";
+
+// [[border, "action"], ...] -- KWin's ElectricBorder number and the action
+// name the daemon knows. Empty when nothing is bound, which is a script that
+// loads, claims no edge and does nothing: `edges shell <edge> none` leaves it
+// installed rather than tearing the package down for a setting that is
+// usually turned straight back on.
+const BINDINGS = @EDGE_BINDINGS@;
+
+// True keeps the edge armed; KWin re-approaches otherwise. There is no second
+// meaning to returning false here -- the action has already been asked for by
+// the time this returns.
+function trigger(action) {
+    callDBus(SERVICE, PATH, IFACE, "Triggered", String(action));
+    return true;
+}
+
+for (let i = 0; i < BINDINGS.length; ++i) {
+    const border = BINDINGS[i][0];
+    const action = BINDINGS[i][1];
+    // The callback is built outside the loop body's scope on purpose: a
+    // closure over the loop variable would hand every edge the last action.
+    registerScreenEdge(border, (function (bound) {
+        return function () { return trigger(bound); };
+    })(action));
+}

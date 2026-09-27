@@ -45,7 +45,13 @@ ShellRoot {
             negative: root.rgb(r.error),
             link: root.rgb(r.primary),
             visited: root.rgb(r.tertiary),
-            tooltipBackground: root.rgb(dark ? r.surfaceContainerHighest : r.inverseSurface),
+            // The same surface tone in both, and deliberately not the
+            // inverse one. Material's tooltip is inverseSurface *paired with*
+            // inverseOnSurface; KDE's `[Colors:Tooltip]` takes its foreground
+            // from the same foreground every other group uses, so inverting
+            // only the background gave the light scheme a near-black tooltip
+            // with near-black text on it.
+            tooltipBackground: root.rgb(r.surfaceContainerHighest),
             titlebarActive: root.rgb(r.surfaceContainerHigh),
             titlebarInactive: root.rgb(r.surfaceContainer),
             disabled: root.rgb(r.outlineVariant)

@@ -1,0 +1,34 @@
+{
+    "id": "weather",
+    "apiVersion": 1,
+    "name": "Weather",
+    "description": "The temperature now, and a forecast when you click it. Off until Settings -> Weather is turned on: it is the one widget that talks to the internet, and it asks Open-Meteo for a place and nothing else.",
+    "icon": "weather-few-clouds",
+    "zones": ["left", "middle", "right"],
+    "orientation": ["horizontal", "vertical"],
+    "renderers": {
+        "quickshell": { "entry": "Widget.qml" }
+    },
+    "config": {
+        "showTemperature": {
+            "type": "bool",
+            "default": true,
+            "label": "Show the temperature",
+            "description": "Beside the icon. Off leaves the icon alone, which is narrower on a full panel."
+        },
+        "showPlace": {
+            "type": "bool",
+            "default": false,
+            "label": "Show the place",
+            "description": "The town the forecast is for, after the temperature."
+        },
+        "days": {
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 6,
+            "label": "Days shown",
+            "description": "How many days of the forecast the popout lists."
+        }
+    }
+}

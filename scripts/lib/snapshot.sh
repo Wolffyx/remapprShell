@@ -14,7 +14,8 @@
 # changing a machine's snapshot policy is precisely the surprise this whole
 # mechanism exists to prevent.
 #
-# Requires brand.sh, log.sh, protected.sh.
+# Requires brand.sh, log.sh, protected.sh -- and config.sh, for the one setting
+# snapshot_autoprune reads.
 
 # Deliberately NOT inside STATE_DIR. The state directory is part of what a
 # snapshot captures and therefore part of what a restore overwrites, so an
@@ -128,14 +129,18 @@ _snapshot_copy() {
 # Echoes the snapshot directory on success.
 snapshot_create() {
     local label=${1:-manual}
+    # The label is part of a directory name. A slash in it made directories
+    # inside the root -- or, with `..`, outside it -- and a leading dash made
+    # a name that reads as a flag to every command given it afterwards. So
+    # both become a dash and are trimmed off the front; spaces are kept.
+    label=${label//\//-}
+    label=$(printf '%s' "$label" | tr -d '\000-\037' | sed -E 's/^[-. ]+//; s/[ ]+$//')
+    [ -n "$label" ] || label=manual
     # Two snapshots taken in the same second with the same label would share a
     # directory and merge into each other -- a restore point that is quietly
     # half of one state and half of another is worse than no restore point.
-    local base dir n
-    base="$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}"
-    dir=$base
-    n=2
-    while [ -e "$dir" ]; do dir="$base-$n"; n=$((n + 1)); done
+    local dir
+    dir=$(unique_path "$(snapshot_root)/$(date +%Y%m%d-%H%M%S)-${label}")
 
     mkdir -p "$dir/files" || { log_error "cannot create $dir"; return 1; }
 
@@ -167,12 +172,17 @@ snapshot_create() {
     printf '%s\n' "$dir"
 }
 
+# Every snapshot's name, oldest first: names begin with a sortable timestamp.
+snapshot_names() { ls -1 "$(snapshot_root)" 2>/dev/null | sort; }
+
+# The oldest -- the pre-install state, which pruning never takes -- by name.
+snapshot_oldest() { snapshot_names | head -1; }
+
 snapshot_latest() {
     local root
     root=$(snapshot_root)
     [ -d "$root" ] || return 1
-    # Names begin with a sortable timestamp, so the last one is the newest.
-    ls -1 "$root" 2>/dev/null | sort | tail -1 | sed "s|^|$root/|"
+    snapshot_names | tail -1 | sed "s|^|$root/|"
 }
 
 # Restores a snapshot.
@@ -250,26 +260,33 @@ snapshot_restore() {
     # files that have just been put back. What used to be lost with it was the
     # profile backups, and those are written into the configuration directory
     # as profiles now, which is the half of this that makes the rule safe.
+    #
+    # Both passes ask whether a path is in the manifest, so it is made a
+    # lookup once. A grep for each was a process for every path we own or
+    # protect, on a command somebody runs because something is already wrong.
+    local -A captured=()
+    while IFS= read -r path; do
+        [ -n "$path" ] && captured[$path]=1
+    done <<< "$manifest"
+
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         [ -e "$path" ] || continue
-        if [ "$path" = "$CONFIG_DIR" ] && ! grep -qxF -- "$path" <<< "$manifest"; then
+        [ -z "${captured[$path]:-}" ] || continue
+        if [ "$path" = "$CONFIG_DIR" ]; then
             log_warn "this snapshot predates $path being captured; leaving your configuration as it is"
             continue
         fi
-        if ! grep -qxF -- "$path" <<< "$manifest"; then
-            snapshot_safe_rm "$path" && removed=$((removed + 1))
-        fi
+        snapshot_safe_rm "$path" && removed=$((removed + 1))
     done < <(owned_paths)
 
     # Anything else that appeared since is reported, not deleted.
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         [ -e "$path" ] || continue
-        if ! grep -qxF -- "$path" <<< "$manifest"; then
-            log_warn "created since the snapshot, left in place: $path"
-            skipped=$((skipped + 1))
-        fi
+        [ -z "${captured[$path]:-}" ] || continue
+        log_warn "created since the snapshot, left in place: $path"
+        skipped=$((skipped + 1))
     done < <(protected_files; protected_dirs)
 
     rm -rf "$staging"
@@ -278,43 +295,112 @@ snapshot_restore() {
 
 # --- removal: user-invoked only -------------------------------------------
 
+# What the two listings below show of each snapshot, read without starting a
+# process for any one of them. They used to run up to five an entry --
+# basename, sed, du, wc and jq -- and nothing bounds how many snapshots there
+# are.
+#
+# Sizes come from one du over the whole store (_snapshot_du), into
+# SNAPSHOT_SIZE by directory. The rest is read per snapshot by
+# _snapshot_details, into SNAPSHOT_CREATED and SNAPSHOT_PATHS.
+declare -gA SNAPSHOT_SIZE=()
+_snapshot_sizes() {   # <root>
+    local entry
+    SNAPSHOT_SIZE=()
+    # NUL-terminated, so no name can be taken for the end of a line. The
+    # size is everything before the first tab and the directory everything
+    # after, exactly as it was passed.
+    while IFS= read -r -d '' entry; do
+        SNAPSHOT_SIZE[${entry#*$'\t'}]=${entry%%$'\t'*}
+    done < <(_snapshot_du "$1"/*/)
+}
+
+# One du over every snapshot directory given, as each would be measured alone.
+#
+# du over several directories counts each file once across all of them: in a
+# store deduplicated with hard links every snapshot after the first would read
+# as nearly empty, and a snapshot directory reached twice would not be listed
+# at all. -l counts a file in every directory holding it -- but also twice in
+# one snapshot holding it under two names, which a du of that snapshot alone
+# never did. So a store with any file of more than one name is measured a
+# snapshot at a time, as it always was, and any other is measured once.
+_snapshot_du() {   # <snapshot dir>...
+    local d
+    if [ -z "$(find "$@" -type f -links +1 -print -quit 2>/dev/null)" ]; then
+        du -shl0 "$@" 2>/dev/null
+        return 0
+    fi
+    for d in "$@"; do
+        du -sh0 "$d" 2>/dev/null
+    done
+}
+
+# The `created=` line of its meta, and how many paths its manifest holds --
+# counted as wc -l counts them, by newlines, so a last line with none is not
+# one. SNAPSHOT_PATHS is empty when there is no manifest to read.
+_snapshot_details() {   # <snapshot dir>
+    local line
+    local -a lines=()
+    SNAPSHOT_CREATED=""
+    SNAPSHOT_PATHS=""
+    if [ -f "$1/meta" ] && [ -r "$1/meta" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ $line == created=* ]] || continue
+            SNAPSHOT_CREATED=${line#created=}
+            break
+        done < "$1/meta"
+    fi
+    [ -f "$1/manifest.txt" ] && [ -r "$1/manifest.txt" ] || return 0
+    mapfile lines < "$1/manifest.txt"
+    SNAPSHOT_PATHS=${#lines[@]}
+    [ "$SNAPSHOT_PATHS" -gt 0 ] || return 0
+    [[ ${lines[-1]} == *$'\n' ]] || SNAPSHOT_PATHS=$((SNAPSHOT_PATHS - 1))
+}
+
 # The same listing as JSON, for anything that has to read it rather than show
 # it. The text form is padded to columns, and a name wider than its column
 # leaves a single space -- which the settings window, splitting on runs of
 # spaces, read as part of the name. A reader should never have to guess at
 # spacing that exists for a person's benefit.
+#
+# Five fields a snapshot, NUL-separated into a single jq at the end, so that
+# nothing in a name or a date can be mistaken for a separator.
 snapshot_list_json() {
-    local root d
+    local root d name locked
+    local -a fields=()
     root=$(snapshot_root)
     [ -d "$root" ] || { printf '[]\n'; return 0; }
-    {
-        for d in "$root"/*/; do
-            [ -d "$d" ] || continue
-            jq -n --arg name "$(basename "$d")" \
-                  --arg created "$(sed -n 's/^created=//p' "$d/meta" 2>/dev/null)" \
-                  --arg size "$(du -sh "$d" 2>/dev/null | cut -f1)" \
-                  --argjson paths "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo 0)" \
-                  --argjson locked "$(snapshot_is_locked "$d" && echo true || echo false)" \
-                  '{name: $name, created: $created, paths: $paths, size: $size, locked: $locked}'
-        done
-    } | jq -sc 'sort_by(.name)'
+    _snapshot_sizes "$root"
+    for d in "$root"/*/; do
+        [ -d "$d" ] || continue
+        name=${d%/}; name=${name##*/}
+        _snapshot_details "$d"
+        locked=false
+        snapshot_is_locked "$d" && locked=true
+        fields+=("$name" "$SNAPSHOT_CREATED" "${SNAPSHOT_PATHS:-0}" "${SNAPSHOT_SIZE[$d]:-}" "$locked")
+    done
+    { [ "${#fields[@]}" -eq 0 ] || printf '%s\0' "${fields[@]}"; } \
+      | jq -Rsc 'split("\u0000") | .[:-1] | [range(0; length; 5) as $i | .[$i:$i + 5]
+                 | {name: .[0], created: .[1], paths: (.[2] | tonumber), size: .[3], locked: (.[4] == "true")}]
+                 | sort_by(.name)'
 }
 
 snapshot_list() {
-    local root d
+    local root d name locked
     root=$(snapshot_root)
     [ -d "$root" ] || { log_info "no snapshots"; return 0; }
+    _snapshot_sizes "$root"
 
     local found=0
     for d in "$root"/*/; do
         [ -d "$d" ] || continue
         found=1
+        name=${d%/}; name=${name##*/}
+        _snapshot_details "$d"
+        locked=""
+        snapshot_is_locked "$d" && locked='  [locked]'
         printf '%-34s %-26s %s path(s)  %s%s\n' \
-            "$(basename "$d")" \
-            "$(sed -n 's/^created=//p' "$d/meta" 2>/dev/null)" \
-            "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo '?')" \
-            "$(du -sh "$d" 2>/dev/null | cut -f1)" \
-            "$(snapshot_is_locked "$d" && printf '  [locked]')"
+            "$name" "$SNAPSHOT_CREATED" "${SNAPSHOT_PATHS:-?}" "${SNAPSHOT_SIZE[$d]:-}" "$locked"
     done
     [ "$found" = 1 ] || log_info "no snapshots"
 }
@@ -329,9 +415,7 @@ snapshot_remove() {
     [ -d "$dir" ] || { log_error "no such snapshot: $name"; return 1; }
     # Removing the oldest means losing the pre-install state, which is the one
     # most likely to be wanted and the least likely to be missed until then.
-    local oldest
-    oldest=$(ls -1 "$root" 2>/dev/null | sort | head -1)
-    if [ "$(basename "$dir")" = "$oldest" ]; then
+    if [ "$(basename "$dir")" = "$(snapshot_oldest)" ]; then
         log_warn "this is the oldest snapshot -- usually the pre-install state"
     fi
 
@@ -366,13 +450,14 @@ snapshot_lock() {   # <name> <on|off>
 # point that can put the machine back the way it was found -- and it is worth
 # more than any number of recent ones.
 snapshot_prunable() {
-    local root d first=1
+    local root d oldest
     root=$(snapshot_root)
-    for d in $(ls -1 "$root" 2>/dev/null | sort); do
-        if [ "$first" = 1 ]; then first=0; continue; fi
+    oldest=$(snapshot_oldest)
+    while IFS= read -r d; do
+        [ "$d" = "$oldest" ] && continue
         snapshot_is_locked "$root/$d" && continue
         printf '%s\n' "$d"
-    done
+    done < <(snapshot_names)
 }
 
 snapshot_prune() {
@@ -384,7 +469,7 @@ snapshot_prune() {
     [ "$keep" -ge 1 ] || { log_error "keep must be at least 1"; return 1; }
 
     local total
-    total=$(ls -1 "$root" 2>/dev/null | wc -l)
+    total=$(snapshot_names | wc -l)
     [ "$total" -gt "$keep" ] || { log_info "$total snapshot(s), keeping $keep: nothing to do"; return 0; }
 
     # `keep` means the newest N are kept, so they are taken out of the running
@@ -396,11 +481,18 @@ snapshot_prune() {
     # So: the newest N are safe, the locked are safe, the oldest is safe, and
     # what is left is what goes. A machine can therefore end up holding more
     # than `keep` -- that is the protection working, not the count failing.
-    local newest removed=0 n
-    newest=$(ls -1 "$root" | sort | tail -n "$keep")
+    #
+    # The newest are a lookup, made once: a grep for each candidate was a
+    # process a snapshot.
+    local -A newest=()
+    local removed=0 n
+    while IFS= read -r n; do
+        [ -n "$n" ] && newest[$n]=1
+    done < <(snapshot_names | tail -n "$keep")
 
     while IFS= read -r n; do
-        grep -qxF -- "$n" <<< "$newest" && continue
+        [ -n "$n" ] || continue
+        [ -z "${newest[$n]:-}" ] || continue
         rm -rf "$root/$n"
         log_info "  removed $n"
         removed=$((removed + 1))
@@ -414,9 +506,13 @@ snapshot_prune() {
 
 # Called after taking one. Off unless `snapshots.keep` says otherwise, because
 # deleting restore points is not a thing to start doing to somebody quietly.
+#
+# Its errors are not hidden. `snapshot create` once called this without
+# config.sh sourced: the lookup was "command not found", which a `2>/dev/null`
+# here swallowed, so keep read as 0 and nothing was pruned however it was set.
 snapshot_autoprune() {
     local keep
-    keep=$(config_get '.snapshots.keep' 0 2>/dev/null) || keep=0
+    keep=$(config_get '.snapshots.keep' 0) || keep=0
     case "$keep" in ''|*[!0-9]*) return 0 ;; esac
     [ "$keep" -ge 1 ] || return 0
     snapshot_prune "$keep"

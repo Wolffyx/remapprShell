@@ -72,132 +72,115 @@ BarWidget {
             font.pixelSize: 11
         }
 
-        Row {
+        LevelSlider {
             width: parent.width
             spacing: 6
-
-            IconButton {
-                id: mute
-                anchors.verticalCenter: parent.verticalCenter
-                iconName: channel.iconName
-                onActivated: channel.toggleMute()
-            }
-
-            NumberSlider {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - mute.width - parent.spacing
-                live: true
-                from: 0
-                // A level already past the cap stays reachable on the slider,
-                // rather than the handle pinned at the end of a shorter track.
-                to: Math.max(channel.ceiling, channel.level) * 100
-                value: channel.level * 100
-                onMoved: v => channel.setLevel(v / 100)
-            }
+            iconName: channel.iconName
+            // A level already past the cap stays reachable on the slider,
+            // rather than the handle pinned at the end of a shorter track.
+            to: Math.max(channel.ceiling, channel.level) * 100
+            value: channel.level * 100
+            onMoved: v => channel.setLevel(v / 100)
+            onIconActivated: channel.toggleMute()
         }
     }
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: AudioStatus.glyph
         fallback: AudioStatus.icon
         glyphSize: root.panelIconSize
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 320
-            implicitHeight: body.implicitHeight
+            spacing: 10
 
-            Column {
-                id: body
+            Channel {
                 width: parent.width
-                spacing: 10
+                title: AudioStatus.nameOf(AudioStatus.sink) || "No output"
+                level: AudioStatus.volume
+                iconName: AudioStatus.icon
+                ceiling: root.maxVolume
+                onSetLevel: value => AudioStatus.setVolume(value)
+                onToggleMute: AudioStatus.toggleMute()
+            }
 
-                Channel {
-                    width: parent.width
-                    title: AudioStatus.nameOf(AudioStatus.sink) || "No output"
-                    level: AudioStatus.volume
-                    iconName: AudioStatus.icon
-                    ceiling: root.maxVolume
-                    onSetLevel: value => AudioStatus.setVolume(value)
-                    onToggleMute: AudioStatus.toggleMute()
+            Channel {
+                visible: root.showMicrophone && !!AudioStatus.source
+                width: parent.width
+                title: AudioStatus.nameOf(AudioStatus.source)
+                level: AudioStatus.micVolume
+                ceiling: root.maxVolume
+                iconName: StatusIcons.micIcon(AudioStatus.micVolume, AudioStatus.micMuted)
+                onSetLevel: value => AudioStatus.setMicVolume(value)
+                onToggleMute: AudioStatus.toggleMicMute()
+            }
+
+            // Only worth a list when there is a choice to make.
+            Column {
+                visible: AudioStatus.sinks.length > 1
+                width: parent.width
+                spacing: 2
+
+                PanelText {
+                    text: "Play through"
+                    font.bold: true
+                    font.pixelSize: 11
                 }
 
-                Channel {
-                    visible: root.showMicrophone && !!AudioStatus.source
-                    width: parent.width
-                    title: AudioStatus.nameOf(AudioStatus.source)
-                    level: AudioStatus.micVolume
-                    ceiling: root.maxVolume
-                    iconName: StatusIcons.micIcon(AudioStatus.micVolume, AudioStatus.micMuted)
-                    onSetLevel: value => AudioStatus.setMicVolume(value)
-                    onToggleMute: AudioStatus.toggleMicMute()
-                }
+                Repeater {
+                    model: AudioStatus.sinks
 
-                // Only worth a list when there is a choice to make.
-                Column {
-                    visible: AudioStatus.sinks.length > 1
-                    width: parent.width
-                    spacing: 2
+                    Rectangle {
+                        id: device
 
-                    PanelText {
-                        text: "Play through"
-                        font.bold: true
-                        font.pixelSize: 11
-                    }
+                        required property var modelData
+                        readonly property bool current: device.modelData === AudioStatus.sink
 
-                    Repeater {
-                        model: AudioStatus.sinks
+                        width: body.width
+                        height: 26
+                        radius: Theme.radiusOf(5)
+                        color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
                         Rectangle {
-                            id: device
-
-                            required property var modelData
-                            readonly property bool current: device.modelData === AudioStatus.sink
-
-                            width: body.width
-                            height: 26
-                            radius: Theme.radiusOf(5)
-                            color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
-
-                            Rectangle {
-                                x: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 8
-                                height: 8
-                                radius: Theme.radiusOf(4)
-                                color: device.current ? Theme.accent : "transparent"
-                                border.width: 1
-                                border.color: device.current ? Theme.accent : Theme.foregroundInactive
-                            }
-
-                            PanelText {
-                                x: 24
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - 30
-                                text: AudioStatus.nameOf(device.modelData)
-                                elide: Text.ElideRight
-                                font.pixelSize: 11
-                            }
-
-                            HoverHandler { id: deviceHover }
-                            TapHandler { onTapped: AudioStatus.useSink(device.modelData) }
+                            x: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 8
+                            height: 8
+                            radius: Theme.radiusOf(4)
+                            color: device.current ? Theme.accent : "transparent"
+                            border.width: 1
+                            border.color: device.current ? Theme.accent : Theme.foregroundInactive
                         }
+
+                        PanelText {
+                            x: 24
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 30
+                            text: AudioStatus.nameOf(device.modelData)
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                        }
+
+                        HoverHandler { id: deviceHover }
+                        TapHandler { onTapped: AudioStatus.useSink(device.modelData) }
                     }
                 }
+            }
 
-                TextButton {
-                    text: "Mixer and devices…"
-                    iconName: "audio-volume-high"
-                    onActivated: {
-                        PlasmaApplets.open("org.kde.plasma.volume");
-                        root.popoutVisible = false;
-                    }
+            TextButton {
+                text: "Mixer and devices…"
+                iconName: "audio-volume-high"
+                onActivated: {
+                    PlasmaApplets.open("org.kde.plasma.volume");
+                    root.popoutVisible = false;
                 }
             }
         }

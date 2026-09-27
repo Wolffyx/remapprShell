@@ -15,8 +15,11 @@
 #      qt5-declarative and reports version "1.0"; handed a Qt6/Quickshell file
 #      it exits 255 with no output at all. Linting against the wrong Qt major
 #      is worse than not linting.
-#   2. It runs one file per invocation and aggregates, so every bad file is
-#      reported rather than aborting at the first.
+#   2. Every bad file is reported, by name, rather than aborting at the first.
+#      One qmllint reads them all and says, as JSON, which it had anything to
+#      say about; only those are linted again, alone, for the words and the
+#      verdict that are that file's. It was one qmllint a file, the same Qt
+#      modules loaded some 370 times over: 49 s for the tree, now about 15.
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -40,7 +43,16 @@ if [ -z "$QMLLINT" ] && command -v qmllint >/dev/null 2>&1; then
         QMLLINT=$(command -v qmllint)
     fi
 fi
-[ -n "$QMLLINT" ] || die "Qt6 qmllint not found (install qt6-declarative, or set QMLLINT_BIN)"
+# An update verifying itself on a user's machine sets LINT_QML_OPTIONAL: qmllint
+# is a development tool there, in a -devel or -dev-tools package outside Arch,
+# and a machine without it is no reason to roll an update back.
+if [ -z "$QMLLINT" ]; then
+    if [ -n "${LINT_QML_OPTIONAL:-}" ]; then
+        log_warn "Qt6 qmllint not found; the QML lint is skipped"
+        exit 0
+    fi
+    die "Qt6 qmllint not found (install qt6-declarative, or set QMLLINT_BIN)"
+fi
 log_debug "using $QMLLINT ($("$QMLLINT" --version 2>&1))"
 
 # The generated singleton must exist or every import of it is a false positive.
@@ -88,8 +100,10 @@ if [ $# -eq 0 ]; then
              | sed -E 's/^([^:]+):([0-9]+):.*property\s+\S+\s+(\S+)$/\1:\2 \3/' || true)
 fi
 
-while IFS= read -r file; do
-    checked=$((checked + 1))
+# lint_one <file>: qmllint over the one file, its output as qmllint gave it --
+# an error with the file named, warnings passed on without failing.
+lint_one() {
+    local file=$1 out
     if ! out=$("$QMLLINT" -I "$IMPORT_ROOT" -I shell "$file" 2>&1); then
         log_error "$file"
         [ -n "$out" ] && printf '%s\n' "$out" >&2
@@ -98,12 +112,51 @@ while IFS= read -r file; do
         # qmllint reports warnings on a zero exit; surface them without failing.
         printf '%s\n' "$out" >&2
     fi
-done < <(if [ $# -gt 0 ]; then
-             printf '%s\n' "$@"
-         else
-             find shell theme -name '*.qml' -type f | sort
-             render_templates
-         fi)
+}
+
+# lint_batch: one qmllint over every file, marking in `quiet` each it had
+# nothing at all to say about; every other file is linted again on its own.
+#
+# A module whose import warned is warned about for the first file that
+# imports it only -- qmllint imports a module once a run -- so every file that
+# imports one is linted alone as well, to say it again for each. And one file
+# that crashes qmllint takes the whole run with it: a run that did not finish
+# with every file in it marks nothing, and each file is linted alone, as
+# before. So does a machine without jq.
+declare -A quiet=()
+lint_batch() {
+    local warned file
+    local -a listed
+    [ "${#files[@]}" -gt 1 ] || return 0
+    { IFS= read -r warned; mapfile -t listed; } < <(
+        "$QMLLINT" -I "$IMPORT_ROOT" -I shell --json - "${files[@]}" 2>/dev/null \
+            | jq -r --argjson n "${#files[@]}" '
+                if (.files | length) != $n then error("the run did not finish") else . end
+                | ([.files[].warnings[] | select(.id == "import") | .message
+                    | capture("importing module \"(?<m>[^\"]+)\"").m | gsub("\\."; "\\.")]
+                   | unique | join("|")),
+                  (.files[] | select(.success and (.warnings | length) == 0) | .filename)' 2>/dev/null)
+    for file in "${listed[@]}"; do
+        quiet[$file]=1
+    done
+    [ -n "$warned" ] || return 0
+    while IFS= read -r file; do
+        unset 'quiet[$file]'
+    done < <(grep -lE "^\s*import\s+($warned)([[:space:];]|\$)" "${listed[@]}" < /dev/null)
+}
+
+mapfile -t files < <(if [ $# -gt 0 ]; then
+                         printf '%s\n' "$@"
+                     else
+                         find shell theme -name '*.qml' -type f | sort
+                         render_templates
+                     fi)
+lint_batch
+for file in "${files[@]}"; do
+    checked=$((checked + 1))
+    [ -z "${quiet[$file]:-}" ] || continue
+    lint_one "$file"
+done
 
 if [ "$failed" -gt 0 ]; then
     die "qmllint: $failed of $checked file(s) failed"

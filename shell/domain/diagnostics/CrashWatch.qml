@@ -26,8 +26,8 @@ pragma Singleton
 // very first crash was seeded away as history instead of reported.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.system
 
 
 QtObject {
@@ -36,43 +36,38 @@ QtObject {
     property string reported: ""
 
     function check() {
-        checkProc.running = false;
-        checkProc.running = true;
+        checkRun.run(["crash", "check"]);
     }
 
-    // Prints "<epoch> <id>" for a crash to report, and nothing otherwise.
-    readonly property Process _check: Process {
-        id: checkProc
-        running: true
-        command: [Branding.ctlBin, "crash", "check"]
+    Component.onCompleted: root.check()
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const id = text.trim().split(/\s+/)[1] ?? "";
-                if (id.length > 0)
-                    root._report(id);
-            }
+    // Prints "<epoch> <id>" for a crash to report, and nothing otherwise.
+    readonly property CtlRun _check: CtlRun {
+        id: checkRun
+        tag: "crash"
+        onFinished: (code, stdout) => {
+            const id = stdout.trim().split(/\s+/)[1] ?? "";
+            if (id.length > 0)
+                root._report(id);
         }
     }
 
     function _report(id) {
         root.reported = id;
         Log.warn("crash", `the shell crashed and restarted itself (${id}); writing a report`);
-        reportProc.running = false;
-        reportProc.command = [Branding.ctlBin, "report", "create",
-                              "--reason", `crash ${id}`, "--crash", id];
-        reportProc.running = true;
+        reportRun.run(["report", "create", "--reason", `crash ${id}`, "--crash", id]);
     }
 
-    // Written locally and sent nowhere, like every report.
-    readonly property Process _reporter: Process {
-        id: reportProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const dir = text.trim().split("\n").pop();
-                if (dir.length > 0)
-                    Log.warn("crash", `report written: ${dir} -- read it with 'report show', ask about it with 'ask --crash'`);
-            }
+    // Written locally and sent nowhere, like every report. It prints the
+    // directory it wrote on stdout.
+    readonly property CtlRun _reporter: CtlRun {
+        id: reportRun
+        tag: "crash"
+        label: "report"
+        onFinished: (code, stdout) => {
+            const dir = stdout.trim().split("\n").pop();
+            if (dir.length > 0)
+                Log.warn("crash", `report written: ${dir} -- read it with 'report show', ask about it with 'ask --crash'`);
         }
     }
 }

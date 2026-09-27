@@ -27,19 +27,28 @@ mkdir -p "$OUT"
 want=${1:-}
 wanted() { [ -z "$want" ] || [ "$want" = "$1" ]; }
 
+# shot <name> <crop> <command...>: the command draws $OUT/<name>.png, and the
+# picture is cropped -- to a geometry, for a picture whose layout is fixed, or
+# as `card`, for one of preview.sh's popout cards.
 shot() {
-    local name=$1; shift
+    local name=$1 crop=$2; shift 2
     wanted "$name" || return 0
     echo "==> $name"
-    PREVIEW_DEMO=1 bash "$HERE/preview.sh" "$@" >/dev/null
-    # The stage is a gradient, so -trim finds no border to cut: every picture
-    # would carry a different amount of empty sky and they would not sit
-    # together on a page. The card is drawn at a known offset instead, so the
-    # crop is arithmetic -- see popout.qml, which places it at 40,40.
-    magick "$OUT/$name.png" -crop "$(magick "$OUT/$name.png" -format '%wx%h' info:)+0+0" \
-        -shave 16x16 +repage "$OUT/$name.png"
+    PREVIEW_DEMO=1 "$@" >/dev/null
+    if [ "$crop" = card ]; then
+        # The stage is a gradient, so -trim finds no border to cut: every
+        # picture would carry a different amount of empty sky and they would
+        # not sit together on a page. The card is drawn at a known offset
+        # instead, so the crop is arithmetic -- see popout.qml, which places it
+        # at 40,40.
+        magick "$OUT/$name.png" -crop "$(magick "$OUT/$name.png" -format '%wx%h' info:)+0+0" \
+            -shave 16x16 +repage "$OUT/$name.png"
+    else
+        magick "$OUT/$name.png" -crop "$crop" +repage "$OUT/$name.png"
+    fi
     echo "    $OUT/$name.png"
 }
+preview() { bash "$HERE/preview.sh" "$@"; }
 
 # The panel, in the three styles it draws: a strip along the edge, a floating
 # bar, islands. panel.qml renders two thinner ones under those, which say
@@ -50,24 +59,19 @@ shot() {
 # there is none -- so it renders as a row of application icons, which is the
 # honest fallback and the wrong advertisement. That one is taken on a real
 # screen, against windows opened for the purpose, and cropped to the card.
-if wanted panel; then
-    echo "==> panel"
-    PREVIEW_DEMO=1 bash "$HERE/preview.sh" "$HERE/panel.qml" "$OUT/panel.png" 1400 320 light >/dev/null
-    magick "$OUT/panel.png" -crop 1400x290+0+10 +repage "$OUT/panel.png"
-    echo "    $OUT/panel.png"
-fi
+shot panel 1400x290+0+10 preview "$HERE/panel.qml" "$OUT/panel.png" 1400 320 light
 
 PREVIEW_WIDGET=status \
-    shot quick-settings "$HERE/popout.qml" "$OUT/quick-settings.png" 560 800 light 3000
+    shot quick-settings card preview "$HERE/popout.qml" "$OUT/quick-settings.png" 560 800 light 3000
 
 PREVIEW_PAGE=appearance \
-    shot settings "$HERE/settings.qml" "$OUT/settings.png" 1280 820 light 3500
+    shot settings card preview "$HERE/settings.qml" "$OUT/settings.png" 1280 820 light 3500
 
 # The notification centre's own feed is empty until something arrives, so the
 # target seeds a plausible one -- see PREVIEW_NOTES in popout.qml. Made up,
 # and deliberately: a real one is somebody's messages.
 PREVIEW_WIDGET=notifications PREVIEW_NOTES=1 \
-    shot notifications "$HERE/popout.qml" "$OUT/notifications.png" 640 700 light 3000
+    shot notifications card preview "$HERE/popout.qml" "$OUT/notifications.png" 640 700 light 3000
 
 # The start menu. Its pinned applications, its recent files, what is playing
 # and what the machine is doing are all somebody's, so all four are replaced --
@@ -75,7 +79,7 @@ PREVIEW_WIDGET=notifications PREVIEW_NOTES=1 \
 # applications because those are the ones a reader of a KDE project will have.
 PREVIEW_WIDGET=launcher \
 PREVIEW_RUNTIME='{"launcher.pinned":["org.kde.dolphin","org.kde.konsole","org.kde.kate","org.kde.kcalc","systemsettings","org.kde.gwenview"]}' \
-    shot launcher "$HERE/popout.qml" "$OUT/launcher.png" 1020 760 light 3200
+    shot launcher card preview "$HERE/popout.qml" "$OUT/launcher.png" 1020 760 light 3200
 
 # Alt+Tab. Not preview.sh's to render: the switcher is a KWin package rather
 # than part of the shell, so it has a harness of its own -- which also holds
@@ -84,12 +88,8 @@ PREVIEW_RUNTIME='{"launcher.pinned":["org.kde.dolphin","org.kde.konsole","org.kd
 # The crop is fixed because the picture is: the same five windows, the same
 # layout, the same stage every time. Change the model in switcher.sh and this
 # wants looking at again.
-if wanted switcher; then
-    echo "==> switcher"
-    SWITCHER_SHOT="$OUT/switcher.png" bash "$HERE/switcher.sh" row >/dev/null
-    magick "$OUT/switcher.png" -crop 1146x334+282+114 +repage "$OUT/switcher.png"
-    echo "    $OUT/switcher.png"
-fi
+SWITCHER_SHOT="$OUT/switcher.png" \
+    shot switcher 1146x334+282+114 bash "$HERE/switcher.sh" row
 
 echo
 echo "done. The README links these by path; nothing else needs changing."

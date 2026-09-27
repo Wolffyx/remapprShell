@@ -19,8 +19,20 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 PALETTE="$REPO_ROOT/theme/colors/palette.json"
 [ -f "$PALETTE" ] || die "no palette at $PALETTE"
 
-# scheme_name <variant>  -- what System Settings shows, and what `defaults` names.
+# scheme_name <variant>  -- what System Settings *shows*: "Remappr Shell Dark".
 scheme_name() { printf '%s %s' "$DISPLAY_NAME" "$(tr '[:lower:]' '[:upper:]' <<< "${1:0:1}")${1:1}"; }
+
+# scheme_id <variant>  -- what KDE *identifies* a scheme by, which is the file's
+# own base name and not its Name.
+#
+# Plasma's own are the proof: BreezeDark.colors carries `Name=Breeze Dark` and
+# `ColorScheme=BreezeDark`, and kdeglobals holds `ColorScheme=BreezeDark`. Ours
+# wrote the display name into both, so kdeglobals named a scheme no file was
+# called -- and everything that resolves a scheme by name rather than reading
+# the colours out of kdeglobals fell back to the default. That is what "the
+# colour scheme 'Remappr Shell Dark' is not installed" in System Settings was,
+# and why light and dark reached some of the desktop and not all of it.
+scheme_id() { printf '%s-%s' "$SLUG" "$1"; }
 scheme_file() { printf '%s/%s-%s.colors' "$REPO_ROOT/theme/colors" "$SLUG" "$1"; }
 
 generate() {
@@ -63,7 +75,7 @@ generate() {
         printf '# SPDX-License-Identifier: GPL-3.0-or-later\n'
 
         printf '\n[General]\n'
-        printf 'ColorScheme=%s\n' "$(scheme_name "$variant")"
+        printf 'ColorScheme=%s\n' "$(scheme_id "$variant")"
         printf 'Name=%s\n'        "$(scheme_name "$variant")"
         printf 'shadeSortColumn=true\n'
 

@@ -14,6 +14,7 @@
         "action": {
             "type": "enum",
             "values": ["promptAll", "promptLogout", "promptReboot", "promptShutDown"],
+            "labels": ["Ask what to do", "Log out", "Restart", "Shut down"],
             "default": "promptAll",
             "label": "Action"
         }

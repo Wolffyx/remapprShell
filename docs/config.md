@@ -46,7 +46,11 @@ How the shell itself looks -- light or dark, its accent, its corners -- and the 
 | `theme.animationMs` | a number, 0 to 400 | `180` | In milliseconds: a popout rising out of the panel, the switcher, the desktop overview. 0 makes them appear at once, which is the fastest the shell can feel and the least it can explain -- a surface that simply exists gives no hint about where it came from. |
 | `theme.desktop.enabled` | `true` or `false` | `true` | Applying the theme also re-themes KDE itself, so applications match the shell rather than only the panel and its popouts. Off confines the theme to what this shell draws. Each part below can be left out; anything left out keeps whatever you have chosen in System Settings, and `rmpr theme revert` puts every part back. |
 | `theme.desktop.followMode` | `true` or `false` | `false` | With Colour scheme set to auto, the colour scheme and icon theme KDE itself uses are rewritten when night falls, so applications turn dark with the shell instead of staying wherever they were last put. Off by default: it writes KDE's own configuration on a schedule, which is not something to do to a desktop uninvited. `rmpr theme variant` does it once, by hand, and `rmpr theme revert` puts it all back. Plasma's own widgets follow from the next plasmashell start. |
+| `theme.desktop.rescuePlasmaSwitch` | `true` or `false` | `true` | Plasma's own "Switch to Dark Mode at Night" is a background module with a timer, and a timer can miss -- a Frameworks upgrade under a running session is enough to stop it. When it does, the shell turns dark at sunset and every application stays light until the next login. On, the desktop is put in the right half here instead, but only after waiting twenty seconds for Plasma to do it first, so the two never write over each other. Off leaves a missed sunset missed. |
 | `theme.desktop.gtk` | `true` or `false` | `true` | Chrome, Electron applications and GTK applications do not read KDE's colour scheme: they ask a portal, and the GTK portal answers from its own dark/light preference. With this on, that preference is written with the rest -- which is what makes them turn light by day and dark by night instead of staying wherever they were. `rmpr theme revert` puts the preference back. |
+| `theme.desktop.gtkThemeLight` | text | `` | The GTK theme to wear in light mode, by name. Empty leaves the theme name alone, which is the default. Asking GTK to prefer light is not the same as giving it a light theme: a theme whose name is the dark half of its pair -- Nordic, adw-gtk3-dark -- ignores the preference and stays dark in every mode. Name both halves here and the pair follows day and night. Not guessed from the other name: adw-gtk3's light half drops "-dark", Nordic's is called Nordic-Polar, and a wrong guess puts you in a theme you never chose. |
+| `theme.desktop.gtkThemeDark` | text | `` | The GTK theme to wear in dark mode, by name. Empty leaves the theme name alone. See GTK theme by day. |
+| `theme.desktop.materialYou` | `true` or `false` | `false` | kde-material-you-colors derives a colour scheme from your wallpaper and applies it to the session -- at login, and again whenever the wallpaper changes. It has its own light/dark switch, so left alone it is the last writer at every login and the desktop wears its answer rather than this shell's. With this on, `rmpr theme variant` writes that switch and restarts the unit so the two agree. Off by default: it is somebody else's service, and rewriting a configuration this project does not own is not something to do uninvited. Ledgered, so `rmpr theme revert` puts it back. |
 | `theme.desktop.colours` | `true` or `false` | `true` | The Plasma colour scheme every Qt application is drawn with. Off leaves whatever you have chosen in System Settings. |
 | `theme.desktop.icons` | `true` or `false` | `true` | The icon theme, for applications and for the shell's own icons, which come from it rather than from a set of our own. |
 | `theme.desktop.style` | `true` or `false` | `true` | The Qt widget style applications are drawn in -- buttons, scrollbars, checkboxes. |
@@ -63,55 +67,43 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.position` | `top`, `bottom`, `left`, `right` | `bottom` | Which edge the panel is anchored to. |
 | `panel.thickness` | a number, 28 to 96 | `52` | Height of a horizontal panel, width of a vertical one. Its buttons grow and shrink with it. |
 | `panel.style` | `full`, `floating`, `islands` | `full` | full is a strip along the whole edge. floating is a rounded bar held clear of the edge. islands draws no bar at all: each zone -- the start button and workspaces, the windows, the tray and clock -- is a rounded island of its own. |
+| `panel.defloat` | `true` or `false` | `true` | With the floating bar or islands, the panel becomes a full-width strip while a window on its monitor reaches into its space -- a maximised one always does -- and floats again when none does, as Plasma's floating panel does. The strip is the bar's own thickness, and the margin a floating panel keeps from the edge is given to the windows while it lasts. Off, it always floats. |
 | `panel.spacing` | a number, 2 to 16 | `5` | The gap between widgets, in pixels. |
 | `panel.iconSize` | a number, 15 to 26 | `18` | The size of the tray's and the status icons, in pixels. |
 | `panel.revealOnHover` | `true` or `false` | `true` | With hiding on, the panel comes back when the pointer reaches the screen edge. Off, it comes back only when something opens from it -- the launcher from a key, say. |
 | `panel.autoHide` | `true` or `false` | `false` | The panel shrinks to a sliver and comes back when the pointer reaches the screen edge. It reserves no space while hidden, so windows use the whole screen. |
-| `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks the first of the usual ones that is installed; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
+| `panel.fullScreen` | `hide`, `kwin` | `hide` | hide draws nothing on a monitor whose top window is full screen, and takes no clicks there, until that window leaves full screen or another is raised over it. kwin leaves it to KWin's stacking, as Plasma's own panel does: a full-screen window stays above the panel only while it has focus, so the panel shows over a game or a video once focus has gone elsewhere on that monitor. Either way the panel keeps the space it reserves, so no other window is resized. |
+| `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing. |
 | `panel.menu.entries` | a list | `[]` | Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes. |
 
-### Windows
+### Widgets
 
-What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
+What appears on the panel, and in which zone.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
-### Launcher
+### Tray icons
 
-What opens when you press the start button, and what opens when you search.
+Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.
 
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `fuzzel`, `rofi`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
-| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `fuzzel`, `rofi`, `custom` | `builtin` | KRunner is Plasma's own search. |
-| `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
-| `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
-| `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
-| `launcher.hints` | `true` or `false` | `true` | The keys the built-in search answers to, under its results. |
-| `launcher.pinned` | a list | `[]` | Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed. |
-| `launcher.kickoffMode` | `menu`, `windowed` | `menu` | Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus. |
+No individual settings: this is a page in the settings window rather than a
+list of values.
 
-### Notifications
+### Sidebar
 
-Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.
+The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `notifications.server` | `plasma`, `shell` | `shell` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
-| `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
-| `notifications.popupPosition` | `auto`, `top-right`, `top-center`, `top-left`, `bottom-right`, `bottom-center`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them. |
-| `notifications.centreStyle` | `grouped`, `stream` | `grouped` | What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier. |
-| `notifications.history` | `true` or `false` | `true` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
-| `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
-
-### Lock & session
-
-This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
+| `sidebar.position` | `right`, `left` | `right` | Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on. |
+| `sidebar.trigger` | `drag`, `hover`, `none` | `drag` | 'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in. |
+| `sidebar.handleWidth` | a number, 2 to 24 | `6` | How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out goes to it rather than to the window beneath. |
+| `sidebar.width` | a number, 280 to 720 | `396` | How wide the panel is, in pixels. |
+| `sidebar.margin` | a number, 0 to 64 | `16` | The gap between the panel and the screen's edges. |
+| `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape. |
+| `sidebar.expanded` | a list | `["media"]` | Which cards start expanded, by id: media, day, weather, machine, notifications. Every card can be folded away and opened again from the sidebar itself; this is what it remembers. |
+| `sidebar.cards` | a list | `["media","day","weather","machine","notifications"]` | Which cards the sidebar draws, in order. Leave a card out to hide it entirely. |
 
 ### Desktop
 
@@ -128,41 +120,72 @@ What this shell draws on the desktop itself: a rounded frame over the screen's c
 | `desktop.clockDate` | `true` or `false` | `true` | Show the date |
 | `desktop.clockInk` | `auto`, `light`, `dark` | `auto` | auto follows the colour scheme. Nothing here can read the wallpaper, so a dark clock on a dark picture is one setting away rather than guessed. |
 
-### Plasma services
+### Weather
 
-Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
+Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
+| `weather.enabled` | `true` or `false` | `false` | Fetches a forecast for your place. Nothing is sent but the coordinates being asked about; nothing is stored but the answer, in memory. |
+| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the place is worked out once from this machine's IP address, which is a guess a network can get wrong; naming it is exact and asks nobody. |
+| `weather.coordinates` | text | `` | "46.77,23.60" -- latitude, longitude. Set, this wins over the place and no lookup of any kind is made. |
+| `weather.units` | `metric`, `imperial` | `metric` | Celsius and km/h, or Fahrenheit and mph. |
+| `weather.refresh` | a number, 10 to 360 | `30` | Minutes between forecasts. The forecast itself changes hourly at best. |
 
-### Widgets
+### Windows
 
-What appears on the panel, and in which zone.
-
-No individual settings: this is a page in the settings window rather than a
-list of values.
-
-### Tray icons
-
-Which tray icons sit on the panel, which go behind the chevron, and which are left out. Drag a row from one list to another.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.
 
-### Screen edges
+### Launcher
 
-What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.
+What opens when you press the start button, and what opens when you search.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
+| `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `custom` | `builtin` | KRunner is Plasma's own search. |
+| `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
+| `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
+| `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
+| `launcher.hints` | `true` or `false` | `true` | The keys the built-in search answers to, under its results. |
+| `launcher.searchSources` | a list | `["apps","windows","files","settings"]` | What the built-in search looks through. apps: everything installed. windows: the open ones, by their titles, so a window can be raised by name. files: what was opened recently. settings: this shell's own pages. Remove a name to stop searching it. |
+| `launcher.learn` | `true` or `false` | `true` | What has been opened before is offered first, and an empty search suggests it. Kept in the state directory and never sent anywhere; turning this off stops it being read, and Forget clears what is there. |
+| `launcher.pinned` | a list | `[]` | Desktop entry ids at the top of the built-in start menu, in this order. Empty picks a terminal, files, a browser, an editor and so on from what is installed. |
+| `launcher.kickoffMode` | `menu`, `windowed` | `menu` | Windowed opens Kickoff as an ordinary window; slower, and it will not close itself when it loses focus. |
+| `launcher.command` | a list | `[]` | For the `custom` provider: a launcher and its arguments, run as written. `launcher.provider` or `launcher.searchProvider` set to `custom` runs it. |
 
-### Shortcuts
+### Notifications
 
-Every global shortcut this shell can take, and what each is bound to. These live in KDE's own kglobalshortcutsrc rather than in this shell's profile, so they are not part of a preset and do not move with one. Nothing is bound by default.
+Plasma draws every notification -- under this shell's own renderer, through the Plasma services it hosts -- unless this shell is asked to draw them itself. The history remembers what went past either way, so a notification that disappeared can be read again and, with AI assist on, asked about.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `notifications.server` | `plasma`, `shell` | `shell` | plasma: Plasma's own notification server, as always. shell: this shell serves them and draws its own popups beside the panel, with an Ask button on each when AI assist is on. That replaces Plasma's, so it is off unless chosen. It works only under this shell's renderer, and while another program holds the notification service -- Plasma's hosted applet, or another shell's bar -- it waits for the service to be let go of rather than taking it. |
+| `notifications.popupTimeout` | a number, 2 to 30 | `6` | Unless the application asks for a time of its own. Critical ones stay until closed, and the pointer resting on a popup holds it. Only when this shell draws them. |
+| `notifications.popupPosition` | `auto`, `top-right`, `top-center`, `top-left`, `bottom-right`, `bottom-center`, `bottom-left` | `auto` | auto is the right-hand end of the panel's edge, beside the clock. The centres are the middle of the top or bottom edge. Only when this shell draws them. |
+| `notifications.centreStyle` | `grouped`, `stream` | `grouped` | What the bell opens. grouped: one card per application, the latest on top and the rest stacked behind it. stream: every notification in order, under today, yesterday and earlier. |
+| `notifications.history` | `true` or `false` | `true` | Listens on the session bus for notifications as they are sent. Nothing is taken over and nothing is stored on disk; the history lives in memory and is gone when the shell stops. Off, the listener does not run at all. |
+| `notifications.historySize` | a number, 5 to 500 | `50` | How many recent notifications to keep. |
+
+### On-screen display
+
+The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
+| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
+
+### Sound
+
+What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
 
 ### Switching windows
 
@@ -178,22 +201,58 @@ What Alt+Tab looks like, and which program gets Alt+Tab and Meta+Tab. KWin draws
 | `switching.overviewStrip` | `true` or `false` | `true` | The row along the bottom with every desktop, what is on each, and a tile for one more. Off gives the whole surface to the selected desktop's windows, and the desktops move on the arrows alone. |
 | `switching.overviewCardWidth` | a number, 260 to 720 | `560` | In pixels. Cards share the room between them, three to a row at most, and never grow past this. |
 
-### Sound
+### Screen edges
 
-What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
+What happens when the pointer is pushed into a corner or an edge of the screen, and whether a window dragged there snaps. KWin does all of it; this only configures KWin, and every change can be undone.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Shortcuts
+
+Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu and Meta+Space the search by default.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
+| `shortcuts.launcher` | text | `Meta` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.search` | text | `Meta+Space` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.settings` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.ask` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.clipboard` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.sidebar` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.keys` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.switcher` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.switcher-reverse` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.overview` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.overview-reverse` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot-screen` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.screenshot-window` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 
-### On-screen display
+### Lock & session
 
-The volume and brightness popup. Plasma draws it by default and works well; ours exists for the placement and animation a Plasma OSD cannot do. Turning ours on without silencing Plasma's shows both -- 'rmpr theme osd ours' silences it.
+This shell's own lock screen -- off until it has been tried -- and which screen asks before the session ends. Plasma's greeter does the locking either way.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `osd.enabled` | `true` or `false` | `false` | Listens to the same signals Plasma's OSD does. Nothing is taken over, and turning it off leaves Plasma exactly as it was. |
-| `osd.timeout` | a number, 500 to 5000 | `1800` | Milliseconds before it fades. |
+| `session.prompt` | `plasma`, `shell` | `plasma` | plasma: Plasma's own logout screen, as always. shell: the shell's -- log out, restart, hibernate where the machine can, shut down -- which ends the session through Plasma's session manager all the same, so applications are still asked to save. |
+
+### Plasma services
+
+Plasma's notifications, its clipboard history and its device notifier live inside Plasma's system tray, and the panel this shell draws has no Plasma tray. So under this shell's own renderer they are kept running by hosting Plasma's own applets outside any panel, each showing as one icon in the tray. Nothing is reimplemented, and nothing is hosted where a Plasma tray is there to provide them.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
+| `clipboard.history` | `own`, `auto`, `plasma` | `own` | Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other. |
+
+### Drawn by
+
+What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `panel.renderer` | text | `quickshell` | Which of them draws the panel: `quickshell` (this shell), `plasma`, `none`, or `quickshell:<config>` for any other Quickshell configuration on this machine -- `rmpr renderer list` names them. Another shell's configuration is always written with the `quickshell:` in front: a bare name is not a renderer, and is not guessed at. Only one can draw, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
 
 ### Layouts
 
@@ -217,14 +276,6 @@ Snapshots of your KDE configuration. Nothing is removed when reverting or uninst
 | --- | --- | --- | --- |
 | `snapshots.keep` | a number, 0 to 200 | `0` | How many restore points are kept when a new one is taken. 0 keeps every one of them, which is the default: deleting somebody's restore points without being asked is not a thing to start doing quietly. Two are never removed by pruning whatever this says -- any restore point you have locked, and the oldest, which is the state the machine was in before this shell was installed. |
 
-### Drawn by
-
-What draws the panel. Only one of these can draw at a time, and switching is a real change to your desktop rather than a setting -- so it happens here, with a restore point, rather than as a value you can type.
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `panel.renderer` | `quickshell`, `plasma`, `caelestia`, `none` | `quickshell` | Which of them draws the panel. Only one can, so two panels at one screen edge is not a state this can reach. Changing it by hand only tells the shell; the shell package, the applet layout and the restore point are the CLI's job -- use `rmpr renderer set`. |
-
 ### AI assist
 
 When something breaks, hand a redacted diagnostic report to an assistant. Off by default. Nothing leaves this machine without a confirmation that shows exactly what would be sent.
@@ -239,8 +290,11 @@ When something breaks, hand a redacted diagnostic report to an assistant. Off by
 
 ### About
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `update.channel` | `main`, `dev` | `main` | Which branch `rmpr update` follows: `main` moves on a release, `dev` is where work lands and moves every day. |
+| `update.remote` | text | `` | A git URL to update from. Empty uses the checkout's own origin, then the project's public address. |
+| `update.localSource` | text | `` | A checkout on this machine to update from instead of a remote -- for testing a change before it is pushed. Empty for none. |
 
 ## The panel contents
 
@@ -351,6 +405,7 @@ when two copies of a widget should differ.
 | Task view | `taskview` | left, middle, right | **not supported** |
 | System tray | `tray` | left, middle, right | `org.kde.plasma.systemtray` |
 | Volume | `volume` | left, middle, right | `org.kde.plasma.volume` (in the tray) |
+| Weather | `weather` | left, middle, right | **not supported** |
 | Virtual desktops | `workspaces` | left, middle, right | `org.kde.plasma.pager` |
 
 A widget with no Plasma applet is left out of the panel under the `plasma`
@@ -453,6 +508,9 @@ without `tray` it stands on the panel alone.
 | `pinned` | a list | `[]` | Desktop entry ids ("org.kde.dolphin"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose "Pin to taskbar" rather than typing them. |
 | `thisScreenOnly` | `true` or `false` | `false` | Each monitor's panel lists the windows on that monitor, as Windows does with "show taskbar apps on the taskbar where the window is open". |
 | `thisDesktopOnly` | `true` or `false` | `true` | The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed. |
+| `previewHeader` | `true` or `false` | `false` | The application's icon and name over the window cards, with how many windows it has. Off, each card's own icon and title say it. |
+| `previewScreen` | `true` or `false` | `false` | With more than one monitor, the one a window is on ("DP-2") after its title. The desktop it is on is said whenever there is more than one. |
+| `stackGroups` | `true` or `false` | `true` | A second square behind the icon when an application has more than one window open, so the count shows on the button itself. |
 | `showTitles` | `true` or `false` | `true` | The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away. |
 | `maxWidth` | a number, 60 to 400 | `230` | Titles are elided past this. |
 | `iconSize` | a number, 0 to 48 | `0` | 0 follows the panel's thickness, so resizing the panel resizes the icons with it. |
@@ -480,6 +538,14 @@ without `tray` it stands on the panel alone.
 | `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
 | `maxVolume` | a number, 0 to 150 | `0` | Percent. 0 follows Settings → Sound, where "Raise maximum volume" lives and which every other slider in this shell reads; anything else is this widget's own ceiling. |
 | `showMicrophone` | `true` or `false` | `true` | A second slider in the popout, for the default input. |
+
+### `widgets.weather`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showTemperature` | `true` or `false` | `true` | Beside the icon. Off leaves the icon alone, which is narrower on a full panel. |
+| `showPlace` | `true` or `false` | `false` | The town the forecast is for, after the temperature. |
+| `days` | a number, 1 to 6 | `5` | How many days of the forecast the popout lists. |
 
 ### `widgets.workspaces`
 

@@ -9,6 +9,7 @@
 import QtQuick
 import QtTest
 import qs.domain.windows.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "WindowEvents"
@@ -25,12 +26,7 @@ TestCase {
     }
 
     function signalLine(payload) {
-        return JSON.stringify({
-            type: "signal",
-            interface: "com.remappr.Shell.Windows",
-            member: "Changed",
-            payload: { type: "s", data: [payload] }
-        });
+        return Bus.signal("com.remappr.Shell.Windows", "Changed", "s", [payload]);
     }
 
     function test_parses_a_list() {
@@ -111,6 +107,35 @@ TestCase {
         compare(nonsense[0].desktops.length, 0);
     }
 
+    // What a window's application is matched by beyond its app id (see
+    // AppMatch), and what the daemon read about its process and the desktop
+    // files named by it. From a script or a daemon too old to send them they
+    // are empty rather than undefined, which only means fewer steps can match.
+    function test_what_a_window_is_matched_by_survives_the_parse() {
+        const w = WindowEvents.parseList(JSON.stringify([windowJson({
+            resourceName: "example-inst",
+            pid: 4242,
+            cmdline: "/usr/bin/example-prog --x",
+            processName: "example-prog",
+            executables: ["/usr/bin/example-prog"],
+            desktopHint: { variable: "APPDIR", path: "/m/x.desktop", name: "X", icon: "x", iconFile: "/m/x.png", extra: 1 },
+            appIdFile: { name: "a file with no path names nothing" },
+            iconPath: "/run/icons/0x1-abc.png"
+        })]))[0];
+        compare([w.resourceName, w.pid, w.cmdline, w.processName], ["example-inst", 4242, "/usr/bin/example-prog --x", "example-prog"]);
+        compare(w.executables, ["/usr/bin/example-prog"]);
+        compare(w.desktopHint, { variable: "APPDIR", path: "/m/x.desktop", id: "", name: "X", icon: "x", iconFile: "/m/x.png" });
+        compare(w.appIdFile, null);
+        compare(w.iconPath, "/run/icons/0x1-abc.png");
+
+        const old = WindowEvents.parseList(JSON.stringify([windowJson()]))[0];
+        compare([old.resourceName, old.pid, old.cmdline, old.processName, old.executables.length, old.desktopHint, old.appIdFile],
+                ["", 0, "", "", 0, null, null]);
+
+        const odd = WindowEvents.parseList(JSON.stringify([windowJson({ pid: "12", executables: "prog", desktopHint: "x" })]))[0];
+        compare([odd.pid, odd.executables.length, odd.desktopHint], [0, 0, null]);
+    }
+
     function test_parses_the_signal_wrapper() {
         const list = WindowEvents.parseSignal(signalLine(JSON.stringify([windowJson()])));
         compare(list.length, 1);
@@ -134,12 +159,14 @@ TestCase {
         compare(WindowEvents.label(null), "");
     }
 
-    // Steam games have no desktop entry: the class is the numeric app id, so
-    // nothing can match and the fallback is all there is.
-    function test_steam_games_get_steams_icon() {
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steam_app_1407200" })), "steam");
-        // But an application that merely mentions steam is not one.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "steamworks-tool" })), "steamworks-tool");
+    // A window whose class no desktop entry names -- a game started by its
+    // store's client, whose class is the client's own made-up id -- gets the
+    // rule every other window gets, and no other program's icon. The class
+    // names no icon in the theme, so where it is drawn it is the theme's
+    // generic one.
+    function test_a_class_with_no_entry_gets_the_ordinary_rule() {
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "client_app_1234" })), "client_app_1234");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Some_Game_42" })), "some_game_42");
     }
 
     // Grouping is the one part of what KDE's task manager does that needs no
@@ -239,6 +266,102 @@ TestCase {
         compare(m["DP-3"], "a");
     }
 
+    // ---- a full-screen window on a monitor ------------------------------
+
+    function test_full_screen_is_read() {
+        compare(WindowEvents.parseList(JSON.stringify([windowJson({ fullScreen: true })]))[0].fullScreen, true);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].fullScreen, false);
+    }
+
+    // The case that was reported: a game full screen, focus gone elsewhere,
+    // and the panel drawn over it. What counts is that it is on top there.
+    function test_the_top_window_full_screen_covers_its_monitor() {
+        const ws = [on("game", "DP-2", { stacking: 9, fullScreen: true }), on("ed", "DP-2", { stacking: 3 }),
+                    on("chat", "DP-3", { stacking: 12, active: true })];
+        compare(WindowEvents.fullScreenOn(ws, "DP-2", "d1"), true);
+        compare(WindowEvents.fullScreenOn(ws, "DP-3", "d1"), false);
+    }
+
+    // A window raised over it is what the user is looking at, so the panel
+    // is wanted again.
+    function test_a_window_above_it_uncovers_the_monitor() {
+        const ws = [on("game", "DP-2", { stacking: 9, fullScreen: true }), on("ed", "DP-2", { stacking: 11 })];
+        compare(WindowEvents.fullScreenOn(ws, "DP-2", "d1"), false);
+    }
+
+    // Minimised, or on another virtual desktop: not on screen, covers nothing
+    // -- and does not hide the ordinary window below it either.
+    function test_a_hidden_full_screen_window_covers_nothing() {
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, minimized: true }),
+                                           on("ed", "DP-2", { stacking: 3 })], "DP-2", "d1"), false);
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: ["d2"] }),
+                                           on("ed", "DP-2", { stacking: 3 })], "DP-2", "d1"), false);
+        // On every desktop, or on this one, it does.
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: [] })],
+                                          "DP-2", "d1"), true);
+        compare(WindowEvents.fullScreenOn([on("game", "DP-2", { stacking: 9, fullScreen: true, desktops: ["d2", "d1"] })],
+                                          "DP-2", "d1"), true);
+    }
+
+    function test_no_windows_cover_nothing() {
+        compare(WindowEvents.fullScreenOn([], "DP-2", "d1"), false);
+        compare(WindowEvents.fullScreenOn(undefined, "DP-2", "d1"), false);
+    }
+
+    // ---- a window reaching a floating panel's edge ------------------------
+
+    // DP-2 as KWin reported it: below DP-3's top, 2560x1440. The panel is at
+    // the bottom and reserves 66 px.
+    readonly property var dp2: ({ x: 0, y: 1040, width: 2560, height: 1440 })
+
+    function at(uuid, x, y, w, h, props) {
+        return Object.assign({ uuid: uuid, output: "DP-2", minimized: false, x: x, y: y, width: w, height: h },
+                             props ?? {});
+    }
+
+    function test_position_is_read() {
+        const w = WindowEvents.parseList(JSON.stringify([windowJson({ x: 720, y: 1360 })]))[0];
+        compare(w.x, 720);
+        compare(w.y, 1360);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].x, 0);
+    }
+
+    // Maximised, it stops where the reserved space starts: touching the
+    // panel, which is what fills the edge.
+    function test_a_maximised_window_reaches_the_edge() {
+        compare(WindowEvents.reachesEdge([at("max", 0, 1040, 2560, 1374)], "d1", dp2, "bottom", 66), true);
+    }
+
+    function test_a_window_clear_of_the_panel_does_not() {
+        compare(WindowEvents.reachesEdge([at("mid", 720, 1360, 1120, 748)], "d1", dp2, "bottom", 66), false);
+        // One pixel short of touching.
+        compare(WindowEvents.reachesEdge([at("near", 0, 1040, 2560, 1373)], "d1", dp2, "bottom", 66), false);
+    }
+
+    // Minimised, on another desktop, or on the other monitor: not there.
+    function test_only_windows_on_this_screen_and_desktop_count() {
+        compare(WindowEvents.reachesEdge([at("min", 0, 1040, 2560, 1440, { minimized: true })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("away", 0, 1040, 2560, 1440, { desktops: ["d2"] })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("dp3", 2560, 0, 1440, 2560)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("all", 0, 1040, 2560, 1440, { desktops: [] })], "d1", dp2, "bottom", 66), true);
+    }
+
+    function test_each_edge() {
+        compare(WindowEvents.reachesEdge([at("t", 100, 1040, 400, 300)], "d1", dp2, "top", 66), true);
+        compare(WindowEvents.reachesEdge([at("t", 100, 1200, 400, 300)], "d1", dp2, "top", 66), false);
+        compare(WindowEvents.reachesEdge([at("l", 0, 1200, 400, 300)], "d1", dp2, "left", 66), true);
+        compare(WindowEvents.reachesEdge([at("r", 2200, 1200, 360, 300)], "d1", dp2, "right", 66), true);
+        compare(WindowEvents.reachesEdge([at("r", 2000, 1200, 300, 300)], "d1", dp2, "right", 66), false);
+    }
+
+    // A window from a script too old to send its geometry has none, and
+    // reaches nothing.
+    function test_no_geometry_reaches_nothing() {
+        compare(WindowEvents.reachesEdge([at("old", 0, 0, 0, 0)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("max", 0, 1040, 2560, 1374)], "d1", null, "bottom", 66), false);
+    }
+
     function group(key, count) {
         const windows = [];
         for (let i = 0; i < (count ?? 1); ++i)
@@ -259,9 +382,9 @@ TestCase {
     // windows in its pinned place.
     function test_pinned_first_then_the_rest() {
         const items = WindowEvents.arrangeTasks(
-            [group("konsole"), group("org.kde.dolphin"), group("class:steam_app_1")],
+            [group("konsole"), group("org.kde.dolphin"), group("class:client_app_1")],
             ["org.kde.dolphin", "google-chrome"], launcher);
-        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:steam_app_1");
+        compare(keys(items), "org.kde.dolphin*,google-chrome*^,konsole,class:client_app_1");
         compare(items[1].windows.length, 0);
     }
 
@@ -285,7 +408,7 @@ TestCase {
 
     function test_app_id_of_an_item() {
         compare(WindowEvents.appIdOf({ key: "org.kde.dolphin" }), "org.kde.dolphin");
-        compare(WindowEvents.appIdOf({ key: "class:steam_app_1" }), "");
+        compare(WindowEvents.appIdOf({ key: "class:client_app_1" }), "");
         compare(WindowEvents.appIdOf({ key: "uuid", appKey: "konsole" }), "konsole");
         compare(WindowEvents.appIdOf(null), "");
     }
@@ -297,10 +420,28 @@ TestCase {
         compare(WindowEvents.togglePinned(["a"], ""), ["a"]);
     }
 
+    // The hash both switchers drew with before it was shared: the same id
+    // always gets the same hue, a hue is a fraction of the wheel, and a
+    // window with no id at all is not an error.
+    function test_a_tint_per_application() {
+        compare(WindowEvents.tintHue("org.kde.dolphin"), WindowEvents.tintHue("org.kde.dolphin"));
+        verify(WindowEvents.tintHue("org.kde.dolphin") !== WindowEvents.tintHue("firefox"));
+        compare(WindowEvents.tintHue(""), 0);
+        compare(WindowEvents.tintHue(undefined), 0);
+        // "a" is 97: 97 degrees of 360.
+        compare(WindowEvents.tintHue("a"), 97 / 360);
+        // (97 * 31 + 98) % 360 = 225.
+        compare(WindowEvents.tintHue("ab"), 225 / 360);
+        for (const id of ["", "x", "org.kde.konsole", "client_app_5678", "a".repeat(500)]) {
+            const hue = WindowEvents.tintHue(id);
+            verify(hue >= 0 && hue < 1, `${id}: ${hue}`);
+        }
+    }
+
     function test_icon_prefers_the_desktop_file() {
         compare(WindowEvents.iconName(windowJson()), "org.kde.dolphin");
-        // Lower-cased, which is what turns "Google-chrome" into an icon that
+        // Lower-cased, which is what turns "Example-Viewer" into an icon that
         // actually exists in the theme.
-        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Google-chrome" })), "google-chrome");
+        compare(WindowEvents.iconName(windowJson({ desktopFile: "", appId: "Example-Viewer" })), "example-viewer");
     }
 }

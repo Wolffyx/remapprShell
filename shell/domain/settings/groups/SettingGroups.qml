@@ -55,4 +55,68 @@ QtObject {
         const now = Array.isArray(chosen) ? chosen : all;
         return all.filter(v => v === value ? on : now.indexOf(v) >= 0);
     }
+
+    // A `list` key with `values` is the same choice, except that the order is
+    // the person's: the sidebar draws its cards in the order the list gives.
+    // So what is there keeps its place, a member turned off leaves, and one
+    // turned on goes at the end. Anything stored that the schema does not
+    // name is left alone rather than dropped.
+    function chooseInOrder(values, chosen, value, on) {
+        const now = Array.isArray(chosen) ? chosen.slice()
+            : typeof chosen === "string" && chosen.length > 0 ? root.parseList(chosen, "items")
+            : (values ?? []).slice();
+        if (on && now.indexOf(value) >= 0)
+            return now;
+        const without = now.filter(v => v !== value);
+        return on ? without.concat([value]) : without;
+    }
+
+    // A free `list` as one line of text, and back. `words` is a command line
+    // -- split on spaces, with quotes keeping a spaced argument whole, because
+    // a command is what those lists hold -- and anything else is items split
+    // on commas. Empty pieces are dropped: a trailing comma is not an item.
+    function parseList(text, mode) {
+        const src = String(text ?? "");
+        if (mode !== "words")
+            return src.split(",").map(t => t.trim()).filter(t => t.length > 0);
+        const out = [];
+        let cur = "";
+        let quote = "";
+        let started = false;
+        for (const ch of src) {
+            if (ch === quote) {
+                quote = "";     // the one that closes it
+                continue;
+            }
+            // Inside quotes everything is kept; outside, all but a space or a quote.
+            if (quote || !/[\s"']/.test(ch)) {
+                cur += ch;
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                started = true;
+                continue;
+            }
+            // A space, outside quotes: the end of a word, if one was started.
+            if (started || cur.length > 0)
+                out.push(cur);
+            cur = "";
+            started = false;
+        }
+        if (started || cur.length > 0)
+            out.push(cur);
+        return out;
+    }
+
+    function formatList(list, mode) {
+        if (!Array.isArray(list))
+            return String(list ?? "");
+        if (mode !== "words")
+            return list.join(", ");
+        return list.map(w => {
+            const t = String(w);
+            return t.length === 0 || /[\s"']/.test(t) ? `"${t.replace(/"/g, "'")}"` : t;
+        }).join(" ");
+    }
 }

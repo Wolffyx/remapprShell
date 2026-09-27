@@ -22,46 +22,38 @@ OUT=${1:-$REPO_ROOT/docs/config.md}
 
 [ -f "$INDEX" ] || "$REPO_ROOT/scripts/gen-widget-index.sh" >/dev/null
 
-# Markdown tables end a cell at a pipe, and a description containing one would
-# silently shift every column after it.
-escape() { printf '%s' "${1//|/\\|}"; }
-
-# What a key accepts, from its schema entry.
-accepts() {
-    local spec=$1
-    local type
-    type=$(jq -r '.type // "string"' <<< "$spec")
-    case "$type" in
-        enum) jq -r '[.values[] | "`\(.)`"] | join(", ")' <<< "$spec" ;;
-        int|number)
-            local min max
-            min=$(jq -r '.min // empty' <<< "$spec")
-            max=$(jq -r '.max // empty' <<< "$spec")
-            if [ -n "$min" ] && [ -n "$max" ]; then printf 'a number, %s to %s' "$min" "$max"
-            else printf 'a number'; fi ;;
-        bool) printf '`true` or `false`' ;;
-        list) printf 'a list' ;;
-        # A fixed set: the members are the whole of what may be in the list, so
-        # the reference names them rather than saying "a list" and stopping.
-        set)  jq -r '[.values[] | "`\(.)`"] | join(", ")' <<< "$spec" ;;
-        *)    printf 'text' ;;
-    esac
-}
-
-key_table() {
-    local keys=$1
-    printf '| Setting | Accepts | Default | Meaning |\n'
-    printf '| --- | --- | --- | --- |\n'
-    local name spec
-    while IFS= read -r name; do
-        spec=$(jq -c --arg k "$name" '.[$k]' <<< "$keys")
-        printf '| `%s` | %s | `%s` | %s |\n' \
-            "$name" \
-            "$(accepts "$spec")" \
-            "$(jq -r 'if has("default") then (.default | tostring) else "--" end' <<< "$spec")" \
-            "$(escape "$(jq -r '.description // .label // ""' <<< "$spec")")"
-    done < <(jq -r 'keys_unsorted[]' <<< "$keys")
-}
+# A table of keys, one row per key from its schema entry, as a jq function over
+# the keys' object: one jq writes every section's tables, and one every
+# widget's. It was five jq a key, and then still five a section and three a
+# widget, which on every `make lint` (lint-docs regenerates this) came to
+# several hundred and then to two hundred.
+#
+# What a key accepts is said the way a person would: the values of an enum, a
+# number's range, and for a fixed set its members -- they are the whole of
+# what may be in the list, so the reference names them rather than saying "a
+# list" and stopping. Markdown tables end a cell at a pipe, so a pipe in a
+# description is escaped: one left in would silently shift every column after
+# it. A value loses the newlines it ends with, as it did when each came
+# through a $(...) of its own.
+KEY_TABLE='
+    def cell: tostring | sub("\n+\\z"; "");
+    def num: if . == null or . == false then "" else cell end;
+    def key_table:
+        "| Setting | Accepts | Default | Meaning |",
+        "| --- | --- | --- | --- |",
+        (to_entries[] | .key as $name | .value as $spec
+         | ($spec.type // "string" | cell) as $type
+         | (if $type == "enum" or $type == "set" then [$spec.values[] | "`\(.)`"] | join(", ")
+            elif $type == "int" or $type == "number" then
+                ($spec.min | num) as $min | ($spec.max | num) as $max
+                | if $min != "" and $max != "" then "a number, \($min) to \($max)" else "a number" end
+            elif $type == "bool" then "`true` or `false`"
+            elif $type == "list" then "a list"
+            else "text" end) as $accepts
+         | (if $spec | has("default") then ($spec.default | cell) else "--" end) as $default
+         | ($spec.description // $spec.label // "" | cell | gsub("\\|"; "\\|")) as $meaning
+         | "| `\($name)` | \($accepts) | `\($default)` | \($meaning) |");
+'
 
 {
     printf '# Configuration reference\n\n'
@@ -90,21 +82,15 @@ key_table() {
     printf 'typo cannot cost you the rest of the file.\n\n'
 
     printf '## Settings\n\n'
-    while IFS= read -r section; do
-        local_id=$(jq -r '.id' <<< "$section")
-        printf '### %s\n\n' "$(jq -r '.label // .id' <<< "$section")"
-        desc=$(jq -r '.description // ""' <<< "$section")
-        [ -n "$desc" ] && printf '%s\n\n' "$desc"
-
-        keys=$(jq -c '.keys // {}' <<< "$section")
-        if [ "$(jq -r 'length' <<< "$keys")" -gt 0 ]; then
-            key_table "$keys"
-            printf '\n'
-        else
-            printf 'No individual settings: this is a page in the settings window rather than a\n'
-            printf 'list of values.\n\n'
-        fi
-    done < <(jq -c '.sections[]' "$SCHEMA")
+    jq -r "$KEY_TABLE"'
+        .sections[]
+        | "### \(.label // .id | cell)", "",
+          (.description // "" | cell | select(. != "") | ., ""),
+          ((.keys // {}) as $keys
+           | if ($keys | length) > 0 then ($keys | key_table), ""
+             else "No individual settings: this is a page in the settings window rather than a",
+                  "list of values.", ""
+             end)' "$SCHEMA"
 
     printf '## The panel contents\n\n'
     printf '`bar.entries` is an ordered list. Order matters *within* a zone, and every entry\n'
@@ -127,14 +113,9 @@ key_table() {
     printf 'With `tray` also on the panel it is left to the tray rather than drawn twice;\n'
     printf 'without `tray` it stands on the panel alone.\n\n'
 
-    while IFS= read -r widget; do
-        id=$(jq -r '.id' <<< "$widget")
-        keys=$(jq -c '.config // {}' <<< "$widget")
-        [ "$(jq -r 'length' <<< "$keys")" -gt 0 ] || continue
-        printf '### `widgets.%s`\n\n' "$id"
-        key_table "$keys"
-        printf '\n'
-    done < <(jq -c '.widgets[]' "$INDEX")
+    jq -r "$KEY_TABLE"'
+        .widgets[] | (.config // {}) as $keys | select(($keys | length) > 0)
+        | "### `widgets.\(.id | cell)`", "", ($keys | key_table), ""' "$INDEX"
 
     printf '## A complete example\n\n'
     printf 'Everything below is optional; anything left out comes from the defaults.\n\n'

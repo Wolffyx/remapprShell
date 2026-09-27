@@ -30,6 +30,7 @@ pragma Singleton
 
 import QtQuick
 import qs.core
+import qs.domain.notifications.popups
 
 QtObject {
     id: root
@@ -41,14 +42,20 @@ QtObject {
     function _hint(hints, name) {
         if (!hints || typeof hints !== "object")
             return undefined;
-        const v = hints[name];
-        if (v && typeof v === "object" && "data" in v)
-            return v.data;
-        return v;
+        return Popups.unwrapped(hints[name]);
+    }
+
+    // The picture a history entry is about, or "": a screenshot that was
+    // saved, a photograph that finished downloading. The same rule the live
+    // popups use (Popups.pictureOf) applied to what the eavesdrop kept -- a
+    // local file whose name ends in an image type, and nothing else, because
+    // the path was chosen by whoever sent the notification.
+    function pictureOf(entry) {
+        return (entry?.urls ?? []).find(u => Popups.isPicture(u)) ?? "";
     }
 
     // Returns { appName, appIcon, summary, body, actions, urgency, desktopEntry,
-    // when } or null.
+    // urls, when } or null.
     function parse(line, now) {
         // BusLine takes the pixels out and bounds the size before anything
         // here sees the line. That is the step this parser used to die in.
@@ -82,6 +89,12 @@ QtObject {
             // 0 low, 1 normal, 2 critical. Absent means normal, per the spec.
             urgency: Number.isFinite(urgency) ? urgency : 1,
             desktopEntry: String(root._hint(hints, "desktop-entry") ?? ""),
+            // Every local file it names, as file:// URLs -- what makes a click
+            // on an entry in the history able to open it. Popups' rule, so
+            // the history and the live popup agree.
+            urls: Popups.urlsOf(hints),
+            // Kept for a click from the history: see Popups.targetFor.
+            eventId: String(root._hint(hints, "x-kde-eventId") ?? ""),
             when: when
         };
     }

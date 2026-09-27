@@ -8,6 +8,7 @@
 import QtQuick
 import QtTest
 import qs.domain.notifications.events
+import "fixtures/bus.js" as Bus
 
 TestCase {
     name: "NotificationEvents"
@@ -15,12 +16,7 @@ TestCase {
     readonly property string captured: '{"type":"method_call","endian":"l","flags":0,"version":1,"cookie":9,"timestamp-realtime":1789051619890040,"sender":":1.1825","destination":":1.45","path":"/org/freedesktop/Notifications","interface":"org.freedesktop.Notifications","member":"Notify","payload":{"type":"susssasa{sv}i","data":["probe-app",0,"","Probe summary","Probe body with /home/someone/x",[],{"image-path":{"type":"s","data":"dialog-information"},"urgency":{"type":"y","data":0},"sender-pid":{"type":"x","data":568015}},-1]}}'
 
     function call(data, extra) {
-        return JSON.stringify(Object.assign({
-            type: "method_call",
-            interface: "org.freedesktop.Notifications",
-            member: "Notify",
-            payload: { type: "susssasa{sv}i", data: data }
-        }, extra ?? {}));
+        return Bus.notify(data, extra);
     }
 
     function test_captured_line() {
@@ -95,30 +91,15 @@ TestCase {
     // segfaults the QML engine from inside the read handler. Reproduced with
     // a real notification before this test was written.
 
-    function pixels(n) {
-        const a = [];
-        for (let i = 0; i < n; i++)
-            a.push(i % 256);
-        return a;
-    }
-
     function imageLine(n) {
-        return JSON.stringify({
-            type: "method_call",
-            interface: "org.freedesktop.Notifications",
-            member: "Notify",
-            payload: {
-                type: "susssasa{sv}i",
-                data: ["image-probe", 0, "", "Image probe", "has an image-data hint", [],
-                       {
-                           "image-data": {
-                               type: "(iiibiiay)",
-                               data: [64, 64, 256, true, 8, 4, pixels(n)]
-                           },
-                           "urgency": { type: "y", data: 1 }
-                       }, -1]
-            }
-        });
+        return Bus.notify(["image-probe", 0, "", "Image probe", "has an image-data hint", [],
+                           {
+                               "image-data": {
+                                   type: "(iiibiiay)",
+                                   data: [64, 64, 256, true, 8, 4, Bus.pixels(n)]
+                               },
+                               "urgency": { type: "y", data: 1 }
+                           }, -1]);
     }
 
     function test_a_notification_carrying_pixels_still_arrives() {
@@ -174,5 +155,50 @@ TestCase {
         compare(NotificationEvents.parse(""), null);
         compare(NotificationEvents.parse("Monitoring bus message stream."), null);
         compare(NotificationEvents.parse('{"type":"method_call","interf'), null);
+    }
+
+    // The file a notification names. Read off the bus while Spectacle saved a
+    // screenshot: `x-kde-urls` is an array of strings, and busctl wraps every
+    // hint as { type, data }. Both shapes reach the history the same way,
+    // which is what lets a click on an old entry open the picture.
+    function test_the_files_a_notification_names() {
+        const line = JSON.stringify({
+            type: "method_call", interface: "org.freedesktop.Notifications", member: "Notify",
+            payload: { data: ["Spectacle", 0, "spectacle", "All Screens", "A screenshot was saved.",
+                              ["default", "Open"],
+                              { "desktop-entry": { type: "s", data: "org.kde.spectacle" },
+                                "x-kde-urls": { type: "as", data: ["file:///home/a/Screenshot.png"] } },
+                              -1] }
+        });
+        const entry = NotificationEvents.parse(line, 1000);
+        compare(entry.urls, ["file:///home/a/Screenshot.png"]);
+        compare(entry.desktopEntry, "org.kde.spectacle");
+    }
+
+    // What the history draws under an entry, when the entry is about a
+    // picture. The same rule the popups use, and the reason the notification
+    // centre could show a screenshot's file name and not the screenshot.
+    function test_the_picture_an_entry_is_about() {
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/Screenshot.png"] }),
+                "file:///home/a/Screenshot.png");
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf"] }), "");
+        compare(NotificationEvents.pictureOf({ urls: [] }), "");
+        compare(NotificationEvents.pictureOf(null), "");
+        // The popups' test of a picture: the extension, whatever its case,
+        // and never a query string.
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/report.pdf", "file:///home/a/P.JPEG"] }),
+                "file:///home/a/P.JPEG");
+        compare(NotificationEvents.pictureOf({ urls: ["file:///home/a/x.pdf?name=y.png"] }), "");
+    }
+
+    // A sender that writes x-kde-urls as one string rather than a list, and
+    // as a bare path: still one file:// URL in the history.
+    function test_a_single_path_is_one_url() {
+        const line = JSON.stringify({
+            type: "method_call", interface: "org.freedesktop.Notifications", member: "Notify",
+            payload: { data: ["Downloads", 0, "", "Done", "", [],
+                              { "x-kde-urls": { type: "s", data: "/home/a/file.zip" } }, -1] }
+        });
+        compare(NotificationEvents.parse(line, 1000).urls, ["file:///home/a/file.zip"]);
     }
 }

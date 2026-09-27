@@ -84,6 +84,8 @@ QtObject {
         atomicWrites: true
         printErrors: false
 
+        onSaveFailed: Fs.forget(Paths.stateDir)
+
         onLoaded: {
             root.markerSeen = true;
             root.markerChecked = true;

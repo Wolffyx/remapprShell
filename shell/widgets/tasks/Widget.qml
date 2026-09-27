@@ -21,11 +21,14 @@ pragma ComponentBehavior: Bound
 // Pinned applications stay on the taskbar, first and in the order pinned,
 // whether or not they are running. KWin does everything asked of it; nothing
 // here moves or rearranges a window.
+//
+// This file is the row's state and what the panel's clicks and hovers do to
+// it. A button is drawn by TaskButton, and the popout -- the menu, or the
+// preview (TaskPreview) -- is TaskPopout.
 
 import QtQuick
-import qs.domain.config
+import Quickshell
 import qs.domain.desktops
-import qs.domain.theme
 import qs.domain.windows
 import qs.domain.windows.events
 import qs.ui.primitives
@@ -53,6 +56,12 @@ BarWidget {
         : Math.max(16, Math.min(56, Math.round(root.buttonHeight * root.iconScale / 100)))
 
     readonly property bool groupByApp: root.widgetConfig?.groupByApp ?? true
+
+    // The application's name above its preview cards, and a second square
+    // peeking out behind the icon of an application with several windows.
+    readonly property bool previewHeader: root.widgetConfig?.previewHeader ?? false
+    readonly property bool previewScreen: root.widgetConfig?.previewScreen ?? false
+    readonly property bool stackGroups: root.widgetConfig?.stackGroups ?? true
 
     // Desktop entry ids, in the order they sit on the taskbar.
     readonly property var pinned: root.widgetConfig?.pinned ?? []
@@ -100,6 +109,20 @@ BarWidget {
     readonly property var items: WindowEvents.arrangeTasks(root.running, root.pinned,
                                                            id => WindowsService.launcherFor(id))
 
+    // A button's item: the one at its place, which is where it is once the
+    // list has settled, as long as the key agrees -- and found by key while
+    // the list is still moving under it. The buttons are repeated over the
+    // keys (see below), so this is how each reads what it shows.
+    function itemFor(index, key) {
+        const at = root.items[index];
+        return at?.key === key ? at : (root.items.find(i => i.key === key) ?? root.noItem);
+    }
+
+    // What a button on its way out reads, for the moment between its key
+    // leaving the list and the button going.
+    readonly property var noItem: ({ key: "", appName: "", windows: [], active: false, attention: false,
+                                     attentionSince: 0, iconName: "", iconFile: "" })
+
     // As tall as the design's buttons at this thickness. With titles a
     // button is as wide as its title needs, up to `maxWidth`; without, it is
     // the icon and its padding.
@@ -111,9 +134,8 @@ BarWidget {
     // button is cut to an equal share of it -- titles elided first, then gone
     // below a readable width, down to the icon alone.
     readonly property real iconOnly: root.iconSize + 2 * root.padding
-    readonly property real share: root.room >= 0 && root.items.length > 0
-        ? Math.max(root.iconOnly, (root.room - root.spacing * (root.items.length - 1)) / root.items.length)
-        : 1e9
+    givesWay: true
+    readonly property real share: Math.max(root.iconOnly, root.wanted)
 
     // Past a certain number of windows even the icon alone does not fit, and a
     // Row does not shrink: the buttons kept their width and ran on past the
@@ -139,27 +161,35 @@ BarWidget {
     readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
 
     // Buttons differ in width once they carry titles, so the one under the
-    // pointer is found by where each actually is rather than by dividing the
-    // position by one width.
+    // pointer is found by where each actually is (BarWidget.indexAlong)
+    // rather than by dividing the position by one width. The taskbar runs
+    // along the panel only.
     function indexAt(position) {
-        for (let i = 0; i < buttons.count; i++) {
-            const b = buttons.itemAt(i);
-            if (b && position >= b.x - root.spacing / 2 && position < b.x + b.width + root.spacing / 2)
-                return i;
-        }
-        return -1;
+        return root.indexAlong(buttons, position, root.spacing, false);
     }
 
     function centreOf(index) {
-        const b = buttons.itemAt(index);
-        return b ? b.x + b.width / 2 : 0;
+        return Math.max(0, root.centreAlong(buttons, index, false));
     }
 
-    popoutPadding: root.popoutMode === "menu" ? 8 : 14
+    // The preview's cards carry their own inner margin, so the card around
+    // them adds only a little: 14 on top of theirs was the wide empty border
+    // round a single window.
+    popoutPadding: root.popoutMode === "menu" ? 8 : 6
     // The menu is a list of actions and has a width of its own; the preview
     // is a picture and takes its size from what it is showing.
     readonly property int menuWidth: 262
     popoutWidth: root.popoutMode === "menu" ? root.menuWidth : -1
+
+    // The preview is reached across an invisible bridge from its button:
+    // the gap above the row was the one stretch of the way to the card that
+    // was not the card, and the card started closing while the pointer
+    // crossed it. The bridge is exactly as wide as the button the preview is
+    // about -- its icon and its margin -- and nothing of it is drawn
+    // (BarWidget.popoutTail). The menu is a menu, and stands clear as the
+    // others do.
+    popoutTail: root.popoutMode !== "menu"
+    popoutTailWidth: buttons.itemAt(root.items.findIndex(i => i.key === root.previewKey))?.width ?? root.drawnIconOnly
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
@@ -170,13 +200,59 @@ BarWidget {
     // Reaching the card means taking the pointer off the button, so a card
     // that read `hoveredIndex` emptied itself on the way there and could never
     // be clicked -- which is exactly what "the popup disappears" was.
-    property var previewItem: null
+    //
+    // Kept as the button's key, and its item looked up afresh from `items`.
+    // The card used to hold the item itself, which was a snapshot: a window
+    // closed from the card stayed on it, and the first movement of the
+    // pointer after any change to the window list handed it a new object,
+    // which rebuilt every card and restarted every live picture. Still
+    // writable: dev/preview/popout.qml points the card at a group by setting
+    // it.
+    property string previewKey: ""
+    property var previewItem: root.items.find(i => i.key === root.previewKey) ?? null
+
+    // Its last window closed -- from the card or anywhere else -- the card
+    // goes with it, rather than staying up empty. For most applications the
+    // group goes too; a pinned one stays on the taskbar with no windows, and
+    // its card turned into "Pinned -- click to start it" under the pointer
+    // that had just closed it (2026-09-24). A card that opened on a pinned
+    // application with nothing running is a different thing, and stays.
+    // Asked of `items` rather than of `previewItem`: clearing the key from
+    // inside that property's own change is a binding loop.
+    property int _previewWindows: 0
+
+    onPreviewKeyChanged: root._previewWindows = root.items.find(i => i.key === root.previewKey)?.windows.length ?? 0
+
+    onItemsChanged: {
+        if (root.previewKey.length === 0 || root.popoutMode === "menu")
+            return;
+        const shown = root.items.find(i => i.key === root.previewKey)?.windows.length ?? -1;
+        if (shown < 0 || (shown === 0 && root._previewWindows > 0)) {
+            root.previewKey = "";
+            root.popoutVisible = false;
+            return;
+        }
+        root._previewWindows = shown;
+    }
 
     // And the card stays up while the pointer crosses the gap to it. Leaving
     // the button starts a short countdown rather than closing; entering the
     // card stops it. Windows and Plasma both do this, and without it a hover
     // preview can only ever be looked at.
+    //
+    // "The card" is the panel's word for it (popoutHovered): the whole card
+    // and the neck it hangs by. The preview's own contents stop short of the
+    // card's padding and know nothing of the neck, so watching them started
+    // the countdown on the very way to the card.
     property bool pointerInPopout: false
+
+    onPopoutHoveredChanged: {
+        root.pointerInPopout = root.popoutHovered;
+        if (root.popoutHovered)
+            root.cancelClose();
+        else if (root.popoutVisible)
+            root.beginClose();
+    }
 
     readonly property Timer _closeDelay: Timer {
         interval: 280
@@ -184,7 +260,7 @@ BarWidget {
             if (root.popoutMode === "menu" || root.pointerInPopout || root.hoveredIndex >= 0)
                 return;
             root.popoutVisible = false;
-            root.previewItem = null;
+            root.previewKey = "";
         }
     }
 
@@ -215,7 +291,7 @@ BarWidget {
     readonly property int flashMs: 6000
 
     implicitWidth: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
-    implicitHeight: root.bar.thickness
+    implicitHeight: root.barThickness
 
     function handleHover(position, horizontal) {
         root.hoveredIndex = root.indexAt(position);
@@ -224,7 +300,7 @@ BarWidget {
             return;
         if (root.hoveredIndex >= 0) {
             root.cancelClose();
-            root.previewItem = root.items[root.hoveredIndex];
+            root.previewKey = root.items[root.hoveredIndex]?.key ?? "";
             root.popoutVisible = true;
             root.requestPopout("tasks", root.centreOf(root.hoveredIndex));
         } else {
@@ -249,7 +325,7 @@ BarWidget {
         if (!root.popoutVisible) {
             root.popoutMode = "preview";
             root.menuItem = null;
-            root.previewItem = null;
+            root.previewKey = "";
             root.pointerInPopout = false;
             root.cancelClose();
         }
@@ -304,466 +380,22 @@ BarWidget {
 
         Repeater {
             id: buttons
-            model: root.items
 
-            Rectangle {
-                id: button
+            // Over the keys, not the items. `items` is made afresh on every
+            // push from the window daemon -- any window's title changing is
+            // one -- and a Repeater over it built every button again each
+            // time, each with its timer and its animation. Over the keys a
+            // button lives as long as its application or window is on the
+            // list, and reads its item through itemFor.
+            model: ScriptModel { values: root.items.map(i => i.key) }
 
-                required property var modelData
-                required property int index
-
-                readonly property bool isActive: button.modelData.active === true
-                // A group is dimmed only when every window in it is minimised:
-                // one visible window means the application is on screen. A
-                // pinned application with no windows is not minimised, just
-                // not running.
-                readonly property bool isMinimized: button.windowCount > 0
-                                                    && button.modelData.windows.every(w => w.minimized)
-                readonly property bool isHovered: button.index === root.hoveredIndex
-                readonly property int windowCount: button.modelData.windows.length
-
-                width: root.titlesFit ? Math.min(root.maxWidth, root.share, content.implicitWidth + 2 * root.padding)
-                                      : root.drawnIconOnly
-                height: root.buttonHeight
-                radius: Math.round(14 * Math.max(0.7, root.unit))
-
-                // Buttons sit on the panel itself, as the design draws them:
-                // no tile until hovered, and the focused window's in the
-                // accent's container colour.
-                color: button.isActive  ? Theme.accC
-                     : button.isHovered ? Theme.s2
-                                        : "transparent"
-
-                // A minimised window is still there and still clickable; it is
-                // dimmed rather than hidden, which is the whole difference
-                // between a task list and a window list.
-                opacity: button.isMinimized ? 0.55 : 1
-
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                // A window asking for attention -- a message arrived, a
-                // dialog wants an answer -- flashes its button for a few
-                // seconds and then keeps an orange tint until it is looked
-                // at, as Windows does. KWin clears the request when the window
-                // is activated, and the tint goes with it.
-                //
-                // The moment the request began is kept by WindowsService, not
-                // here: any change to the window list rebuilds every button,
-                // and a flash timed from the button would start over each
-                // time some other window changed its title.
-                readonly property bool wantsAttention: button.modelData.attention === true && !button.isActive
-                property bool flashing: false
-
-                function startFlash() {
-                    const left = root.flashMs - (Date.now() - (button.modelData.attentionSince ?? 0));
-                    button.flashing = button.wantsAttention && left > 0;
-                    if (button.flashing) {
-                        flashStop.interval = left;
-                        flashStop.restart();
-                    }
-                }
-
-                onWantsAttentionChanged: button.startFlash()
-                Component.onCompleted: button.startFlash()
-
-                Timer {
-                    id: flashStop
-                    onTriggered: button.flashing = false
-                }
-
-                Rectangle {
-                    id: attentionTint
-                    anchors.fill: parent
-                    radius: parent.radius
-                    color: Theme.neutral
-                    visible: button.wantsAttention
-                    opacity: 0.45
-
-                    SequentialAnimation on opacity {
-                        running: button.flashing
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.9; duration: 420; easing.type: Easing.InOutQuad }
-                        NumberAnimation { to: 0.15; duration: 420; easing.type: Easing.InOutQuad }
-                    }
-                }
-
-                onFlashingChanged: if (!button.flashing) attentionTint.opacity = 0.45
-
-                Row {
-                    id: content
-                    anchors.centerIn: parent
-                    spacing: Math.round(10 * Math.max(0.7, root.unit))
-
-                    PanelIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: root.drawnIcon
-                        iconName: button.modelData.iconName
-                        iconFile: button.modelData.iconFile
-                    }
-
-                    PanelText {
-                        id: title
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: root.titlesFit
-                        width: Math.min(title.implicitWidth, root.titleRoom)
-                        elide: Text.ElideRight
-                        text: button.modelData.windows.length === 1
-                            ? WindowEvents.label(button.modelData.windows[0])
-                            : button.modelData.appName
-                    }
-                }
-
-                // Under the button, in the panel's margin: how many windows
-                // the application has, and whether one of them is focused --
-                // a long accent bar for the focused one, a short mark per
-                // other window. Colour alone is the distinction a person with
-                // low vision may not see at all, so the count is shape as
-                // well as tint.
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: parent.height + Math.max(1, Math.round(((root.bar?.thickness ?? 40) - root.buttonHeight) / 2 - 7))
-                    spacing: 3
-
-                    Repeater {
-                        // Past four the marks stop being countable and start
-                        // being noise.
-                        model: Math.min(4, button.windowCount)
-
-                        Rectangle {
-                            required property int index
-
-                            width: button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, root.unit))
-                                                                 : Math.round(6 * Math.max(0.7, root.unit))
-                            height: 3
-                            radius: 1.5
-                            color: button.isActive && index === 0 ? Theme.acc : Theme.alpha(Theme.fg, 0.4)
-                        }
-                    }
-                }
-            }
+            TaskButton { taskbar: root }
         }
     }
 
-    // One popout, two contents: a button's menu, or the preview.
+    // One popout, two contents: a button's menu, or the preview. What each
+    // is and does is TaskPopout's.
     popout: Component {
-        Item {
-            // The loaded contents are Items; the linter only knows they are
-            // QObjects, so they are read through a typed alias.
-            readonly property Item shownContent: (menuLoader.item ?? previewLoader.item) as Item
-
-            // In menu mode the width is the widget's to state, not the
-            // menu's to work out: the rows are as wide as the menu and the
-            // menu as wide as the card, so asking the menu how wide it wants
-            // to be is a loop. The card's own width is what breaks it.
-            implicitWidth: root.popoutMode === "menu" ? root.menuWidth
-                                                      : (shownContent?.implicitWidth ?? 1)
-            implicitHeight: shownContent?.implicitHeight ?? 1
-
-            Loader {
-                id: menuLoader
-
-                // The menu's rows are as wide as the menu, and the menu is as
-                // wide as it is given: `popoutWidth` above fixes the card at
-                // 262 and this Loader is what passes that on. Without a width
-                // here every row laid out 0 wide inside a card the right size,
-                // which is a right click that does nothing at all.
-                width: parent.width
-                active: root.popoutMode === "menu" && root.menuItem !== null
-                sourceComponent: TaskMenu {
-                    item: root.menuItem
-                    entry: WindowsService.entryById(WindowEvents.appIdOf(root.menuItem))
-                    pinned: root.menuItem?.pinned === true
-
-                    onLaunch: action => {
-                        WindowsService.launch(WindowEvents.appIdOf(root.menuItem), action);
-                        root.popoutVisible = false;
-                    }
-                    onTogglePin: {
-                        ConfigStore.set("widgets.tasks.pinned",
-                                        WindowEvents.togglePinned(root.pinned, WindowEvents.appIdOf(root.menuItem)));
-                        root.popoutVisible = false;
-                    }
-                    onCloseWindows: {
-                        for (const w of root.menuItem?.windows ?? [])
-                            WindowsService.close(w.uuid);
-                        root.popoutVisible = false;
-                    }
-                }
-            }
-
-            Loader {
-                id: previewLoader
-                active: root.popoutMode !== "menu"
-                sourceComponent: root.preview
-            }
-
-            // The card is as tall as whichever is loaded. The menu's height is
-            // the sum of its rows, which it only knows once it has a width.
-        }
-    }
-
-    // The preview.
-    //
-    // It shows a live picture of the window where the compositor gives one --
-    // KWin's screencast protocol, through this project's one compiled part
-    // (plugin/) -- and the application's icon where it does not.
-    //
-    // A group of several windows is a picture each, not a list of titles, and
-    // every one of them is a target: hovering a grouped button and then being
-    // unable to say which window you meant is the whole complaint against a
-    // grouped taskbar, and "click to move through them" is an answer only for
-    // somebody who already knows which one is next.
-    //
-    // The previous note here said a picture was impossible. It was wrong in an
-    // instructive way: the protocol is restricted rather than absent, and KWin
-    // gives it to a client whose desktop file asks for it by name.
-    readonly property Component preview: Component {
-        Item {
-            id: preview
-
-            readonly property var item: root.previewItem
-            readonly property var windows: preview.item?.windows ?? []
-            readonly property bool many: preview.windows.length > 1
-
-            // Three across before it wraps. Four Chrome windows in a row is
-            // wider than a laptop screen, and a card wider than the screen is
-            // clamped -- which puts the cards under a button they did not come
-            // from.
-            readonly property int columns: Math.min(3, Math.max(1, preview.windows.length))
-            readonly property int cellWidth: 176
-            readonly property int cellHeight: 99
-
-            implicitWidth: Math.max(260, body.implicitWidth + 24)
-            implicitHeight: body.implicitHeight + 14
-
-            // Closing a window from its own picture, as every taskbar preview
-            // does -- and from the single window's picture too, which had none
-            // and is the commonest case there is.
-            //
-            // Drawn faintly rather than only under the pointer. A cross nobody
-            // can see is a feature nobody finds, and this one is small, in a
-            // corner, and on a card that is already a deliberate hover; the
-            // risk it guards against is a row of bright crosses over something
-            // somebody is only reading, which dimming answers just as well.
-            component CloseButton: Rectangle {
-                id: closeButton
-
-                required property string uuid
-
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.margins: 6
-                width: 20
-                height: 20
-                radius: 10
-                opacity: closePointer.hovered ? 1 : 0.55
-                color: closePointer.hovered ? Theme.error : Theme.alpha(Theme.background, 0.8)
-                Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
-
-                Glyph {
-                    anchors.centerIn: parent
-                    name: "close"
-                    fallback: "window-close"
-                    size: 13
-                    color: closePointer.hovered ? Theme.errorFg : Theme.foreground
-                }
-
-                HoverHandler { id: closePointer; cursorShape: Qt.PointingHandCursor }
-                TapHandler {
-                    onTapped: {
-                        WindowsService.close(closeButton.uuid);
-                        // The card stays: closing one of five windows is
-                        // usually the first of several, and a card that
-                        // vanished would make the second a fresh hunt. It
-                        // closes itself when the last one goes, because the
-                        // group does.
-                        root.cancelClose();
-                    }
-                }
-            }
-
-            // The pointer being on the card is what keeps the card. Declared
-            // here rather than on each cell so the gaps between them count as
-            // being on it too.
-            HoverHandler {
-                id: cardHover
-                onHoveredChanged: {
-                    root.pointerInPopout = cardHover.hovered;
-                    if (cardHover.hovered)
-                        root.cancelClose();
-                    else
-                        root.beginClose();
-                }
-            }
-
-            Column {
-                id: body
-                anchors.centerIn: parent
-                spacing: 8
-
-                // One window: the picture is the card, as big as it is worth
-                // drawing, and the title sits under the application below.
-                Item {
-                    id: sole
-
-                    visible: preview.windows.length === 1
-                    width: 300
-                    height: 169
-
-                    WindowThumbnail {
-                        anchors.fill: parent
-                        windowId: preview.windows[0]?.uuid ?? ""
-                        iconName: preview.item?.iconName ?? ""
-                        iconFile: preview.item?.iconFile ?? ""
-                        iconScale: 0.3
-                        sourceAspect: WindowEvents.aspectOf(preview.windows[0])
-                        live: preview.windows.length === 1
-                        opacity: preview.windows[0]?.minimized ? 0.55 : 1
-                    }
-
-                    CloseButton { uuid: preview.windows[0]?.uuid ?? "" }
-
-                    // The picture behaves as the cells below do: the thing
-                    // itself is the target. Under the close button, which
-                    // takes its own taps first.
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                    TapHandler {
-                        onTapped: {
-                            WindowsService.activate(preview.windows[0]?.uuid ?? "");
-                            root.popoutVisible = false;
-                        }
-                    }
-                }
-
-                // The application, once, however many windows it has.
-                Row {
-                    spacing: 12
-
-                    PanelIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 40
-                        iconName: preview.item?.iconName ?? ""
-                        iconFile: preview.item?.iconFile ?? ""
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
-
-                        PanelText {
-                            text: preview.item?.appName ?? ""
-                            font.bold: true
-                        }
-
-                        PanelText {
-                            visible: text.length > 0
-                            text: preview.many
-                                ? `${preview.windows.length} windows — pick one`
-                                : preview.windows.length === 0 ? "Pinned — click to start it" : ""
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 11
-                        }
-                    }
-                }
-
-                // Every window it has, each with its own picture and each a
-                // target. Only `columns` is set -- see ZoneRow for why setting
-                // both goes wrong.
-                Grid {
-                    visible: preview.many
-                    columns: preview.columns
-                    spacing: 8
-
-                    Repeater {
-                        model: preview.many ? preview.windows : []
-
-                        Rectangle {
-                            id: cell
-
-                            required property var modelData
-                            required property int index
-
-                            width: preview.cellWidth
-                            height: preview.cellHeight + cellTitle.implicitHeight + 14
-                            radius: Theme.radiusOf(12)
-                            color: cell.modelData.active ? Theme.accC
-                                 : cellPointer.hovered ? Theme.s2
-                                                       : "transparent"
-                            Behavior on color { ColorAnimation { duration: Theme.durationFast } }
-
-                            WindowThumbnail {
-                                id: shot
-                                x: 4
-                                y: 4
-                                width: preview.cellWidth - 8
-                                height: preview.cellHeight
-                                windowId: cell.modelData.uuid ?? ""
-                                iconName: preview.item?.iconName ?? ""
-                                iconFile: preview.item?.iconFile ?? ""
-                                iconScale: 0.4
-                                sourceAspect: WindowEvents.aspectOf(cell.modelData)
-                                // A picture is a screencast stream, and one
-                                // per window is one per window. Eight is more
-                                // than anybody picks from at a glance; past
-                                // that the cards are icons, which is what a
-                                // thumbnail falls back to anyway.
-                                live: cell.index < 8
-                                opacity: cell.modelData.minimized ? 0.55 : 1
-                            }
-
-                            PanelText {
-                                id: cellTitle
-                                x: 6
-                                width: cell.width - 12
-                                anchors.top: shot.bottom
-                                anchors.topMargin: 4
-                                elide: Text.ElideRight
-                                text: WindowEvents.label(cell.modelData)
-                                color: cell.modelData.minimized ? Theme.foregroundInactive : Theme.foreground
-                                font.pixelSize: 11
-                                font.italic: cell.modelData.minimized
-                            }
-
-                            CloseButton { uuid: cell.modelData.uuid ?? "" }
-
-                            HoverHandler { id: cellPointer; cursorShape: Qt.PointingHandCursor }
-                            TapHandler {
-                                // The whole cell, not the picture: a target
-                                // the size of the thing it stands for.
-                                onTapped: {
-                                    WindowsService.activate(cell.modelData.uuid);
-                                    root.popoutVisible = false;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // One window's title, under the picture of it. A group says
-                // its titles on the cards above instead.
-                Row {
-                    visible: preview.windows.length === 1
-                    spacing: 6
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 3
-                        height: 12
-                        radius: 1.5
-                        color: preview.windows[0]?.active ? Theme.accent : "transparent"
-                    }
-
-                    PanelText {
-                        id: soleTitle
-                        width: Math.min(soleTitle.implicitWidth, 320)
-                        elide: Text.ElideRight
-                        text: preview.windows[0] ? WindowEvents.label(preview.windows[0]) : ""
-                        color: preview.windows[0]?.minimized ? Theme.foregroundInactive : Theme.foreground
-                        font.pixelSize: 12
-                        font.italic: preview.windows[0]?.minimized === true
-                    }
-                }
-            }
-        }
+        TaskPopout { taskbar: root }
     }
 }

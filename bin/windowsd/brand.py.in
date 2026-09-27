@@ -1,0 +1,32 @@
+"""What an install names this daemon, and the tables it shares with the CLI.
+
+GENERATED FILE -- DO NOT EDIT. Regenerate: make link (or scripts/install.sh)
+
+The one module of the daemon that is a template. Everything an install
+decides -- a name, a path, a table read out of scripts/lib -- is rendered in
+here, once, and the other modules take it from here rather than carrying
+placeholders of their own.
+"""
+
+DISPLAY_NAME = "@DISPLAY_NAME@"
+SLUG = "@SLUG@"
+ENV_PREFIX = "@ENV_PREFIX@"
+
+# The shell's bus name, which every interface here is named under.
+DBUS_NAME = "@DBUS_NAME@"
+
+# The name this copy of the daemon owns on the bus: the shell's, in every
+# install. A line of its own because the test suite runs a copy under a name
+# of its own -- and that name differing from SHORTCUT_OWNER, in shortcuts.py,
+# is what keeps the copy off the keyboard.
+BUS_NAME = "@DBUS_NAME@"
+
+# The CLI, which every shortcut and screen edge runs.
+CTL = "@BIN_DIR@/@CTL_BIN@"
+
+# scripts/lib/keycodes.tsv as {name: Qt key code}; see keys.py.
+ACCEL_KEYCODES = @ACCEL_KEYCODES@
+
+# scripts/lib/shortcut-actions.tsv as {id: [name, [CLI arguments]]}; see
+# shortcuts.py.
+SHORTCUT_ACTIONS = @SHORTCUT_ACTIONS@

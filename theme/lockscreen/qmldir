@@ -4,3 +4,71 @@ LockUi 1.0 LockUi.qml
 LockOsd 1.0 LockOsd.qml
 MediaCard 1.0 MediaCard.qml
 singleton Options 1.0 Options.qml
+singleton LockKeys 1.0 LockKeys.qml
+singleton LockText 1.0 LockText.qml
+
+# The parts every style is built from.
+LockStyle 1.0 LockStyle.qml
+LockPrompt 1.0 LockPrompt.qml
+LockClock 1.0 LockClock.qml
+LockFace 1.0 LockFace.qml
+LockPicture 1.0 LockPicture.qml
+LockMessage 1.0 LockMessage.qml
+LockActions 1.0 LockActions.qml
+LockStatus 1.0 LockStatus.qml
+LockRing 1.0 LockRing.qml
+SymbolText 1.0 SymbolText.qml
+
+# Drawn by the frame over every style.
+LockLockout 1.0 LockLockout.qml
+LockPower 1.0 LockPower.qml
+LockDim 1.0 LockDim.qml
+
+# The styles themselves. LockUi loads one by file name; they are named here
+# as well because a directory with a qmldir exposes only what the qmldir
+# lists, and a style that cannot see LockPrompt cannot take a password.
+LockGlass 1.0 LockGlass.qml
+LockEditorial 1.0 LockEditorial.qml
+LockConsole 1.0 LockConsole.qml
+LockAmbient 1.0 LockAmbient.qml
+LockBoard 1.0 LockBoard.qml
+LockPoster 1.0 LockPoster.qml
+LockSeats 1.0 LockSeats.qml
+LockMinimal 1.0 LockMinimal.qml
+LockDayAhead 1.0 LockDayAhead.qml
+LockSecure 1.0 LockSecure.qml
+LockAccessible 1.0 LockAccessible.qml
+LockKiosk 1.0 LockKiosk.qml
+
+# The parts of the larger styles, each named for its style. Named here for
+# the same reason the styles are: a style that cannot see one of its parts
+# does not load, and the frame draws glass in its place.
+DayAheadPalette 1.0 DayAheadPalette.qml
+DayAheadGround 1.0 DayAheadGround.qml
+DayAheadCard 1.0 DayAheadCard.qml
+DayAheadCaption 1.0 DayAheadCaption.qml
+DayAheadStatusButton 1.0 DayAheadStatusButton.qml
+DayAheadToday 1.0 DayAheadToday.qml
+DayAheadTimeline 1.0 DayAheadTimeline.qml
+DayAheadPlayer 1.0 DayAheadPlayer.qml
+DayAheadLockCard 1.0 DayAheadLockCard.qml
+DayAheadPill 1.0 DayAheadPill.qml
+SecurePalette 1.0 SecurePalette.qml
+SecureLog 1.0 SecureLog.qml
+SecureAuthCard 1.0 SecureAuthCard.qml
+SecureTab 1.0 SecureTab.qml
+SecurePasswordPanel 1.0 SecurePasswordPanel.qml
+SecureKeyPanel 1.0 SecureKeyPanel.qml
+SecureRail 1.0 SecureRail.qml
+SecureStatusTiles 1.0 SecureStatusTiles.qml
+AccessibleLook 1.0 AccessibleLook.qml
+AccessibleRing 1.0 AccessibleRing.qml
+AccessibleChoice 1.0 AccessibleChoice.qml
+AccessibleChoices 1.0 AccessibleChoices.qml
+AccessibleFact 1.0 AccessibleFact.qml
+AccessibleFacts 1.0 AccessibleFacts.qml
+AccessiblePrompt 1.0 AccessiblePrompt.qml
+AccessibleCaptions 1.0 AccessibleCaptions.qml
+KioskChip 1.0 KioskChip.qml
+KioskWelcome 1.0 KioskWelcome.qml
+KioskStaff 1.0 KioskStaff.qml

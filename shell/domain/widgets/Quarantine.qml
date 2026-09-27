@@ -132,7 +132,7 @@ QtObject {
         root.health = Object.assign({}, root.health, { [id]: entry });
 
         if ((entry.attempts ?? 0) >= root.maxAttempts)
-            root._quarantine(id, `failed to load ${entry.attempts} times: ${entry.lastError}`);
+            root._quarantine([{ id: id, reason: `failed to load ${entry.attempts} times: ${entry.lastError}` }]);
 
         root._persist();
     }
@@ -151,39 +151,53 @@ QtObject {
         Log.info("quarantine", `released '${id}'`);
     }
 
-    function _quarantine(id, reason) {
-        root.quarantined = Object.assign({}, root.quarantined, {
-            [id]: { reason: reason, at: new Date().toISOString() }
-        });
-        Log.warn("quarantine", `'${id}' quarantined: ${reason}`);
+    // Each of `found` -- { id, reason } -- disabled, and one report written
+    // for them all.
+    function _quarantine(found) {
+        if (found.length === 0)
+            return;
+        const at = new Date().toISOString();
+        const next = Object.assign({}, root.quarantined);
+        for (const f of found) {
+            next[f.id] = { reason: f.reason, at: at };
+            Log.warn("quarantine", `'${f.id}' quarantined: ${f.reason}`);
+        }
+        root.quarantined = next;
 
         // The same reporter the systemd unit's OnFailure= runs. One report
         // format and one code path, whether the shell died or merely gave up
         // on a widget -- and it is written here, at the point a widget is
-        // actually disabled, rather than on every failed attempt.
-        root._report.running = false;
-        root._report.command = [Branding.ctlBin, "report", "create",
-                                "--reason", `widget '${id}' quarantined: ${reason}`];
-        root._report.running = true;
+        // actually disabled, rather than on every failed attempt. One run for
+        // several widgets: a second run stops the first, so a report each
+        // left only the last one written.
+        root._report.run(["report", "create", "--reason",
+                          found.map(f => `widget '${f.id}' quarantined: ${f.reason}`).join("; ")]);
     }
 
     // Nothing is sent anywhere: the report is a directory of text files under
     // the state directory, and every consumer of one is separately opt-in.
-    // The reporter's own progress lines come back on stderr. They are logged
-    // rather than dropped: a report that failed to be written is worth knowing
-    // about precisely when something has already gone wrong. Read through a
-    // collector rather than the `exited` signal, whose exit-status parameter
-    // the linter cannot resolve -- and note that a comment line starting with
-    // the linter's own name is parsed as a directive, so it cannot be named
-    // at the start of one.
-    readonly property Process _report: Process {
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const last = text.trim().split("\n").pop();
-                if (last.length > 0)
-                    Log.debug("quarantine", `report: ${last}`);
-            }
+    // The reporter's own progress lines come back on stderr, and its last
+    // line is logged rather than dropped -- at debug, with a failure too: the
+    // quarantine above has already said what matters at warn.
+    readonly property CtlRun _report: CtlRun {
+        tag: "quarantine"
+        label: "report"
+        level: "debug"
+    }
+
+    // What one widget that was loading when the last session ended counts
+    // for: the reason to quarantine it, or "" to keep it.
+    function _settle(id, entry, diedDuringBoot) {
+        if (!diedDuringBoot) {
+            // The shell ran fine and was stopped later; this widget is not
+            // implicated, so the attempt does not count.
+            entry.attempts = 0;
+            return "";
         }
+        if ((entry.attempts ?? 0) >= root.maxAttempts)
+            return `the shell died while loading '${id}', ${entry.attempts} time(s) in a row`;
+        Log.warn("quarantine", `'${id}' was loading when the shell died during startup (${entry.attempts ?? 0}/${root.maxAttempts})`);
+        return "";
     }
 
     function _persist() {
@@ -199,6 +213,8 @@ QtObject {
         path: Paths.widgetHealthFile
         atomicWrites: true
         printErrors: false
+
+        onSaveFailed: Fs.forget(Paths.stateDir)
 
         onLoaded: {
             try {
@@ -221,24 +237,17 @@ QtObject {
                 // without counting them.
                 const diedDuringBoot = data.booting === true;
 
+                const found = [];
                 for (const id of Object.keys(health)) {
                     if (!health[id].inFlight)
                         continue;
-
-                    if (diedDuringBoot) {
-                        if ((health[id].attempts ?? 0) >= root.maxAttempts)
-                            root._quarantine(id, `the shell died while loading '${id}', ${health[id].attempts} time(s) in a row`);
-                        else
-                            Log.warn("quarantine", `'${id}' was loading when the shell died during startup (${health[id].attempts ?? 0}/${root.maxAttempts})`);
-                    } else {
-                        // The shell ran fine and was stopped later; this widget
-                        // is not implicated, so the attempt does not count.
-                        health[id].attempts = 0;
-                    }
-
+                    const reason = root._settle(id, health[id], diedDuringBoot);
+                    if (reason)
+                        found.push({ id: id, reason: reason });
                     health[id].inFlight = false;
                 }
                 root.health = health;
+                root._quarantine(found);
             } catch (e) {
                 Log.warn("quarantine", `health file unreadable, starting fresh: ${e}`);
                 root.health = ({});

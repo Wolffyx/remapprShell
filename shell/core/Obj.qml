@@ -31,26 +31,36 @@ QtObject {
     // Arrays are deliberately NOT merged element-wise: `bar.entries` is an
     // ordered list, and merging it positionally would make a profile that
     // reorders widgets produce a nonsensical hybrid of the two orders.
+    //
+    // The first layer is copied once and every later one is merged into that
+    // copy. Copying the result again for each layer, at every level, is what
+    // this used to do: one rebuild of the configuration copied the whole of
+    // the shipped defaults three times over, and an empty runtime layer still
+    // cost a full copy of everything beneath it.
     function deepMerge(...layers) {
-        let out = {};
+        let out = null;
         for (const layer of layers) {
             if (!root.isPlainObject(layer))
                 continue;
-            out = root._merge2(out, layer);
+            if (out === null)
+                out = root.clone(layer);
+            else
+                root._mergeInto(out, layer);
         }
-        return out;
+        return out ?? {};
     }
 
-    function _merge2(base, over) {
-        const out = root.clone(base);
+    // Merges `over` into `target` in place. Safe only because `target` is
+    // this file's own fresh copy, nested objects and all; `over` is never
+    // touched, and anything taken from it is cloned on the way in.
+    function _mergeInto(target, over) {
         for (const k of Object.keys(over)) {
             const ov = over[k];
-            if (root.isPlainObject(ov) && root.isPlainObject(out[k]))
-                out[k] = root._merge2(out[k], ov);
+            if (root.isPlainObject(ov) && root.isPlainObject(target[k]))
+                root._mergeInto(target[k], ov);
             else
-                out[k] = root.clone(ov);
+                target[k] = root.clone(ov);
         }
-        return out;
     }
 
     function deepEqual(a, b) {

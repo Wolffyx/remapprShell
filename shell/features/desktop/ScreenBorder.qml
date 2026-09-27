@@ -25,8 +25,8 @@ PanelWindow {
     required property var modelData
     screen: modelData
 
-    readonly property int inset: Math.max(0, ConfigStore.value("desktop.borderInset", 10))
-    readonly property int radius: Math.max(0, ConfigStore.value("desktop.borderRadius", 26))
+    readonly property int inset: Math.max(0, ConfigStore.value("desktop.borderInset", 0))
+    readonly property int radius: Math.max(0, ConfigStore.value("desktop.borderRadius", 13))
 
     anchors {
         top: true

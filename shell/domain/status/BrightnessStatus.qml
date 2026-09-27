@@ -9,9 +9,14 @@ pragma Singleton
 //
 // The displays are read with one busctl per display, all in one process,
 // because powerdevil names them and a monitor can come and go. Any signal on
-// either object re-reads everything -- the Desktops rule -- except while a
-// write is still on its way, when a re-read would drag a slider back to where
-// it was a moment ago.
+// the brightness object re-reads them all -- the Desktops rule -- except while
+// a write is still on its way, when a re-read would drag a slider back to
+// where it was a moment ago.
+//
+// Night Light is read by NightLight, the one reader of KWin's object, and
+// shown from there. It had a read and a monitor of its own here, and every
+// signal from it re-read every display too: a transition, which moves the
+// temperature a step at a time, was a busctl per display per step.
 //
 // Night Light is suspended the way KWin's own shortcut does it: by invoking
 // that shortcut. `inhibit` on the NightLight object is no use from here --
@@ -38,7 +43,7 @@ QtObject {
     readonly property string displayNames: JSON.stringify(root.displays.map(d => d.name))
 
     // KWin's NightLight properties, as they are on the bus.
-    property var nightLight: ({})
+    readonly property var nightLight: NightLight.props
 
     readonly property string nightState: StatusIcons.nightLightState(root.nightLight)
 
@@ -90,6 +95,20 @@ QtObject {
         root._flush();
     }
 
+    // One display at `percent` of its range, as a slider asks for it -- never
+    // below the floor (StatusIcons.brightnessFromPercent).
+    function setPercent(name, percent) {
+        const display = root.displayNamed(name);
+        if (display)
+            root.setBrightness(name, StatusIcons.brightnessFromPercent(percent, display.max));
+    }
+
+    // Every display at `percent`, as one slider for all of them asks.
+    function setAllPercent(percent) {
+        for (const d of root.displays)
+            root.setPercent(d.name, percent);
+    }
+
     // Every display at once, by wheel notches, as the brightness keys do.
     function step(steps, stepPercent) {
         for (const d of root.displays)
@@ -99,13 +118,11 @@ QtObject {
     function toggleNightLight() {
         if (!["warm", "day", "suspended"].includes(root.nightState))
             return;
-        toggle.running = true;
+        Dbus.invokeShortcut("Toggle Night Color");
     }
 
     function refresh() {
         names.refresh();
-        night.running = false;
-        night.running = true;
     }
 
     function summary() {
@@ -183,22 +200,6 @@ QtObject {
         }
     }
 
-    readonly property Process _night: Process {
-        id: night
-        command: Dbus.callArgs("org.kde.KWin", "/org/kde/KWin/NightLight", "org.freedesktop.DBus.Properties",
-                               "GetAll", "s", ["org.kde.KWin.NightLight"])
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: root.nightLight = StatusIcons.busProps(Dbus.unwrap(text, "NightLight"))
-        }
-    }
-
-    readonly property Process _toggle: Process {
-        id: toggle
-        command: Dbus.callArgs("org.kde.kglobalaccel", "/component/kwin", "org.kde.kglobalaccel.Component",
-                               "invokeShortcut", "s", ["Toggle Night Color"])
-    }
-
     // Signals come in bursts -- one per step of a drag, one per display --
     // so a re-read waits for the burst to end.
     readonly property Timer _settle: Timer {
@@ -211,11 +212,5 @@ QtObject {
         service: root.service
         path: root.path
         onChanged: if (!write.running) settle.restart()
-    }
-
-    readonly property DbusWatch _nightWatch: DbusWatch {
-        service: "org.kde.KWin"
-        path: "/org/kde/KWin/NightLight"
-        onChanged: settle.restart()
     }
 }

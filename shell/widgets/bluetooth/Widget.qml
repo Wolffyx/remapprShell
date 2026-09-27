@@ -40,123 +40,109 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
+        thickness: root.barThickness
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: BluetoothStatus.glyph
         fallback: BluetoothStatus.icon
         glyphSize: root.panelIconSize
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 300
-            implicitHeight: body.implicitHeight
+            spacing: 8
 
-            Column {
-                id: body
+            PopoutHeader {
+                title: "Bluetooth"
+
+                Toggle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    enabled: !BluetoothStatus.blocked
+                    opacity: enabled ? 1 : 0.4
+                    checked: BluetoothStatus.enabled
+                    onToggled: value => BluetoothStatus.setEnabled(value)
+                }
+            }
+
+            PanelText {
+                visible: BluetoothStatus.blocked
                 width: parent.width
-                spacing: 8
+                wrapMode: Text.WordWrap
+                color: Theme.foregroundInactive
+                font.pixelSize: 11
+                text: "Bluetooth is blocked: a hardware switch, a key, or airplane mode."
+            }
 
-                Row {
-                    width: parent.width
-                    spacing: 8
+            Repeater {
+                model: BluetoothStatus.enabled ? BluetoothStatus.paired : []
 
-                    PanelText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - power.width - 8
-                        text: "Bluetooth"
-                        font.bold: true
-                    }
+                Rectangle {
+                    id: device
 
-                    Toggle {
-                        id: power
-                        anchors.verticalCenter: parent.verticalCenter
-                        enabled: !BluetoothStatus.blocked
-                        opacity: enabled ? 1 : 0.4
-                        checked: BluetoothStatus.enabled
-                        onToggled: value => BluetoothStatus.setEnabled(value)
-                    }
-                }
+                    required property var modelData
 
-                PanelText {
-                    visible: BluetoothStatus.blocked
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
-                    text: "Bluetooth is blocked: a hardware switch, a key, or airplane mode."
-                }
+                    width: body.width
+                    height: line.implicitHeight + 10
+                    radius: Theme.radiusOf(6)
+                    color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
 
-                Repeater {
-                    model: BluetoothStatus.enabled ? BluetoothStatus.paired : []
+                    Row {
+                        id: line
+                        x: 6
+                        y: 5
+                        width: parent.width - 12
+                        spacing: 10
 
-                    Rectangle {
-                        id: device
-
-                        required property var modelData
-
-                        width: body.width
-                        height: line.implicitHeight + 10
-                        radius: Theme.radiusOf(6)
-                        color: deviceHover.hovered ? Theme.hoverBackground : "transparent"
-
-                        Row {
-                            id: line
-                            x: 6
-                            y: 5
-                            width: parent.width - 12
-                            spacing: 10
-
-                            PanelIcon {
-                                anchors.verticalCenter: parent.verticalCenter
-                                implicitSize: 22
-                                iconName: device.modelData.icon ?? ""
-                                fallbackName: "network-bluetooth"
-                                opacity: device.modelData.connected ? 1 : 0.6
-                            }
-
-                            Column {
-                                width: parent.width - 22 - parent.spacing
-                                spacing: 1
-
-                                PanelText {
-                                    width: parent.width
-                                    text: BluetoothStatus.nameOf(device.modelData)
-                                    elide: Text.ElideRight
-                                    font.bold: device.modelData.connected
-                                }
-
-                                PanelText {
-                                    width: parent.width
-                                    text: BluetoothStatus.describe(device.modelData)
-                                    color: Theme.foregroundInactive
-                                    font.pixelSize: 10
-                                }
-                            }
+                        PanelIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 22
+                            iconName: device.modelData.icon ?? ""
+                            fallbackName: "network-bluetooth"
+                            opacity: device.modelData.connected ? 1 : 0.6
                         }
 
-                        HoverHandler { id: deviceHover }
-                        TapHandler { onTapped: BluetoothStatus.toggleConnection(device.modelData) }
-                    }
-                }
+                        Column {
+                            width: parent.width - 22 - parent.spacing
+                            spacing: 1
 
-                PanelText {
-                    visible: BluetoothStatus.enabled && BluetoothStatus.paired.length === 0
-                    width: parent.width
-                    color: Theme.foregroundInactive
-                    font.pixelSize: 11
-                    text: "No paired devices."
-                }
+                            PanelText {
+                                width: parent.width
+                                text: BluetoothStatus.nameOf(device.modelData)
+                                elide: Text.ElideRight
+                                font.bold: device.modelData.connected
+                            }
 
-                TextButton {
-                    text: "Pair a device…"
-                    iconName: "network-bluetooth"
-                    onActivated: {
-                        PlasmaApplets.open("org.kde.plasma.bluetooth");
-                        root.popoutVisible = false;
+                            PanelText {
+                                width: parent.width
+                                text: BluetoothStatus.describe(device.modelData)
+                                color: Theme.foregroundInactive
+                                font.pixelSize: 10
+                            }
+                        }
                     }
+
+                    HoverHandler { id: deviceHover }
+                    TapHandler { onTapped: BluetoothStatus.toggleConnection(device.modelData) }
+                }
+            }
+
+            PanelText {
+                visible: BluetoothStatus.enabled && BluetoothStatus.paired.length === 0
+                width: parent.width
+                color: Theme.foregroundInactive
+                font.pixelSize: 11
+                text: "No paired devices."
+            }
+
+            TextButton {
+                text: "Pair a device…"
+                iconName: "network-bluetooth"
+                onActivated: {
+                    PlasmaApplets.open("org.kde.plasma.bluetooth");
+                    root.popoutVisible = false;
                 }
             }
         }

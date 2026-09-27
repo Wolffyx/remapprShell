@@ -56,61 +56,24 @@ QtObject {
 
         let out = "";
         let i = 0;
-        let inString = false;
 
         while (i < line.length) {
             const c = line[i];
 
-            if (inString) {
-                out += c;
-                if (c === "\\") {
-                    // An escape takes the next character with it, so a
-                    // backslash before a quote does not end the string.
-                    if (i + 1 < line.length)
-                        out += line[i + 1];
-                    i += 2;
-                    continue;
-                }
-                if (c === '"')
-                    inString = false;
-                i++;
-                continue;
-            }
-
+            // A string is copied whole, so nothing inside one is ever read
+            // as an array.
             if (c === '"') {
-                inString = true;
-                out += c;
-                i++;
+                const end = root._stringEnd(line, i);
+                out += line.slice(i, end);
+                i = end;
                 continue;
             }
 
-            if (c === "[") {
-                // Measure the run of integers this bracket opens, without
-                // keeping any of it.
-                let j = i + 1;
-                let count = 0;
-                let digits = 0;
-                while (j < line.length) {
-                    const d = line[j];
-                    if (d >= "0" && d <= "9") {
-                        digits++;
-                        j++;
-                    } else if (d === "," && digits > 0) {
-                        count++;
-                        digits = 0;
-                        j++;
-                    } else {
-                        break;
-                    }
-                }
-                if (digits > 0)
-                    count++;
-
-                if (line[j] === "]" && count >= root.byteRunLength) {
-                    out += "[]";
-                    i = j + 1;
-                    continue;
-                }
+            const arrayEnd = c === "[" ? root._byteArrayEnd(line, i) : -1;
+            if (arrayEnd >= 0) {
+                out += "[]";
+                i = arrayEnd;
+                continue;
             }
 
             out += c;
@@ -118,6 +81,52 @@ QtObject {
         }
 
         return out;
+    }
+
+    // The index just past the quote that closes the string opening at
+    // `start`, or the end of the line when nothing closes it. An escape takes
+    // the next character with it, so a backslash before a quote does not end
+    // the string.
+    function _stringEnd(line, start) {
+        let j = start + 1;
+        while (j < line.length) {
+            if (line[j] === "\\")
+                j += 2;
+            else if (line[j] === '"')
+                return j + 1;
+            else
+                j++;
+        }
+        return line.length;
+    }
+
+    // The index just past the `]` of a byte array opening at `start` -- a
+    // run of at least byteRunLength integers -- or -1 when there is none.
+    function _byteArrayEnd(line, start) {
+        const run = root._integerRun(line, start + 1);
+        return line[run.end] === "]" && run.count >= root.byteRunLength ? run.end + 1 : -1;
+    }
+
+    // The run of comma-separated integers starting at `start`, measured
+    // without keeping any of it: how many there are, and the index of the
+    // first character that is not part of the run.
+    function _integerRun(line, start) {
+        let j = start;
+        let count = 0;
+        let digits = 0;
+        while (j < line.length) {
+            const d = line[j];
+            if (d >= "0" && d <= "9") {
+                digits++;
+            } else if (d === "," && digits > 0) {
+                count++;
+                digits = 0;
+            } else {
+                break;
+            }
+            j++;
+        }
+        return { end: j, count: digits > 0 ? count + 1 : count };
     }
 
     // The parsed message, or null for anything that is not one: a banner line,
@@ -161,5 +170,18 @@ QtObject {
         if (!Array.isArray(data) || data.length < (least ?? 0))
             return null;
         return data;
+    }
+
+    // An a{sv} as `busctl --json=short` renders it -- [{ Name: { type, data } }],
+    // the reply to a Properties.GetAll -- as a plain { Name: value }. Anything
+    // else is an empty object.
+    function props(data) {
+        const first = Array.isArray(data) ? data[0] : null;
+        const out = {};
+        if (!first || typeof first !== "object")
+            return out;
+        for (const key of Object.keys(first))
+            out[key] = first[key]?.data;
+        return out;
     }
 }

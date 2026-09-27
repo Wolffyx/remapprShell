@@ -1,14 +1,22 @@
 pragma ComponentBehavior: Bound
 
-// The clock's popout: the time, the whole date, and the month.
+// The clock's popout: the time, the whole date, the month, and the weather.
 //
 // Weeks start on the locale's first day. Arrows move by a month and the
 // month's name goes back to today's. Events and holidays are Plasma's --
 // its calendar has the plugins for them -- so a button opens that.
+//
+// The grid itself is qs.ui.primitives' MonthGrid, shared with the sidebar's
+// day card. The days the forecast reaches carry its glyph under the number,
+// and choosing one says what that day is going to do -- which is the whole of
+// "the weather, on the calendar". With `weather.enabled` off none of it is
+// drawn and this is the calendar it always was.
 
 import QtQuick
 import qs.domain.calendar
 import qs.domain.theme
+import qs.domain.weather
+import qs.domain.weather.forecast
 import qs.platform.kde
 import qs.ui.primitives
 import qs.ui.controls
@@ -39,7 +47,10 @@ Column {
         cal.month = cal.now.getMonth();
     }
 
-    readonly property var weeks: Calendar.weeks(cal.year, cal.month, cal.firstDay)
+    // The day whose forecast is shown under the grid: today until another is
+    // chosen.
+    property date picked: cal.now
+    readonly property var forecast: Forecast.dayAt(WeatherStatus.days, cal.picked.getTime())
 
     // How wide it is belongs to the widget: `popoutWidth`. The Loader
     // anchors this to fill the card, so a width set here would be
@@ -103,63 +114,75 @@ Column {
 
     Item { width: 1; height: 8 }
 
-    Row {
+    MonthGrid {
+        id: grid
         width: parent.width
+        locale: cal.locale
+        firstDay: cal.firstDay
+        now: cal.now
+        year: cal.year
+        month: cal.month
+        selected: cal.picked
+        badgeFor: cell => {
+            const day = Forecast.dayAt(WeatherStatus.days, new Date(cell.year, cell.month, cell.day).getTime());
+            return day ? Forecast.describe(day.code, true).glyph : "";
+        }
+        onPicked: cell => cal.picked = new Date(cell.year, cell.month, cell.day)
+    }
 
-        Repeater {
-            model: Calendar.weekdayOrder(cal.firstDay)
+    Item { width: 1; height: 10 }
+
+    // What the chosen day is going to do. Only for the days the forecast
+    // reaches -- five of them -- so most of a month says nothing, which is
+    // honest.
+    Rectangle {
+        visible: WeatherStatus.enabled && cal.forecast !== null
+        width: parent.width
+        height: visible ? 52 : 0
+        radius: Theme.radiusOf(14)
+        color: Theme.alpha(Theme.fg, 0.05)
+
+        Glyph {
+            x: 12
+            anchors.verticalCenter: parent.verticalCenter
+            name: cal.forecast ? Forecast.describe(cal.forecast.code, true).glyph : ""
+            size: 26
+            color: Theme.acc
+        }
+
+        Column {
+            x: 50
+            anchors.verticalCenter: parent.verticalCenter
 
             PanelText {
-                required property int modelData
-                width: cal.width / 7
-                height: 28
-                horizontalAlignment: Text.AlignHCenter
-                text: cal.locale.standaloneDayName(modelData, Locale.NarrowFormat)
-                font.pixelSize: 12
+                text: cal.forecast
+                    ? `${Forecast.degrees(cal.forecast.high, WeatherStatus.temperatureUnit)} / ${Forecast.degrees(cal.forecast.low, "")}`
+                    : ""
+                font.pixelSize: 14
+                font.weight: Font.Medium
+            }
+
+            PanelText {
+                text: cal.forecast
+                    ? [Forecast.describe(cal.forecast.code, true).label,
+                       cal.forecast.rain > 0 ? `${Math.round(cal.forecast.rain)}% rain` : ""].filter(s => s).join(" · ")
+                    : ""
+                font.pixelSize: 11
                 color: Theme.mut
             }
         }
-    }
 
-    Repeater {
-        model: cal.weeks
-
-        Row {
-            id: week
-            required property var modelData
-            width: cal.width
-
-            Repeater {
-                model: week.modelData
-
-                Item {
-                    id: cell
-
-                    required property var modelData
-                    readonly property bool today: Calendar.isToday(cell.modelData, cal.now)
-
-                    width: cal.width / 7
-                    height: 38
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 34
-                        height: 34
-                        radius: Theme.radiusOf(17)
-                        color: cell.today ? Theme.acc : "transparent"
-                    }
-
-                    PanelText {
-                        anchors.centerIn: parent
-                        text: cell.modelData.day
-                        font.pixelSize: 14
-                        color: cell.today ? Theme.accFg : Theme.fg
-                        opacity: cell.modelData.inMonth ? 1 : 0.35
-                    }
-                }
-            }
+        PanelText {
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: cal.picked.toLocaleDateString(cal.locale, "ddd d MMM")
+            font.pixelSize: 11
+            color: Theme.mut
         }
     }
+
+    Item { visible: WeatherStatus.enabled && cal.forecast !== null; width: 1; height: 10 }
 
     Item { width: 1; height: 14 }
 

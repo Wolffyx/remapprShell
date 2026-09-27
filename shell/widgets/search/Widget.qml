@@ -13,13 +13,12 @@ BarWidget {
     id: root
 
     readonly property string label: root.widgetConfig?.label ?? "Search"
-    readonly property bool vertical: !(root.bar?.horizontal ?? true)
 
     // The panel's click reaches a widget only through its MouseArea, which
     // listens only for a widget that takes hover or has a popout.
     wantsHover: true
 
-    tooltip: root.label.length > 0 && !root.vertical ? "" : "Search"
+    tooltip: root.label.length > 0 && !root.barVertical ? "" : "Search"
 
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
@@ -34,8 +33,8 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
-        vertical: root.vertical
+        thickness: root.barThickness
+        vertical: root.barVertical
         hovered: root.hovered
         active: LauncherService.searchProvider.visible
         filled: true

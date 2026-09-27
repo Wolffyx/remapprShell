@@ -3,10 +3,16 @@
 Description=@DISPLAY_NAME@
 Documentation=@REPO_FETCH@
 PartOf=graphical-session.target
-After=graphical-session.target
+
+# Started with Plasma's core -- KWin, ksmserver, plasmashell -- and not after
+# graphical-session.target, which Plasma reaches only once the whole workspace
+# is up. powerdevil alone held that back by six seconds at login, while
+# plasmashell's own panel was already on screen. What starts later is watched
+# for, not waited for: every DbusWatch re-reads when its service appears.
+After=plasma-core.target
 
 # The shell is a Wayland client and cannot start without a compositor.
-Requisite=graphical-session.target
+Requisite=plasma-core.target
 
 # A shell that dies cannot write its own report, so the capture is a separate
 # unit that systemd starts precisely when this one fails. Note that quickshell
@@ -35,4 +41,4 @@ Slice=session.slice
 TimeoutStopSec=5s
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=plasma-core.target

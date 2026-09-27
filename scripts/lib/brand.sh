@@ -54,7 +54,6 @@ BIN_DIR="$HOME/.local/bin"
 SYSTEMD_USER_DIR="$XDG_CONFIG_HOME/systemd/user"
 PLASMA_SHELLS_DIR="$XDG_DATA_HOME/plasma/shells"
 PLASMA_LNF_DIR="$XDG_DATA_HOME/plasma/look-and-feel"
-PLASMA_PLASMOIDS_DIR="$XDG_DATA_HOME/plasma/plasmoids"
 PLASMA_DESKTOPTHEME_DIR="$XDG_DATA_HOME/plasma/desktoptheme"
 KWIN_SWITCHER_DIR="$XDG_DATA_HOME/kwin/tabbox"
 KWIN_SCRIPTS_DIR="$XDG_DATA_HOME/kwin/scripts"
@@ -67,8 +66,19 @@ SESSION_BIN="$SLUG-session"
 CTL_BIN="$SLUG-ctl"
 WINDOWSD_BIN="$SLUG-windowsd"
 KWIN_SCRIPT_ID="$SLUG-windows"
+# A second script, and deliberately not the same one: the window list is a
+# read and says so in its own header, while an edge trigger acts. Separate
+# packages also mean enabling one does not enable the other.
+KWIN_EDGES_SCRIPT_ID="$SLUG-edges"
 SYSTEMD_UNIT="$SLUG.service"
+# Two look-and-feel packages, light and dark, because Plasma's own day/night
+# switch (kdeglobals [KDE] AutomaticLookAndFeel) swaps the *whole global theme*
+# between two named packages. With ours not named there it swapped to Breeze
+# and Breeze Dark at sunset, taking the colour scheme, the icons and the
+# decorations with it -- which is what "dark did not reach everywhere" was on
+# 2026-09-16. Naming both of ours makes Plasma's switch ours.
 LNF_PACKAGE_ID="$SLUG.lookandfeel"
+LNF_DARK_PACKAGE_ID="$SLUG-dark.lookandfeel"
 
 # The Plasma renderer needs a shell package of its own rather than a flag on
 # the first one. plasmashell namespaces both the applet layout
@@ -78,10 +88,7 @@ LNF_PACKAGE_ID="$SLUG.lookandfeel"
 # rather than by care.
 PLASMA_SHELL_PACKAGE_ID="${SLUG}-plasma.desktop"
 SAFE_MODE_VAR="${ENV_PREFIX}_SAFE_MODE"
-# Set to keep a command away from the live session -- no DBus calls, no service
-# restarts, no package cache rebuild. Tests run against a throwaway HOME but
-# share the real session bus, so without this a test switching shell packages
-# would switch the desktop the person is sitting in front of.
+
 # Is this shell's Quickshell running -- installed, or straight from a checkout?
 #
 # `make run` starts it from the working tree ("quickshell -n -p
@@ -125,6 +132,38 @@ shell_ipc_path() {
     fi
 }
 
+# Every Quickshell running that is not this shell -- neither the installed copy
+# nor this checkout -- as "pid command" lines. What doctor and preflight warn
+# about as a second shell drawing beside ours. They used to match the installed
+# directory alone, and so named the copy `make run` starts from this tree as a
+# competitor of itself.
+other_quickshells() {
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            *"$QS_CONFIG_DIR"*|*"$REPO_ROOT/shell/shell.qml"*) continue ;;
+        esac
+        printf '%s\n' "$line"
+    done < <(_shell_processes)
+    return 0
+}
+
+# One field of what the session bus knows about a name's owner -- PID, Comm,
+# CommandLine -- or nothing when nobody holds the name.
+bus_status_field() {   # <bus name> <field>
+    busctl --user status "$1" 2>/dev/null | sed -n "s/^$2=//p"
+}
+
+# Whether this shell holds a bus name, whichever copy of it is running: the
+# owner's command line names the config path the shell was started with.
+shell_holds_bus_name() {   # <bus name>
+    bus_status_field "$1" CommandLine | grep -qF -- "$(shell_ipc_path)"
+}
+
+# Set to keep a command away from the live session -- no DBus calls, no service
+# restarts, no package cache rebuild. Tests run against a throwaway HOME but
+# share the real session bus, so without this a test switching shell packages
+# would switch the desktop the person is sitting in front of.
 NO_SESSION_VAR="${ENV_PREFIX}_NO_SESSION"
 DEBUG_VAR="${ENV_PREFIX}_DEBUG"
 
@@ -153,8 +192,9 @@ profile_file() { printf '%s/shell.json' "$(profile_dir)"; }
 export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        REPO_PUSH REPO_FETCH VERSION \
        QS_CONFIG_DIR CONFIG_DIR DATA_DIR STATE_DIR BIN_DIR SYSTEMD_USER_DIR \
-       PLASMA_SHELLS_DIR PLASMA_LNF_DIR PLASMA_PLASMOIDS_DIR PLASMA_DESKTOPTHEME_DIR \
+       PLASMA_SHELLS_DIR PLASMA_LNF_DIR PLASMA_DESKTOPTHEME_DIR \
        KWIN_SWITCHER_DIR KWIN_SCRIPTS_DIR DBUS_SERVICES_DIR \
        COLORS_DIR APPLICATIONS_DIR \
-       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID SYSTEMD_UNIT LNF_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
+       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID KWIN_EDGES_SCRIPT_ID SYSTEMD_UNIT \
+       LNF_PACKAGE_ID LNF_DARK_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
        SAFE_MODE_VAR DEBUG_VAR NO_SESSION_VAR

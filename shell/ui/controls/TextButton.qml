@@ -2,7 +2,10 @@
 //
 // `checked` marks the current choice in a row of them -- a power profile, say
 // -- so a set of alternatives needs no separate control. `primary` is the one
-// action a card exists for, drawn in the accent.
+// action a card exists for, drawn in the accent. `tonal` is the quieter way to
+// say "do this", once per row of a list -- Use on a profile, Apply on a
+// layout: the accent's container colour, turning to the accent itself under
+// the pointer.
 
 import QtQuick
 import qs.ui.primitives
@@ -17,6 +20,8 @@ Item {
     property string glyph: ""
     property bool checked: false
     property bool primary: false
+    property bool tonal: false
+    property real radius: Math.min(height / 2, Theme.radiusSmall)
     signal activated
 
     readonly property bool filled: root.checked || root.primary
@@ -28,8 +33,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: Math.min(height / 2, Theme.radiusSmall)
+        radius: root.radius
         color: root.filled ? Theme.acc
+             : root.tonal ? (hover.hovered ? Theme.acc : Theme.accC)
              : hover.hovered ? Theme.alpha(Theme.fg, 0.12)
              : Theme.alpha(Theme.fg, 0.06)
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
@@ -59,7 +65,9 @@ Item {
                 id: label
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.text
-                color: root.filled ? Theme.accFg : Theme.fg
+                color: root.filled ? Theme.accFg
+                     : root.tonal ? (hover.hovered ? Theme.accFg : Theme.accCFg)
+                     : Theme.fg
             }
         }
 

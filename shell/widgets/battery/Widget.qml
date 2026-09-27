@@ -33,11 +33,11 @@ BarWidget {
 
     BarButton {
         id: button
-        thickness: root.bar?.thickness ?? 40
-        vertical: !(root.bar?.horizontal ?? true)
+        thickness: root.barThickness
+        vertical: root.barVertical
         hovered: root.hovered
         active: root.popoutVisible
-        size: Math.max(22, Math.round(40 * root.unit))
+        size: root.tileSize
         glyph: PowerStatus.glyph
         fallback: PowerStatus.icon
         glyphSize: root.panelIconSize
@@ -45,72 +45,67 @@ BarWidget {
     }
 
     popout: Component {
-        Item {
+        PopoutColumn {
+            id: body
             implicitWidth: 280
-            implicitHeight: body.implicitHeight
+            spacing: 10
 
-            Column {
-                id: body
+            Row {
                 width: parent.width
                 spacing: 10
 
-                Row {
-                    width: parent.width
-                    spacing: 10
-
-                    PanelIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 32
-                        iconName: PowerStatus.icon
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 1
-
-                        PanelText {
-                            text: StatusIcons.percent(PowerStatus.level)
-                            font.bold: true
-                            font.pixelSize: 16
-                        }
-
-                        PanelText {
-                            text: [PowerStatus.stateLabel, PowerStatus.timeLabel].filter(s => s).join(" · ")
-                            color: Theme.foregroundInactive
-                            font.pixelSize: 11
-                        }
-                    }
+                PanelIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitSize: 32
+                    iconName: PowerStatus.icon
                 }
 
-                PanelText {
-                    text: "Power profile"
-                    font.bold: true
-                    font.pixelSize: 11
-                }
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 1
 
-                Row {
-                    spacing: 6
+                    PanelText {
+                        text: StatusIcons.percent(PowerStatus.level)
+                        font.bold: true
+                        font.pixelSize: 16
+                    }
 
-                    Repeater {
-                        model: PowerStatus.profiles
-
-                        TextButton {
-                            required property string modelData
-                            text: StatusIcons.profileLabel(modelData)
-                            iconName: StatusIcons.profileIcon(modelData)
-                            checked: PowerStatus.profile === modelData
-                            onActivated: PowerStatus.setProfile(modelData)
-                        }
+                    PanelText {
+                        text: [PowerStatus.stateLabel, PowerStatus.timeLabel].filter(s => s).join(" · ")
+                        color: Theme.foregroundInactive
+                        font.pixelSize: 11
                     }
                 }
+            }
 
-                TextButton {
-                    text: "Power and battery…"
-                    iconName: "battery-good"
-                    onActivated: {
-                        PlasmaApplets.open("org.kde.plasma.battery");
-                        root.popoutVisible = false;
+            PanelText {
+                text: "Power profile"
+                font.bold: true
+                font.pixelSize: 11
+            }
+
+            Row {
+                spacing: 6
+
+                Repeater {
+                    model: PowerStatus.profiles
+
+                    TextButton {
+                        required property string modelData
+                        text: StatusIcons.profileLabel(modelData)
+                        iconName: StatusIcons.profileIcon(modelData)
+                        checked: PowerStatus.profile === modelData
+                        onActivated: PowerStatus.setProfile(modelData)
                     }
+                }
+            }
+
+            TextButton {
+                text: "Power and battery…"
+                iconName: "battery-good"
+                onActivated: {
+                    PlasmaApplets.open("org.kde.plasma.battery");
+                    root.popoutVisible = false;
                 }
             }
         }

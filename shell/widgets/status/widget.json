@@ -21,6 +21,7 @@
         "density": {
             "type": "enum",
             "values": ["roomy", "dense"],
+            "labels": ["A grid of tiles", "A list of rows"],
             "default": "roomy",
             "label": "Quick settings",
             "description": "roomy: a grid of tiles. dense: a list of rows, each with its switch."

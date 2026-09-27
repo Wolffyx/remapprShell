@@ -34,7 +34,49 @@ QtObject {
         location: "file://@CONFIG_DIR@/lockscreen.conf"
     }
 
+    // Which lock screen is drawn. LockUi knows the names; an unknown one
+    // falls back to glass there rather than to an empty screen here.
+    readonly property string style: settings.value("style", "glass")
+
     readonly property string clockPosition: settings.value("clockPosition", "left")
     readonly property int wallpaperBlur: Math.max(0, Math.min(40, Number(settings.value("wallpaperBlur", 26))))
     readonly property bool showSessionButtons: String(settings.value("showSessionButtons", "true")) !== "false"
+
+    // Whether Material Symbols is installed. Every icon here is that font
+    // drawing a name as a ligature; without it the name is drawn as the
+    // word -- "bedtime", "group", "lock", on the first fresh install. So
+    // SymbolText draws nothing without it, and LockActions draws its buttons
+    // as words that were meant to be read. Not a setting: a fact.
+    readonly property bool hasSymbols: Qt.fontFamilies().indexOf("Material Symbols Rounded") >= 0
+
+    // The one colour every style draws its focus and its primary button in.
+    // Four, by name, as the design offers them -- a name rather than a hex
+    // string so that a typo is the default rather than an invisible focus
+    // ring.
+    readonly property var accents: ({
+        "indigo": "#4f60c8",
+        "terracotta": "#c8674f",
+        "green": "#3f8f6e",
+        "violet": "#8a5cc8",
+    })
+    readonly property color accent: root.accents[String(settings.value("accent", "indigo"))] ?? root.accents.indigo
+
+    // Seconds without a key or the pointer before the screen dims to the
+    // clock alone. Zero never dims: Plasma turns the screen off on its own
+    // schedule regardless, and some people want only that.
+    readonly property int dimSeconds: Math.max(0, Math.min(600, Number(settings.value("dimSeconds", 20)) || 0))
+
+    // The shutter lifting after a correct password. Off, the greeter quits
+    // the moment it is let in, as Plasma's does.
+    readonly property bool unlockAnimation: String(settings.value("unlockAnimation", "true")) !== "false"
+
+    // The charge, in percent, at which the lock screen hibernates on its own
+    // after a minute's warning. Zero never does, and leaves it to Plasma's
+    // power management -- which has a critical-battery action of its own.
+    readonly property int hibernateAt: Math.max(0, Math.min(10, Number(settings.value("hibernateAt", 3)) || 0))
+
+    // The kiosk style's two lines of text: whose computer this is, and the
+    // one thing a guest should know. Empty draws a generic name and nothing.
+    readonly property string kioskName: String(settings.value("kioskName", ""))
+    readonly property string kioskNote: String(settings.value("kioskNote", ""))
 }

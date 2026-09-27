@@ -10,6 +10,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.platform.kde
 import qs.domain.config
 import qs.domain.surfaces
 
@@ -45,16 +46,14 @@ QtObject {
             Surfaces.openSession(kind ?? "promptAll");
             return;
         }
-        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt",
-                                 "org.kde.LogoutPrompt", kind ?? "promptAll"]);
+        Dbus.send("org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", kind ?? "promptAll");
     }
 
     // What the shell's session screen does once a choice is made. ksmserver
     // ends the session exactly as it does from Plasma's screen: applications
     // are asked to close, and one with unsaved work can say so.
     function _shutdown(method) {
-        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.Shutdown", "/Shutdown",
-                                 "org.kde.Shutdown", method]);
+        Dbus.send("org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown", method);
     }
     function logout() { root._shutdown("logout"); }
     function reboot() { root._shutdown("logoutAndReboot"); }

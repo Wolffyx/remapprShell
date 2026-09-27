@@ -76,6 +76,15 @@ Item {
         // qmllint enable missing-property
     }
 
+    // Puts the frame in a state a picture cannot wait for: a lockout, a
+    // battery running out, the screen dimmed. For the same harness.
+    function simulate(what) {
+        // qmllint disable missing-property
+        if (oursLoader.item)
+            oursLoader.item.ui.simulate(what);
+        // qmllint enable missing-property
+    }
+
     implicitWidth: 800
     implicitHeight: 600
 
@@ -106,14 +115,20 @@ Item {
         focus: true
         sourceComponent: Item {
             property alias unlock: unlock
+            property alias ui: lockUi
 
+            // Let in: the shutter lifts, and the greeter quits once it has --
+            // or at once, with the animation off. LockUi guarantees `left`
+            // follows `leave` within a second and a half whatever happens.
             Unlock {
                 id: unlock
                 authenticator: root.greeterAuthenticator
-                onFinished: Qt.quit()
+                onFinished: lockUi.leave()
             }
 
             LockUi {
+                id: lockUi
+                onGone: Qt.quit()
                 anchors.fill: parent
                 focus: true
                 unlock: unlock

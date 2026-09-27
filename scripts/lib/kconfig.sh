@@ -11,9 +11,15 @@
 
 kconfig_ledger() { printf '%s/kconfig-ledger.json' "$STATE_DIR"; }
 
+# Once a process, for each ledger: kconfig_set calls this before every write,
+# and a theme apply writes a hundred keys. Checked again whenever the file has
+# gone -- a revert or a restore can take it away between two writes.
+_KCONFIG_LEDGER_READY=""
+
 _kconfig_ledger_init() {
     local led
     led=$(kconfig_ledger)
+    [ "$_KCONFIG_LEDGER_READY" = "$led" ] && [ -s "$led" ] && return 0
     mkdir -p "$(dirname "$led")"
     [ -s "$led" ] || printf '{"entries":[]}\n' > "$led"
 
@@ -28,6 +34,7 @@ _kconfig_ledger_init() {
         mv "$tmp" "$led"
         log_debug "kconfig: gave unscoped ledger entries a scope"
     fi
+    _KCONFIG_LEDGER_READY=$led
 }
 
 # Turns a "A/B" group path into the repeated --group arguments kwriteconfig6
@@ -37,13 +44,29 @@ _kconfig_ledger_init() {
 # spaces and split on whitespace, which silently broke every group whose name
 # contains one -- plasmashellrc's "[PlasmaViews][Panel 811]" being exactly that
 # case, written as two groups called "Panel" and "811" that KDE never reads.
+#
+# Into KCONFIG_GARGS, with nothing started: kconfig_set runs for every key a
+# theme writes and a revert for every key it puts back, and taking these as
+# lines from a process substitution was a subshell each time.
+KCONFIG_GARGS=()
+_kconfig_gargs() {
+    local g
+    local -a parts=()
+    KCONFIG_GARGS=()
+    IFS=/ read -ra parts <<< "$1"
+    for g in "${parts[@]}"; do
+        [ -n "$g" ] && KCONFIG_GARGS+=(--group "$g")
+    done
+    # A group with no name in it at all stays the one empty argument it has
+    # always been, which kreadconfig6 refuses. No argument would be the root
+    # group, which nobody named.
+    [ "${#KCONFIG_GARGS[@]}" -gt 0 ] || KCONFIG_GARGS=("")
+}
+
+# The same, one argument a line, for callers that read them with mapfile.
 _kconfig_group_args() {
-    local path=$1 g
-    local -a out=()
-    while IFS= read -r g; do
-        [ -n "$g" ] && out+=(--group "$g")
-    done < <(printf '%s\n' "$path" | tr '/' '\n')
-    printf '%s\n' "${out[@]}"
+    _kconfig_gargs "$1"
+    printf '%s\n' "${KCONFIG_GARGS[@]}"
 }
 
 # kconfig_set <scope> <file> <group> <key> <value>
@@ -59,8 +82,8 @@ kconfig_set() {
     local scope=$1 file=$2 group=$3 key=$4 value=$5
     _kconfig_ledger_init
 
-    local -a gargs=()
-    mapfile -t gargs < <(_kconfig_group_args "$group")
+    _kconfig_gargs "$group"
+    local -a gargs=("${KCONFIG_GARGS[@]}")
 
     # Read the prior state before touching anything. A plain read cannot
     # distinguish "unset" from "set to empty", so an improbable sentinel is
@@ -83,20 +106,27 @@ kconfig_set() {
     # holding what the first one left there -- which is how the screen edges'
     # master switch can be turned back on without also undoing the corners
     # set before it. Undoing both, newest first, arrives at the original.
-    local led
+    #
+    # One jq both asks and appends: it prints the ledger with the record
+    # added, or nothing when the scope already has one -- and only then is
+    # the file rewritten.
+    local led updated
     led=$(kconfig_ledger)
-    if ! jq -e --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \
-            '.entries[] | select(.scope == $s and .file == $f and .group == $g and .key == $k)' "$led" >/dev/null 2>&1; then
+    updated=$(jq --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \
+                 --argjson had "$had" --arg v "$prior" \
+                 'if any(.entries[]?; .scope == $s and .file == $f and .group == $g and .key == $k) then empty
+                  else .entries += [{scope: $s, file: $f, group: $g, key: $k, had: $had, value: $v}] end' "$led")
+    if [ -n "$updated" ]; then
         local tmp
         tmp=$(mktemp)
-        jq --arg s "$scope" --arg f "$file" --arg g "$group" --arg k "$key" \
-           --argjson had "$had" --arg v "$prior" \
-           '.entries += [{scope: $s, file: $f, group: $g, key: $k, had: $had, value: $v}]' "$led" > "$tmp"
+        printf '%s\n' "$updated" > "$tmp"
         mv "$tmp" "$led"
     fi
 
     kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" "$value"
-    log_debug "kconfig: $file [$group] $key = $value (was: $([ "$had" = true ] && printf '%s' "$prior" || printf '<unset>'))"
+    local was='<unset>'
+    [ "$had" = true ] && was=$prior
+    log_debug "kconfig: $file [$group] $key = $value (was: $was)"
 }
 
 # kconfig_revert <scope|--all>
@@ -121,28 +151,26 @@ kconfig_revert() {
     count=$(jq "$filter | length" "$led")
     [ "$count" -gt 0 ] || { log_info "nothing to revert${scope:+ for $scope}"; return 0; }
 
-    # Each field travels base64-encoded. jq's @tsv escapes a tab inside a
-    # value as a literal "\t", which kwriteconfig6 then writes back as a
-    # backslash: a shortcut bound to two keys ("Alt+Tab<tab>Meta+Tab") came
-    # back from a revert as one key with a backslash in it.
+    # Each field travels whole, ended by a NUL, which no value read from a
+    # KDE file can hold. jq's @tsv escapes a tab inside a value as a literal
+    # "\t", which kwriteconfig6 then writes back as a backslash: a shortcut
+    # bound to two keys ("Alt+Tab<tab>Meta+Tab") came back from a revert as
+    # one key with a backslash in it. Base64 was the first answer to that, at
+    # ten processes a key to decode; a NUL needs none. A NUL that did get into
+    # the ledger is dropped, as decoding the base64 into a variable dropped it.
     local file group key had value
-    while IFS=$'\t' read -r file group key had value; do
-        file=$(printf '%s' "$file" | base64 -d)
-        group=$(printf '%s' "$group" | base64 -d)
-        key=$(printf '%s' "$key" | base64 -d)
-        had=$(printf '%s' "$had" | base64 -d)
-        value=$(printf '%s' "$value" | base64 -d)
-        local -a gargs=()
-        mapfile -t gargs < <(_kconfig_group_args "$group")
+    while IFS= read -r -d '' file && IFS= read -r -d '' group && IFS= read -r -d '' key \
+          && IFS= read -r -d '' had && IFS= read -r -d '' value; do
+        _kconfig_gargs "$group"
 
         if [ "$had" = "true" ]; then
-            kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" "$value"
+            kwriteconfig6 --file "$file" "${KCONFIG_GARGS[@]}" --key "$key" "$value"
             log_debug "kconfig: restored $file [$group] $key = $value"
         else
-            kwriteconfig6 --file "$file" "${gargs[@]}" --key "$key" --delete
+            kwriteconfig6 --file "$file" "${KCONFIG_GARGS[@]}" --key "$key" --delete
             log_debug "kconfig: removed $file [$group] $key (was unset)"
         fi
-    done < <(jq -r "$filter | reverse | .[] | [.file, .group, .key, (.had|tostring), .value] | map(@base64) | @tsv" "$led")
+    done < <(jq --raw-output0 "$filter | reverse | .[] | .file, .group, .key, .had, .value | tostring | gsub(\"\\u0000\"; \"\")" "$led")
 
     # Drop only what was reverted; other scopes keep their records.
     local tmp

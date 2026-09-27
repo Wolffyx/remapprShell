@@ -37,8 +37,19 @@ QtObject {
     // bottom corners are a straight line is what that looks like. So the gap
     // opens up instead, to at least the shadow's reach. With no shadow -- the
     // default -- there is nothing to make room for and the gap is the gap.
-    function away(extent, gap, shadowMargin) {
-        return Math.max(0, extent + Math.max(gap, shadowMargin) - shadowMargin);
+    //
+    // `room` is how much of the window lies between the panel and what is
+    // drawn: the shadow's margin, unless the popout hangs from its widget by
+    // a neck across the gap (Tail), which needs all of it. Whatever the room,
+    // what is drawn lands in the same place -- only the window grows.
+    function away(extent, gap, shadowMargin, room) {
+        return Math.max(0, extent + root.reach(gap, shadowMargin) - (room ?? shadowMargin));
+    }
+
+    // How far what is drawn sits clear of the panel's edge: the gap, or the
+    // shadow's reach where that is further.
+    function reach(gap, shadowMargin) {
+        return Math.max(gap, shadowMargin);
     }
 
     // Where the window starts along the panel.

@@ -45,6 +45,24 @@
             "label": "Only this desktop's windows",
             "description": "The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed."
         },
+        "previewHeader": {
+            "type": "bool",
+            "default": false,
+            "label": "Name the application above its previews",
+            "description": "The application's icon and name over the window cards, with how many windows it has. Off, each card's own icon and title say it."
+        },
+        "previewScreen": {
+            "type": "bool",
+            "default": false,
+            "label": "Name the monitor on each preview",
+            "description": "With more than one monitor, the one a window is on (\"DP-2\") after its title. The desktop it is on is said whenever there is more than one."
+        },
+        "stackGroups": {
+            "type": "bool",
+            "default": true,
+            "label": "Stack the icon of an application with several windows",
+            "description": "A second square behind the icon when an application has more than one window open, so the count shows on the button itself."
+        },
         "showTitles": {
             "type": "bool",
             "default": true,

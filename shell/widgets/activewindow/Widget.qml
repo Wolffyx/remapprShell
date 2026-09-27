@@ -18,8 +18,6 @@ import qs.ui.primitives
 BarWidget {
     id: root
 
-    readonly property int size: Math.max(22, Math.round(40 * root.unit))
-
     readonly property int maxWidth: root.widgetConfig?.maxWidth ?? 320
     readonly property bool showIcon: root.widgetConfig?.showIcon ?? true
     readonly property bool showAppName: root.widgetConfig?.showAppName ?? false
@@ -29,22 +27,16 @@ BarWidget {
     readonly property string title: root.window ? WindowEvents.label(root.window) : ""
 
     // Clicks and hover come through the panel, as for the other widgets with
-    // no popout.
+    // no popout -- and the panel's hover is BarWidget's `hovered`, as it is
+    // for all of them.
     wantsHover: true
-    property bool pointed: false
 
     present: root.window !== null
 
     tooltip: root.appName && root.appName !== root.title ? `${root.title}\n${root.appName}` : root.title
 
     implicitWidth: row.implicitWidth + 2 * Math.round(12 * Math.max(0.7, root.unit))
-    implicitHeight: root.size
-
-    function handleHover(position, horizontal) {
-        root.pointed = true;
-    }
-
-    onDismissPopout: root.pointed = false
+    implicitHeight: root.tileSize
 
     function handleActivate(button) {
         if (button === Qt.MiddleButton || !root.window)
@@ -54,9 +46,9 @@ BarWidget {
 
     BarButton {
         anchors.fill: parent
-        thickness: root.bar?.thickness ?? 40
-        hovered: root.pointed
-        size: root.size
+        thickness: root.barThickness
+        hovered: root.hovered
+        size: root.tileSize
     }
 
     Row {

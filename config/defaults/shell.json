@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "theme": {
         "mode": "auto",
         "accent": "plasma",
@@ -10,6 +10,10 @@
         "desktop": {
             "enabled": true,
             "followMode": false,
+            "rescuePlasmaSwitch": true,
+            "gtkThemeLight": "",
+            "gtkThemeDark": "",
+            "materialYou": false,
             "colours": true,
             "gtk": true,
             "icons": true,
@@ -24,10 +28,12 @@
         "position": "bottom",
         "thickness": 52,
         "style": "full",
+        "defloat": true,
         "spacing": 5,
         "iconSize": 18,
         "autoHide": false,
         "revealOnHover": true,
+        "fullScreen": "hide",
         "menu": {
             "systemMonitor": "auto",
             "entries": []
@@ -111,6 +117,13 @@
         "actionPrefix": ">",
         "dense": false,
         "hints": true,
+        "searchSources": [
+            "apps",
+            "windows",
+            "files",
+            "settings"
+        ],
+        "learn": true,
         "pinned": []
     },
     "audio": {
@@ -155,11 +168,11 @@
     },
     "widgets": {
         "clock": {
-            "format": "HH:mm",
+            "format": "",
             "showDate": true,
             "dateFormat": "ddd d MMM",
             "hour12": false,
-            "showSeconds": true
+            "showSeconds": false
         },
         "launcher": {
             "icon": "start-here-kde"
@@ -183,5 +196,54 @@
         "clockSize": 92,
         "clockDate": true,
         "clockInk": "auto"
+    },
+    "sidebar": {
+        "position": "right",
+        "trigger": "drag",
+        "handleWidth": 6,
+        "width": 396,
+        "margin": 16,
+        "reserveSpace": false,
+        "expanded": [
+            "media"
+        ],
+        "cards": [
+            "media",
+            "day",
+            "weather",
+            "machine",
+            "notifications"
+        ]
+    },
+    "weather": {
+        "enabled": false,
+        "place": "",
+        "coordinates": "",
+        "units": "metric",
+        "refresh": 30
+    },
+    "clipboard": {
+        "history": "own"
+    },
+    "update": {
+        "channel": "main",
+        "remote": "",
+        "localSource": ""
+    },
+    "shortcuts": {
+        "launcher": "Meta",
+        "search": "Meta+Space",
+        "settings": "",
+        "ask": "",
+        "clipboard": "",
+        "sidebar": "",
+        "keys": "",
+        "switcher": "",
+        "switcher-reverse": "",
+        "overview": "",
+        "overview-reverse": "",
+        "screenshot": "",
+        "screenshot-screen": "",
+        "screenshot-window": ""
     }
 }

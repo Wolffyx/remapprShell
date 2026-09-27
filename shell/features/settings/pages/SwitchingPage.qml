@@ -11,46 +11,31 @@ pragma ComponentBehavior: Bound
 // its holder included -- is undone by one button.
 
 import QtQuick
-import Quickshell.Io
 import qs.core
+import qs.platform.system
 import qs.domain.config
-import qs.platform.kde
-import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
 
 CardGrid {
     id: root
 
-    // `switcher status --json`, parsed. Null until the first read returns.
-    property var switcherState: null
-    property string status: ""
-    property bool busy: false
+    // `switcher status --json`, and the command that changes it.
+    readonly property CtlSession ctl: CtlSession {
+        prefix: ["switcher"]
+        readFailed: "Could not read the window switcher's settings."
+    }
+    readonly property var switcherState: root.ctl.state
 
     readonly property var layouts: root.switcherState?.layouts ?? []
 
     // Read from configuration rather than from `switcher status`: these are
     // this shell's own settings, and the shell already has them.
     readonly property string drawnByWindows: ConfigStore.value("switching.windows", "plasma")
-    readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "shell")
+    readonly property string drawnByDesktops: ConfigStore.value("switching.desktops", "plasma")
     readonly property var keys: root.switcherState?.keys ?? []
 
-    count: 4
-
-    Component.onCompleted: root.refresh()
-
-    function refresh() {
-        readProc.running = false;
-        readProc.running = true;
-    }
-
-    function run(args) {
-        if (root.busy)
-            return;
-        root.status = "";
-        runProc.command = [Branding.ctlBin, "switcher"].concat(args);
-        runProc.running = true;
-    }
+    Component.onCompleted: root.ctl.refresh()
 
     // Who holds a key, said in a sentence rather than as a component id.
     function describe(k) {
@@ -66,37 +51,6 @@ CardGrid {
         return `Held by ${who}. Giving it to ${kwins} takes it from them; undo gives it back.`;
     }
 
-    readonly property Process _read: Process {
-        id: readProc
-        command: [Branding.ctlBin, "switcher", "status", "--json"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    root.switcherState = JSON.parse(text);
-                } catch (e) {
-                    root.status = "Could not read the window switcher's settings.";
-                    Log.warn("settings", `switcher status: ${e}`);
-                }
-            }
-        }
-    }
-
-    readonly property Process _run: Process {
-        id: runProc
-        onRunningChanged: {
-            root.busy = running;
-            if (!running)
-                root.refresh();
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const errors = text.split("\n").filter(l => /error/i.test(l));
-                if (errors.length > 0)
-                    root.status = errors.pop().replace(/^.*error:?\s*/i, "");
-            }
-        }
-    }
-
     // Who draws each of the two, which is a different question from who holds
     // the key: the setting says which is drawn, and the command moves the key
     // to match, because an overview nobody can open is not a choice.
@@ -109,8 +63,8 @@ CardGrid {
         SectionLabel { text: "Who draws it" }
 
         SettingRow {
-            width: drawnBy.width - 2 * drawnBy.padding
-            enabled: !root.busy
+            width: drawnBy.contentWidth
+            enabled: !root.ctl.busy
             label: "Alt+Tab"
             description: root.drawnByWindows === "shell"
                 ? `${Branding.displayName}'s own card row, drawn here. It shows each application's icon: a picture of a window is KWin's to give and it gives one only to its own switcher.`
@@ -122,7 +76,7 @@ CardGrid {
                 values: ["plasma", "shell"]
                 labels: ["KWin", "This shell"]
                 current: root.drawnByWindows
-                onPicked: value => root.run(["use", value])
+                onPicked: value => root.ctl.run(["use", value])
             }
         }
 
@@ -135,19 +89,16 @@ CardGrid {
         // It is a real choice and it stays -- it is the only one this project
         // can restyle. But someone choosing it should know what they are
         // taking on, and KWin's is the one that ships.
-        PanelText {
-            width: drawnBy.width - 2 * drawnBy.padding
+        Hint {
+            width: drawnBy.contentWidth
             visible: root.drawnByWindows === "shell"
-            wrapMode: Text.WordWrap
             text: "Held keys are less reliable here than in KWin's. This shell is not the compositor: the key press and the key release each cross four processes to reach it, and they race. Pressed quickly, the switcher can stay on screen after the key is let go. KWin's switcher has none of that, shows a real picture of each window, and is what this shell uses unless you change it."
-            font.pixelSize: 12
-            lineHeight: 1.35
-            color: Theme.error
+            tone: "error"
         }
 
         SettingRow {
-            width: drawnBy.width - 2 * drawnBy.padding
-            enabled: !root.busy
+            width: drawnBy.contentWidth
+            enabled: !root.ctl.busy
             label: "Meta+Tab"
             description: root.drawnByDesktops === "shell"
                 ? `${Branding.displayName}'s own overview: every desktop, what is open on each, and one more at the end.`
@@ -159,7 +110,7 @@ CardGrid {
                 values: ["plasma", "shell"]
                 labels: ["KWin", "This shell"]
                 current: root.drawnByDesktops
-                onPicked: value => root.run(["desktops", value])
+                onPicked: value => root.ctl.run(["desktops", value])
             }
         }
     }
@@ -172,9 +123,9 @@ CardGrid {
         SectionLabel { text: "Alt+Tab looks like" }
 
         Flow {
-            width: look.width - 2 * look.padding
+            width: look.contentWidth
             spacing: 6
-            enabled: !root.busy
+            enabled: !root.ctl.busy
 
             Repeater {
                 model: root.layouts
@@ -184,18 +135,14 @@ CardGrid {
 
                     text: modelData.name
                     checked: modelData.id === (root.switcherState?.layout ?? "")
-                    onActivated: if (!checked) root.run(["layout", modelData.id])
+                    onActivated: if (!checked) root.ctl.run(["layout", modelData.id])
                 }
             }
         }
 
-        PanelText {
+        Hint {
             visible: root.switcherState !== null && !root.layouts.some(l => l.id === Branding.slug)
-            width: look.width - 2 * look.padding
-            wrapMode: Text.WordWrap
-            color: Theme.mut
-            font.pixelSize: 12
-            lineHeight: 1.35
+            width: look.contentWidth
             text: `${Branding.displayName}'s own switcher, in the panel's colours, is installed by "theme apply" and is not installed yet.`
         }
     }
@@ -212,47 +159,42 @@ CardGrid {
 
         SectionLabel { text: "The desktop overview" }
 
-        ToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+        ConfigToggleRow {
+            width: overviewCard.contentWidth
             label: "Closes when the key is released"
             description: "Held, like Alt+Tab. Off, one press opens it and it stays until you choose, press Escape or click away."
-            checked: ConfigStore.value("switching.overviewHold", true) === true
-            onToggled: value => ConfigStore.set("switching.overviewHold", value)
+            path: "switching.overviewHold"
         }
 
-        ToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+        ConfigToggleRow {
+            width: overviewCard.contentWidth
             label: "Window titles"
             description: "The title strip along the top of each card."
-            checked: ConfigStore.value("switching.overviewTitles", true) === true
-            onToggled: value => ConfigStore.set("switching.overviewTitles", value)
+            path: "switching.overviewTitles"
         }
 
-        ToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+        ConfigToggleRow {
+            width: overviewCard.contentWidth
             label: "List minimised windows"
             description: "Off lists only what is on screen."
-            checked: ConfigStore.value("switching.overviewMinimised", true) === true
-            onToggled: value => ConfigStore.set("switching.overviewMinimised", value)
+            path: "switching.overviewMinimised"
         }
 
-        ToggleRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+        ConfigToggleRow {
+            width: overviewCard.contentWidth
             label: "The desktop strip"
             description: "Every desktop along the bottom, with what is on each and a tile for one more."
-            checked: ConfigStore.value("switching.overviewStrip", true) === true
-            onToggled: value => ConfigStore.set("switching.overviewStrip", value)
+            path: "switching.overviewStrip"
         }
 
-        SliderRow {
-            width: overviewCard.width - 2 * overviewCard.padding
+        ConfigSliderRow {
+            width: overviewCard.contentWidth
             label: "Widest a window card gets"
             from: 260
             to: 720
             stepSize: 20
-            value: ConfigStore.value("switching.overviewCardWidth", 560)
             unit: "px"
-            onMoved: value => ConfigStore.set("switching.overviewCardWidth", Math.round(value))
+            path: "switching.overviewCardWidth"
         }
     }
 
@@ -272,51 +214,27 @@ CardGrid {
 
                 required property var modelData
 
-                width: keyCard.width - 2 * keyCard.padding
-                enabled: !root.busy
+                width: keyCard.contentWidth
+                enabled: !root.ctl.busy
                 label: `${keyRow.modelData.key}: ${keyRow.modelData.label.toLowerCase()}`
                 description: root.describe(keyRow.modelData)
 
                 TextButton {
                     visible: !keyRow.modelData.kwin || keyRow.modelData.holders.length > 1
                     text: "Give it to KWin"
-                    onActivated: root.run(["give", keyRow.modelData.id])
+                    onActivated: root.ctl.run(["give", keyRow.modelData.id])
                 }
             }
         }
 
-        Flow {
-            width: keyCard.width - 2 * keyCard.padding
-            spacing: 8
-            enabled: !root.busy
-
-            TextButton {
-                visible: root.switcherState?.customised ?? false
-                iconName: "edit-undo"
-                text: "Undo everything set here"
-                onActivated: root.run(["revert"])
-            }
-
-            // Plasma's own page has the rest: the switcher's second shortcut
-            // set, which windows it lists, the order they come in.
-            TextButton {
-                iconName: "configure"
-                text: "Plasma's task switcher settings"
-                onActivated: PlasmaApplets.openSettings("kcm_kwintabbox")
-            }
-
-            IconButton {
-                iconName: "view-refresh"
-                onActivated: root.refresh()
-            }
-        }
-
-        PanelText {
-            visible: root.status.length > 0
-            width: keyCard.width - 2 * keyCard.padding
-            wrapMode: Text.WordWrap
-            text: root.status
-            font.pixelSize: 12
+        // Plasma's own page has the rest: the switcher's second shortcut
+        // set, which windows it lists, the order they come in.
+        UndoFooter {
+            spacing: keyCard.spacing
+            session: root.ctl
+            customised: root.switcherState?.customised ?? false
+            settingsModule: "kcm_kwintabbox"
+            settingsText: "Plasma's task switcher settings"
         }
     }
 }

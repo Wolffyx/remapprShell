@@ -6,22 +6,9 @@
 set -uo pipefail
 
 SOURCE_REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SANDBOX=$(mktemp -d); trap 'rm -rf "$SANDBOX"' EXIT
-
-export HOME="$SANDBOX/home"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$HOME/.local/bin"
-
-# Names come from branding.json like everywhere else; the slug lint fails the
-# build if one is written literally, and it caught this file.
-source "$SOURCE_REPO/scripts/lib/log.sh"
-REPO_ROOT="$SOURCE_REPO" source "$SOURCE_REPO/scripts/lib/brand.sh"
-
-# The sandbox HOME does not sandbox systemd. Until this was set, the update
-# below restarted the user's real, running shell on every run of the suite.
-export "$NO_SESSION_VAR=1"
+source "$SOURCE_REPO/tests/lib/harness.sh"
+harness_init
+mkdir -p "$HOME/.local/bin"
 
 # `update.sh` runs preflight first, and preflight fails outright without a
 # Plasma session and the binaries the shell is installed against. A container
@@ -32,17 +19,16 @@ for tool in plasmashell quickshell; do
         || { printf '  SKIP  %s not available; the update pipeline needs a desktop\n' "$tool"; exit 0; }
 done
 
-pass=0; fail=0
-check() { if [ "$2" = "$3" ]; then printf '  PASS  %s\n' "$1"; pass=$((pass+1));
-          else printf '  FAIL  %s (expected %q, got %q)\n' "$1" "$3" "$2" >&2; fail=$((fail+1)); fi; }
-
 # The installation being updated, and the newer version it updates to.
 INSTALLED="$SANDBOX/installed"
 NEWER="$SANDBOX/newer"
 # The working tree, not `git ls-files`: an uncommitted change is exactly what
 # is usually being tested, and copying only tracked files silently omits it.
+# Less what is built or rendered in it rather than written: `make plugin`'s
+# build directory was most of every copy, and the copy is made three times.
 mkdir -p "$INSTALLED"
-tar -C "$SOURCE_REPO" --exclude=.git -cf - . | tar -C "$INSTALLED" -xf -
+tar -C "$SOURCE_REPO" --exclude=.git --exclude=./build --exclude='./dev/preview/root.*' -cf - . \
+    | tar -C "$INSTALLED" -xf -
 cp -a "$INSTALLED" "$NEWER"
 
 echo "0.9.9" > "$NEWER/VERSION"
@@ -83,6 +69,4 @@ echo "1.0.0" > "$BROKEN/VERSION"
 check "a version that fails its own lint is rejected" \
       "$(grep -c 'does not pass its own QML lint' "$SANDBOX/broken-out")" "1"
 
-echo
-if [ "$fail" -gt 0 ]; then printf 'FAILED: %d passed, %d failed\n' "$pass" "$fail" >&2; exit 1; fi
-printf 'OK: %d passed\n' "$pass"
+harness_done

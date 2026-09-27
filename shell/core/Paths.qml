@@ -22,7 +22,22 @@ QtObject {
     // which belongs to the user.
     readonly property string stateDir: Branding.stateDir
     readonly property string widgetHealthFile: `${root.stateDir}/widget-health.json`
-    readonly property string diagnosticsDir: `${root.stateDir}/diagnostics`
+
+    // What the launcher has been used to open, and when. State rather than
+    // configuration: nobody would type it, and losing it costs a few days of
+    // learning rather than a setting.
+    readonly property string launcherUsageFile: `${root.stateDir}/launcher-usage.json`
+
+    // The last forecast fetched, with the time it was fetched at. State, and
+    // a cache: it exists so a restart draws the weather at once instead of an
+    // empty card, and losing it costs one request.
+    readonly property string weatherCacheFile: `${root.stateDir}/weather.json`
+
+    // Images that were copied, kept as files because a clipboard picture is
+    // megabytes and the history holds several. Written by the clipboard
+    // watcher, deleted as entries fall off the end of the history, and gone
+    // entirely when the history is cleared.
+    readonly property string clipboardDir: `${root.stateDir}/clipboard`
 
     // Written once the first-run wizard has been through. It lives in state
     // rather than in the profile because "have you seen this window" is ours to

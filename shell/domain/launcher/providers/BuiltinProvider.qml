@@ -9,7 +9,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.core
 import qs.domain.config
 import qs.domain.launcher
@@ -17,7 +16,9 @@ import qs.domain.launcher.actions
 import qs.domain.launcher.apps
 import qs.domain.session
 import qs.domain.surfaces
+import qs.domain.windows
 import qs.platform.kde
+import qs.platform.system
 
 Provider {
     id: root
@@ -29,7 +30,10 @@ Provider {
 
     property string query: ""
     property int selectedIndex: 0
-    property int maxResults: 8
+    // As many rows as the card draws. It was eight while applications were
+    // the only source; with windows and files beside them, a row lost to a
+    // heading is a row of results lost.
+    property int maxResults: 9
 
     // "apps": the start menu, under its button. "search": the search, over
     // the whole screen.
@@ -50,6 +54,24 @@ Provider {
     readonly property string prefix: ConfigStore.value("launcher.actionPrefix", ">") ?? ">"
     readonly property bool dense: ConfigStore.value("launcher.dense", false) === true
     readonly property bool hints: ConfigStore.value("launcher.hints", true) !== false
+
+    // What the search looks through besides applications. A list rather than
+    // a switch per source: the order is Results', and what a person wants to
+    // say here is "not my files", not "files third".
+    readonly property var sources: ConfigStore.value("launcher.searchSources",
+                                                     ["apps", "windows", "files", "settings"]) ?? []
+
+    function searches(source) { return root.sources.indexOf(source) >= 0; }
+
+    // Whether what has been opened before counts towards what is offered.
+    // Off means the list is the same for everybody -- which is a preference
+    // some people hold, and the only way to make a shared machine's launcher
+    // stop telling the room what you opened.
+    readonly property bool learns: ConfigStore.value("launcher.learn", true) !== false
+
+    function _history(kind, id) {
+        return root.learns ? Frecency.historyFor(kind, id) : null;
+    }
 
     // Applications, minus the ones that ask not to be shown.
     readonly property var applications: DesktopEntries.applications.values
@@ -73,30 +95,137 @@ Provider {
         return String(value ?? "").toLowerCase();
     }
 
-    // Ranked, not merely filtered: a prefix match on the name is almost
-    // always what was meant, and burying it under an alphabetical list of
-    // substring matches makes the launcher feel wrong even when the right
-    // entry is present.
+    // What a desktop entry offers to be matched on. `exec` is here because
+    // people type the binary -- "nvim", "code" -- far more often than the name
+    // somebody gave the entry.
+    //
+    // `pinned` and `preferred` are not matched on: they are what makes two
+    // equally good matches order themselves the way this machine would. See
+    // Rank.bonus.
+    function fieldsFor(app) {
+        return {
+            name: app.name,
+            generic: app.genericName || app.comment,
+            keywords: app.keywords,
+            exec: app.execString,
+            id: app.id,
+            pinned: root.pinnedIds.indexOf(app.id) >= 0,
+            preferred: DefaultApps.isDefault(app.id)
+        };
+    }
+
+    // Pinning, from the results rather than from a settings page: the moment
+    // somebody knows which of eight terminals they meant is the moment they
+    // are looking at all eight.
+    //
+    // It writes `launcher.pinned`, which is the same list the start menu
+    // pins to -- one idea, not two -- so a thing pinned here is at the top of
+    // the menu as well, and the search suggests it before anything is typed.
+    function isPinned(app) {
+        return !!app && root.pinnedIds.indexOf(app.id) >= 0;
+    }
+
+    function togglePin(app) {
+        if (!app)
+            return;
+        const pinned = root.pinnedIds.slice();
+        const at = pinned.indexOf(app.id);
+        if (at >= 0)
+            pinned.splice(at, 1);
+        else
+            pinned.push(app.id);
+        ConfigStore.set("launcher.pinned", pinned);
+        Log.info("launcher", `${at >= 0 ? "unpinned" : "pinned"} ${app.id}`);
+    }
+
+    // The selected row's application, when it has one -- what the pin key
+    // acts on.
+    readonly property var selectedApp: {
+        const item = root.results[root.selectedIndex];
+        return item?.kind === "app" ? item.app : null;
+    }
+
+    // Ranked, not merely filtered, and ranked by Rank -- a continuous score
+    // plus what this machine's own history of opening the thing is worth.
+    //
+    // The scoring used to be five buckets with ties broken alphabetically,
+    // which made the order independent of what anybody actually ran: "s" put
+    // Settings above Spotify forever. The alphabet is still the tie-break,
+    // but only between results of equal score, which two things rarely are
+    // once a use has been recorded.
     function rank(q) {
+        const now = Date.now();
         const scored = [];
         for (const app of root.applications) {
-            const name = root._lower(app.name);
-            let score = -1;
-            if (name === q) score = 0;
-            else if (name.startsWith(q)) score = 1;
-            else if (name.includes(q)) score = 2;
-            else if (root._lower(app.genericName).includes(q)) score = 3;
-            else if (root._lower(app.keywords).includes(q)) score = 4;
-            if (score >= 0)
-                scored.push({ app: app, score: score, name: name });
+            const score = Rank.rank(q, root.fieldsFor(app), root._history("app", app.id), now);
+            if (score !== Rank.none)
+                scored.push({ app: app, score: score, name: root._lower(app.name) });
         }
-        scored.sort((a, b) => a.score !== b.score ? a.score - b.score : a.name.localeCompare(b.name));
+        scored.sort((a, b) => a.score !== b.score ? b.score - a.score : a.name.localeCompare(b.name));
         return scored.slice(0, root.maxResults).map(s => s.app);
+    }
+
+    // What the search offers before anything is typed: what this machine
+    // opens, most recently first, and the pinned applications behind it. An
+    // empty launcher that already lists the four things you open every day is
+    // most of what "it learned" feels like.
+    readonly property var suggestedApps: {
+        const byId = {};
+        for (const app of root.applications)
+            byId[app.id] = app;
+
+        const now = Date.now();
+        const used = (root.learns ? Object.keys(Frecency.entries) : [])
+            .filter(k => k.startsWith("app:"))
+            .map(k => ({ app: byId[k.slice(4)], history: Frecency.entries[k] }))
+            .filter(e => !!e.app)
+            .map(e => ({ app: e.app, weight: Rank.recency(e.history.uses, e.history.lastMs, now) }))
+            .filter(e => e.weight > 0)
+            .sort((a, b) => b.weight - a.weight)
+            .map(e => e.app);
+
+        // Pinned first, in the order they were pinned: that is somebody
+        // having said outright which ones they mean, and it outranks what
+        // they happened to open this morning.
+        const out = [];
+        for (const app of root.pinnedApps) {
+            if (root.pinnedIds.indexOf(app.id) < 0)
+                break;     // the stand-ins shown when nothing is pinned
+            out.push(app);
+        }
+        for (const app of used.concat(root.pinnedApps)) {
+            if (out.length >= root.maxResults)
+                break;
+            if (!out.some(a => a.id === app.id))
+                out.push(app);
+        }
+        return out.slice(0, root.maxResults);
     }
 
     function appItem(app) {
         return { kind: "app", app: app, name: app.name, icon: app.icon ?? "",
                  description: app.genericName || app.comment || "" };
+    }
+
+    // An open window. The title is what is matched and drawn; which
+    // application it belongs to is the line under it, because two windows of
+    // the same editor are told apart by their titles alone.
+    function windowItem(window, appName) {
+        return { kind: "window", uuid: window.uuid, name: window.title || appName,
+                 icon: WindowsService.iconFor(window),
+                 iconFile: WindowsService.iconFileFor(window),
+                 description: appName };
+    }
+
+    function fileItem(file) {
+        return { kind: "file", file: file, uri: file.uri, name: file.name,
+                 glyph: file.folder ? "folder" : "description", description: file.dir };
+    }
+
+    // A page of this shell's own settings, by the name the window gives it.
+    function settingItem(section) {
+        return { kind: "setting", id: section.id, name: section.label,
+                 glyph: section.glyph || "tune", description: section.description ?? "" };
     }
 
     function sumItem(text) {
@@ -109,6 +238,69 @@ Provider {
     // order they offer it: with the action prefix, a sum and then the
     // actions; without, a sum and then applications. With nothing typed the
     // search suggests the pinned applications; the menu shows its own.
+    // Everything every source offers for what was typed, each scored the same
+    // way, so a window and an application compete on merit rather than on
+    // which list they came from. What survives is Results' to decide.
+    function candidates(text) {
+        const now = Date.now();
+        return [].concat(...root._sources.filter(s => root.searches(s.searched))
+                                         .map(s => root._matching(s, text, now)));
+    }
+
+    // Where a search looks, in the order it lists them, each under the name
+    // `searches()` knows it by. For one thing found there: what is matched
+    // (`fields`), what it was chosen before as (`history`), and what the
+    // result carries (`result`) -- made only for a thing that matched.
+    readonly property var _sources: [
+        {
+            searched: "apps", group: "app",
+            list: () => root.applications,
+            fields: app => root.fieldsFor(app),
+            history: app => root._history("app", app.id),
+            result: (app, fields) => ({ item: root.appItem(app), pinned: fields.pinned })
+        },
+        // A window is worth finding by its title -- "the tab I left open" --
+        // which nothing else here can match. No history: a window is a thing
+        // that exists now, not a thing chosen before.
+        {
+            searched: "windows", group: "window",
+            list: () => WindowsService.windows,
+            fields: window => ({ name: window.title, generic: WindowsService.appNameFor(window),
+                                 id: window.appId, prose: true }),
+            history: () => null,
+            result: (window, fields) => ({ item: root.windowItem(window, fields.generic) })
+        },
+        {
+            searched: "files", group: "file",
+            list: () => RecentFiles.files,
+            fields: file => ({ name: file.name, generic: file.dir }),
+            history: file => root._history("file", file.uri),
+            result: file => ({ item: root.fileItem(file) })
+        },
+        // The settings window has twenty pages and nobody remembers which one
+        // holds the panel's rounding. Searching them is what the window's own
+        // search would be, without the window.
+        {
+            searched: "settings", group: "setting",
+            list: () => Schema.sections,
+            fields: section => ({ name: section.label, generic: section.description, id: section.id }),
+            history: section => root._history("setting", section.id),
+            result: section => ({ item: root.settingItem(section) })
+        }
+    ]
+
+    // What one source offers for `text`, every thing in it scored the same way.
+    function _matching(source, text, now) {
+        const out = [];
+        for (const thing of source.list()) {
+            const fields = source.fields(thing);
+            const score = Rank.rank(text, fields, source.history(thing), now);
+            if (score !== Rank.none)
+                out.push(Object.assign({ score: score, group: source.group }, source.result(thing, fields)));
+        }
+        return out;
+    }
+
     readonly property var results: {
         const parsed = Actions.parse(root.query, root.prefix);
         const out = [];
@@ -119,11 +311,13 @@ Provider {
                 out.push({ kind: "action", action: a, name: a.name, glyph: a.glyph, description: a.description });
             return out;
         }
+        // Nothing typed: what this machine opens, with no heading over it --
+        // a suggestion is not a search result.
         if (parsed.text.length === 0)
-            return root.mode === "search" ? root.pinnedApps.slice(0, root.maxResults).map(root.appItem) : [];
+            return root.mode === "search" ? root.suggestedApps.map(root.appItem) : [];
         if (Actions.isSum(parsed.text))
-            out.push(root.sumItem(parsed.text));
-        return out.concat(root.rank(root._lower(parsed.text)).map(root.appItem));
+            out.push(Object.assign(root.sumItem(parsed.text), { group: "sum" }));
+        return out.concat(Results.merge(root.candidates(parsed.text), root.maxResults - out.length));
     }
 
     function open(mode) {
@@ -173,24 +367,54 @@ Provider {
     }
 
     function activate(item) {
-        if (!item)
-            return;
-        if (item.kind === "app")
-            root.launch(item.app);
-        else if (item.kind === "action")
-            root.run(item.action.id);
-        else if (item.kind === "sum") {
+        const act = root._activators[item?.kind];
+        if (act)
+            act(item);
+    }
+
+    // What choosing a result does, by its kind.
+    readonly property var _activators: ({
+        app: item => root.launch(item.app),
+        window: item => root.raise(item),
+        file: item => root.openFile(item),
+        setting: item => root.openSetting(item),
+        action: item => root.run(item.action.id),
+        sum: item => {
             root.copy(item.value);
             root.close();
         }
-    }
+    })
 
     function launch(app) {
         if (!app)
             return;
         Log.info("launcher", `launching ${app.id}`);
-        app.execute();
+        // Before the launch, not after: the launch is the last thing that
+        // happens to this provider before the window closes, and a history
+        // written after it was written by a component being torn down.
+        Frecency.record("app", app.id);
+        Launch.entry(app);
         root.close();
+    }
+
+    // A window found by its title: brought to the front, on whichever desktop
+    // it is on. KWin does the moving -- see WindowsService.
+    function raise(item) {
+        root.close();
+        WindowsService.activate(item.uuid);
+        Log.info("launcher", `raising ${item.uuid}`);
+    }
+
+    function openFile(item) {
+        Frecency.record("file", item.uri);
+        root.close();
+        RecentFiles.open(item.file);
+    }
+
+    function openSetting(item) {
+        Frecency.record("setting", item.id);
+        root.close();
+        Quickshell.execDetached([Branding.ctlBin, "settings", item.id]);
     }
 
     function _cycle(key, order, fallback) {
@@ -205,6 +429,11 @@ Provider {
             root.query = `${root.prefix}`;
             return;
         }
+        // Actions are learned too, for when the ordering below them is ranked
+        // rather than listed. Recorded even though Actions.match does not yet
+        // read it: a history is only worth anything once it has been kept for
+        // a while, and starting to keep it costs one line.
+        Frecency.record("action", id);
         const screen = root.shownOn;
         root.close();
         switch (id) {
@@ -225,8 +454,7 @@ Provider {
             Quickshell.execDetached([Branding.ctlBin, "settings"]);
             break;
         case "taskview":
-            Quickshell.execDetached(["busctl", "--user", "call", "org.kde.kglobalaccel", "/component/kwin",
-                                     "org.kde.kglobalaccel.Component", "invokeShortcut", "s", "Overview"]);
+            Dbus.invokeShortcut("Overview");
             break;
         case "sidebar":
             Surfaces.toggleSidebar(screen);
@@ -256,23 +484,7 @@ Provider {
 
     // A sum's answer onto the clipboard: through wl-copy's stdin, as the
     // clipboard widget does, so it is never in a process's arguments.
-    property string _pending: ""
-
     function copy(text) {
-        root._pending = String(text ?? "");
-        copier.running = false;
-        copier.stdinEnabled = true;
-        copier.running = true;
-    }
-
-    readonly property Process _copier: Process {
-        id: copier
-        command: ["wl-copy"]
-        stdinEnabled: true
-        onStarted: {
-            copier.write(root._pending);
-            root._pending = "";
-            copier.stdinEnabled = false;
-        }
+        Clipboard.copyText(text);
     }
 }

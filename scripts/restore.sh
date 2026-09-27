@@ -35,22 +35,16 @@ done
 root=$(snapshot_root)
 
 if [ "$MODE" = list ]; then
-    [ -d "$root" ] || { log_info "no snapshots yet"; exit 0; }
-    for d in "$root"/*/; do
-        [ -d "$d" ] || continue
-        printf '%s  %s  %s path(s)\n' \
-            "$(basename "$d")" \
-            "$(grep -h '^created=' "$d/meta" 2>/dev/null | cut -d= -f2-)" \
-            "$(wc -l < "$d/manifest.txt" 2>/dev/null || echo '?')"
-    done
+    snapshot_list
     exit 0
 fi
 
 case "$MODE" in
     preinstall)
         # The oldest snapshot is the one taken before anything was changed.
-        target=$(ls -1 "$root" 2>/dev/null | sort | head -1 | sed "s|^|$root/|")
+        target=$(snapshot_oldest)
         [ -n "$target" ] || die "no snapshots exist; nothing to restore"
+        target="$root/$target"
         ;;
     named)
         target=$WANT
@@ -75,9 +69,7 @@ fi
 
 if [ "$ASSUME_YES" != 1 ]; then
     log_warn "this will overwrite $(wc -l < "$target/manifest.txt") path(s) with their snapshotted contents."
-    printf 'continue? [y/N] ' >&2
-    read -r reply < /dev/tty || reply=""
-    case "$reply" in [yY]*) ;; *) die "aborted" ;; esac
+    confirm_or_die
 fi
 
 # A snapshot of the current state first: a restore is itself a destructive

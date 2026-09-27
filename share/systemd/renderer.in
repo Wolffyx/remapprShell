@@ -1,0 +1,20 @@
+# GENERATED FILE -- DO NOT EDIT. Regenerate: make link
+[Unit]
+Description=Quickshell configuration %I, drawing the panel in place of @DISPLAY_NAME@'s
+Documentation=@REPO_FETCH@
+
+# Another Quickshell shell, chosen with `@ALIAS@ renderer set quickshell:%I`.
+# None of its code is ours; this unit only starts it with the session and lets
+# switching away stop it. -n leaves it alone when something else has already
+# started the same configuration.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/quickshell -n -c %I
+Restart=on-failure
+RestartSec=2s
+Slice=session.slice
+
+[Install]
+WantedBy=graphical-session.target

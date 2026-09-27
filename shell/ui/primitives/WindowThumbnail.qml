@@ -35,10 +35,6 @@ Item {
     // means the compositor is asked for nothing at all.
     property bool live: true
 
-    // Whether a picture is actually being drawn, for a caller that wants to
-    // say so -- or to stop drawing its own title over it.
-    readonly property bool showingPicture: root.live && (stream.item?.showing ?? false)
-
     // Said once per session rather than per thumbnail: a shell with no plugin
     // is a shell showing icons, and that should be explicable without reading
     // the source.

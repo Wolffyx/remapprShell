@@ -88,6 +88,22 @@ QtObject {
         return chosen;
     }
 
+    // The system monitors installed, best first. Found the way the everyday
+    // picks are, by what the desktop entries say they are -- the menu
+    // specification's `Monitor` category -- rather than from a list of
+    // programs somebody once knew about. A window comes before a program
+    // that runs in a terminal, then the alphabet decides. `named` are ids put
+    // ahead of the rest when they are installed, whatever their categories.
+    function monitors(apps, named) {
+        const shown = (apps ?? []).filter(a => a && !a.noDisplay);
+        const first = root.resolvePinned(shown, named);
+        const rest = shown
+            .filter(a => first.indexOf(a) < 0 && root._cats(a).indexOf("Monitor") >= 0)
+            .sort((a, b) => (a.runInTerminal === true) - (b.runInTerminal === true)
+                            || String(a.name).localeCompare(String(b.name)));
+        return first.concat(rest);
+    }
+
     // [{ letter, apps }], A to Z, anything not starting with a letter under
     // "#" at the end.
     function byLetter(apps) {
@@ -134,5 +150,26 @@ QtObject {
                        folder: mime === "inode/directory", when: when });
         }
         return out.sort((a, b) => b.when - a.when).slice(0, limit ?? 10);
+    }
+
+    // ---- what the system opens things with ----------------------------------
+
+    // What `xdg-mime query default` answered, one type per line, in the order
+    // the types were asked about.
+    //
+    // A line can be empty (nothing is the default for that type), and it can
+    // carry more than one entry; the first is the default and the rest are
+    // fallbacks, exactly as in mimeapps.list.
+    function parseQueriedDefaults(text) {
+        const out = [];
+        for (const raw of String(text ?? "").split("\n")) {
+            const first = raw.split(";")[0].trim();
+            if (first.length === 0)
+                continue;
+            const id = first.endsWith(".desktop") ? first.slice(0, -8) : first;
+            if (out.indexOf(id) < 0)
+                out.push(id);
+        }
+        return out;
     }
 }

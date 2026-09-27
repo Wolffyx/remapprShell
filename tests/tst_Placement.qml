@@ -57,6 +57,33 @@ TestCase {
         compare(Placement.away(0, 0, 40), 0);
     }
 
+    // ---- a popout that hangs from its widget ------------------------------
+
+    // The distance the neck crosses: the gap, or the shadow's reach if that
+    // opened it up.
+    function test_what_is_drawn_sits_the_gap_or_the_shadow_clear() {
+        compare(Placement.reach(gap, 0), gap);
+        compare(Placement.reach(gap, shadow), shadow);
+        compare(Placement.reach(gap, 6), gap);
+    }
+
+    // With a tail the window's room on the panel's side is that whole
+    // distance, so the window starts at the panel's edge -- the neck has to
+    // reach it -- and never over the panel.
+    function test_a_tail_takes_the_window_to_the_panels_edge() {
+        compare(Placement.away(extent, gap, 0, Placement.reach(gap, 0)), extent);
+        compare(Placement.away(extent, gap, shadow, Placement.reach(gap, shadow)), extent);
+    }
+
+    // And the card itself does not move: only the window grows towards the
+    // panel. The start of the card is where it was without one.
+    function test_a_tail_does_not_move_the_card() {
+        for (const s of [0, 6, shadow]) {
+            const room = Placement.reach(gap, s);
+            compare(Placement.away(extent, gap, s, room) + room, Placement.away(extent, gap, s) + s);
+        }
+    }
+
     // ---- along the panel --------------------------------------------------
 
     function test_centred_on_what_the_slot_pointed_at() {

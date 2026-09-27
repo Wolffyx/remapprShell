@@ -18,12 +18,19 @@
 widgetStyle=Breeze
 
 # part: colours
+#
+# The scheme's *id*, which is the base name of its file -- not the name
+# System Settings shows. Plasma's own work that way (BreezeDark.colors is
+# `Name=Breeze Dark` and `ColorScheme=BreezeDark`), and writing the display
+# name here named a scheme no file was called: System Settings said the scheme
+# was not installed and chose the default, and anything resolving a scheme by
+# name rather than reading kdeglobals stayed on it.
 # variant: dark
 [kdeglobals][General]
-ColorScheme=@DISPLAY_NAME@ Dark
+ColorScheme=@SLUG@-dark
 # variant: light
 [kdeglobals][General]
-ColorScheme=@DISPLAY_NAME@ Light
+ColorScheme=@SLUG@-light
 # variant: any
 
 # part: icons

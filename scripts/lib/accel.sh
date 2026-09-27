@@ -21,6 +21,23 @@
 
 ACCEL_FILE=kglobalshortcutsrc
 
+# This project's own actions, in order, and what each is called: every key it
+# can bind and every screen edge of its own can run. Read once from
+# shortcut-actions.tsv, which the session daemon has rendered in too -- so the
+# CLI, the edges, doctor and the daemon agree about what exists.
+ACCEL_ACTIONS_FILE="$REPO_ROOT/scripts/lib/shortcut-actions.tsv"
+ACCEL_ACTIONS=()
+declare -gA ACCEL_ACTION_LABEL=()
+_accel_load_actions() {
+    local id label args
+    while IFS=$'\t' read -r id label args; do
+        case "$id" in ''|'#'*) continue ;; esac
+        ACCEL_ACTIONS+=("$id")
+        ACCEL_ACTION_LABEL[$id]=$label
+    done < "$ACCEL_ACTIONS_FILE"
+}
+_accel_load_actions
+
 # accel_holders <key>
 #
 # Every action bound to exactly that key, one per line:
@@ -52,6 +69,61 @@ accel_holders() {
                 if (key == want) { print g "\t" action "\t" friendly; break }
             }
         }' "$file"
+}
+
+# This project's own actions' keys now, and what the old form still holds for
+# them, from one read of the file: into ACCEL_CUR -- [<slug>] <action> -- and
+# ACCEL_OLD -- [services][<slug>-<action>.desktop] _launch -- by action, as the
+# first field of the value with a tab between two keys made a space, "" when
+# there is none.
+#
+# One awk rather than kreadconfig6 twice an action, piped through three more
+# processes each time: `shortcuts sync` runs at every login, and that was
+# ninety processes before the first key was compared, and doctor asked the
+# same of every action again. shortcuts.sh reads it again after every write,
+# so what is compared is always what is in the file. KConfig's escapes are
+# undone as kreadconfig6 undoes them, the ones a key can hold.
+declare -gA ACCEL_CUR=() ACCEL_OLD=()
+accel_read_bound() {
+    local kind action value
+    ACCEL_CUR=(); ACCEL_OLD=()
+    while IFS=$'\t' read -r kind action value; do
+        case "$kind" in
+            cur) ACCEL_CUR[$action]=$value ;;
+            old) ACCEL_OLD[$action]=$value ;;
+        esac
+    done < <(awk -v ours="[$SLUG]" -v legacy="[services][$SLUG-" '
+        function unescape(s,    out, i, c) {
+            out = ""
+            for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (c != "\\" || i == length(s)) { out = out c; continue }
+                c = substr(s, ++i, 1)
+                if (c == "s") out = out " "
+                else if (c == "t" || c == "n" || c == "r") out = out " "
+                else if (c == "\\") out = out "\\"
+                else out = out "\\" c
+            }
+            return out
+        }
+        /^[ \t]*\[/ { group = $0; gsub(/^[ \t]+|[ \t]+$/, "", group); next }
+        /^[ \t]*#/ || index($0, "=") == 0 { next }
+        {
+            i = index($0, "=")
+            key = substr($0, 1, i - 1); gsub(/^[ \t]+|[ \t]+$/, "", key)
+            value = substr($0, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", value)
+            if (group == ours) { kind = "cur"; action = key }
+            else if (key == "_launch" && index(group, legacy) == 1 && group ~ /\.desktop\]$/) {
+                kind = "old"
+                action = substr(group, length(legacy) + 1)
+                sub(/\.desktop\]$/, "", action)
+            } else next
+            value = unescape(value)
+            sub(/,.*/, "", value)
+            gsub(/\t/, " ", value)
+            gsub(/^ +| +$/, "", value)
+            print kind "\t" action "\t" value
+        }' "$XDG_CONFIG_HOME/$ACCEL_FILE" 2>/dev/null)
 }
 
 accel_value() {   # <group> <action>
@@ -197,52 +269,47 @@ _ACCEL_MOD_Ctrl=67108864       # 0x04000000
 _ACCEL_MOD_Alt=134217728       # 0x08000000
 _ACCEL_MOD_Shift=33554432      # 0x02000000
 
-# Qt::Key values for everything that is not a letter or a digit, which are
-# their ASCII codes. Only what a person is likely to bind: an unknown name
-# makes the conversion fail, and the caller falls back to the restart.
+# Qt::Key values for everything that is not a letter, a digit or a function
+# key, read once from the table the session daemon is rendered with -- see
+# keycodes.tsv for why there is one. An unknown name makes the conversion fail,
+# and the caller falls back to the restart.
+ACCEL_KEYCODES_FILE="$REPO_ROOT/scripts/lib/keycodes.tsv"
+declare -gA _ACCEL_KEYCODES=()
+_accel_load_keycodes() {
+    local name code
+    while IFS=$'\t' read -r name code; do
+        # Comments and blank lines have no number after a tab.
+        [[ $code =~ ^[0-9]+$ ]] && [ -n "$name" ] || continue
+        _ACCEL_KEYCODES[$name]=$code
+    done < "$ACCEL_KEYCODES_FILE"
+}
+_accel_load_keycodes
+
 _accel_base_code() {
     local k=$1
     case "$k" in
-        [A-Za-z])  printf '%d' "'$(printf '%s' "$k" | tr '[:lower:]' '[:upper:]')" ; return 0 ;;
+        [A-Za-z])  printf '%d' "'${k^^}" ; return 0 ;;
         [0-9])     printf '%d' "'$k" ; return 0 ;;
         F[1-9]|F1[0-9]|F2[0-5]) printf '%d' $(( 16777264 + ${k#F} - 1 )) ; return 0 ;;
     esac
-    case "$k" in
-        Space)        printf '32' ;;
-        Tab)          printf '16777217' ;;
-        Backtab)      printf '16777218' ;;
-        Return|Enter) printf '16777220' ;;
-        Escape|Esc)   printf '16777216' ;;
-        Backspace)    printf '16777219' ;;
-        Delete|Del)   printf '16777223' ;;
-        Insert|Ins)   printf '16777222' ;;
-        Home)         printf '16777232' ;;
-        End)          printf '16777233' ;;
-        PgUp|PageUp)  printf '16777238' ;;
-        PgDown|PageDown) printf '16777239' ;;
-        Left)         printf '16777234' ;;
-        Up)           printf '16777235' ;;
-        Right)        printf '16777236' ;;
-        Down)         printf '16777237' ;;
-        Print|SysReq) printf '16777225' ;;
-        Menu)         printf '16777301' ;;
-        Comma)        printf '44' ;;
-        Period)       printf '46' ;;
-        Slash)        printf '47' ;;
-        Semicolon)    printf '59' ;;
-        Equal)        printf '61' ;;
-        Minus)        printf '45' ;;
-        Plus)         printf '43' ;;
-        *) return 1 ;;
-    esac
+    [ -n "$k" ] && [ -n "${_ACCEL_KEYCODES[$k]:-}" ] || return 1
+    printf '%s' "${_ACCEL_KEYCODES[$k]}"
 }
 
 # accel_keycode <key>   -- "Meta+Shift+Print" -> one integer, Qt's encoding.
 # Fails on anything it does not know rather than guessing a wrong key.
 accel_keycode() {
     local spec=$1 part total=0 base="" bases=0 mod
-    local IFS='+'
-    for part in $spec; do
+    local -a parts=()
+    # The plus key itself: "Meta++" split on "+" is a modifier and nothing.
+    case "$spec" in
+        +)   spec=Plus ;;
+        *++) spec=${spec%+}Plus ;;
+    esac
+    # Split by `read`, not by an unquoted expansion: that one globbed as well,
+    # so "Meta+*" became the files in the current directory and was refused.
+    IFS='+' read -ra parts <<< "$spec"
+    for part in "${parts[@]}"; do
         [ -n "$part" ] || continue
         case "$part" in
             Meta|Super|Win) mod=$_ACCEL_MOD_Meta ;;

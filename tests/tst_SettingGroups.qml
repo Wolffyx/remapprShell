@@ -122,4 +122,37 @@ TestCase {
     function test_a_value_outside_the_set_is_not_added() {
         compare(SettingGroups.chooseFrom(members, ["wifi"], "vpn", true), ["wifi"]);
     }
+
+    // ---- lists ----------------------------------------------------------
+
+    function test_an_ordered_list_keeps_the_persons_order() {
+        const cards = ["media", "day", "weather"];
+        compare(SettingGroups.chooseInOrder(cards, ["weather", "media"], "day", true), ["weather", "media", "day"]);
+        compare(SettingGroups.chooseInOrder(cards, ["weather", "media"], "weather", false), ["media"]);
+    }
+
+    function test_an_absent_ordered_list_is_all_of_them() {
+        compare(SettingGroups.chooseInOrder(["a", "b"], undefined, "a", false), ["b"]);
+    }
+
+    function test_a_list_that_was_saved_as_text_is_mended_not_mapped() {
+        // The old text field saved `"a,b"`; turning one on must not throw.
+        compare(SettingGroups.chooseInOrder(["a", "b"], "a,b", "a", true), ["a", "b"]);
+    }
+
+    function test_items_split_on_commas() {
+        compare(SettingGroups.parseList(" org.kde.dolphin, firefox ,,", "items"), ["org.kde.dolphin", "firefox"]);
+        compare(SettingGroups.formatList(["a", "b"], "items"), "a, b");
+        compare(SettingGroups.parseList("", "items"), []);
+    }
+
+    function test_a_command_splits_like_a_shell_would() {
+        compare(SettingGroups.parseList(`fuzzel --prompt "run: " -w 40`, "words"), ["fuzzel", "--prompt", "run: ", "-w", "40"]);
+        compare(SettingGroups.parseList(`a '' b`, "words"), ["a", "", "b"]);
+    }
+
+    function test_a_command_comes_back_as_it_went_in() {
+        const argv = ["fuzzel", "--prompt", "run: ", ""];
+        compare(SettingGroups.parseList(SettingGroups.formatList(argv, "words"), "words"), argv);
+    }
 }
