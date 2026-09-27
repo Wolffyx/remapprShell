@@ -147,6 +147,14 @@ PanelWindow {
         win.winIndex = -1;
     }
 
+    // Straight to the desktop at `at`; nothing, past the last one.
+    function jumpToDesk(at) {
+        if (at >= win.desks.length)
+            return;
+        win.deskIndex = at;
+        win.winIndex = -1;
+    }
+
     // Tab runs through the windows of the desktop under the selection and
     // then on to the next desktop, so the key alone reaches everything that
     // is open rather than stopping at the end of one desktop's cards.
@@ -294,11 +302,7 @@ PanelWindow {
             default:
                 // 1..9 jumps, as the design's Super+1…5 does.
                 if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
-                    const at = event.key - Qt.Key_1;
-                    if (at < win.desks.length) {
-                        win.deskIndex = at;
-                        win.winIndex = -1;
-                    }
+                    win.jumpToDesk(event.key - Qt.Key_1);
                     event.accepted = true;
                 }
                 break;

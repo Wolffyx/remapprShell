@@ -117,14 +117,18 @@ QtObject {
         const owned = {};
         const hosted = [];
         let pkg = "";
+        // What each kind of line says.
+        const take = {
+            package: value => { pkg = value ?? ""; },
+            owned: value => { owned[value] = true; },
+            free: value => { owned[value] = false; },
+            hosted: value => { if (value) hosted.push(value); }
+        };
         for (const line of lines) {
             const [kind, value] = line.split(" ");
-            if (kind === "package")
-                pkg = value ?? "";
-            else if (kind === "owned" || kind === "free")
-                owned[value] = kind === "owned";
-            else if (kind === "hosted" && value)
-                hosted.push(value);
+            const said = take[kind];
+            if (said)
+                said(value);
         }
         root.shellPackage = pkg;
         root.owned = owned;
@@ -142,11 +146,15 @@ QtObject {
             }))
         });
         root._decideNotifications();
-        for (const applet of root.decision.start) {
-            if (root.started[applet])
-                continue;
+        // Marked started all at once, before any is hosted: one change to
+        // `started`, not one an applet.
+        const starting = root.decision.start.filter(applet => !root.started[applet]);
+        const started = Object.assign({}, root.started);
+        for (const applet of starting)
+            started[applet] = true;
+        root.started = started;
+        for (const applet of starting) {
             const s = root.services.find(x => x.applet === applet);
-            root.started = Object.assign({}, root.started, { [applet]: true });
             Log.info("services", `hosting Plasma's ${s.what} (${applet}): nothing else provides it under this renderer`);
             root._host(applet);
         }
@@ -216,9 +224,14 @@ QtObject {
                 remaining: root._expecting,
                 closed: root._closedWindows
             });
+            // Counted as closed all at once, before any is: one change each
+            // to what is expected, not one a window.
+            const closed = Object.assign({}, root._closedWindows);
+            for (const uuid of closing)
+                closed[uuid] = true;
+            root._closedWindows = closed;
+            root._expecting = Math.max(0, root._expecting - closing.length);
             for (const uuid of closing) {
-                root._closedWindows = Object.assign({}, root._closedWindows, { [uuid]: true });
-                root._expecting = Math.max(0, root._expecting - 1);
                 Log.info("services", "closing a hosted applet's window; the applet stays in the tray");
                 WindowsService.close(uuid);
             }

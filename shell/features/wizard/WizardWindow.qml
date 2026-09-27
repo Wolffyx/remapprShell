@@ -220,13 +220,13 @@ FloatingWindow {
     // Everything the wizard writes, once whatever was there has been kept and
     // whatever preset was chosen has landed.
     function _write() {
-        // Written after the preset has landed, so these win over it.
-        for (const path of Object.keys(root._writes))
-            ConfigStore.set(path, root._writes[path]);
-
-        ConfigStore.set("theme.desktop.enabled", root.themeDesktop);
+        // Written after the preset has landed, so these win over it. As one
+        // change: a value at a time, the whole configuration was worked out
+        // again for each.
+        const values = Object.assign({}, root._writes, { "theme.desktop.enabled": root.themeDesktop });
         for (const part of root.themeParts)
-            ConfigStore.set(`theme.desktop.${part.key}`, root.themeWanted[part.key] !== false);
+            values[`theme.desktop.${part.key}`] = root.themeWanted[part.key] !== false;
+        ConfigStore.setMany(values);
 
         if (root.renderer !== "quickshell") {
             root.status = `Switching to the ${root.renderer} renderer...`;

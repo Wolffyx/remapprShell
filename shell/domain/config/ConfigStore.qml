@@ -82,13 +82,20 @@ QtObject {
     // defaults: an override exists to differ from what this profile already
     // says, and recording a value equal to it would freeze it.
     function setForScreen(name, path, value) {
+        return root.setManyForScreen(name, { [path]: value });
+    }
+
+    // Several overrides for one output, `values` keyed by path, as one change.
+    function setManyForScreen(name, values) {
         if (!root.writable)
             return false;
-        const current = Obj.get(root.merged, path, undefined);
-        const overlay = root.monitorData[name] ?? {};
-        const next = Obj.deepEqual(value, current) ? Obj.unset(overlay, path)
-                                                   : Obj.set(overlay, path, value);
-        root.monitorData = Object.assign({}, root.monitorData, { [name]: next });
+        let overlay = root.monitorData[name] ?? {};
+        for (const [path, value] of Object.entries(values)) {
+            const current = Obj.get(root.merged, path, undefined);
+            overlay = Obj.deepEqual(value, current) ? Obj.unset(overlay, path)
+                                                    : Obj.set(overlay, path, value);
+        }
+        root.monitorData = Object.assign({}, root.monitorData, { [name]: overlay });
         root._monitorWrites[name] = true;
         root._monitorTimer.restart();
         return true;
@@ -145,18 +152,32 @@ QtObject {
     // Sets a value, keeping the profile sparse: if the new value equals the
     // shipped default, the key is removed instead of written.
     function set(path, value) {
+        return root.setMany({ [path]: value });
+    }
+
+    // Several values, `values` keyed by path, as one change: the profile is
+    // replaced once, so everything drawn from the configuration is worked out
+    // again once, not once a value.
+    function setMany(values) {
+        const paths = Object.keys(values);
         if (!root.writable) {
-            Log.warn("config", `refusing to write ${path}: ${root.lastError}`);
+            Log.warn("config", `refusing to write ${paths.join(", ")}: ${root.lastError}`);
             return false;
         }
 
-        const isDefault = Obj.deepEqual(value, Obj.get(root.defaults, path, undefined));
-        if (isDefault) {
-            root.profileData = Obj.unset(root.profileData, path);
-            root._drop(path);
-        } else {
-            root.profileData = Obj.set(root.profileData, path, value);
+        let data = root.profileData;
+        const dropped = [];
+        for (const path of paths) {
+            const value = values[path];
+            if (!Obj.deepEqual(value, Obj.get(root.defaults, path, undefined))) {
+                data = Obj.set(data, path, value);
+                continue;
+            }
+            data = Obj.unset(data, path);
+            dropped.push(path);
         }
+        root.profileData = data;
+        root._removed = root._removed.concat(dropped);
         root._scheduleWrite();
         return true;
     }

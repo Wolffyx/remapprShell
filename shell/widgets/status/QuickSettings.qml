@@ -23,18 +23,22 @@ Item {
     required property var widget
 
     implicitWidth: 384
+
+    // The page behind each name `widget.page` can hold; any other is the main one.
+    readonly property var pageFor: ({
+        wifi: wifiPage,
+        ethernet: ethernetPage,
+        bluetooth: bluetoothPage,
+        volume: volumePage,
+        microphone: microphonePage,
+        brightness: brightnessPage
+    })
     implicitHeight: (pages.item as Item)?.implicitHeight ?? 0
 
     Loader {
         id: pages
         width: parent.width
-        sourceComponent: qs.widget.page === "wifi" ? wifiPage
-                       : qs.widget.page === "ethernet" ? ethernetPage
-                       : qs.widget.page === "bluetooth" ? bluetoothPage
-                       : qs.widget.page === "volume" ? volumePage
-                       : qs.widget.page === "microphone" ? microphonePage
-                       : qs.widget.page === "brightness" ? brightnessPage
-                       : mainPage
+        sourceComponent: qs.pageFor[qs.widget.page] ?? mainPage
         onLoaded: slide.restart()
 
         NumberAnimation {

@@ -67,10 +67,11 @@ Item {
                 width: parent.width
                 spacing: 14
 
+                // Any view but these two is a category; "everything" is the one of all.
                 readonly property var shown: twoPane.view === "home" ? twoPane.provider.pinnedApps
-                    : twoPane.view === "everything" ? Apps.inCategory(twoPane.provider.applications, "all")
                     : twoPane.view === "recent" ? []
-                    : Apps.inCategory(twoPane.provider.applications, twoPane.view)
+                    : Apps.inCategory(twoPane.provider.applications,
+                                      twoPane.view === "everything" ? "all" : twoPane.view)
 
                 Heading {
                     visible: twoPane.view !== "recent"

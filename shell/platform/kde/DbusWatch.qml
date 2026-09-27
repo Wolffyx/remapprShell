@@ -40,6 +40,18 @@ QtObject {
     // them -- a read at startup found nothing there.
     property bool _banner: true
 
+    // Gone, or back: either way what was read is out of date. Only coming
+    // back is `appeared`. The first such line is the banner, and says neither.
+    function _nameLine(line) {
+        if (root._banner) {
+            root._banner = false;
+            return;
+        }
+        root.changed(line);
+        if (line.includes(" is owned by "))
+            root.appeared();
+    }
+
     readonly property Process _proc: Process {
         command: ["gdbus", "monitor", `--${root.bus}`, "--dest", root.service, "--object-path", root.path]
         running: root.running
@@ -49,14 +61,7 @@ QtObject {
                 if (line.startsWith("Monitoring signals"))
                     return;
                 if (line.startsWith("The name ")) {
-                    // Gone, or back: either way what was read is out of date.
-                    // Only coming back is `appeared`.
-                    if (!root._banner) {
-                        root.changed(line);
-                        if (line.includes(" is owned by "))
-                            root.appeared();
-                    }
-                    root._banner = false;
+                    root._nameLine(line);
                     return;
                 }
                 if (root.filter.length > 0 && !line.includes(root.filter))

@@ -84,22 +84,25 @@ QtObject {
         let quote = "";
         let started = false;
         for (const ch of src) {
-            if (quote) {
-                if (ch === quote)
-                    quote = "";
-                else
-                    cur += ch;
-            } else if (ch === '"' || ch === "'") {
+            if (ch === quote) {
+                quote = "";     // the one that closes it
+                continue;
+            }
+            // Inside quotes everything is kept; outside, all but a space or a quote.
+            if (quote || !/[\s"']/.test(ch)) {
+                cur += ch;
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
                 quote = ch;
                 started = true;
-            } else if (/\s/.test(ch)) {
-                if (started || cur.length > 0)
-                    out.push(cur);
-                cur = "";
-                started = false;
-            } else {
-                cur += ch;
+                continue;
             }
+            // A space, outside quotes: the end of a word, if one was started.
+            if (started || cur.length > 0)
+                out.push(cur);
+            cur = "";
+            started = false;
         }
         if (started || cur.length > 0)
             out.push(cur);

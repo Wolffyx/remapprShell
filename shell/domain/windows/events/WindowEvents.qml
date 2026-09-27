@@ -242,10 +242,13 @@ QtObject {
             return false;
         const d = depth + 1;
         const sx = screen.x, sy = screen.y, sw = screen.width, sh = screen.height;
-        const strip = edge === "top" ? { x: sx, y: sy, w: sw, h: d }
-                    : edge === "left" ? { x: sx, y: sy, w: d, h: sh }
-                    : edge === "right" ? { x: sx + sw - d, y: sy, w: d, h: sh }
-                    : { x: sx, y: sy + sh - d, w: sw, h: d };
+        const strips = {
+            top: { x: sx, y: sy, w: sw, h: d },
+            left: { x: sx, y: sy, w: d, h: sh },
+            right: { x: sx + sw - d, y: sy, w: d, h: sh },
+            bottom: { x: sx, y: sy + sh - d, w: sw, h: d }
+        };
+        const strip = strips[edge] ?? strips.bottom;
         for (const w of windows ?? []) {
             if (!w || w.minimized || !(w.width > 0) || !(w.height > 0))
                 continue;
@@ -288,12 +291,9 @@ QtObject {
                 continue;
             seen.add(id);
             const mine = list.filter(i => root.appIdOf(i) === id);
-            if (mine.length === 0) {
-                const made = launcher ? launcher(id) : null;
-                if (made)
-                    out.push(Object.assign({}, made, { pinned: true, launcher: true }));
-                continue;
-            }
+            const made = mine.length === 0 && launcher ? launcher(id) : null;
+            if (made)
+                out.push(Object.assign({}, made, { pinned: true, launcher: true }));
             for (const i of mine) {
                 used.add(i);
                 out.push(Object.assign({}, i, { pinned: true, launcher: false }));

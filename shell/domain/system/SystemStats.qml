@@ -51,14 +51,13 @@ QtObject {
             + "for f in /sys/class/drm/card*/device/gpu_busy_percent; do [ -r \"$f\" ] && { echo \"busy $f\"; break; }; done"]
         stdout: StdioCollector {
             onStreamFinished: {
+                // Where each kind of line goes; the first of a kind is kept.
+                const into = { cpu: "_cpuTempPath", gpu: "_gpuTempPath", busy: "_gpuBusyPath" };
                 for (const line of text.split("\n")) {
                     const [kind, path] = line.split(" ");
-                    if (kind === "cpu" && !root._cpuTempPath)
-                        root._cpuTempPath = path;
-                    else if (kind === "gpu" && !root._gpuTempPath)
-                        root._gpuTempPath = path;
-                    else if (kind === "busy" && !root._gpuBusyPath)
-                        root._gpuBusyPath = path;
+                    const property = into[kind];
+                    if (property && !root[property])
+                        root[property] = path;
                 }
             }
         }

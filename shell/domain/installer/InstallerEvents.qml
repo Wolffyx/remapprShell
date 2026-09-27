@@ -70,15 +70,21 @@ QtObject {
             return next;
         if (ev.kind === "step") {
             next.push({ label: ev.text, state: "running" });
-        } else if (ev.kind === "ok" || ev.kind === "fail") {
-            for (let i = next.length - 1; i >= 0; i--) {
-                if (next[i].label === ev.text && next[i].state === "running") {
-                    next[i] = { label: ev.text, state: ev.kind === "ok" ? "done" : "failed" };
-                    break;
-                }
-            }
+            return next;
         }
+        const i = ev.kind === "ok" || ev.kind === "fail" ? root._lastRunning(next, ev.text) : -1;
+        if (i >= 0)
+            next[i] = { label: ev.text, state: ev.kind === "ok" ? "done" : "failed" };
         return next;
+    }
+
+    // Where the latest task of that name still running is, or -1.
+    function _lastRunning(tasks, label) {
+        for (let i = tasks.length - 1; i >= 0; i--) {
+            if (tasks[i].label === label && tasks[i].state === "running")
+                return i;
+        }
+        return -1;
     }
 
     // What `::done <n>` says: finished, and how many steps failed. -1 while

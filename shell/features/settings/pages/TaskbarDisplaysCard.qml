@@ -50,8 +50,10 @@ Card {
                 k => ConfigStore.isOverriddenForScreen(screenBlock.name, k))
 
             function useShared() {
+                const shared = {};
                 for (const k of screenBlock.ownKeys)
-                    ConfigStore.setForScreen(screenBlock.name, k, ConfigStore.value(k, undefined));
+                    shared[k] = ConfigStore.value(k, undefined);
+                ConfigStore.setManyForScreen(screenBlock.name, shared);
             }
 
             width: parent.width

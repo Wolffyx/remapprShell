@@ -25,8 +25,5 @@ PanelText {
     wrapMode: Text.WordWrap
     font.pixelSize: 12
     lineHeight: 1.35
-    color: root.tone === "error" ? Theme.error
-         : root.tone === "warning" ? Theme.warning
-         : root.tone === "plain" ? Theme.fg
-         : Theme.mut
+    color: ({ error: Theme.error, warning: Theme.warning, plain: Theme.fg })[root.tone] ?? Theme.mut
 }

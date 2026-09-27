@@ -45,6 +45,16 @@ PanelWindow {
     readonly property int margin: Math.max(0, Number(ConfigStore.value("sidebar.margin", 16)))
     readonly property bool reserves: ConfigStore.value("sidebar.reserveSpace", false) === true
     readonly property var cards: Cards.order(ConfigStore.value("sidebar.cards", []))
+
+    // What draws each card, by its id.
+    readonly property var cardFor: ({
+        media: media,
+        day: day,
+        weather: weather,
+        machine: machine,
+        notifications: notes
+    })
+
     readonly property var expanded: ConfigStore.value("sidebar.expanded", [])
 
     function isOpen(id) { return Cards.isOpen(win.expanded, id); }
@@ -138,12 +148,7 @@ PanelWindow {
                     Loader {
                         required property var modelData
                         width: body.width
-                        sourceComponent: modelData.id === "media" ? media
-                                       : modelData.id === "day" ? day
-                                       : modelData.id === "weather" ? weather
-                                       : modelData.id === "machine" ? machine
-                                       : modelData.id === "notifications" ? notes
-                                       : null
+                        sourceComponent: win.cardFor[modelData.id] ?? null
                     }
                 }
             }

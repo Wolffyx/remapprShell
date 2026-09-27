@@ -243,52 +243,61 @@ Provider {
     // which list they came from. What survives is Results' to decide.
     function candidates(text) {
         const now = Date.now();
-        const out = [];
+        return [].concat(...root._sources.filter(s => root.searches(s.searched))
+                                         .map(s => root._matching(s, text, now)));
+    }
 
-        if (root.searches("apps")) {
-            for (const app of root.applications) {
-                const fields = root.fieldsFor(app);
-                const score = Rank.rank(text, fields, root._history("app", app.id), now);
-                if (score !== Rank.none)
-                    out.push({ item: root.appItem(app), score: score, group: "app",
-                               pinned: fields.pinned });
-            }
-        }
-
+    // Where a search looks, in the order it lists them, each under the name
+    // `searches()` knows it by. For one thing found there: what is matched
+    // (`fields`), what it was chosen before as (`history`), and what the
+    // result carries (`result`) -- made only for a thing that matched.
+    readonly property var _sources: [
+        {
+            searched: "apps", group: "app",
+            list: () => root.applications,
+            fields: app => root.fieldsFor(app),
+            history: app => root._history("app", app.id),
+            result: (app, fields) => ({ item: root.appItem(app), pinned: fields.pinned })
+        },
         // A window is worth finding by its title -- "the tab I left open" --
         // which nothing else here can match. No history: a window is a thing
         // that exists now, not a thing chosen before.
-        if (root.searches("windows")) {
-            for (const window of WindowsService.windows) {
-                const appName = WindowsService.appNameFor(window);
-                const score = Rank.rank(text, { name: window.title, generic: appName,
-                                               id: window.appId, prose: true }, null, now);
-                if (score !== Rank.none)
-                    out.push({ item: root.windowItem(window, appName), score: score, group: "window" });
-            }
-        }
-
-        if (root.searches("files")) {
-            for (const file of RecentFiles.files) {
-                const score = Rank.rank(text, { name: file.name, generic: file.dir },
-                                        root._history("file", file.uri), now);
-                if (score !== Rank.none)
-                    out.push({ item: root.fileItem(file), score: score, group: "file" });
-            }
-        }
-
+        {
+            searched: "windows", group: "window",
+            list: () => WindowsService.windows,
+            fields: window => ({ name: window.title, generic: WindowsService.appNameFor(window),
+                                 id: window.appId, prose: true }),
+            history: () => null,
+            result: (window, fields) => ({ item: root.windowItem(window, fields.generic) })
+        },
+        {
+            searched: "files", group: "file",
+            list: () => RecentFiles.files,
+            fields: file => ({ name: file.name, generic: file.dir }),
+            history: file => root._history("file", file.uri),
+            result: file => ({ item: root.fileItem(file) })
+        },
         // The settings window has twenty pages and nobody remembers which one
         // holds the panel's rounding. Searching them is what the window's own
         // search would be, without the window.
-        if (root.searches("settings")) {
-            for (const section of Schema.sections) {
-                const score = Rank.rank(text, { name: section.label, generic: section.description, id: section.id },
-                                        root._history("setting", section.id), now);
-                if (score !== Rank.none)
-                    out.push({ item: root.settingItem(section), score: score, group: "setting" });
-            }
+        {
+            searched: "settings", group: "setting",
+            list: () => Schema.sections,
+            fields: section => ({ name: section.label, generic: section.description, id: section.id }),
+            history: section => root._history("setting", section.id),
+            result: section => ({ item: root.settingItem(section) })
         }
+    ]
 
+    // What one source offers for `text`, every thing in it scored the same way.
+    function _matching(source, text, now) {
+        const out = [];
+        for (const thing of source.list()) {
+            const fields = source.fields(thing);
+            const score = Rank.rank(text, fields, source.history(thing), now);
+            if (score !== Rank.none)
+                out.push(Object.assign({ score: score, group: source.group }, source.result(thing, fields)));
+        }
         return out;
     }
 
@@ -358,23 +367,23 @@ Provider {
     }
 
     function activate(item) {
-        if (!item)
-            return;
-        if (item.kind === "app")
-            root.launch(item.app);
-        else if (item.kind === "window")
-            root.raise(item);
-        else if (item.kind === "file")
-            root.openFile(item);
-        else if (item.kind === "setting")
-            root.openSetting(item);
-        else if (item.kind === "action")
-            root.run(item.action.id);
-        else if (item.kind === "sum") {
+        const act = root._activators[item?.kind];
+        if (act)
+            act(item);
+    }
+
+    // What choosing a result does, by its kind.
+    readonly property var _activators: ({
+        app: item => root.launch(item.app),
+        window: item => root.raise(item),
+        file: item => root.openFile(item),
+        setting: item => root.openSetting(item),
+        action: item => root.run(item.action.id),
+        sum: item => {
             root.copy(item.value);
             root.close();
         }
-    }
+    })
 
     function launch(app) {
         if (!app)

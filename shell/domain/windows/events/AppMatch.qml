@@ -198,28 +198,18 @@ QtObject {
     function _byCommandLine(full, processName, executables, window, index, depth) {
         const exec = key => (index.exec.get(key) ?? [])[0] ?? null;
         const firstSpace = full.indexOf(" ");
-        let cmdLine = full;
-        let slash = 0;
-
-        let found = exec(cmdLine);
-        if (!found) {
-            // Everything after the last slash before the first space: the
-            // line with the program's directory taken off.
-            slash = firstSpace >= 0 ? cmdLine.lastIndexOf("/", firstSpace) : cmdLine.lastIndexOf("/");
-            if (slash > 0)
-                found = exec(cmdLine.slice(slash + 1));
+        // The program without its arguments, and where its directory ends:
+        // the last slash before the first space. Everything after that slash
+        // is a line with the program's directory taken off.
+        const cmdLine = firstSpace > 0 ? full.slice(0, firstSpace) : full;
+        const slash = firstSpace >= 0 ? full.lastIndexOf("/", firstSpace) : full.lastIndexOf("/");
+        const lines = firstSpace > 0 ? [full, cmdLine] : [full];
+        const tried = slash > 0 ? [].concat(...lines.map(l => [l, l.slice(slash + 1)])) : lines;
+        for (const line of tried) {
+            const found = exec(line);
+            if (found)
+                return root.installed(found, "commandLine");
         }
-        if (!found && firstSpace > 0) {
-            cmdLine = cmdLine.slice(0, firstSpace);
-            found = exec(cmdLine);
-            if (!found) {
-                slash = cmdLine.lastIndexOf("/");
-                if (slash > 0)
-                    found = exec(cmdLine.slice(slash + 1));
-            }
-        }
-        if (found)
-            return root.installed(found, "commandLine");
 
         const runtime = root.runtimes.includes(cmdLine)
             || (slash > 0 && root.runtimes.includes(cmdLine.slice(slash + 1)));

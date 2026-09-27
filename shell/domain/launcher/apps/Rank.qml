@@ -117,16 +117,8 @@ QtObject {
         // weakest is what the result is worth. Typing more words may only
         // ever narrow the list.
         const parts = q.split(/\s+/).filter(p => p.length > 0);
-        if (parts.length > 1) {
-            let worst = Infinity;
-            for (const part of parts) {
-                const s = root.score(part, fields);
-                if (s === root.none)
-                    return root.none;
-                worst = Math.min(worst, s);
-            }
-            return worst;
-        }
+        if (parts.length > 1)
+            return root._weakest(parts, fields);
 
         const name = root._lower(fields?.name);
         const generic = root._lower(fields?.generic);
@@ -186,6 +178,19 @@ QtObject {
             return root.fuzzy + Math.round(200 * q.length / Math.max(name.length, 1));
 
         return root.none;
+    }
+
+    // Several words: every one of them has to match something, and the
+    // weakest is what the result is worth.
+    function _weakest(parts, fields) {
+        let worst = Infinity;
+        for (const part of parts) {
+            const s = root.score(part, fields);
+            if (s === root.none)
+                return root.none;
+            worst = Math.min(worst, s);
+        }
+        return worst;
     }
 
     // A tie-break inside a class: shorter names first, and small enough that

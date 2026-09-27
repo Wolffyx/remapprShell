@@ -32,8 +32,11 @@ Item {
     property string view: "home"
     readonly property bool searching: menu.provider.query.length > 0
 
-    implicitWidth: menu.layout === "twopane" ? 928 : menu.layout === "grid" ? 496 : 420
-    implicitHeight: menu.layout === "twopane" ? 668 : menu.layout === "grid" ? 540 : 600
+    // The size of each layout; the list's is the rest.
+    readonly property size layoutSize: ({ twopane: Qt.size(928, 668), grid: Qt.size(496, 540) })[menu.layout]
+                                       ?? Qt.size(420, 600)
+    implicitWidth: menu.layoutSize.width
+    implicitHeight: menu.layoutSize.height
 
     focus: true
     Keys.forwardTo: [search]

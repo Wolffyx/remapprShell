@@ -69,13 +69,11 @@ QtObject {
                 continue;
             }
 
-            if (c === "[") {
-                const run = root._integerRun(line, i + 1);
-                if (line[run.end] === "]" && run.count >= root.byteRunLength) {
-                    out += "[]";
-                    i = run.end + 1;
-                    continue;
-                }
+            const arrayEnd = c === "[" ? root._byteArrayEnd(line, i) : -1;
+            if (arrayEnd >= 0) {
+                out += "[]";
+                i = arrayEnd;
+                continue;
             }
 
             out += c;
@@ -100,6 +98,13 @@ QtObject {
                 j++;
         }
         return line.length;
+    }
+
+    // The index just past the `]` of a byte array opening at `start` -- a
+    // run of at least byteRunLength integers -- or -1 when there is none.
+    function _byteArrayEnd(line, start) {
+        const run = root._integerRun(line, start + 1);
+        return line[run.end] === "]" && run.count >= root.byteRunLength ? run.end + 1 : -1;
     }
 
     // The run of comma-separated integers starting at `start`, measured

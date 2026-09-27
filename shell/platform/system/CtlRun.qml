@@ -51,12 +51,8 @@ QtObject {
     }
 
     function _log(level, message) {
-        if (level === "debug")
-            Log.debug(root.tag, message);
-        else if (level === "info")
-            Log.info(root.tag, message);
-        else
-            Log.warn(root.tag, message);
+        const say = { debug: Log.debug, info: Log.info }[level] ?? Log.warn;
+        say(root.tag, message);
     }
 
     readonly property Process _proc: Process {
