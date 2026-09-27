@@ -43,11 +43,16 @@ source "$REPO_ROOT/scripts/lib/log.sh"
 # which is one of the things deps.sh installs. The bootstrap (install.sh at
 # the top of the tree) has usually done this already, and then it is one
 # quiet check. A dry run only says what is missing.
+#
+# Asking for the help is not asking for an install: it is answered here, before
+# anything is checked, or `setup --help` on a machine without Quickshell would
+# go and install it first.
 _dry=0; _yes=()
 for _a in "$@"; do
     case "$_a" in
         --dry-run)    _dry=1 ;;
         --unattended) _yes=(--yes) ;;
+        -h|--help)    sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     esac
 done
 if ! _missing=$("$REPO_ROOT/scripts/deps.sh" check); then
@@ -246,12 +251,20 @@ summary at the end, and a restore point is taken before the first change."
 
 # A machine that failed the check can still be set up -- a missing optional
 # tool is a warning, not a wall -- but the default is no, and a front end with
-# nobody behind it takes the default.
+# nobody behind it takes the default. A dry run is not asked: what it would do
+# is its whole point, so it says what it would do anyway, as it does for a
+# missing package.
+preflight_failed() {
+    if [ "$DRY" = 1 ]; then
+        log_warn "dry run: preflight found problems; what would run follows anyway"
+        return 0
+    fi
+    ui_yesno "Preflight found problems (see the terminal). Set up anyway?" no || cancelled
+}
+
 if [ "$PREFLIGHT" = 1 ]; then
     ui_note "checking this machine"
-    "$REPO_ROOT/scripts/preflight.sh" \
-        || ui_yesno "Preflight found problems (see the terminal). Set up anyway?" no \
-        || cancelled
+    "$REPO_ROOT/scripts/preflight.sh" || preflight_failed
 fi
 
 given() { [ -n "${ANSWER[$1]+x}" ]; }

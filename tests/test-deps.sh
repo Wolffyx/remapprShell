@@ -71,6 +71,11 @@ mkdir -p "$CORE"
 for t in bash env sh sed head tr cut id dirname cat grep; do
     ln -s "$(command -v "$t")" "$CORE/$t"
 done
+# And somebody who is not root, as at a desktop: as root deps.sh runs the
+# package manager itself, and a sudo stand-in would never be asked. CI's
+# container is root.
+printf '#!/bin/sh\n[ "$1" = -u ] && echo 1000 && exit 0\nexec %s "$@"\n' "$(command -v id)" > "$STUBS/id"
+chmod +x "$STUBS/id"
 deps() { PATH="$STUBS:$CORE" "$DEPS" "$@"; }
 os ID=arch
 
@@ -135,7 +140,7 @@ echo "sudo $*" >> "$SUDO_LOG"
 exit 0
 STUB
 chmod +x "$STUBS/sudo"
-rm "$STUBS/jq" "$STUBS/kdialog"
+rm -f "$STUBS/jq" "$STUBS/kdialog"
 os ID=arch
 export SUDO_LOG="$SANDBOX/sudo.log"
 DEPS_DRY=0 deps install --yes >/dev/null 2>&1 < /dev/null
