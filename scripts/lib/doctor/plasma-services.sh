@@ -5,8 +5,55 @@
 # A section of doctor.sh, which sources it and supplies ok, warn, bad, fix and
 # section. Requires brand.sh, config.sh and renderers.sh.
 
+# One of Plasma's tray-only services: who holds its bus name, and whether that
+# is what should.
+doctor_tray_service() {   # <bus name> <what it is> <live package> <notifications.server>
+    local name=$1 what=$2 live_pkg=$3 notif_server=$4 comm cfg
+    comm=$(bus_status_field "$name" Comm)
+    # Asked to serve them itself, the shell waits for whoever holds the name
+    # rather than taking it -- so the one thing worth saying is who that is.
+    if [ "$name" = org.freedesktop.Notifications ] && [ "$notif_server" = shell ]; then
+        if shell_holds_bus_name "$name"; then
+            ok "notifications: served by this shell (notifications.server)"
+            return
+        fi
+        if [ -n "$comm" ]; then
+            warn "notifications.server is shell, but $comm holds the notification service"
+            fix "the shell waits and takes over when it is let go of; until then $comm draws them"
+            return
+        fi
+    fi
+    # plasmashell holding one of these while it is on our package holds a
+    # leftover: the service was created by the previous package's tray and
+    # outlived it, because switching packages live does not restart
+    # plasmashell. The name is taken, so nothing else can serve it -- and for
+    # notifications, the applet that draws popups is gone: they are accepted
+    # and never shown.
+    if [ "$comm" = plasmashell ] && [ "$live_pkg" = "$SHELL_PACKAGE_ID" ]; then
+        if [ "$name" = org.freedesktop.Notifications ]; then
+            bad "notifications: held by plasmashell with no notifications applet -- accepted, never shown"
+        else
+            warn "$what: held by plasmashell, left over from the previous panel"
+        fi
+        fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
+    elif [ "$comm" = quickshell ]; then
+        # Ours is Quickshell too, and so is caelestia's bar: name the config.
+        cfg=$(bus_status_field "$name" CommandLine \
+              | grep -o -- '-p [^ ]*' | sed 's/^-p //; s|/shell.qml$||; s|.*/||')
+        ok "$what: provided by quickshell (${cfg:-unknown config})"
+    elif [ -n "$comm" ]; then
+        ok "$what: provided by $comm"
+    elif [ "$name" = org.freedesktop.Notifications ]; then
+        bad "nothing provides notifications: every notification sent now is dropped"
+        fix "under the quickshell renderer the shell hosts Plasma's own: $ALIAS start (and services.hostPlasma on)"
+    else
+        warn "nothing provides $what"
+        fix "the clipboard widget keeps a history of its own meanwhile; Plasma's comes back with the shell"
+    fi
+}
+
 doctor_plasma_services() {
-    local merged_cfg live_pkg notif_server pair name what comm cfg clip_history
+    local merged_cfg live_pkg notif_server pair clip_history
     local klipper_up
     section "Plasma services"
 
@@ -19,47 +66,7 @@ doctor_plasma_services() {
     live_pkg=$(live_shell_package '')
     notif_server=$(jq -r '.notifications.server // "plasma"' <<< "$merged_cfg" 2>/dev/null)
     for pair in "org.freedesktop.Notifications:notifications" "org.kde.klipper:clipboard history"; do
-        name=${pair%%:*}; what=${pair#*:}
-        comm=$(bus_status_field "$name" Comm)
-        # Asked to serve them itself, the shell waits for whoever holds the name
-        # rather than taking it -- so the one thing worth saying is who that is.
-        if [ "$name" = org.freedesktop.Notifications ] && [ "$notif_server" = shell ]; then
-            if shell_holds_bus_name "$name"; then
-                ok "notifications: served by this shell (notifications.server)"
-                continue
-            elif [ -n "$comm" ]; then
-                warn "notifications.server is shell, but $comm holds the notification service"
-                fix "the shell waits and takes over when it is let go of; until then $comm draws them"
-                continue
-            fi
-        fi
-        # plasmashell holding one of these while it is on our package holds a
-        # leftover: the service was created by the previous package's tray and
-        # outlived it, because switching packages live does not restart
-        # plasmashell. The name is taken, so nothing else can serve it -- and for
-        # notifications, the applet that draws popups is gone: they are accepted
-        # and never shown.
-        if [ "$comm" = plasmashell ] && [ "$live_pkg" = "$SHELL_PACKAGE_ID" ]; then
-            if [ "$name" = org.freedesktop.Notifications ]; then
-                bad "notifications: held by plasmashell with no notifications applet -- accepted, never shown"
-            else
-                warn "$what: held by plasmashell, left over from the previous panel"
-            fi
-            fix "restart plasmashell so the shell can host Plasma's own: systemctl --user restart plasma-plasmashell"
-        elif [ "$comm" = quickshell ]; then
-            # Ours is Quickshell too, and so is caelestia's bar: name the config.
-            cfg=$(bus_status_field "$name" CommandLine \
-                  | grep -o -- '-p [^ ]*' | sed 's/^-p //; s|/shell.qml$||; s|.*/||')
-            ok "$what: provided by quickshell (${cfg:-unknown config})"
-        elif [ -n "$comm" ]; then
-            ok "$what: provided by $comm"
-        elif [ "$name" = org.freedesktop.Notifications ]; then
-            bad "nothing provides notifications: every notification sent now is dropped"
-            fix "under the quickshell renderer the shell hosts Plasma's own: $ALIAS start (and services.hostPlasma on)"
-        else
-            warn "nothing provides $what"
-            fix "the clipboard widget keeps a history of its own meanwhile; Plasma's comes back with the shell"
-        fi
+        doctor_tray_service "${pair%%:*}" "${pair#*:}" "$live_pkg" "$notif_server"
     done
 
     # Which clipboard history Meta+V actually shows, which is a setting and not

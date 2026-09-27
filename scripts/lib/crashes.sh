@@ -14,36 +14,54 @@ CRASH_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/quickshell/crashes"
 # The dump directory holds every quickshell on this machine, ours and anyone
 # else's -- a second shell running side by side writes here too. A dump is
 # ours only if it says so, so nobody else's crash is ever reported as ours.
+# crash_list asks the same of every dump at once, in its awk: the two must
+# agree.
 crash_is_ours() {
     local dir=$1
     [ -f "$dir/report.txt" ] || return 1
     grep -qxF "Config Path: $QS_CONFIG_DIR/shell.qml" "$dir/report.txt"
 }
 
-crash_field() {
-    sed -n "s/^$2: *//p" "$1/report.txt" 2>/dev/null | head -1
-}
-
 # crash_list [--all]   -- oldest first: id, time, signal, epoch.
+#
+# One awk reads every report, asking crash_is_ours' question of each dump and
+# taking its first `Signal:` as it goes, and the time is bash's own. It was
+# six processes a dump -- grep, stat, basename, date, sed and head -- and every
+# shell start lists the dumps, with nothing ever clearing them away.
 crash_list() {
     local all=${1:-}
     [ -d "$CRASH_ROOT" ] || return 0
-    local dir when
-    while IFS= read -r dir; do
-        [ -d "$dir" ] || continue
-        [ "$all" = "--all" ] || crash_is_ours "$dir" || continue
-        when=$(stat -c %Y "$dir")
-        printf '%s\t%s\t%s\t%s\n' \
-            "$(basename "$dir")" \
-            "$(date -d "@$when" '+%Y-%m-%d %H:%M:%S')" \
-            "$(crash_field "$dir" Signal)" \
-            "$when"
+    local line when rest
+    while IFS= read -r line; do
+        when=${line%%$'\t'*}
+        rest=${line#*$'\t'}
+        printf '%s\t%(%Y-%m-%d %H:%M:%S)T\t%s\t%s\n' "${rest%%$'\t'*}" "$when" "${rest#*$'\t'}" "$when"
     done < <(find "$CRASH_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null \
-             | sort -n | cut -d' ' -f2-)
+             | sort -n \
+             | CRASH_OURS="Config Path: $QS_CONFIG_DIR/shell.qml" awk -v all="$all" '
+                 # "<epoch> <dir>" in, "<epoch>\t<id>\t<signal>" out: the
+                 # signal last, where a tab in it cannot move the id.
+                 {
+                     when = substr($0, 1, index($0, " ") - 1)
+                     sub(/\..*/, "", when)
+                     dir = substr($0, index($0, " ") + 1)
+                     id = dir
+                     sub(/.*\//, "", id)
+                     report = dir "/report.txt"
+                     ours = 0; signal = ""; found = 0
+                     while ((getline text < report) > 0) {
+                         if (text == ENVIRON["CRASH_OURS"]) ours = 1
+                         if (found || index(text, "Signal:") != 1) continue
+                         found = 1
+                         signal = substr(text, 8)
+                         sub(/^ */, "", signal)
+                     }
+                     close(report)
+                     if (all == "--all" || ours) print when "\t" id "\t" signal
+                 }')
 }
 
 crash_newest() { crash_list | tail -1 | cut -f1; }
-crash_newest_epoch() { crash_list | tail -1 | cut -f4; }
 
 # crash_since <epoch>   -- "<epoch> <id>" for the newest dump written after
 # that moment, or nothing.
@@ -56,10 +74,15 @@ crash_newest_epoch() { crash_list | tail -1 | cut -f4; }
 # reach it rather than in QML where one cannot.
 #
 # Every shell start asks this, so the dumps are listed once: the newest line
-# has both the id and the time.
-crash_since() {
+# has both the id and the time. A caller that has listed them already -- `crash
+# check` -- hands that line in, and they are not listed again.
+crash_since() {   # <epoch> [newest line of crash_list]
     local since=${1:-0} newest when
-    newest=$(crash_list | tail -1)
+    if [ $# -gt 1 ]; then
+        newest=$2
+    else
+        newest=$(crash_list | tail -1)
+    fi
     [ -n "$newest" ] || return 0
     when=${newest##*$'\t'}
     [ "$when" -gt "$since" ] 2>/dev/null || return 0

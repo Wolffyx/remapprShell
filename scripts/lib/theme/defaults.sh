@@ -5,19 +5,67 @@
 # Sourced by theme.sh, never executed. Requires log.sh, kconfig.sh and
 # config.sh -- and install.sh, for where the packages are.
 
+# Which parts would be written, and which are left alone -- for `status` and
+# for saying out loud what an apply did.
+DESKTOP_PARTS=(colours icons style plasmaTheme decorations switcher gtk)
+
 # Is this part of the desktop ours to theme? `theme.desktop.enabled` is the
 # whole question and each part is a second one, so turning the lot off is one
 # setting and leaving out just the colour scheme is another. Anything left out
 # keeps whatever the user chose in System Settings.
 desktop_part_wanted() {
-    local part=$1
-    [ "$(config_get ".theme.desktop.enabled" true)" = "true" ] || return 1
-    [ "$(config_get ".theme.desktop.$part" true)" = "true" ]
+    [ "$(desktop_parts_wanted "$1")" = "$1"$'\t'true ]
 }
 
-# Which parts would be written, and which are left alone -- for `status` and
-# for saying out loud what an apply did.
-desktop_parts() { printf '%s\n' colours icons style plasmaTheme decorations switcher gtk; }
+# desktop_parts_wanted [part...]   -- "<part>\t<true|false>" for each part,
+# every one of them when none is named, from one jq.
+#
+# It was two config_get a part, and so fourteen jq runs for `status` to say
+# what an apply would write. Each setting is read as config_get reads it --
+# absent, empty or unreadable is the default, true, and anything but "true"
+# is off -- so the answer is the one those fourteen gave.
+desktop_parts_wanted() {
+    [ $# -gt 0 ] || set -- "${DESKTOP_PARTS[@]}"
+    config_merged | jq -R -s -r '
+        # What config_get reads, as text, less the newlines its command
+        # substitution takes off the end -- and "" where it falls back.
+        def text(p): (try p catch null) as $v
+            | if $v == null then ""
+              else $v | if type == "array" or type == "object" then tojson else tostring end end
+            | sub("\n+\\z"; "");
+        def on(p): text(p) | . == "true" or . == "";
+        (try fromjson catch null) as $c
+        | ($c | on(.theme.desktop.enabled)) as $all
+        | $ARGS.positional[] as $part
+        | "\($part)\t\($all and ($c | on(.theme.desktop[$part])))"' --args "$@"
+}
+
+# Whether the lines under a `# part:` marker are written, saying so when they
+# are not.
+_defaults_part_on() {   # <part>
+    desktop_part_wanted "$1" && return 0
+    log_info "leaving $1 alone (theme.desktop.$1 is off)"
+    return 1
+}
+
+# A group header, [file][Group] or [file][A][B], into DEFAULTS_FILE and
+# DEFAULTS_GROUP -- "A/B" for the nested one, as kconfig_set takes it.
+#
+# In the shell, where it was sed, head, tail and paste for every header. Empty
+# groups at the end are dropped, as they were when the lines they became were
+# read into a variable.
+_defaults_header() {   # <line>
+    local inner=${1#\[}
+    inner=${inner%\]}
+    while [[ $inner == *'][' ]]; do
+        inner=${inner%']['}
+    done
+    DEFAULTS_FILE=${inner%%']['*}
+    DEFAULTS_GROUP=""
+    [[ $inner == *']['* ]] || return 0
+    DEFAULTS_GROUP=${inner#*']['}
+    DEFAULTS_GROUP=${DEFAULTS_GROUP//']['//}
+}
 
 # apply_defaults [variant] [variant-only]
 #
@@ -53,12 +101,8 @@ apply_defaults() {
             '# part: '*)
                 part=${line#\# part: }
                 variant="any"
-                if desktop_part_wanted "$part"; then
-                    wanted=1
-                else
-                    wanted=0
-                    log_info "leaving $part alone (theme.desktop.$part is off)"
-                fi
+                wanted=0
+                _defaults_part_on "$part" && wanted=1
                 continue
                 ;;
             '#'*)
@@ -79,10 +123,9 @@ apply_defaults() {
 
         if [[ "$line" =~ ^\[ ]]; then
             # [file][Group] or [file][A][B]
-            local parts
-            parts=$(printf '%s' "$line" | sed 's/^\[//; s/\]$//; s/\]\[/\n/g')
-            file=$(printf '%s' "$parts" | head -1)
-            group=$(printf '%s' "$parts" | tail -n +2 | paste -sd'/' -)
+            _defaults_header "$line"
+            file=$DEFAULTS_FILE
+            group=$DEFAULTS_GROUP
             continue
         fi
 

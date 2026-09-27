@@ -4,6 +4,34 @@
 #
 # Sourced by renderer.sh, never executed. Requires brand.sh and log.sh.
 
+# Whether a plasmawindowed process hosts the device notifier. It holds no bus
+# name; its tray item, which only --statusnotifier creates, says it is there.
+#
+# Only that process's own items are asked, and the first that answers is
+# enough. Every other item in the tray -- a busctl each, and a tray holds
+# dozens -- is passed over by the bus name it is registered under, which one
+# listing of the bus ties to a process. By name alone it cannot be done: KF6
+# registers an item under its connection's unique name, ":1.1635", and not
+# the org.kde.StatusNotifierItem-<pid>-<n> that would say whose it is.
+hosts_device_notifier() {   # <pid>
+    local it id name owner rest
+    local -A owned=()
+    while read -r name owner rest; do
+        [ "$owner" = "$1" ] && owned[$name]=1
+    done < <(busctl --user list --no-legend 2>/dev/null)
+    [ "${#owned[@]}" -gt 0 ] || return 1
+    while read -r it; do
+        [ -n "$it" ] || continue
+        [ -n "${owned[${it%%/*}]:-}" ] || continue
+        id=$(busctl --user get-property "${it%%/*}" "/${it#*/}" org.kde.StatusNotifierItem Id 2>/dev/null)
+        id=${id#s \"}; id=${id%\"}
+        [ "$id" = plasmawindowed_org.kde.plasma.devicenotifier ] && return 0
+    done < <(busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+               org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null \
+             | grep -o '"[^"]*"' | tr -d '"')
+    return 1
+}
+
 # Under the quickshell renderer the shell hosts Plasma's notifications and
 # clipboard applets with plasmawindowed, because nothing else would provide
 # them (shell/domain/backend/PlasmaServices.qml). Any other renderer has a
@@ -19,22 +47,13 @@ stop_hosted_services() {
     local pid name owner
     pid=$(bus_status_field org.kde.plasmawindowed PID)
     [ -n "$pid" ] || return 0
-    local hosting=0 it id
+    local hosting=0
     for name in org.freedesktop.Notifications org.kde.klipper; do
         owner=$(bus_status_field "$name" PID)
         [ "$owner" = "$pid" ] && hosting=1
     done
-    # The device notifier holds no bus name; its tray item, which only
-    # --statusnotifier creates, says it is there.
-    if [ "$hosting" = 0 ]; then
-        while read -r it; do
-            [ -n "$it" ] || continue
-            id=$(busctl --user get-property "${it%%/*}" "/${it#*/}" org.kde.StatusNotifierItem Id 2>/dev/null \
-                 | sed -e 's/^s "//' -e 's/"$//')
-            [ "$id" = plasmawindowed_org.kde.plasma.devicenotifier ] && hosting=1
-        done < <(busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
-                   org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null \
-                 | grep -o '"[^"]*"' | tr -d '"')
+    if [ "$hosting" = 0 ] && hosts_device_notifier "$pid"; then
+        hosting=1
     fi
     [ "$hosting" = 1 ] || return 0
     log_info "closing Plasma's applets hosted for the quickshell renderer (plasmawindowed, pid $pid);"

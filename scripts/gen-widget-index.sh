@@ -15,27 +15,33 @@ cd "$REPO_ROOT"
 command -v jq >/dev/null 2>&1 || die "jq is required"
 
 out=shell/widgets/index.json
-tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
+shopt -s nullglob
+manifests=(shell/widgets/*/widget.json)
 
-count=0
-: > "$tmp"
-for manifest in shell/widgets/*/widget.json; do
-    [ -e "$manifest" ] || continue
-    dir=$(dirname "$manifest")
-    id=$(basename "$dir")
+# Only when the one jq below has failed: which manifest, and why, one at a time
+# and in order, as the loop over them all used to say it.
+explain_failure() {
+    local manifest id declared
+    for manifest in "${manifests[@]}"; do
+        jq -e . "$manifest" >/dev/null 2>&1 || die "$manifest is not valid JSON"
+        id=${manifest%/widget.json}
+        id=${id##*/}
+        declared=$(jq -r '.id // empty' "$manifest")
+        [ "$declared" = "$id" ] || die "$manifest declares id '$declared' but lives in '$id/'"
+    done
+    die "jq could not index the widgets, though every manifest reads"
+}
 
-    jq -e . "$manifest" >/dev/null 2>&1 || die "$manifest is not valid JSON"
-
-    # The directory name is authoritative: it is what the loader resolves a
-    # widget path from, so a manifest claiming a different id would produce a
-    # widget that can be configured but never loaded.
-    declared=$(jq -r '.id // empty' "$manifest")
-    [ "$declared" = "$id" ] || die "$manifest declares id '$declared' but lives in '$id/'"
-
-    jq -c --arg id "$id" '. + {id: $id, builtin: true}' "$manifest" >> "$tmp"
-    count=$((count + 1))
-done
-
-jq -s '{generated: true, widgets: .}' "$tmp" > "$out"
-log_step "indexed $count built-in widget(s) -> $out"
+# One jq for every manifest; it was three a widget. With none at all it reads
+# an empty stdin rather than waiting on the terminal.
+#
+# The directory name is authoritative: it is what the loader resolves a widget
+# path from, so a manifest claiming a different id would produce a widget that
+# can be configured but never loaded.
+index=$(jq -n '{generated: true, widgets: [inputs
+            | (input_filename | split("/")[-2]) as $id
+            | if (.id // "" | tostring) != $id then error("id") else . end
+            | . + {id: $id, builtin: true}]}' "${manifests[@]}" < /dev/null 2>/dev/null) \
+    || explain_failure
+printf '%s\n' "$index" > "$out"
+log_step "indexed ${#manifests[@]} built-in widget(s) -> $out"

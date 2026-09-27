@@ -23,8 +23,12 @@ STYLES=(
 
 style_field() {   # <id> <n>
     local s
+    local -a fields
     for s in "${STYLES[@]}"; do
-        [ "${s%%|*}" = "$1" ] && { cut -d'|' -f"$2" <<< "$s"; return 0; }
+        [ "${s%%|*}" = "$1" ] || continue
+        IFS='|' read -ra fields <<< "$s"
+        printf '%s\n' "${fields[$2 - 1]:-}"
+        return 0
     done
     return 1
 }
@@ -33,14 +37,18 @@ style_ids() { local s; for s in "${STYLES[@]}"; do printf '%s ' "${s%%|*}"; done
 # Where Qt looks for style plugins. The tests point it at a directory of
 # their own, so what is installed on the machine running them does not
 # change the answer.
+#
+# Split by bash rather than by tr: every style asks, and `status` asks of
+# every style.
 STYLE_DIRS_VAR="${ENV_PREFIX}_STYLE_DIRS"
 style_dirs() {
     if [ -n "${!STYLE_DIRS_VAR:-}" ]; then
-        tr ':' '\n' <<< "${!STYLE_DIRS_VAR}"
+        local dirs=${!STYLE_DIRS_VAR}
+        printf '%s\n' "${dirs//:/$'\n'}"
         return
     fi
-    local d
-    for d in $(tr ':' ' ' <<< "${QT_PLUGIN_PATH:-}") /usr/lib/qt6/plugins /usr/lib64/qt6/plugins; do
+    local d path=${QT_PLUGIN_PATH:-}
+    for d in ${path//:/ } /usr/lib/qt6/plugins /usr/lib64/qt6/plugins; do
         printf '%s/styles\n' "$d"
     done
 }
@@ -57,10 +65,11 @@ style_installed() {
 
 # The id of the style in use, or kdeglobals' own value when it is none of ours.
 style_active_id() {
-    local current s
+    local current s id key
     current=$(kreadconfig6 --file kdeglobals --group KDE --key widgetStyle --default '')
     for s in "${STYLES[@]}"; do
-        [ "$(cut -d'|' -f2 <<< "$s" | tr '[:upper:]' '[:lower:]')" = "${current,,}" ] && { printf '%s' "${s%%|*}"; return; }
+        IFS='|' read -r id key _ <<< "$s"
+        [ "${key,,}" = "${current,,}" ] && { printf '%s' "$id"; return; }
     done
     printf '%s' "$current"
 }

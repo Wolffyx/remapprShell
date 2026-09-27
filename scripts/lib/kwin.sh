@@ -54,6 +54,115 @@ night_light_wait() {   # [seconds]
     done
 }
 
+# kwinrc_read <array> <group>...
+#
+# Every key of those groups into the named associative array, keyed
+# "<group>:<key>", each as kreadconfig6 would read it. A key it would find
+# unset is left out, so a lookup names its own default:
+# ${rc[Windows:AutoRaise]-false}.
+#
+# One awk for them all, where each key was a kreadconfig6 of its own --
+# nineteen for one refresh of the screen edges page. It reads what KConfig
+# reads, in the same order: the kwinrc in each of XDG_CONFIG_DIRS (absolute
+# ones only, as Qt takes them), the last first, then the user's own over them
+# -- and on Plasma the first of those directories is the look and feel's
+# ~/.config/kdedefaults, so the cascade is not academic. A key, a group or a
+# whole file marked `[$i]` keeps its value from the files after it, and a key
+# marked `[$d]` is taken away. What it would have to imitate beyond that -- an
+# escape in a value, a value to expand (`[$e]`), one in the user's language
+# (`Key[de]`) -- it leaves to kreadconfig6, key by key: nothing KWin or System
+# Settings writes into these groups has one.
+kwinrc_read() {
+    local -n _kw_rc=$1
+    shift
+    local -a _kw_given=() _kw_dirs=() _kw_files=()
+    local _kw_d _kw_i _kw_how _kw_name _kw_value _kw_absent="__rmpr_absent_1f8b__"
+    _kw_rc=()
+    IFS=: read -ra _kw_given <<< "${XDG_CONFIG_DIRS:-}"
+    for _kw_d in "${_kw_given[@]}"; do
+        [[ $_kw_d == /* ]] && _kw_dirs+=("$_kw_d")
+    done
+    [ ${#_kw_dirs[@]} -gt 0 ] || _kw_dirs=(/etc/xdg)
+    for (( _kw_i = ${#_kw_dirs[@]} - 1; _kw_i >= 0; _kw_i-- )); do
+        _kw_d=${_kw_dirs[_kw_i]}/kwinrc
+        [ -f "$_kw_d" ] && [ -r "$_kw_d" ] && _kw_files+=("$_kw_d")
+    done
+    _kw_d=$XDG_CONFIG_HOME/kwinrc
+    [ -f "$_kw_d" ] && [ -r "$_kw_d" ] && _kw_files+=("$_kw_d")
+    [ ${#_kw_files[@]} -gt 0 ] || return 0
+
+    while IFS=$'\t' read -r _kw_how _kw_name _kw_value; do
+        [ "$_kw_how" = ask ] && _kw_value=$(kreadconfig6 --file kwinrc --group "${_kw_name%%:*}" \
+                                                --key "${_kw_name#*:}" --default "$_kw_absent")
+        [ "$_kw_value" = "$_kw_absent" ] || _kw_rc[$_kw_name]=$_kw_value
+    done < <(IFS=$'\t'; LC_ALL=C awk -v groups="$*" '
+        BEGIN {
+            n = split(groups, g, "\t")
+            for (k = 1; k <= n; k++) want[g[k]] = 1
+        }
+        # A group locked by the file before is locked from here on, and after
+        # a file locked whole no file is read at all.
+        FNR == 1 {
+            if (sealed) exit
+            for (k in locking) locked[k] = 1
+            split("", locking)
+            group = ""; filelock = 0
+        }
+        { sub(/^[ \t\r\f\v]+/, ""); sub(/[ \t\r\f\v]+$/, "") }
+        $0 == "" || /^#/ { next }
+        /^\[/ { header($0); next }
+        group != "" && !(group in locked) { entry() }
+
+        # "[A][B]" is B inside A, and after a "]" anything but another "[" is
+        # dropped. A last "[$i]" locks the group, or on its own the file. A
+        # header with no "]" is not one, and the group before it goes on.
+        function header(line,    name, part, shut, lock) {
+            name = ""; lock = filelock
+            while (substr(line, 1, 1) == "[") {
+                shut = index(line, "]")
+                if (!shut) return
+                part = substr(line, 2, shut - 2)
+                line = substr(line, shut + 1)
+                if (part != "$i" || line != "") name = name == "" ? part : name "\035" part
+                else if (name == "") filelock = sealed = 1
+                else lock = 1
+            }
+            grouplock = lock
+            group = (name in want) ? name : ""
+            if (group != "" && lock) locking[group] = 1
+        }
+
+        function entry(    eq, key, value, opts, lang, shut, name) {
+            eq = index($0, "=")
+            key = eq ? substr($0, 1, eq - 1) : $0
+            value = eq ? substr($0, eq + 1) : ""
+            sub(/[ \t\r\f\v]+$/, "", key)
+            sub(/^[ \t\r\f\v]+/, "", value)
+            # Markers and a language come off the end, as KConfig takes them.
+            opts = ""; lang = 0
+            while (match(key, /\[[^[]*$/)) {
+                shut = index(substr(key, RSTART), "]")
+                if (!shut) return
+                if (substr(key, RSTART + 1, 1) == "$") opts = opts substr(key, RSTART + 2, shut - 3)
+                else lang = 1
+                key = substr(key, 1, RSTART - 1)
+            }
+            if (key == "") return
+            name = group ":" key
+            if (lang || opts ~ /e/ || index(value, "\\")) { ask[name] = 1; return }
+            if (name in fixed) return
+            if (opts ~ /d/) { delete val[name]; return }
+            if (!eq) return
+            val[name] = value
+            if (grouplock || opts ~ /i/) fixed[name] = 1
+        }
+
+        END {
+            for (name in ask) print "ask\t" name
+            for (name in val) if (!(name in ask)) print "val\t" name "\t" val[name]
+        }' "${_kw_files[@]}")
+}
+
 # Tiling scripts take a window dragged to a screen edge for themselves, and so
 # does KWin's own snapping: with both on, which one gets the drag depends on
 # timing. Only an *enabled* one is named. Installed is not the same thing --
@@ -64,8 +173,10 @@ KWIN_TILING_SCRIPTS=(krohnkite bismuth polonium kzones)
 
 kwin_tiling_scripts() {
     local s
+    local -A rc=()
+    kwinrc_read rc Plugins
     for s in "${KWIN_TILING_SCRIPTS[@]}"; do
-        kwin_plugin_enabled "$s" && printf '%s\n' "$s"
+        [ "${rc[Plugins:${s}Enabled]-false}" = true ] && printf '%s\n' "$s"
     done
     return 0
 }

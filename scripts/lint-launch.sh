@@ -31,33 +31,37 @@ LAUNCH=shell/platform/system/Launch.qml
 programs='xdg-open|kde-open|kioclient|gtk-launch|systemsettings|plasmawindowed'
 
 fail=0
-checked=0
-while IFS= read -r file; do
-    [ "$file" = "$LAUNCH" ] && continue
-    checked=$((checked + 1))
-    while IFS= read -r hit; do
-        log_error "$hit"
-        fail=1
-    done < <(awk -v file="$file" -v progs="$programs" '
-        {
-            allowed = (prev ~ /lint-launch: allow/) || ($0 ~ /lint-launch: allow/)
-            prev = $0
-        }
-        /^[ \t]*\/\// || allowed { next }
-        /\.execute\(/ {
-            printf "%s:%d: execute() starts the application as the shell'\''s child -- use Launch.entry() or Launch.action()\n", file, NR
-            next
-        }
-        /Qt\.openUrlExternally\(/ {
-            printf "%s:%d: Qt.openUrlExternally() opens it as the shell'\''s child -- use Launch.open()\n", file, NR
-            next
-        }
-        $0 ~ ("\\[[ \t]*[\"'\''](" progs ")[\"'\'']") && $0 !~ /Launch\./ {
-            match($0, "(" progs ")")
-            printf "%s:%d: runs %s as the shell'\''s child -- use Launch.command() or Launch.open()\n", file, NR, substr($0, RSTART, RLENGTH)
-        }
-    ' "$file")
-done < <(find shell -name '*.qml' -type f | sort)
+mapfile -t files < <(find shell -name '*.qml' -type f ! -path "$LAUNCH" | sort)
+checked=${#files[@]}
+# One awk over every file rather than one a file: FNR and FILENAME are each
+# file's own, and each file starts with no line above its first. Taken whole
+# rather than read as it comes, so that a file awk cannot open stops the lint
+# -- awk stops there -- instead of passing every file after it unread.
+hits=$(awk -v progs="$programs" '
+    FNR == 1 { prev = "" }
+    {
+        allowed = (prev ~ /lint-launch: allow/) || ($0 ~ /lint-launch: allow/)
+        prev = $0
+    }
+    /^[ \t]*\/\// || allowed { next }
+    /\.execute\(/ {
+        printf "%s:%d: execute() starts the application as the shell'\''s child -- use Launch.entry() or Launch.action()\n", FILENAME, FNR
+        next
+    }
+    /Qt\.openUrlExternally\(/ {
+        printf "%s:%d: Qt.openUrlExternally() opens it as the shell'\''s child -- use Launch.open()\n", FILENAME, FNR
+        next
+    }
+    $0 ~ ("\\[[ \t]*[\"'\''](" progs ")[\"'\'']") && $0 !~ /Launch\./ {
+        match($0, "(" progs ")")
+        printf "%s:%d: runs %s as the shell'\''s child -- use Launch.command() or Launch.open()\n", FILENAME, FNR, substr($0, RSTART, RLENGTH)
+    }
+' "${files[@]}" < /dev/null)
+while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    log_error "$hit"
+    fail=1
+done <<< "$hits"
 
 if [ "$fail" -ne 0 ]; then
     log_error "  an application started there dies with the shell; Launch gives it a scope of its own"

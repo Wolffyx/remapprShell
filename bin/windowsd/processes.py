@@ -49,10 +49,11 @@ def find_executable(word, path=None):
     if os.path.isabs(word):
         return os.path.normpath(word) if runnable(word) else ""
     for directory in (os.environ.get("PATH", "") if path is None else path).split(os.pathsep):
-        if directory:
-            candidate = os.path.normpath(os.path.join(directory, word))
-            if runnable(candidate):
-                return candidate
+        if not directory:
+            continue
+        candidate = os.path.normpath(os.path.join(directory, word))
+        if runnable(candidate):
+            return candidate
     return ""
 
 

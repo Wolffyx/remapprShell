@@ -390,7 +390,8 @@ while [ $# -gt 0 ]; do
         --unit)              MODE=unit; MODE_ARG=${2:?--unit needs a name}; shift ;;
         --failed)            MODE=failed ;;
         --crash)             MODE=crash
-                             case "${2-}" in -*|"") ;; *) MODE_ARG=$2; shift ;; esac ;;
+                             # An id may follow; the next option may too.
+                             [[ -z "${2-}" || "$2" == -* ]] || { MODE_ARG=$2; shift; } ;;
         --provider)          PROVIDER=${2:?--provider needs a name}; shift ;;
         --show)              SHOW=yes ;;
         --review)            REVIEW=yes ;;

@@ -19,17 +19,25 @@ BASE=shell/ui/primitives/BarWidget.qml
 mapfile -t signals < <(grep -oE '^\s*signal\s+[a-zA-Z_][a-zA-Z0-9_]*' "$BASE" \
                        | awk '{print $2}' | sort -u)
 
+# Every function a widget defines under a signal's name, as "<file>:<name>",
+# by one grep over every widget file for every signal at once -- it was a grep
+# a file a signal. Sorted by file, then by name, and each pair once, as that
+# loop reported them.
+redefinitions() {
+    local names
+    [ "${#signals[@]}" -gt 0 ] || return 0
+    printf -v names '%s|' "${signals[@]}"
+    find shell/widgets -name '*.qml' -type f -exec grep -HoE "^\s*function\s+(${names%|})\s*\(" {} + \
+        | sed -E 's/:\s*function\s+([a-zA-Z0-9_]+).*/:\1/' \
+        | sort -t: -k1,1 -k2,2 -u
+}
+
 fail=0
-# lint-nesting: allow -- each widget, then each signal it must not redefine
-while IFS= read -r file; do
-    for name in "${signals[@]}"; do
-        if grep -qE "^\s*function\s+${name}\s*\(" "$file"; then
-            log_error "$file: defines function ${name}(), which is a signal on BarWidget"
-            log_error "  QML refuses to load the file; handle it as on$(printf '%s' "${name:0:1}" | tr '[:lower:]' '[:upper:]')${name:1} instead"
-            fail=1
-        fi
-    done
-done < <(find shell/widgets -name '*.qml' -type f | sort)
+while IFS=: read -r file name; do
+    log_error "$file: defines function ${name}(), which is a signal on BarWidget"
+    log_error "  QML refuses to load the file; handle it as on${name^} instead"
+    fail=1
+done < <(redefinitions)
 
 [ "$fail" -eq 0 ] || exit 1
 log_step "widget lint clean (${#signals[@]} base signal(s) checked)"

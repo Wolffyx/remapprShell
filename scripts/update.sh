@@ -216,19 +216,29 @@ fi
 shipped_version=$(jq -r '.schemaVersion // 1' "$REPO_ROOT/config/defaults/shell.json" 2>/dev/null || echo 1)
 current_version=$(jq -r '.schemaVersion // 1' "$profile" 2>/dev/null || echo "$shipped_version")
 
+# The first schema version from <from> to <to> that <steps>, one version a
+# line, has no migration for; nothing when every one has.
+first_unmigrated() {   # <from> <to> <steps>
+    local v
+    local -A have=()
+    while IFS= read -r v; do
+        [ -n "$v" ] && have[$v]=1
+    done <<< "$3"
+    for ((v = $1; v <= $2; v++)); do
+        [ -n "${have[$v]:-}" ] || { echo "$v"; return; }
+    done
+}
+
 if [ "$current_version" -lt "$shipped_version" ]; then
     log_step "configuration schema $current_version -> $shipped_version"
     steps=$(config_migration_steps "$REPO_ROOT/shell/domain/config/Migrations.qml")
-    v=$((current_version + 1))
-    while [ "$v" -le "$shipped_version" ]; do
-        if ! grep -qx -- "$v" <<< "$steps"; then
-            log_error "no migration for schema version $v"
-            log_error "the shell would refuse to load this configuration"
-            "$0" --rollback
-            exit 1
-        fi
-        v=$((v + 1))
-    done
+    missing=$(first_unmigrated "$((current_version + 1))" "$shipped_version" "$steps")
+    if [ -n "$missing" ]; then
+        log_error "no migration for schema version $missing"
+        log_error "the shell would refuse to load this configuration"
+        "$0" --rollback
+        exit 1
+    fi
     log_info "migrations present for every step; the shell applies them on next read"
 fi
 

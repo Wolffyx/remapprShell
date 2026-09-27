@@ -120,6 +120,19 @@ install_package() {
     log_info "  gen   $dest"
 }
 
+# One manifest entry put in place, by its kind.
+install_entry() {
+    local kind=$1 src=$2 dest=$3
+    [ "$kind" = symlink ] || [ -e "$REPO_ROOT/$src" ] || die "manifest references missing source: $src"
+    case "$kind" in
+        dir)      install_dir      "$REPO_ROOT/$src" "$dest" ;;
+        template) install_template "$REPO_ROOT/$src" "$dest" ;;
+        package)  install_package  "$REPO_ROOT/$src" "$dest" ;;
+        symlink)  install_symlink  "$src" "$dest" ;;
+        *) die "unknown manifest kind: $kind" ;;
+    esac
+}
+
 log_step "$MODE ($DISPLAY_NAME $VERSION)"
 
 # The generated singleton must exist before shell/ is linked or copied.
@@ -134,15 +147,7 @@ while IFS='|' read -r kind src dest; do
     [ -n "$kind" ] || continue
     case "$MODE" in
         uninstall) remove_dest "$dest" || failed=1 ;;
-        *)
-            [ "$kind" = symlink ] || [ -e "$REPO_ROOT/$src" ] || die "manifest references missing source: $src"
-            case "$kind" in
-                dir)      install_dir      "$REPO_ROOT/$src" "$dest" || failed=1 ;;
-                template) install_template "$REPO_ROOT/$src" "$dest" || failed=1 ;;
-                package)  install_package  "$REPO_ROOT/$src" "$dest" || failed=1 ;;
-                symlink)  install_symlink  "$src" "$dest" || failed=1 ;;
-                *) die "unknown manifest kind: $kind" ;;
-            esac ;;
+        *)         install_entry "$kind" "$src" "$dest" || failed=1 ;;
     esac
 done < <(manifest_entries)
 
@@ -178,18 +183,14 @@ fi
 PATH_CONF="$XDG_CONFIG_HOME/environment.d/60-$SLUG-path.conf"
 if [ "$MODE" = uninstall ]; then
     rm -f "$PATH_CONF"
-else
-    case ":$PATH:" in
-        *":$BIN_DIR:"*) : ;;
-        *)
-            if [ ! -f "$PATH_CONF" ]; then
-                mkdir -p "$(dirname "$PATH_CONF")"
-                printf '# GENERATED FILE -- DO NOT EDIT. Removed by uninstalling %s.\nPATH=%s:${PATH}\n' \
-                    "$DISPLAY_NAME" "$BIN_DIR" > "$PATH_CONF"
-                log_step "$BIN_DIR goes on PATH from the next login ($PATH_CONF)"
-            fi
-            log_info "until then: $BIN_DIR/$ALIAS" ;;
-    esac
+elif [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+    if [ ! -f "$PATH_CONF" ]; then
+        mkdir -p "$(dirname "$PATH_CONF")"
+        printf '# GENERATED FILE -- DO NOT EDIT. Removed by uninstalling %s.\nPATH=%s:${PATH}\n' \
+            "$DISPLAY_NAME" "$BIN_DIR" > "$PATH_CONF"
+        log_step "$BIN_DIR goes on PATH from the next login ($PATH_CONF)"
+    fi
+    log_info "until then: $BIN_DIR/$ALIAS"
 fi
 
 [ "$failed" = 0 ] || die "$MODE completed with errors"

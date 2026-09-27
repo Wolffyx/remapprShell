@@ -11,11 +11,55 @@
 # `colors.css` is safe and `gtk.css` was not.
 GTK_PALETTE_NAMES='window_bg_color|view_bg_color|theme_bg_color|theme_base_color|headerbar_bg_color|card_bg_color|popover_bg_color|sidebar_bg_color|accent_bg_color|dialog_bg_color'
 
+# A scheme KDE cannot resolve to a file. kdeglobals names a scheme by the base
+# name of its .colors file -- BreezeDark, not "Breeze Dark" -- and this project
+# wrote the display name there until 2026-09-16. The colours still reached
+# every application, because they are copied into kdeglobals as well, so the
+# desktop looked nearly right: System Settings said the scheme was not
+# installed and chose the default, and everything that resolves a scheme by
+# name rather than reading the copy stayed on whatever it had.
+#
+# Nearly right is the worst kind of wrong to find by eye, so it is checked.
+doctor_scheme_file() {   # <the scheme kdeglobals names>
+    local scheme=$1 found="" dir want_bg have_bg
+    [ -n "$scheme" ] || return 0
+    for dir in "$COLORS_DIR" "$XDG_DATA_HOME/color-schemes" /usr/share/color-schemes; do
+        [ -f "$dir/$scheme.colors" ] && { found=$dir; break; }
+    done
+    if [ -z "$found" ]; then
+        bad "kdeglobals names a colour scheme no file is called: '$scheme'"
+        fix "KDE identifies a scheme by its file's base name, not the name it shows"
+        fix "applications read the colours copied into kdeglobals and look right;"
+        fix "  anything that resolves the scheme by name falls back to the default"
+        fix "put ours back: $ALIAS theme apply"
+        return 0
+    fi
+    ok "the colour scheme resolves to a file: $found/$scheme.colors"
+
+    # And holds that file's colours, which is a separate write again.
+    #
+    # kdeglobals carries both: the scheme's name under [General], and a
+    # copy of its [Colors:*] groups, which is what every Qt application
+    # reads. Found disagreeing on the morning of 2026-09-23 -- the name
+    # said our light scheme, every group held our dark one, and every
+    # window on the desktop was dark while this section said nothing.
+    want_bg=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
+                  "$found/$scheme.colors" 2>/dev/null | head -1 | tr -d ' ')
+    have_bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '' | tr -d ' ')
+    [ -z "$want_bg" ] || [ "$have_bg" = "$want_bg" ] && return 0
+    bad "kdeglobals names '$scheme' and holds another scheme's colours"
+    fix "the name is a label; the [Colors:*] groups copied beside it are what"
+    fix "  every Qt application draws from -- so the desktop wears the copy"
+    fix "'$scheme' paints windows $want_bg; kdeglobals says $have_bg"
+    fix "put the named scheme's colours back: $ALIAS theme variant auto"
+}
+
 doctor_light_dark() {
-    local variant scheme_now theme_desktop theme_colours auto_lnf found dir want_bg
-    local have_bg lnf_auto lnf_light lnf_dark lnf_now lnf_want want_icons have_icons
+    local variant scheme_now theme_desktop theme_colours theme_gtk auto_lnf
+    local lnf_auto lnf_light lnf_dark lnf_now lnf_want want_icons have_icons
     local gtk_v gtk_css pinned imported f var val flags kd_scheme gtk_pref gtk_theme
-    local named_light named_dark
+    local named_light named_dark line
+    local -A session_env=()
     section "light and dark"
 
     # Who has the last word on the colour scheme. Nothing here is this project's
@@ -27,6 +71,8 @@ doctor_light_dark() {
     scheme_now=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme --default '')
     theme_desktop=$(config_get '.theme.desktop.enabled' true)
     theme_colours=$(config_get '.theme.desktop.colours' true)
+    # Read once: three checks below turn on it.
+    theme_gtk=$(config_get '.theme.desktop.gtk' true)
 
     if [ "$theme_desktop" != "true" ] || [ "$theme_colours" != "true" ]; then
         ok "colour scheme left to you (theme.desktop.colours is off): $scheme_now"
@@ -64,50 +110,9 @@ doctor_light_dark() {
         fix "settle it at login: systemctl --user enable $SLUG-theme.service"
     fi
 
-    # A scheme KDE cannot resolve to a file. kdeglobals names a scheme by the base
-    # name of its .colors file -- BreezeDark, not "Breeze Dark" -- and this project
-    # wrote the display name there until 2026-09-16. The colours still reached
-    # every application, because they are copied into kdeglobals as well, so the
-    # desktop looked nearly right: System Settings said the scheme was not
-    # installed and chose the default, and everything that resolves a scheme by
-    # name rather than reading the copy stayed on whatever it had.
-    #
-    # Nearly right is the worst kind of wrong to find by eye, so it is checked.
-    if [ -n "$scheme_now" ]; then
-        found=""
-        for dir in "$COLORS_DIR" "$XDG_DATA_HOME/color-schemes" /usr/share/color-schemes; do
-            [ -f "$dir/$scheme_now.colors" ] && { found=$dir; break; }
-        done
-        if [ -n "$found" ]; then
-            ok "the colour scheme resolves to a file: $found/$scheme_now.colors"
-
-            # And holds that file's colours, which is a separate write again.
-            #
-            # kdeglobals carries both: the scheme's name under [General], and a
-            # copy of its [Colors:*] groups, which is what every Qt application
-            # reads. Found disagreeing on the morning of 2026-09-23 -- the name
-            # said our light scheme, every group held our dark one, and every
-            # window on the desktop was dark while this section said nothing.
-            want_bg=$(sed -n '/^\[Colors:Window\]/,/^\[/ s/^BackgroundNormal=//p' \
-                          "$found/$scheme_now.colors" 2>/dev/null | head -1 | tr -d ' ')
-            have_bg=$(kreadconfig6 --file kdeglobals --group "Colors:Window" --key BackgroundNormal --default '' | tr -d ' ')
-            if [ -z "$want_bg" ] || [ "$have_bg" = "$want_bg" ]; then
-                :
-            else
-                bad "kdeglobals names '$scheme_now' and holds another scheme's colours"
-                fix "the name is a label; the [Colors:*] groups copied beside it are what"
-                fix "  every Qt application draws from -- so the desktop wears the copy"
-                fix "'$scheme_now' paints windows $want_bg; kdeglobals says $have_bg"
-                fix "put the named scheme's colours back: $ALIAS theme variant auto"
-            fi
-        else
-            bad "kdeglobals names a colour scheme no file is called: '$scheme_now'"
-            fix "KDE identifies a scheme by its file's base name, not the name it shows"
-            fix "applications read the colours copied into kdeglobals and look right;"
-            fix "  anything that resolves the scheme by name falls back to the default"
-            fix "put ours back: $ALIAS theme apply"
-        fi
-    fi
+    # Whether the scheme it names is a file, and its colours the ones in force:
+    # doctor_scheme_file, above.
+    doctor_scheme_file "$scheme_now"
 
     # Who switches light and dark. Plasma's own switch (kdeglobals [KDE]
     # AutomaticLookAndFeel) applies a whole *global theme* at sunset -- and with
@@ -198,7 +203,7 @@ doctor_light_dark() {
     # own dark flag reading `false` -- the application was not in dark mode, it was
     # merely painted that way, which is why nothing that asks about dark mode could
     # see it. Neither file is this project's to write; we write `settings.ini`.
-    if [ "$(config_get '.theme.desktop.gtk' true)" = "true" ]; then
+    if [ "$theme_gtk" = "true" ]; then
         for gtk_v in 3.0 4.0; do
             gtk_css="$XDG_CONFIG_HOME/gtk-$gtk_v/gtk.css"
             [ -f "$gtk_css" ] || continue
@@ -223,7 +228,7 @@ doctor_light_dark() {
     for gtk_v in 3.0 4.0; do
         gtk_css="$XDG_CONFIG_HOME/gtk-$gtk_v/gtk.css"
         [ -f "$gtk_css" ] || continue
-        [ "$(config_get '.theme.desktop.gtk' true)" = "true" ] || continue
+        [ "$theme_gtk" = "true" ] || continue
         while read -r imported; do
             [ -n "$imported" ] || continue
             case $imported in /*) f=$imported ;; *) f="$XDG_CONFIG_HOME/gtk-$gtk_v/$imported" ;; esac
@@ -242,8 +247,14 @@ doctor_light_dark() {
     # These beat every file. `GTK_THEME` in particular is absolute: GTK takes it
     # over the theme name, the preference and the portal, and `GTK_THEME=x:dark`
     # is how a whole session ends up dark with nothing on disk to show for it.
+    #
+    # The environment is asked for once, not once a variable.
+    while IFS= read -r line; do
+        [[ $line == ?*=* ]] || continue
+        session_env[${line%%=*}]=${line#*=}
+    done < <(systemctl --user show-environment 2>/dev/null)
     for var in GTK_THEME QT_STYLE_OVERRIDE; do
-        val=$(systemctl --user show-environment 2>/dev/null | sed -n "s/^$var=//p")
+        val=${session_env[$var]:-}
         [ -n "$val" ] || continue
         bad "$var=$val is set for the whole session"
         fix "it beats every file this project writes, and every mode switch"
@@ -276,7 +287,7 @@ doctor_light_dark() {
     # A GTK theme whose *name* is the dark half of its pair ignores every
     # preference we write and stays dark in each mode. The preference agreeing is
     # not the same as the theme agreeing.
-    if [ "$(config_get '.theme.desktop.gtk' true)" = "true" ] && command -v gsettings >/dev/null 2>&1; then
+    if [ "$theme_gtk" = "true" ] && command -v gsettings >/dev/null 2>&1; then
         gtk_pref=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null | tr -d "'")
         gtk_theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
         named_light=$(config_get '.theme.desktop.gtkThemeLight' "")

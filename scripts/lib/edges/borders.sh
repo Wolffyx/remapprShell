@@ -73,13 +73,17 @@ action_for_store() { printf '%s' "${STORE_ACTION[$1]:-}"; }
 # The edges each effect is bound to, as "i,j" in order -- 9 and junk dropped,
 # nothing at all for no edge -- read from kwinrc once and kept up to date by
 # every write below.
-declare -A EFFECT_EDGES=()
+#
+# The same read brings the corners' own values and the snapping switches into
+# EDGES_RC, by "<group>:<key>" (kwin.sh's kwinrc_read): one awk, where every
+# refresh of the settings page was nineteen kreadconfig6, one a key.
+declare -A EFFECT_EDGES=() EDGES_RC=()
 EFFECT_EDGES_READ=0
 effect_edges_read() {
     local s
+    kwinrc_read EDGES_RC ElectricBorders Windows "${EFFECT_STORES[@]%%:*}"
     for s in "${EFFECT_STORES[@]}"; do
-        EFFECT_EDGES[$s]=$(_edge_list_with \
-            "$(kreadconfig6 --file kwinrc --group "${s%%:*}" --key "${s#*:}" --default 9)")
+        EFFECT_EDGES[$s]=$(_edge_list_with "${EDGES_RC[$s]-9}")
     done
     EFFECT_EDGES_READ=1
 }
@@ -105,13 +109,13 @@ _edge_list_with() {   # <"i,j,..."> [add|remove <index>]
 edge_action() {
     local edge=$1 idx cur store
     idx=$(edge_index "$edge")
-    cur=$(kreadconfig6 --file kwinrc --group ElectricBorders --key "$edge" --default None)
+    [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
+    cur=${EDGES_RC[ElectricBorders:$edge]-None}
     cur=${cur,,}
     if [ -n "$cur" ] && [ "$cur" != none ]; then
         printf '%s' "$cur"
         return
     fi
-    [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
     for store in "${EFFECT_STORES[@]}"; do
         case ",${EFFECT_EDGES[$store]}," in
             *",$idx,"*) action_for_store "$store"; return ;;
@@ -137,7 +141,10 @@ require_triggers_on() {
     return 0
 }
 
-snap_key() { kreadconfig6 --file kwinrc --group Windows --key "$1" --default true; }
+snap_key() {
+    [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
+    printf '%s' "${EDGES_RC[Windows:$1]-true}"
+}
 
 # set_edge <Edge> <action>
 #
@@ -152,10 +159,13 @@ set_edge() {
 
     want=None
     [ "$store" = border ] && want=$action
-    cur=$(kreadconfig6 --file kwinrc --group ElectricBorders --key "$edge" --default None)
-    [ "${cur,,}" = "${want,,}" ] || kconfig_set edges kwinrc ElectricBorders "$edge" "$want"
-
     [ "$EFFECT_EDGES_READ" = 1 ] || effect_edges_read
+    cur=${EDGES_RC[ElectricBorders:$edge]-None}
+    if [ "${cur,,}" != "${want,,}" ]; then
+        kconfig_set edges kwinrc ElectricBorders "$edge" "$want"
+        EDGES_RC[ElectricBorders:$edge]=$want
+    fi
+
     for s in "${EFFECT_STORES[@]}"; do
         old=${EFFECT_EDGES[$s]}
         if [ "$s" = "$store" ]; then

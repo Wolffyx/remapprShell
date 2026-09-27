@@ -61,6 +61,17 @@ def fail(code, message):
     sys.exit(code)
 
 
+def seconds(text):
+    """--timeout's value: a number of seconds, more than none."""
+    try:
+        value = float(text)
+    except ValueError:
+        value = 0
+    if value <= 0:
+        fail(EXIT_USAGE, "--timeout takes a number of seconds")
+    return value
+
+
 def parse(argv):
     """(interactive, timeout, check) from the command line."""
     interactive, timeout, check = False, 60.0, False
@@ -72,12 +83,7 @@ def parse(argv):
         elif arg == "--check":
             check = True
         elif arg == "--timeout" and args:
-            try:
-                timeout = float(args.pop(0))
-            except ValueError:
-                timeout = 0
-            if timeout <= 0:
-                fail(EXIT_USAGE, "--timeout takes a number of seconds")
+            timeout = seconds(args.pop(0))
         else:
             fail(EXIT_USAGE, f"unknown argument: {arg}")
     return interactive, timeout, check

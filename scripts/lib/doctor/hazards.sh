@@ -116,21 +116,26 @@ doctor_hazards() {
     # grabbed, and that is invisible from the file: the record is perfect. It is
     # the one failure this project spent a whole evening finding, so it is checked
     # by name.
+    #
+    # Both forms from one read of the file, the one `shortcuts` makes, where this
+    # was a kreadconfig6 for every action in each -- and a cut beside each of the
+    # second. The first action with a key on record is the one looked at.
+    accel_read_bound
     bound=""
     for k in "${ACCEL_ACTIONS[@]}"; do
-        [ -n "$bound" ] && break
-        bound=$(kreadconfig6 --file kglobalshortcutsrc --group "$SLUG" --key "$k" --default '' 2>/dev/null)
+        bound=${ACCEL_CUR[$k]:-}
+        [ -z "$bound" ] || break
     done
     legacy=""
     for k in "${ACCEL_ACTIONS[@]}"; do
-        v=$(kreadconfig6 --file kglobalshortcutsrc --group services --group "$SLUG-$k.desktop" --key _launch --default '' 2>/dev/null | cut -d, -f1)
+        v=${ACCEL_OLD[$k]:-}
         [ -n "$v" ] && [ "$v" != none ] && legacy="$legacy $k"
     done
     if [ -n "$legacy" ]; then
         warn "shortcuts still bound the old way:$legacy"
         fix "those are never grabbed after login; move them: $ALIAS shortcuts migrate"
     fi
-    if [ -n "$bound" ] && [ "${bound%%,*}" != none ]; then
+    if [ -n "$bound" ] && [ "$bound" != none ]; then
         case "$(accel_component_active "$SLUG")" in
             true)  ok "our global shortcuts have a running owner, so the keys are grabbed" ;;
             false) bad "our global shortcuts are filed but not grabbed: no owner is running"

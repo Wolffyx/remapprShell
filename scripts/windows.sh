@@ -200,10 +200,39 @@ JS
             return 1
         }
 
-        behaviour_read() {
-            local spec=$1
-            IFS='|' read -r _id group key _kind _choices fallback <<< "$spec"
-            kreadconfig6 --file kwinrc --group "$group" --key "$key" --default "$fallback"
+        # Every key's value, from one read of kwinrc where each was a
+        # kreadconfig6 of its own: "<spec>" then "<value>", for each key in
+        # turn, into BEHAVIOUR_VALUES.
+        behaviour_values() {
+            local spec group key fallback
+            local -A rc=()
+            kwinrc_read rc Windows
+            BEHAVIOUR_VALUES=()
+            for spec in "${BEHAVIOUR_KEYS[@]}"; do
+                IFS='|' read -r _ group key _ _ fallback <<< "$spec"
+                BEHAVIOUR_VALUES+=("$spec" "${rc[$group:$key]-$fallback}")
+            done
+        }
+
+        behaviour_status_json() {
+            behaviour_values
+            jq -n --arg scripts "$(kwin_tiling_scripts)" \
+                '{settings: [$ARGS.positional as $a | range(0; $a | length; 2) as $i
+                             | ($a[$i] | split("|")) as [$id, $group, $key, $kind, $choices, $default]
+                             | {id: $id, key: $key, kind: $kind, value: $a[$i + 1], default: $default,
+                                choices: ($choices | split(" ") | map(select(length > 0)))}],
+                  tilingScripts: ($scripts | split("\n") | map(select(length > 0)))}' \
+                --args "${BEHAVIOUR_VALUES[@]}"
+        }
+
+        behaviour_status_text() {
+            local i scripts
+            behaviour_values
+            for (( i = 0; i < ${#BEHAVIOUR_VALUES[@]}; i += 2 )); do
+                printf '%-20s %s\n' "${BEHAVIOUR_VALUES[i]%%|*}" "${BEHAVIOUR_VALUES[i + 1]}"
+            done
+            scripts=$(kwin_tiling_scripts | tr '\n' ' ')
+            [ -z "$scripts" ] || printf '%-20s %s\n' "tiling script" "$scripts"
         }
 
         sub=${1:-status}
@@ -212,25 +241,9 @@ JS
         case "$sub" in
             status)
                 if [ "${1:-}" = "--json" ]; then
-                    entries=""
-                    for spec in "${BEHAVIOUR_KEYS[@]}"; do
-                        IFS='|' read -r id group key kind choices fallback <<< "$spec"
-                        entries+=$(jq -n --arg id "$id" --arg key "$key" --arg kind "$kind" \
-                                         --arg value "$(behaviour_read "$spec")" --arg default "$fallback" \
-                                         --arg choices "$choices" \
-                            '{id: $id, key: $key, kind: $kind, value: $value, default: $default,
-                              choices: ($choices | split(" ") | map(select(length > 0)))}')
-                    done
-                    printf '%s' "$entries" | jq -s --arg scripts "$(kwin_tiling_scripts)" \
-                        '{settings: ., tilingScripts: ($scripts | split("\n") | map(select(length > 0)))}'
+                    behaviour_status_json
                 else
-                    for spec in "${BEHAVIOUR_KEYS[@]}"; do
-                        printf '%-20s %s\n' "${spec%%|*}" "$(behaviour_read "$spec")"
-                    done
-                    scripts=$(kwin_tiling_scripts | tr '\n' ' ')
-                    if [ -n "$scripts" ]; then
-                        printf '%-20s %s\n' "tiling script" "$scripts"
-                    fi
+                    behaviour_status_text
                 fi
                 ;;
 

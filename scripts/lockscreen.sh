@@ -113,24 +113,72 @@ look_spec() {
     return 1
 }
 
-# The stored value, as a person set it: an inverted key (Plasma asks whether
-# to *hide* the clock; this asks whether to show it) is turned back here.
-look_read() {
+# Our own file's [Lock] group, read once into LOOK_OURS by key: `status` asks
+# for every setting each time the settings page opens, and each of ours was a
+# kreadconfig6 of its own.
+#
+# It is one file, not a cascade -- KConfig reads a path it is given whole on
+# its own -- and nothing but look_write writes it, so the awk reads what
+# kwriteconfig6 writes: the last `key=value` under [Lock], trimmed. A value
+# with an escape in it (kwriteconfig6 writes a leading space as `\s`, a
+# backslash as `\\`), or a key with a marker or a language on it, is left to
+# kreadconfig6: KConfig's rules for those have corners not worth copying for
+# the rare value that has one.
+declare -A LOOK_OURS=()
+LOOK_OURS_READ=0
+look_ours_read() {
+    local how key value absent="__rmpr_absent_1f8b__"
+    LOOK_OURS=()
+    LOOK_OURS_READ=1
+    [ -f "$OURS_FILE" ] || return 0
+    while IFS=$'\t' read -r how key value; do
+        [ "$how" = ask ] && value=$(kreadconfig6 --file "$OURS_FILE" --group Lock --key "$key" --default "$absent")
+        [ "$value" = "$absent" ] || LOOK_OURS[$key]=$value
+    done < <(LC_ALL=C awk '
+        { sub(/^[ \t\r\f\v]+/, ""); sub(/[ \t\r\f\v]+$/, "") }
+        /^\[/ { lock = ($0 == "[Lock]"); next }
+        !lock || $0 == "" || /^#/ { next }
+        {
+            eq = index($0, "=")
+            key = eq ? substr($0, 1, eq - 1) : $0
+            value = eq ? substr($0, eq + 1) : ""
+            sub(/[ \t\r\f\v]+$/, "", key)
+            sub(/^[ \t\r\f\v]+/, "", value)
+        }
+        key ~ /\[/ { sub(/\[.*/, "", key); ask[key] = 1; next }
+        key == "" || !eq { next }
+        index(value, "\\") { ask[key] = 1; next }
+        { got[key] = value }
+        END {
+            for (key in ask) print "ask\t" key "\t"
+            for (key in got) if (!(key in ask)) print "val\t" key "\t" got[key]
+        }' "$OURS_FILE")
+}
+
+# The stored value, as a person set it, into LOOK_VALUE: an inverted key
+# (Plasma asks whether to *hide* the clock; this asks whether to show it) is
+# turned back here. Plasma's keys are kreadconfig6's to read, cascade and all.
+look_value() {
     local spec=$1 id key kind choices fallback store invert raw stored
     IFS='|' read -r id key kind choices fallback store invert <<< "$spec"
     raw=$fallback
-    [ "$invert" = invert ] && raw=$([ "$fallback" = true ] && echo false || echo true)
+    if [ "$invert" = invert ]; then
+        raw=true
+        [ "$fallback" = true ] && raw=false
+    fi
     if [ "$store" = plasma ]; then
         stored=$(kreadconfig6 --file kscreenlockerrc "${PLASMA_LOOK_GROUP[@]}" --key "$key" --default "$raw")
     else
-        stored=$(kreadconfig6 --file "$OURS_FILE" --group Lock --key "$key" --default "$raw")
+        [ "$LOOK_OURS_READ" = 1 ] || look_ours_read
+        stored=${LOOK_OURS[$key]-$raw}
     fi
-    if [ "$invert" = invert ]; then
-        [ "$stored" = true ] && printf 'false' || printf 'true'
-    else
-        printf '%s' "$stored"
-    fi
+    LOOK_VALUE=$stored
+    [ "$invert" = invert ] || return 0
+    LOOK_VALUE=true
+    [ "$stored" = true ] && LOOK_VALUE=false
+    return 0
 }
+look_read() { look_value "$1"; printf '%s' "$LOOK_VALUE"; }
 
 look_write() {
     local spec=$1 value=$2 id key kind choices fallback store invert written
@@ -143,33 +191,42 @@ look_write() {
     else
         mkdir -p "$(dirname "$OURS_FILE")"
         kwriteconfig6 --file "$OURS_FILE" --group Lock --key "$key" "$written"
+        LOOK_OURS_READ=0
     fi
 }
 
+# Every setting, from one jq given each spec and its value in turn: it was a
+# jq a setting, and a kreadconfig6 each besides.
 look_json() {
-    local spec id key kind choices fallback store invert out=""
+    local spec
+    local -a pairs=()
     for spec in "${LOOK_KEYS[@]}"; do
-        IFS='|' read -r id key kind choices fallback store invert <<< "$spec"
-        out+=$(jq -n -c --arg id "$id" --arg key "$key" --arg kind "$kind" --arg store "$store" \
-                        --arg value "$(look_read "$spec")" --arg default "$fallback" \
-                        --arg choices "$choices" \
-            '{id: $id, key: $key, kind: $kind, store: $store, value: $value, default: $default,
-              choices: ($choices | split(" ") | map(select(length > 0)))}')
+        look_value "$spec"
+        pairs+=("$spec" "$LOOK_VALUE")
     done
-    printf '%s' "$out" | jq -s -c .
+    jq -n -c '[$ARGS.positional as $a | range(0; $a | length; 2) as $i
+               | ($a[$i] | split("|")) as [$id, $key, $kind, $choices, $default, $store]
+               | {id: $id, key: $key, kind: $kind, store: $store, value: $a[$i + 1], default: $default,
+                  choices: ($choices | split(" ") | map(select(length > 0)))}]' --args "${pairs[@]}"
 }
 
 status_json() {
-    local greeter="" gid="" pkgs="" p dest h live
+    local greeter="" gid="" p dest h present foreign live
+    local -a pkgs=()
     greeter=$(lockscreen_greeter) && gid=$(lockscreen_greeter_id "$greeter")
+    # Four arguments a package for the one jq below, where each package was a
+    # cat and a jq of its own. The marker is read as `$(cat)` read it: all of
+    # it, less the newlines at the end.
     for p in "${LOCKSCREEN_PACKAGES[@]}"; do
         dest=$(lockscreen_installed_dir "$p")
         h=""
-        [ -f "$dest/$LOCKSCREEN_MARKER" ] && h=$(cat "$dest/$LOCKSCREEN_MARKER")
-        pkgs+=$(jq -n -c --arg id "$p" --arg hash "$h" \
-                    --argjson present "$([ -d "$PLASMA_SHELLS_DIR/$p" ] && echo true || echo false)" \
-                    --argjson foreign "$([ -e "$dest" ] && [ ! -f "$dest/$LOCKSCREEN_MARKER" ] && echo true || echo false)" \
-                    '{id: $id, present: $present, installed: ($hash != ""), hash: $hash, foreign: $foreign}')$'\n'
+        [ -f "$dest/$LOCKSCREEN_MARKER" ] && IFS= read -r -d '' h < "$dest/$LOCKSCREEN_MARKER"
+        h=${h%"${h##*[!$'\n']}"}
+        present=false
+        [ -d "$PLASMA_SHELLS_DIR/$p" ] && present=true
+        foreign=false
+        [ -e "$dest" ] && [ ! -f "$dest/$LOCKSCREEN_MARKER" ] && foreign=true
+        pkgs+=("$p" "$h" "$present" "$foreign")
     done
     live=$(live_shell_package)
     jq -n -c \
@@ -177,16 +234,31 @@ status_json() {
         --argjson tried "$( [ -f "$LOCKSCREEN_MARK" ] && jq -c . "$LOCKSCREEN_MARK" 2>/dev/null || echo null)" \
         --arg greeter "$greeter" --arg greeterId "$gid" \
         --argjson enabled "$(lockscreen_enabled && echo true || echo false)" \
-        --argjson packages "$(printf '%s' "$pkgs" | jq -s -c .)" \
         --arg live "$live" \
         --argjson liveIsOurs "$(is_ours "$live" && echo true || echo false)" \
         --argjson look "$(look_json)" \
-        '{source: $source, look: $look, tried: $tried, greeter: $greeter, greeterId: $greeterId, enabled: $enabled,
+        '[$ARGS.positional as $a | range(0; $a | length; 4) as $i
+          | {id: $a[$i], present: ($a[$i + 2] == "true"), installed: ($a[$i + 1] != ""), hash: $a[$i + 1],
+             foreign: ($a[$i + 3] == "true")}] as $packages
+         | {source: $source, look: $look, tried: $tried, greeter: $greeter, greeterId: $greeterId, enabled: $enabled,
           packages: $packages, live: $live, liveIsOurs: $liveIsOurs,
           triedIsSource: ($tried != null and $tried.hash == $source),
           triedWithThisGreeter: ($tried != null and $tried.greeter == $greeterId),
           drawn: (if ($liveIsOurs and ([$packages[] | select(.id == $live and .installed)] | length > 0))
-                  then "ours" else "plasma" end)}'
+                  then "ours" else "plasma" end)}' --args "${pkgs[@]}"
+}
+
+# One style loaded in Plasma's greeter for `check --all`, and what became of
+# it said either way.
+check_style() {   # <lockscreen dir> <style>
+    local out
+    if out=$(lockscreen_check "$1" 15 "$2"); then
+        log_step "$2: loads"
+        return 0
+    fi
+    log_warn "$2: does not load cleanly"
+    printf '%s\n' "$out" | sed 's/^/    /' >&2
+    return 1
 }
 
 cmd=${1:-status}
@@ -228,13 +300,7 @@ case "$cmd" in
             IFS='|' read -r _ _ _ styles _ <<< "$spec"
             failed=0
             for st in $styles; do
-                if out=$(lockscreen_check "$src" 15 "$st"); then
-                    log_step "$st: loads"
-                else
-                    log_warn "$st: does not load cleanly"
-                    printf '%s\n' "$out" | sed 's/^/    /' >&2
-                    failed=1
-                fi
+                check_style "$src" "$st" || failed=1
             done
             [ "$failed" = 0 ] || die "not every style loads cleanly"
             exit 0

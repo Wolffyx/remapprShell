@@ -6,15 +6,20 @@
 # section. Requires brand.sh and kconfig.sh.
 
 doctor_kde_changes() {
-    local led drift scope file group key had value gargs live
+    local led drift scope file group key had value live
     section "KDE configuration we have changed"
 
     led=$(kconfig_ledger)
     if [ -s "$led" ] && [ "$(jq '.entries | length' "$led")" -gt 0 ]; then
         drift=0
+        # One kreadconfig6 a key, and it stays: the value KDE reads is the
+        # file's cascaded through XDG_CONFIG_DIRS -- kdedefaults/ among them
+        # in a Plasma session -- with its escapes, [$i] and [$e] applied, and
+        # a second reading of the files here would only be right until it met
+        # one of those.
         while IFS=$'\t' read -r scope file group key had value; do
-            mapfile -t gargs < <(_kconfig_group_args "$group")
-            live=$(kreadconfig6 --file "$file" "${gargs[@]}" --key "$key" --default '<unset>' 2>/dev/null)
+            _kconfig_gargs "$group"
+            live=$(kreadconfig6 --file "$file" "${KCONFIG_GARGS[@]}" --key "$key" --default '<unset>' 2>/dev/null)
             printf '  %-9s %s [%s] %s = %s\n' "[$scope]" "$file" "$group" "$key" "$live"
             [ "$live" = "<unset>" ] && drift=$((drift + 1))
         done < <(jq -r '.entries[] | [(.scope // "-"), .file, .group, .key, (.had|tostring), .value] | @tsv' "$led")

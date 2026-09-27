@@ -19,24 +19,22 @@ cd "$REPO_ROOT/shell"
 declare -A rank=( [core]=0 [platform]=1 [domain]=2 [ui]=3 [features]=4 [widgets]=4 )
 fail=0
 
-# lint-nesting: allow -- each file, then each import in it
-while IFS= read -r file; do
+# Every import of every file, as "<file>:<layer it imports>", by one grep over
+# them all -- it was a grep, a sed and a tr a file, some nine hundred processes
+# a run. Matches both `import qs.domain.config` and `import "../domain/config"`.
+while IFS=: read -r file dep; do
     layer=${file%%/*}
     [ -n "${rank[$layer]:-}" ] || continue
-
-    # Matches both `import qs.domain.config` and `import "../domain/config"`.
-    while IFS= read -r dep; do
-        [ -n "${rank[$dep]:-}" ] || continue
-        if [ "${rank[$dep]}" -gt "${rank[$layer]}" ]; then
-            log_error "$file: '$layer' (rank ${rank[$layer]}) imports '$dep' (rank ${rank[$dep]})"
-            fail=1
-        elif [ "${rank[$dep]}" -eq "${rank[$layer]}" ] && [ "$dep" != "$layer" ]; then
-            log_error "$file: sideways import '$layer' -> '$dep'"
-            fail=1
-        fi
-    done < <(grep -oE '^\s*import\s+(qs\.[a-z]+|"[./]*[a-z]+)' "$file" 2>/dev/null \
-             | sed -E 's/.*(qs\.|")([.\/]*)//' | tr -d '"')
-done < <(find . -name '*.qml' -type f | sed 's|^\./||')
+    [ -n "${rank[$dep]:-}" ] || continue
+    if [ "${rank[$dep]}" -gt "${rank[$layer]}" ]; then
+        log_error "$file: '$layer' (rank ${rank[$layer]}) imports '$dep' (rank ${rank[$dep]})"
+        fail=1
+    elif [ "${rank[$dep]}" -eq "${rank[$layer]}" ] && [ "$dep" != "$layer" ]; then
+        log_error "$file: sideways import '$layer' -> '$dep'"
+        fail=1
+    fi
+done < <(find . -name '*.qml' -type f -exec grep -HoE '^\s*import\s+(qs\.[a-z]+|"[./]*[a-z]+)' {} + 2>/dev/null \
+         | sed -E 's|^\./||; s/^([^:]*):.*(qs\.|")[.\/]*/\1:/')
 
 [ "$fail" -eq 0 ] || exit 1
 log_step "layer lint clean"

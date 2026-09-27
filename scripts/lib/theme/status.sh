@@ -6,7 +6,7 @@
 # and the other files beside this one.
 
 theme_status() {   # --json in $WITH_JSON
-    local styles part
+    local styles part wanted how
     if [ "$WITH_JSON" = 1 ]; then
         styles=$(for s in "${STYLES[@]}"; do
                      IFS='|' read -r id key glob pkg label <<< "$s"
@@ -25,11 +25,8 @@ theme_status() {   # --json in $WITH_JSON
             --argjson splash "$(has "$LNF_DEST/contents/splash/Splash.qml")" \
             --arg style "$(style_active_id)" \
             --argjson styles "$styles" \
-            --argjson desktop "$(for part in $(desktop_parts); do
-                                    printf '%s\t%s\n' "$part" "$(desktop_part_wanted "$part" && echo true || echo false)"
-                                done | jq -R -s -c 'split("\n")[] | select(length > 0) | split("\t")
-                                                    | {(.[0]): (.[1] == "true")}' | jq -s -c 'add
-                                                    + {enabled: '"$(config_get '.theme.desktop.enabled' true)"'}')" \
+            --arg wanted "$(desktop_parts_wanted)" \
+            --argjson enabled "$(config_get '.theme.desktop.enabled' true)" \
             --argjson styleCustomised "$(jq -e '[.entries[] | select(.scope == "style")] | length > 0' "$(kconfig_ledger)" >/dev/null 2>&1 && echo true || echo false)" \
             --arg variant "$(resolve_variant)" \
             --argjson followMode "$(config_get '.theme.desktop.followMode' false)" \
@@ -37,7 +34,8 @@ theme_status() {   # --json in $WITH_JSON
             --argjson materialYou "$([ -f "$XDG_CONFIG_HOME/$MATERIAL_YOU_CONF" ] && echo true || echo false)" \
             '{package: $package, active: ($active == $lnf),
               parts: {schemes: $schemes, switcher: $switcher, desktoptheme: $desktoptheme, splash: $splash},
-              desktop: $desktop,
+              desktop: (($wanted | split("\n") | map(select(length > 0) | split("\t") | {(.[0]): (.[1] == "true")})
+                        | add) + {enabled: $enabled}),
               variant: {resolved: $variant, follows: $followMode},
               style: $style, styles: $styles, styleCustomised: $styleCustomised,
               gtkThemes: $gtkThemes, materialYouInstalled: $materialYou}'
@@ -66,10 +64,11 @@ theme_status() {   # --json in $WITH_JSON
     else
         echo 'themes the desktop: no (theme.desktop.enabled is off); an apply would write none of:'
     fi
-    for part in $(desktop_parts); do
-        printf '  %-12s %s\n' "$part" \
-            "$(desktop_part_wanted "$part" && echo "applied" || echo "left as System Settings has it")"
-    done
+    while IFS=$'\t' read -r part wanted; do
+        how="left as System Settings has it"
+        [ "$wanted" = true ] && how="applied"
+        printf '  %-12s %s\n' "$part" "$how"
+    done < <(desktop_parts_wanted)
     printf 'light or dark: %s (theme.mode: %s)%s\n' \
         "$(resolve_variant)" "$(config_get '.theme.mode' 'auto')" \
         "$([ "$(config_get '.theme.desktop.followMode' false)" = "true" ] && printf ', and the desktop follows it' || printf '; the desktop follows it only when theme.desktop.followMode is on')"

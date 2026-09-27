@@ -62,33 +62,38 @@ shell_remove() {
     log_step "removed $EDGES_SCRIPT_DEST"
 }
 
+# What `edges shell` says with nothing named: what this shell has bound to
+# an edge, and whether the script that follows them is running.
+edges_shell_list() {
+    local raw
+    raw=$(shell_bindings_raw)
+    if [ -z "$raw" ]; then
+        echo "nothing bound to an edge by this shell"
+    else
+        printf '%s\n' "$raw" | tr ',' '\n' | while IFS=: read -r e a; do
+            [ -n "$e" ] || continue
+            printf '  %-12s %s\n' "$e" "$a"
+        done
+    fi
+    echo
+    if ! kwin_plugin_enabled "$KWIN_EDGES_SCRIPT_ID"; then
+        echo "the edge script is not enabled"
+    elif kwin_script_loaded "$KWIN_EDGES_SCRIPT_ID"; then
+        echo "the edge script is enabled and loaded"
+    else
+        echo "the edge script is enabled but KWin has not loaded it"
+    fi
+    echo
+    echo "actions: $(shell_actions | tr '\n' ' ')"
+}
+
 edges_shell() {   # [<edge> <action|none>]
-    local edge action raw kept local_ifs pair
+    local edge action kept local_ifs pair
     edge=${1:-}
     action=${2:-}
 
     if [ -z "$edge" ]; then
-        raw=$(shell_bindings_raw)
-        if [ -z "$raw" ]; then
-            echo "nothing bound to an edge by this shell"
-        else
-            printf '%s\n' "$raw" | tr ',' '\n' | while IFS=: read -r e a; do
-                [ -n "$e" ] || continue
-                printf '  %-12s %s\n' "$e" "$a"
-            done
-        fi
-        echo
-        if kwin_plugin_enabled "$KWIN_EDGES_SCRIPT_ID"; then
-            if kwin_script_loaded "$KWIN_EDGES_SCRIPT_ID"; then
-                echo "the edge script is enabled and loaded"
-            else
-                echo "the edge script is enabled but KWin has not loaded it"
-            fi
-        else
-            echo "the edge script is not enabled"
-        fi
-        echo
-        echo "actions: $(shell_actions | tr '\n' ' ')"
+        edges_shell_list
         exit 0
     fi
 

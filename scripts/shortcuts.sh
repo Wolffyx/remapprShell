@@ -52,57 +52,9 @@ action_label() { printf '%s' "${ACCEL_ACTION_LABEL[$1]:-}"; }
 
 valid_action() { [ -n "$1" ] && [ -n "${ACCEL_ACTION_LABEL[$1]+x}" ]; }
 
-# Every action's key now, and what the old form still holds for it, from one
-# read of the file: into CUR and OLD, by action, as the first field of the
-# value with a tab between two keys made a space -- "" when there is none.
-#
-# One awk rather than kreadconfig6 twice an action, piped through three more
-# processes each time: `sync` runs at every login, and that was ninety
-# processes before the first key was compared. Read again after every write,
-# so what is compared is always what is in the file. KConfig's escapes are
-# undone as kreadconfig6 undoes them, the ones a key can hold.
-declare -A CUR=() OLD=()
-read_bound() {
-    local kind action value
-    CUR=(); OLD=()
-    while IFS=$'\t' read -r kind action value; do
-        case "$kind" in
-            cur) CUR[$action]=$value ;;
-            old) OLD[$action]=$value ;;
-        esac
-    done < <(awk -v ours="[$COMPONENT]" -v legacy="[services][$SLUG-" '
-        function unescape(s,    out, i, c) {
-            out = ""
-            for (i = 1; i <= length(s); i++) {
-                c = substr(s, i, 1)
-                if (c != "\\" || i == length(s)) { out = out c; continue }
-                c = substr(s, ++i, 1)
-                if (c == "s") out = out " "
-                else if (c == "t" || c == "n" || c == "r") out = out " "
-                else if (c == "\\") out = out "\\"
-                else out = out "\\" c
-            }
-            return out
-        }
-        /^[ \t]*\[/ { group = $0; gsub(/^[ \t]+|[ \t]+$/, "", group); next }
-        /^[ \t]*#/ || index($0, "=") == 0 { next }
-        {
-            i = index($0, "=")
-            key = substr($0, 1, i - 1); gsub(/^[ \t]+|[ \t]+$/, "", key)
-            value = substr($0, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", value)
-            if (group == ours) { kind = "cur"; action = key }
-            else if (key == "_launch" && index(group, legacy) == 1 && group ~ /\.desktop\]$/) {
-                kind = "old"
-                action = substr(group, length(legacy) + 1)
-                sub(/\.desktop\]$/, "", action)
-            } else next
-            value = unescape(value)
-            sub(/,.*/, "", value)
-            gsub(/\t/, " ", value)
-            gsub(/^ +| +$/, "", value)
-            print kind "\t" action "\t" value
-        }' "$XDG_CONFIG_HOME/$ACCEL_FILE" 2>/dev/null)
-}
+# What is bound now -- every action's key, and what the old desktop-file form
+# still holds for it -- is read by accel_read_bound in lib/accel.sh, into
+# ACCEL_CUR and ACCEL_OLD: doctor asks the same question of the same file.
 
 # What the shell's configuration wants for every action, into WANT: a key,
 # "none", or "" when it leaves the action to whatever KDE has. One jq over the
@@ -144,12 +96,12 @@ case "$cmd" in
         # one answer to "what is bound", so the window and the terminal cannot
         # disagree about it.
         if [ "${1:-}" = "--json" ]; then
-            read_bound
+            accel_read_bound
             read_configured "$(config_merged)"
             fields=()
             for a in "${ACTIONS[@]}"; do
-                cur=${CUR[$a]:-}; [ "$cur" = none ] && cur=""
-                old=${OLD[$a]:-}; [ "$old" = none ] && old=""
+                cur=${ACCEL_CUR[$a]:-}; [ "$cur" = none ] && cur=""
+                old=${ACCEL_OLD[$a]:-}; [ "$old" = none ] && old=""
                 fields+=("$a" "$(action_label "$a")" "$cur" "$old" "${WANT[$a]:-}")
             done
             # Five fields an action, handed over as arguments so that nothing
@@ -175,12 +127,12 @@ case "$cmd" in
         printf 'component %s: %s\n\n' "$COMPONENT" "$state"
 
         printf '%-12s %-28s %s\n' ACTION SHORTCUT 'OLD ENTRY'
-        read_bound
+        accel_read_bound
         for a in "${ACTIONS[@]}"; do
-            cur=${CUR[$a]:-}
+            cur=${ACCEL_CUR[$a]:-}
             [ "$cur" = none ] && cur=""
             [ -n "$cur" ] || cur='<unbound>'
-            old=${OLD[$a]:-}
+            old=${ACCEL_OLD[$a]:-}
             [ "$old" = none ] && old=""
             printf '%-12s %-28s %s\n' "$a" "$cur" "${old:+$old -- run '$ALIAS shortcuts migrate'}"
         done
@@ -240,17 +192,17 @@ case "$cmd" in
     sync)
         quiet=0; [ "${1:-}" = "--quiet" ] && quiet=1
         read_configured "$(config_merged)"
-        read_bound
+        accel_read_bound
         changed=0
         for a in "${ACTIONS[@]}"; do
             want=${WANT[$a]:-}
             [ -n "$want" ] || continue
-            cur=${CUR[$a]:-}
+            cur=${ACCEL_CUR[$a]:-}
             ACCEL_FRIENDLY_HINT=$(action_label "$a")
             if [ "$want" = none ]; then
                 [ -z "$cur" ] || [ "$cur" = none ] && continue
                 accel_clear shortcuts "$COMPONENT" "$a"
-                read_bound
+                accel_read_bound
                 [ "$quiet" = 1 ] || log_step "$a unbound, as configured"
                 changed=$((changed + 1))
                 continue
@@ -264,7 +216,7 @@ case "$cmd" in
             accel_take shortcuts "$want" "$COMPONENT" "$a" replace
             # Taking a key takes it from whoever held it -- another of ours
             # included -- so what the rest are compared against is read again.
-            read_bound
+            accel_read_bound
             [ "$quiet" = 1 ] || log_step "$a -> $want, as configured"
             changed=$((changed + 1))
         done
@@ -285,11 +237,11 @@ case "$cmd" in
         # for it: kglobalaccel refuses a key it already has recorded against a
         # live component, and rewriting the file underneath it changes nothing.
         declare -A want=()
-        read_bound
+        accel_read_bound
         for a in "${ACTIONS[@]}"; do
-            old=${OLD[$a]:-}
+            old=${ACCEL_OLD[$a]:-}
             [ -n "$old" ] && [ "$old" != none ] || continue
-            cur=${CUR[$a]:-}
+            cur=${ACCEL_CUR[$a]:-}
             if [ -n "$cur" ] && [ "$cur" != none ]; then
                 log_info "$a is already bound to $cur; dropping the old $old"
             else
@@ -324,19 +276,19 @@ case "$cmd" in
         }
 
         write_wanted
-        read_bound
+        accel_read_bound
         lost=""
         for a in "${!want[@]}"; do
-            [ "${CUR[$a]:-}" = "${want[$a]}" ] || lost="$lost $a"
+            [ "${ACCEL_CUR[$a]:-}" = "${want[$a]}" ] || lost="$lost $a"
         done
         if [ -n "$lost" ]; then
             log_warn "kglobalaccel wrote over:$lost -- trying once more"
             write_wanted
-            read_bound
+            accel_read_bound
         fi
 
         for a in "${!want[@]}"; do
-            cur=${CUR[$a]:-}
+            cur=${ACCEL_CUR[$a]:-}
             if [ "$cur" = "${want[$a]}" ]; then
                 log_step "$a -> $cur (was a desktop-file entry)"
                 moved=$((moved + 1))

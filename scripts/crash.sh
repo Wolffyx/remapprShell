@@ -72,7 +72,10 @@ case "$cmd" in
     # Prints "<epoch> <id>" for a crash to report, and nothing otherwise.
     check)
         seen_file="$STATE_DIR/last-crash"
-        newest=$(crash_newest_epoch)
+        # Listed once, for both answers below: the newest line has the time
+        # and the id. It was listed twice, and a listing reads every dump.
+        newest=$(crash_list | tail -1)
+        when=${newest##*$'\t'}
 
         if [ ! -f "$seen_file" ]; then
             # Never run here before, so every dump already present predates
@@ -82,14 +85,14 @@ case "$cmd" in
             # away as history instead of reported.
             mkdir -p "$STATE_DIR"
             printf '%s %s
-' "${newest:-0}" "$(crash_newest)" > "$seen_file"
+' "${when:-0}" "${newest%%$'\t'*}" > "$seen_file"
             exit 0
         fi
 
         seen=$(cut -d' ' -f1 "$seen_file" 2>/dev/null)
         case "$seen" in ''|*[!0-9]*) seen=0 ;; esac
 
-        line=$(crash_since "$seen")
+        line=$(crash_since "$seen" "$newest")
         [ -n "$line" ] || exit 0
 
         printf '%s

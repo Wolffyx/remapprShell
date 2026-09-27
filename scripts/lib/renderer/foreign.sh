@@ -29,7 +29,7 @@ start_foreign() {
 # Every one of them but `keep`: whatever our template runs, and any instance of
 # the configuration being left that something else started.
 stop_foreign() {
-    local keep=${1:-} leaving=${2:-} unit inst
+    local keep=${1:-} leaving=${2:-} unit inst entry
     session_available || return 0
     while read -r unit; do
         [ -n "$unit" ] || continue
@@ -43,8 +43,9 @@ stop_foreign() {
              } | awk '$1 !~ /@\.service$/ {print $1}' | sort -u)
     if [ -n "$leaving" ] && [ "$leaving" != "$keep" ]; then
         quickshell kill -c "$leaving" >/dev/null 2>&1 && log_step "stopped the running $leaving instance"
-        if renderer_autostart_entry "$leaving" >/dev/null; then
-            log_warn "$(renderer_autostart_entry "$leaving") will start $leaving again at the next login"
+        # Asked once and kept: it reads every autostart entry there is.
+        if entry=$(renderer_autostart_entry "$leaving"); then
+            log_warn "$entry will start $leaving again at the next login"
         fi
     fi
     return 0

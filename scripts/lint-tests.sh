@@ -28,38 +28,52 @@ cd "$REPO_ROOT"
 
 fail=0
 checked=0
+declare -A offenders=()   # module -> its singletons that import Quickshell
+
+# quickshell_singletons <dir>: the singletons of the module in <dir> that import
+# Quickshell, one to a line. The qmldir names the singletons: "singleton <Type>
+# <version> <file>".
+quickshell_singletons() {
+    local dir=$1
+    local -a singletons
+    [ -f "$dir/qmldir" ] || return 0
+    mapfile -t singletons < <(awk '$1 == "singleton" { print "'"$dir"'/" $NF }' "$dir/qmldir" | sort)
+    [ "${#singletons[@]}" -gt 0 ] || return 0
+    # -s: a singleton the qmldir names but that is not there is not this lint's
+    # to report.
+    grep -lsE '^\s*import\s+Quickshell' "${singletons[@]}" || true
+}
 
 # check_module <test> <module>: 1 when a singleton of the module imports
 # Quickshell, and so keeps the whole module from loading under qmltestrunner.
+# Each module is read once, however many tests import it -- most import the
+# same few, and it was read again for every one.
 check_module() {
-    local test=$1 module=$2 dir qml bad=0
+    local test=$1 module=$2 dir qml
     # qs.domain.osd.events -> shell/domain/osd/events
     dir="shell/${module#qs.}"
     dir=${dir//./\/}
     [ -d "$dir" ] || return 0
     checked=$((checked + 1))
 
-    # The qmldir names the singletons: "singleton <Type> <version> <file>".
-    [ -f "$dir/qmldir" ] || return 0
-
+    [ -n "${offenders[$module]+set}" ] || offenders[$module]=$(quickshell_singletons "$dir")
+    [ -n "${offenders[$module]}" ] || return 0
     while IFS= read -r qml; do
-        [ -f "$qml" ] || continue
-        grep -qE '^\s*import\s+Quickshell' "$qml" || continue
         log_error "$test imports $module, which cannot load outside a running shell"
         log_error "  $qml is a singleton of that module and imports Quickshell,"
         log_error "  so qmltestrunner instantiates it and the whole module fails"
         log_error "  move the pure code into a leaf module of its own, as qs.domain.osd.events is"
-        bad=1
-    done < <(awk '$1 == "singleton" { print "'"$dir"'/" $NF }' "$dir/qmldir" | sort)
-    return "$bad"
+    done <<< "${offenders[$module]}"
+    return 1
 }
 
-for test in tests/tst_*.qml; do
-    [ -f "$test" ] || continue
-    while IFS= read -r module; do
-        check_module "$test" "$module" || fail=1
-    done < <(grep -oE '^\s*import\s+qs\.[a-zA-Z0-9_.]+' "$test" | awk '{print $2}')
-done
+# Every test's qs imports, as "<test>:<import line>", by one grep over them all
+# rather than a grep and an awk a test.
+shopt -s nullglob
+tests=(tests/tst_*.qml)
+while IFS=: read -r test line; do
+    check_module "$test" "${line##*[[:space:]]}" || fail=1
+done < <(grep -HoE '^\s*import\s+qs\.[a-zA-Z0-9_.]+' "${tests[@]}" < /dev/null)
 
 [ "$fail" -eq 0 ] || exit 1
 log_step "test import lint clean ($checked module(s) checked)"

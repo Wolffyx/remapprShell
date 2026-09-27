@@ -71,6 +71,61 @@ accel_holders() {
         }' "$file"
 }
 
+# This project's own actions' keys now, and what the old form still holds for
+# them, from one read of the file: into ACCEL_CUR -- [<slug>] <action> -- and
+# ACCEL_OLD -- [services][<slug>-<action>.desktop] _launch -- by action, as the
+# first field of the value with a tab between two keys made a space, "" when
+# there is none.
+#
+# One awk rather than kreadconfig6 twice an action, piped through three more
+# processes each time: `shortcuts sync` runs at every login, and that was
+# ninety processes before the first key was compared, and doctor asked the
+# same of every action again. shortcuts.sh reads it again after every write,
+# so what is compared is always what is in the file. KConfig's escapes are
+# undone as kreadconfig6 undoes them, the ones a key can hold.
+declare -gA ACCEL_CUR=() ACCEL_OLD=()
+accel_read_bound() {
+    local kind action value
+    ACCEL_CUR=(); ACCEL_OLD=()
+    while IFS=$'\t' read -r kind action value; do
+        case "$kind" in
+            cur) ACCEL_CUR[$action]=$value ;;
+            old) ACCEL_OLD[$action]=$value ;;
+        esac
+    done < <(awk -v ours="[$SLUG]" -v legacy="[services][$SLUG-" '
+        function unescape(s,    out, i, c) {
+            out = ""
+            for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (c != "\\" || i == length(s)) { out = out c; continue }
+                c = substr(s, ++i, 1)
+                if (c == "s") out = out " "
+                else if (c == "t" || c == "n" || c == "r") out = out " "
+                else if (c == "\\") out = out "\\"
+                else out = out "\\" c
+            }
+            return out
+        }
+        /^[ \t]*\[/ { group = $0; gsub(/^[ \t]+|[ \t]+$/, "", group); next }
+        /^[ \t]*#/ || index($0, "=") == 0 { next }
+        {
+            i = index($0, "=")
+            key = substr($0, 1, i - 1); gsub(/^[ \t]+|[ \t]+$/, "", key)
+            value = substr($0, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", value)
+            if (group == ours) { kind = "cur"; action = key }
+            else if (key == "_launch" && index(group, legacy) == 1 && group ~ /\.desktop\]$/) {
+                kind = "old"
+                action = substr(group, length(legacy) + 1)
+                sub(/\.desktop\]$/, "", action)
+            } else next
+            value = unescape(value)
+            sub(/,.*/, "", value)
+            gsub(/\t/, " ", value)
+            gsub(/^ +| +$/, "", value)
+            print kind "\t" action "\t" value
+        }' "$XDG_CONFIG_HOME/$ACCEL_FILE" 2>/dev/null)
+}
+
 accel_value() {   # <group> <action>
     local -a gargs=()
     mapfile -t gargs < <(_kconfig_group_args "$1")

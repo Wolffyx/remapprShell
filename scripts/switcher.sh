@@ -57,21 +57,44 @@ DEFAULT_LAYOUT=thumbnail_grid
 # Every installed window-switcher package, "<id>\t<name>". KWin 6 looks under
 # both kwin/ and kwin-wayland/ in each data directory; the user's own come
 # first, so theirs wins a duplicate id.
+#
+# One jq reads every metadata.json, where it was two a file. Each goes in whole
+# and is parsed on its own inside, so one that does not parse -- or that jq
+# cannot open, and so is never handed over -- is only that package falling
+# back to its directory's name, as it did when each had a jq to itself. What
+# comes back is what `jq -r` into a variable made of it: a NUL dropped, and the
+# newlines at the end.
 switcher_layouts() {
-    local d m id name dirs
+    local d m i id name dirs
+    local -a files=() args=() found=()
     local -A seen=()
     IFS=: read -r -a dirs <<< "$XDG_DATA_HOME:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
     for d in "${dirs[@]}"; do
         [ -n "$d" ] || continue
         for m in "$d"/kwin/tabbox/*/metadata.json "$d"/kwin-wayland/tabbox/*/metadata.json; do
             [ -f "$m" ] || continue
-            id=$(jq -r '.KPlugin.Id // empty' "$m" 2>/dev/null)
-            [ -n "$id" ] || id=$(basename "$(dirname "$m")")
-            [ -n "${seen[$id]:-}" ] && continue
-            seen[$id]=1
-            name=$(jq -r '.KPlugin.Name // empty' "$m" 2>/dev/null)
-            printf '%s\t%s\n' "$id" "${name:-$id}"
+            [ -r "$m" ] && args+=(--rawfile "m${#files[@]}" "$m")
+            files+=("$m")
         done
+    done
+    [ "${#files[@]}" -gt 0 ] || return 0
+
+    # Two fields a file, its id and its name, "" for either it does not have.
+    mapfile -d '' -t found < <(jq -n --raw-output0 --argjson n "${#files[@]}" "${args[@]}" '
+        def raw: if type == "string" then . else tojson end | gsub("\u0000"; "") | sub("\n+\\z"; "");
+        def field(f): [try (f // empty | raw) catch ""] | .[0] // "";
+        range($n) as $i
+        | ($ARGS.named["m\($i)"] | try fromjson catch null)
+        | field(.KPlugin.Id), field(.KPlugin.Name)' 2>/dev/null)
+
+    for i in "${!files[@]}"; do
+        m=${files[$i]}
+        id=${found[2 * i]:-}
+        [ -n "$id" ] || { id=${m%/*}; id=${id##*/}; }
+        [ -n "${seen[$id]:-}" ] && continue
+        seen[$id]=1
+        name=${found[2 * i + 1]:-}
+        printf '%s\t%s\n' "$id" "${name:-$id}"
     done
 }
 

@@ -80,6 +80,28 @@ answer() {   # <key> <value> <allowed...>
     die "--$key: '$value' is not one of: $*"
 }
 
+# `--<question> <value>`: the answer to that question, given in advance.
+answer_option() {   # <option> <value>
+    case "$1" in
+        --mode)        answer mode "$2" copy link ;;
+        --renderer)    answer renderer "$2" quickshell plasma none ;;
+        --keys)        ANSWER[keys]=$2 ;;
+        --alttab)      answer alttab "$2" plasma shell none ;;
+        --window-list) answer window-list "$2" yes no ;;
+        --previews)    answer previews "$2" yes no ;;
+        --theme)       answer theme "$2" yes no ;;
+        --autostart)   answer autostart "$2" yes no ;;
+    esac
+}
+
+# `--ui <front end>`: "gui" is the installer window, anything else one of
+# dialog.sh's front ends in place of it.
+choose_ui() {   # <front end>
+    GUI=no
+    [ "$1" = gui ] && { GUI=yes; return; }
+    export "${ENV_PREFIX}_UI=$1"
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --unattended)  export "${ENV_PREFIX}_UI=none"; GUI=no ;;
@@ -89,20 +111,11 @@ while [ $# -gt 0 ]; do
         --progress)    PROGRESS=1 ;;
         --describe)    DESCRIBE=1; GUI=no ;;
         --ui)          [ $# -ge 2 ] || die "--ui needs a front end"
-                       if [ "$2" = gui ]; then GUI=yes; else export "${ENV_PREFIX}_UI=$2"; GUI=no; fi
+                       choose_ui "$2"
                        shift ;;
         --mode|--renderer|--keys|--alttab|--window-list|--previews|--theme|--autostart)
                        [ $# -ge 2 ] || die "$1 needs a value"
-                       case "$1" in
-                           --mode)        answer mode "$2" copy link ;;
-                           --renderer)    answer renderer "$2" quickshell plasma none ;;
-                           --keys)        ANSWER[keys]=$2 ;;
-                           --alttab)      answer alttab "$2" plasma shell none ;;
-                           --window-list) answer window-list "$2" yes no ;;
-                           --previews)    answer previews "$2" yes no ;;
-                           --theme)       answer theme "$2" yes no ;;
-                           --autostart)   answer autostart "$2" yes no ;;
-                       esac
+                       answer_option "$1" "$2"
                        shift ;;
         -h|--help)     sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
         *)             die "unknown argument: $1" ;;
@@ -117,24 +130,26 @@ done
 # window is Quickshell's, which deps.sh has just made sure of, run from this
 # tree: the shell is not installed yet. It runs this script again with the
 # answers, so what is applied is exactly what the terminal would apply.
-if [ "$GUI" != no ] && [ ${#ANSWER[@]} -eq 0 ] && [ "$DRY" = 0 ]; then
-    if [ "$GUI" = yes ] || { [ -n "${WAYLAND_DISPLAY:-}" ] && [ -z "${!_ui_var:-}" ]; }; then
-        if command -v quickshell >/dev/null 2>&1 && [ -f "$REPO_ROOT/shell/installer.qml" ]; then
-            "$REPO_ROOT/scripts/gen-branding.sh" >/dev/null && "$REPO_ROOT/scripts/gen-qmldir.sh" >/dev/null \
-                || die "could not prepare the installer window"
-            # What the window passes back to this script: the switches that
-            # are not questions.
-            extra=()
-            [ $SNAPSHOT = 0 ] && extra+=(--no-snapshot)
-            export "${ENV_PREFIX}_SETUP_EXTRA=${extra[*]}"
-            export "${ENV_PREFIX}_INSTALLER_SOURCE=$REPO_ROOT"
-            export QML2_IMPORT_PATH="$REPO_ROOT/shell${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
-            export QS_NO_RELOAD_POPUP=1
-            exec quickshell -p "$REPO_ROOT/shell/installer.qml"
-        fi
+open_installer_window() {
+    [ "$GUI" != no ] && [ ${#ANSWER[@]} -eq 0 ] && [ "$DRY" = 0 ] || return 0
+    [ "$GUI" = yes ] || { [ -n "${WAYLAND_DISPLAY:-}" ] && [ -z "${!_ui_var:-}" ]; } || return 0
+    if ! command -v quickshell >/dev/null 2>&1 || [ ! -f "$REPO_ROOT/shell/installer.qml" ]; then
         [ "$GUI" = yes ] && die "the installer window needs Quickshell and a graphical session"
+        return 0
     fi
-fi
+    "$REPO_ROOT/scripts/gen-branding.sh" >/dev/null && "$REPO_ROOT/scripts/gen-qmldir.sh" >/dev/null \
+        || die "could not prepare the installer window"
+    # What the window passes back to this script: the switches that are not
+    # questions.
+    local extra=()
+    [ $SNAPSHOT = 0 ] && extra+=(--no-snapshot)
+    export "${ENV_PREFIX}_SETUP_EXTRA=${extra[*]}"
+    export "${ENV_PREFIX}_INSTALLER_SOURCE=$REPO_ROOT"
+    export QML2_IMPORT_PATH="$REPO_ROOT/shell${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+    export QS_NO_RELOAD_POPUP=1
+    exec quickshell -p "$REPO_ROOT/shell/installer.qml"
+}
+open_installer_window
 
 # The front end, decided once here, now that --ui and --unattended have had
 # their say. Every question below asks inside `$(...)`, where it could not be
@@ -229,16 +244,14 @@ ui_info "$DISPLAY_NAME $VERSION" \
 Every question is asked first. Nothing is written until you confirm the
 summary at the end, and a restore point is taken before the first change."
 
+# A machine that failed the check can still be set up -- a missing optional
+# tool is a warning, not a wall -- but the default is no, and a front end with
+# nobody behind it takes the default.
 if [ "$PREFLIGHT" = 1 ]; then
     ui_note "checking this machine"
-    if ! "$REPO_ROOT/scripts/preflight.sh"; then
-        # A machine that failed the check can still be set up -- a missing
-        # optional tool is a warning, not a wall -- but the default is no, and
-        # a front end with nobody behind it takes the default.
-        if ! ui_yesno "Preflight found problems (see the terminal). Set up anyway?" no; then
-            cancelled
-        fi
-    fi
+    "$REPO_ROOT/scripts/preflight.sh" \
+        || ui_yesno "Preflight found problems (see the terminal). Set up anyway?" no \
+        || cancelled
 fi
 
 given() { [ -n "${ANSWER[$1]+x}" ]; }
