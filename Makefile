@@ -73,7 +73,7 @@ lint-tests: ## Fail if a QML test imports a module needing a running shell
 lint-launch: ## Fail if the shell starts an application anywhere but through Launch
 	@scripts/lint-launch.sh
 
-lint-nesting: ## Warn about a loop nested in a loop with a condition among them
+lint-nesting: ## Warn about statements nested three deep, and ladders of tests on one thing
 	@scripts/lint-nesting.sh
 
 lint-qml: brand ## Run qmllint over the shell

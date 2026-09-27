@@ -1,7 +1,10 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-09-27**: nested loops flattened and a lint for them
+sessions, and added to since -- most recently on the evening of **2026-09-27**: every N+1 in the
+tree -- a process a loop item, a write a loop item, a ladder of tests, a nest
+three deep -- and the shell taken down for twelve minutes by one of the fixes
+("The evening of 2026-09-27: N+1"). That morning, nested loops flattened and a lint for them
 ("2026-09-27: loops in loops"). Before that, **2026-09-25**: in the evening a first-run wizard that
 draws each answer as it is given ("The evening of 2026-09-25"); in the
 afternoon a one-line installer ("The afternoon of 2026-09-25"); in the morning, two things
@@ -304,6 +307,120 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The evening of 2026-09-27: N+1
+
+The user asked for the rest of the N+1 shapes after the loops in loops: "for's,
+if's and so on". Four were looked for, and each is fixed across the tree.
+
+**First, the outage.** At 20:04 the shell died and did not come back: systemd
+restarted it six times in three seconds and stopped (`start-limit-hit`). The
+cause was a fix -- `take[kind]?.(value)` in `PlasmaServices._decide`. **Qt
+6.11's QML compiler segfaults on an optional call** (`QV4::Compiler::Codegen`,
+in a CallExpression inside a for-of), and qmllint 6.11.2 does too, with rc 139
+and no output. The live checkout hot-reloaded it, and every restart compiled
+it again. Written as `const said = take[kind]; if (said) said(value);` it is
+fine; `systemctl --user reset-failed` and `start` brought the shell back at
+20:17. **Never write `?.(` in QML here.** The same probe found that this Qt's
+JavaScript has no `Array.prototype.flatMap` and no `findLastIndex` -- probe
+with qmltestrunner offscreen (see the memory note), never in the live shell.
+Seven diagnostic reports (`diagnostics/20260927-2004*`) and one quickshell
+dump are that crash; no widget was quarantined. Separately: a `git stash` in
+the live checkout, to lint the old tree, put the old files in front of the
+running shell until the pop. Lint an old tree in a worktree instead.
+
+**A process a loop item** -- the shell's own N+1 query. Everything the
+settings pages and the shell's start ask the CLI was measured with strace:
+
+| what | before | after |
+|---|---|---|
+| `crash list` / `crash check`, every shell start | ~6 a dump, twice | 3 / 5 |
+| `theme status --json` (AppearancePage) | ~36 | 2 |
+| `lockscreen status` (LockPage) | 30 | 4 |
+| `windows` status (WindowsPage) | 17 | 3 |
+| `edges status` (EdgesPage) | 19 kreadconfig6 | 2 awk |
+| `snapshot list --json`, 13 snapshots | 75 | 3 |
+| `profile list`, 12 profiles | 48 | 1 |
+| `renderer list`, six foreign configs | 260 | 74 |
+| doctor's shortcut hazards | 29 | 1 |
+| a revert, 20 keys | 122 | 22 (20 are kwriteconfig6) |
+| `gen-qmldir.sh`, every `make test` | 859 | 4 |
+| `lint-qml.sh`, the tree | 54 s | 16 s |
+
+and `gen-docs` 216 -> 18, `gen-widget-index` 124 -> 2, `lint-layers` 511 ->
+5, `lint-launch` 300 -> 3, `lint-widgets` 132 -> 6, `lint-tests` 361 -> 79.
+Every output was diffed byte for byte against the old script, on fixtures
+with the awkward cases as well as on this machine, read-only. How:
+
+- **kwinrc is read once**, by `kwinrc_read <array> <group>...` in
+  `lib/kwin.sh`: one awk over the same cascade kreadconfig6 reads (absolute
+  `XDG_CONFIG_DIRS`, lowest first, then the user's file), honouring `[$i]` and
+  `[$d]`. An escaped value, `[$e]` or a language-tagged key is still asked of
+  kreadconfig6, one key, so nothing is imitated wrongly. It matched
+  kreadconfig6 on 24 cascade fixtures and on all 39 keys of the real kwinrc.
+  The lock screen reads its own `[Lock]` the same way. **Not done**: the
+  doctor's `kde-changes` still asks kreadconfig6 a key, because it reads
+  arbitrary files where the cascade, kdedefaults and escapes all matter.
+- **The ledger streams NUL-ended fields** (`jq --raw-output0`) in place of
+  base64, ten processes a key to decode. **jq 1.7 or later is now needed**;
+  Arch has 1.8, and every distribution with Plasma 6 has 1.7. `kconfig_set`
+  asks and appends in one jq, and a jq that fails no longer truncates the
+  ledger. Found on the way: an entry with an empty group reverted with its
+  fields shifted, because `read` with a tab IFS collapses empty fields.
+- **qmllint runs once** over every file (`--json -`), and only a file it had
+  something to say about is linted again alone, for its own words. A module
+  import that warns is reported for the first importer only, so every file
+  importing one is linted alone too; a batch that crashes or drops a file
+  marks nothing quiet, and every file is linted alone as before.
+- The triage behind this was wrong twice, and the fixes did not follow it:
+  plasmawindowed's tray items are on unique bus names here, not
+  `org.kde.StatusNotifierItem-<pid>-*` (so `renderer/services.sh` maps names
+  to pids with one `busctl list`), and `jq -R` with `input_filename` runs a
+  file without a final newline into the next (so `profile list` uses
+  `--rawfile`).
+
+**A write a loop item** -- one property change, and everything bound to it
+worked out again, per item. The wizard's Finish set about twenty values one at
+a time, and each `ConfigStore.set` replaced `profileData` and so re-merged the
+whole configuration: `ConfigStore.setMany(values)` does it once, and
+`setManyForScreen` for one output (TaskbarDisplaysCard's "use shared").
+`PlasmaServices` marks its started applets and closed windows in one write
+each. **And one bug**: `Quarantine` quarantining several widgets after a boot
+death wrote a report each through one `CtlRun`, whose second run stops the
+first -- only the last report was ever written. One report names them all now.
+
+**A ladder** -- three or more tests of one thing in a row. Now a table from
+each value to what it does: the launcher's result kinds (`_activators`) and
+its four sources (`_sources`, one `_matching` loop for all), `CtlRun._log`,
+SystemStats' hwmon lines, PlasmaServices' state lines, QuickSettings' pages,
+the Sidebar's cards, Hint's tones, StartMenu's sizes and WindowEvents' edge
+strips. A `switch` is left as it is: it already is the table, written down.
+
+**Three deep** -- about thirty nests, flattened by leaving early or naming the
+inner block: `AppMatch._byCommandLine` (the four command lines it tries are a
+list now), `Rank._weakest`, `InstallerEvents._lastRunning`, `DbusWatch._nameLine`,
+`Overview.jumpToDesk`, SettingGroups' word splitter, `BusLine._byteArrayEnd`;
+`setup.sh`'s `open_installer_window`, `answer_option` and `choose_ui`;
+`install.sh`'s `install_entry`; `update.sh`'s `first_unmigrated` (which was
+also a grep a schema version); the doctor's `doctor_tray_service`;
+`edges_shell_list`; and the rest in the scripts named above.
+
+**The lint** grew to match. `scripts/lib/nesting.py` now reports **any three
+control statements nested** (a script's top-level `case` on its command is not
+a level: its arms are the commands) and **a ladder**: three or more `==`/`!=`
+tests of one subject in a row -- `if`/`else if`, `elif`, or `?:` whose
+otherwise is the next `?:`. Properties side by side that each ask one thing
+are not a ladder, and nor are two tests and an else. `lint-nesting: allow` on
+any statement of a finding, or the line above, still quiets it; the scanner
+passes its own rules. A case pattern's `)` now counts as a command position,
+so `x) if ...` on one line is seen.
+
+**Left, for another day**: `desktop_part_wanted` is still a jq a marker in
+`apply_defaults` and `install.sh` (6, was 12); `lint-qml.sh`'s
+`render_templates` counts a failure in a process substitution, so a template
+with unresolved placeholders logs an error and does not fail the lint (fixing
+it would make `update.sh` roll back on it -- decide first); the doctor's
+"grabbed" check reads only the first action with a key on record.
 
 ### 2026-09-27: loops in loops, flattened, and a lint for them
 

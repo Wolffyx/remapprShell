@@ -74,7 +74,7 @@ jobs:
       - name: Docs lint
         run: ./scripts/lint-docs.sh
 
-      # Warns about a loop nested in a loop with a condition among them.
+      # Warns about statements nested three deep, and ladders of tests.
       - name: Nesting lint
         run: ./scripts/lint-nesting.sh
 
