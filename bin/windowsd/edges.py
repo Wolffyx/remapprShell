@@ -3,18 +3,25 @@
 import sys
 
 from . import brand
-from .gio import Gio
+from .gio import Gio, GLib
 from .shortcuts import SHORTCUT_ACTIONS
 
 # Triggered: what the screen-edge KWin script calls when the pointer reaches an
 # edge it claimed. A KWin script can call DBus and never be called, so the edge
-# arrives here and is run here.
+# arrives here and is run here. Reached: an edge whose action is not a command
+# but something the shell does to a surface it already has up -- lighting the
+# sidebar's grab strip -- announced for the shell to hear, with no process in
+# between.
+EDGE_INTERFACE = brand.DBUS_NAME + ".Edges"
 EDGE_INTROSPECTION = f"""
 <node>
-  <interface name="{brand.DBUS_NAME}.Edges">
+  <interface name="{EDGE_INTERFACE}">
     <method name="Triggered">
       <arg type="s" name="action" direction="in"/>
     </method>
+    <signal name="Reached">
+      <arg type="s" name="action"/>
+    </signal>
   </interface>
 </node>
 """
@@ -39,7 +46,7 @@ class ScreenEdges:
     def __init__(self, shortcuts):
         self._shortcuts = shortcuts
 
-    def handle_call(self, _connection, _sender, _path, _interface, method, params, invocation):
+    def handle_call(self, connection, _sender, _path, _interface, method, params, invocation):
         if method != "Triggered":
             invocation.return_error_literal(
                 Gio.dbus_error_quark(), Gio.DBusError.UNKNOWN_METHOD, method
@@ -48,12 +55,18 @@ class ScreenEdges:
 
         action = params[0] if params else ""
         entry = SHORTCUT_ACTIONS.get(action)
-        if entry is None:
+        if entry is not None:
+            self._shortcuts._run(action, entry[1])
+        elif action:
+            # Not a command: the shell's own (sidebar-reveal, in
+            # shell/domain/sidebar/SidebarReveal.qml), announced rather than
+            # run. An action the shell does not know is logged there.
+            connection.emit_signal(
+                None, EDGE_OBJECT_PATH, EDGE_INTERFACE, "Reached", GLib.Variant("(s)", (action,))
+            )
+        else:
             # Answered rather than raised: the caller is a KWin script, and an
             # error raised into the compositor's script engine is a warning
-            # nobody reads. The name is printed here instead, where the
-            # journal has it.
-            print(f"unknown edge action: {action!r}", file=sys.stderr)
-        else:
-            self._shortcuts._run(action, entry[1])
+            # nobody reads. Printed here instead, where the journal has it.
+            print("an edge with no action", file=sys.stderr)
         invocation.return_value(None)

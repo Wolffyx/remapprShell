@@ -362,6 +362,22 @@ edge again, full height, deaf over full screen, ordinary cursor -- and
 reserving is the opt-in. What that leaves is Wayland's own limit: a press
 on the strip cannot be passed on to the window under it, so either the
 edge is given up or the strip takes the last pixels of a scrollbar.
+**Then push, then pull** (the user's choice, after the limit was put to them;
+"still takes half of the chrome scrollbar" with the strip at 6 px). The strip
+takes nothing until the pointer is pushed into the edge, then lights down the
+whole edge for two seconds -- longer while hovered or held -- to be pressed
+and pulled. The push is KWin's: `edges follow` binds the sidebar's edge to
+`sidebar-reveal`, a shell-only edge action (`SHELL_EDGE_ACTIONS` in
+lib/edges/script.sh); the daemon runs every action a key can have and
+*announces* any other as `Edges.Reached`, and `SidebarReveal` hears it. The
+shell now runs `edges follow` at start too, since the default needs an edge
+bound. It takes one pixel column (`sidebar.handleWidth` default 1) and draws
+four. **A shared edge cannot be pushed into** -- KWin puts screen edges only on
+the outside of the layout, and DP-2's right edge is DP-3's left -- so only a
+screen whose sidebar side is outer gets a strip (`Cards.edgeIsOuter`, tested
+on this layout); on DP-2 it is Meta+S, by the user's choice. Seen: the edge
+bound (`Right:sidebar-reveal`), the script loaded, a probe through
+`Triggered` logged by the shell. **Not yet pushed and pulled by hand.**
 **Not yet pulled by hand.**
 Not built: pushing the open sidebar back to the edge to close it, which
 caelestia does -- a drag on the card would have to share with the weather

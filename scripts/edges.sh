@@ -13,9 +13,10 @@
 #                          the same as `set <edge> <name>`; with `none`, take
 #                          that effect off every edge
 #   follow                 make KWin's edges agree with the sidebar's own
-#                          settings: an edge on the side it opens from when
-#                          sidebar.trigger is "hover", and no edge at all when
-#                          it is anything else
+#                          settings: on the side it opens from, an edge that
+#                          opens it ("hover"), or lights its grab strip
+#                          ("drag", unless the strip reserves its space), or
+#                          none at all
 #   snap on|off            Aero-Snap style edge tiling and maximise
 #   disable-all            the master switch: every mouse trigger off
 #   enable-all             ...and back on, exactly as they were

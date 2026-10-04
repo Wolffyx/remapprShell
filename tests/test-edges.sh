@@ -152,14 +152,37 @@ env -u "$NO_SESSION_VAR" "$REPO_ROOT/scripts/edges.sh" revert >/dev/null 2>&1
 check "with one, KWin is asked to reload" "$(grep -c reconfigure "$CALLS")" "1"
 
 # An edge runs the same actions a key does, and says so from the same list the
-# daemon that runs them is rendered from. It used to pick them out of the
-# daemon's source with sed.
-echo "== an edge offers every shortcut action =="
+# daemon that runs them is rendered from -- then the shell's own, which no key
+# can have. It used to pick them out of the daemon's source with sed.
+echo "== an edge offers every shortcut action, and the shell's own =="
 listed=$("$REPO_ROOT/scripts/edges.sh" shell 2>/dev/null | sed -n 's/^actions: //p' | tr ' ' '\n' | grep . | paste -sd' ')
-check "the shortcut list, in order" "$listed" \
-      "$(grep -v '^#' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv" | cut -f1 | paste -sd' ')"
+check "the shortcut list, in order, then the shell's" "$listed" \
+      "$(grep -v '^#' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv" | cut -f1 | paste -sd' ') sidebar-reveal"
 edges shell Top screenshot-window
 check "and takes one of them"       "$(key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings)" "Top:screenshot-window"
+edges revert
+
+# The edge on the sidebar's side follows its settings. "drag" -- the default --
+# is a grab strip lit by pushing into that edge, so the edge is bound to light
+# it; a strip that reserves its space is always there and needs no edge.
+echo "== the sidebar's edge follows its settings =="
+profile="$CONFIG_DIR/profiles/default/shell.json"
+mkdir -p "$(dirname "$profile")"
+sidebar() { printf '{ "sidebar": %s }\n' "$1" > "$profile"; edges follow; }
+binding() { key "Script-$KWIN_EDGES_SCRIPT_ID" Bindings; }
+sidebar '{}'
+check "by default the strip is lit from the right"   "$(binding)" "Right:sidebar-reveal"
+sidebar '{ "position": "left" }'
+check "and moves with the sidebar"                   "$(binding)" "Left:sidebar-reveal"
+sidebar '{ "position": "left", "trigger": "hover" }'
+check "hover opens it from the edge instead"         "$(binding)" "Left:sidebar"
+sidebar '{ "handleReserves": true }'
+check "a reserved strip needs no edge"               "$(binding)" ""
+sidebar '{ "trigger": "none" }'
+check "and neither does no trigger"                  "$(binding)" ""
+edges shell Top screenshot-window
+sidebar '{}'
+check "another edge of ours is left alone"           "$(binding)" "Top:screenshot-window,Right:sidebar-reveal"
 edges revert
 
 harness_done

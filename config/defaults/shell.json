@@ -200,7 +200,7 @@
     "sidebar": {
         "position": "right",
         "trigger": "drag",
-        "handleWidth": 6,
+        "handleWidth": 1,
         "handleReserves": false,
         "width": 396,
         "margin": 16,

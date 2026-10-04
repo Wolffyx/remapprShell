@@ -22,8 +22,13 @@ EDGES_GROUP="Script-$KWIN_EDGES_SCRIPT_ID"
 
 # The actions an edge can run: the shortcut actions, which is the same list a
 # key can be bound to -- lib/accel.sh's, from the file the daemon that runs
-# them is rendered from, so the two can never disagree about what exists.
-shell_actions() { printf '%s\n' "${ACCEL_ACTIONS[@]}"; }
+# them is rendered from, so the two can never disagree about what exists --
+# and the shell's own. Those are not commands but something the shell does to
+# a surface it already has up, so the daemon announces them rather than runs
+# them (bin/windowsd/edges.py, "Reached"): sidebar-reveal lights the sidebar's
+# grab strip, to be pulled. No key can be bound to one.
+SHELL_EDGE_ACTIONS=(sidebar-reveal)
+shell_actions() { printf '%s\n' "${ACCEL_ACTIONS[@]}" "${SHELL_EDGE_ACTIONS[@]}"; }
 
 shell_bindings_raw() {
     kreadconfig6 --file kwinrc --group "$EDGES_GROUP" --key Bindings --default ''
@@ -133,49 +138,55 @@ edges_shell() {   # [<edge> <action|none>]
         && log_step "$edge -> $action"
 }
 
-# The sidebar draws down one side (sidebar.position) and is opened by an
-# edge. Pushing the pointer into the right-hand edge and having a panel
-# appear on the left is nobody's idea of following, so this moves the edge
-# to the side the panel is on -- and does nothing at all when no edge is
-# bound to the sidebar, because binding one is the user's decision, not
-# a side effect of choosing a side.
+# The sidebar draws down one side (sidebar.position), and the edge on that
+# side does what sidebar.trigger says:
 #
-# Called by hand, and by the shell itself when the setting changes.
+#   hover  opens the sidebar on a pointer that merely reaches the edge
+#   drag   lights the grab strip when the pointer is pushed into the edge, to
+#          be pressed and pulled -- nothing at all at the edge until then, so
+#          a scrollbar there keeps every pixel. Unless the strip reserves its
+#          own space (sidebar.handleReserves): then it is always there, nothing
+#          is under it, and the edge has nothing to do.
+#   none   nothing
+#
+# So the edge moves with the side, and its action with the trigger; anything
+# else bound to the sidebar is let go. Called by hand, and by the shell itself
+# when it starts and when either setting changes.
 edges_follow() {
-    local want trigger raw have local_ifs pair
+    local want side trigger reserves action raw have bound local_ifs pair
+    IFS=$'\t' read -r side trigger reserves < <(config_merged | jq -r \
+        '[.sidebar.position // "right", .sidebar.trigger // "drag", (.sidebar.handleReserves // false | tostring)] | @tsv')
     want=Right
-    [ "$(config_get '.sidebar.position' right)" = left ] && want=Left
-    trigger=$(config_get '.sidebar.trigger' drag)
+    [ "$side" = left ] && want=Left
+
+    action=""
+    case "$trigger" in
+        hover) action=sidebar ;;
+        drag)  [ "$reserves" = true ] || action=sidebar-reveal ;;
+    esac
 
     raw=$(shell_bindings_raw)
-    have=""
+    have="" bound=""
     local_ifs=$IFS; IFS=','
     for pair in $raw; do
-        [ "${pair#*:}" = sidebar ] && have=${pair%%:*}
+        case "${pair#*:}" in
+            sidebar|sidebar-reveal) have=${pair%%:*}; bound=${pair#*:} ;;
+        esac
     done
     IFS=$local_ifs
 
-    # The sidebar is pulled out by its own strip now (sidebar.trigger
-    # "drag"), so KWin's edge would open it a second way -- on a pointer
-    # that merely reaches the edge, which is the thing the strip exists to
-    # stop. Choosing anything but "hover" gives the edge back.
-    if [ "$trigger" != hover ]; then
-        if [ -n "$have" ]; then
-            exec "$0" shell "$have" none
-        fi
-        log_info "sidebar.trigger is '$trigger'; no screen edge opens the sidebar"
+    if [ -z "$action" ]; then
+        [ -n "$have" ] && exec "$0" shell "$have" none
+        log_info "sidebar.trigger is '$trigger'; no screen edge is the sidebar's"
         exit 0
     fi
-
-    if [ -z "$have" ]; then
-        log_info "sidebar.trigger is 'hover'; binding the $want edge"
-        exec "$0" shell "$want" sidebar
-    fi
-    if [ "$have" = "$want" ]; then
-        log_info "the sidebar's edge is already $want"
+    if [ "$have" = "$want" ] && [ "$bound" = "$action" ]; then
+        log_info "the sidebar's edge is already $want ($action)"
         exit 0
     fi
-
-    "$0" shell "$have" none >/dev/null || die "could not free the $have edge"
-    exec "$0" shell "$want" sidebar
+    if [ -n "$have" ] && [ "$have" != "$want" ]; then
+        "$0" shell "$have" none >/dev/null || die "could not free the $have edge"
+    fi
+    log_info "the $want edge: $action"
+    exec "$0" shell "$want" "$action"
 }

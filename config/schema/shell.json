@@ -292,7 +292,7 @@
                     ],
                     "default": "drag",
                     "label": "Opened by",
-                    "description": "'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in.",
+                    "description": "'drag': push the pointer into the sidebar's edge and a strip there lights up for a moment -- press it and pull inwards. Until it is pushed it takes nothing, so a scrollbar at that edge keeps every pixel, and a pointer resting there opens nothing. Only on a screen whose edge on that side is not shared with another screen; a shared edge cannot be pushed into. 'hover' opens the sidebar on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in.",
                     "labels": [
                         "Pulled from its strip",
                         "Pointer at the edge",
@@ -301,18 +301,18 @@
                 },
                 "sidebar.handleWidth": {
                     "type": "int",
-                    "min": 2,
+                    "min": 1,
                     "max": 24,
                     "step": 1,
-                    "default": 6,
+                    "default": 1,
                     "label": "Grab strip",
-                    "description": "How wide the strip you pull is, in pixels -- pressed anywhere down the edge and pulled inwards. While it keeps windows off it, this is also how much of that edge they give up."
+                    "description": "How many pixels at the very edge the lit strip takes, in pixels. One is the column the pointer stops in when it is pushed into the edge. While the strip keeps windows off it, this is also how much of that edge they give up."
                 },
                 "sidebar.handleReserves": {
                     "type": "bool",
                     "default": false,
                     "label": "Keep windows off the strip",
-                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it and nothing under it -- a scrollbar at the edge -- loses a click to it, at the cost of a gap that wide down that edge. Off: no gap, and the strip lies over the edge of whatever window is there and takes a press on it."
+                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it. Nothing is ever under it then, so it is simply always there, on every screen, with no push needed -- at the cost of a gap that wide down that edge. Off: no gap, and the strip takes nothing until it is pushed into."
                 },
                 "sidebar.width": {
                     "type": "int",

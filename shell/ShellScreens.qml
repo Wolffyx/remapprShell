@@ -24,6 +24,7 @@ import qs.domain.notifications
 import qs.features.launcher
 import qs.features.desktop
 import qs.features.overlays
+import qs.domain.sidebar.cards
 import qs.domain.surfaces
 import qs.domain.surfaces.place
 
@@ -56,11 +57,17 @@ Scope {
         SearchOverlay {}
     }
 
-    // The strip the sidebar is pulled out by, on every screen -- so it comes
+    // The strip the sidebar is pulled out by, on each screen -- so it comes
     // out of the monitor it was dragged on. `sidebar.trigger` chooses between
-    // this, KWin's screen edge, and neither.
+    // this, KWin's screen edge, and neither. Only where that side is the
+    // outside of the layout, since the strip is lit by pushing into the edge
+    // and a shared edge cannot be pushed into -- unless it reserves its space
+    // and is always there.
     Variants {
-        model: ConfigStore.value("sidebar.trigger", "drag") === "drag" ? Quickshell.screens : []
+        model: ConfigStore.value("sidebar.trigger", "drag") !== "drag" ? []
+            : ConfigStore.value("sidebar.handleReserves", false) === true ? Quickshell.screens
+            : Quickshell.screens.filter(s => Cards.edgeIsOuter(s, Quickshell.screens,
+                                                               Cards.onLeft(ConfigStore.value("sidebar.position", "right"))))
         SidebarHandle {}
     }
 

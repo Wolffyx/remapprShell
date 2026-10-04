@@ -5,28 +5,35 @@ pragma ComponentBehavior: Bound
 // KWin's screen edges answer a pointer that merely *reaches* the edge, which
 // is how the sidebar was opened before -- and a panel that appears because the
 // pointer went to the scrollbar is a panel that opens all day by accident.
-// This is the other thing every shell with a sidebar does: a few pixels at the
-// very edge that has to be pressed and pulled inwards.
+// This is the other thing every shell with a sidebar does: the very edge of
+// the screen, pressed and pulled inwards.
 //
 // One per screen, so the sidebar comes out of *this* monitor rather than the
-// first one. That is the whole reason it exists on every screen rather than
-// being a single surface: a layer surface belongs to one output, and the
-// output it belongs to is the answer to "which screen did you drag on".
+// first one: a layer surface belongs to one output, and the output it belongs
+// to is the answer to "which screen did you drag on".
 //
-// It lies over the edge of whatever window is there and reserves nothing:
-// the screen is the windows', and a gap down one side of it only for this was
-// dead space (2026-10-04). The cost is the one every drag handle on Wayland
-// pays -- a press on the strip is the strip's, never passed on to the window
-// under it. `sidebar.handleReserves` reserves the strip's width instead, the
-// way a shell with a frame round the screen gets its handle for nothing; off
-// by default.
+// Push, then pull. The strip lies over the edge of whatever window is there,
+// and a press on it is the strip's -- Wayland does not hand it on to the
+// window under it, so a strip that was always there took the last pixels of
+// every scrollbar against that edge. So it takes nothing at all until the
+// pointer is pushed into the edge (SidebarReveal, off KWin's own screen
+// edge), then lights up down the whole edge for a moment to be pressed and
+// pulled, and goes back to nothing. Only a screen whose edge on that side is
+// the outside of the layout has one: a shared edge cannot be pushed into, the
+// pointer goes on to the next screen (ShellScreens).
 //
-// Down the whole height of the edge: pressed anywhere and pulled inwards. `sidebar.handleWidth` is how wide.
+// What it takes is the last `sidebar.handleWidth` pixels -- one by default,
+// the column the pointer stops in when it is pushed. What it draws is a little
+// wider, to be seen.
 //
-// It goes deaf -- draws nothing, takes nothing -- while the sidebar is out and
-// over a full-screen window, without unmapping: the reserved space goes with
-// the surface, and every maximised window on the screen would be resized away
-// and back each time. The panel steps aside the same way, for the same reason.
+// `sidebar.handleReserves` is the other answer: the strip reserves its own
+// width, as a panel does, so nothing is ever under it and it can simply always
+// be there -- at the cost of a gap that wide down that edge, which is why it
+// is off.
+//
+// Over a full-screen window on its monitor, and while the sidebar is out, it
+// takes and draws nothing -- without unmapping, so a reserved strip keeps its
+// space and maximised windows are not resized away and back.
 
 import QtQuick
 import Quickshell
@@ -34,6 +41,7 @@ import Quickshell.Wayland
 import qs.core
 import qs.domain.config
 import qs.domain.desktops
+import qs.domain.sidebar
 import qs.domain.sidebar.cards
 import qs.domain.surfaces
 import qs.domain.theme
@@ -47,7 +55,7 @@ PanelWindow {
     screen: handle.modelData
 
     readonly property bool leftEdge: Cards.onLeft(ConfigStore.value("sidebar.position", "right"))
-    readonly property int strip: Math.max(2, Number(ConfigStore.value("sidebar.handleWidth", 6)))
+    readonly property int strip: Math.max(1, Number(ConfigStore.value("sidebar.handleWidth", 1)))
     readonly property bool reserves: ConfigStore.value("sidebar.handleReserves", false) === true
 
     // How far it has to be pulled before the sidebar comes out. Far enough
@@ -61,7 +69,18 @@ PanelWindow {
                                                                     handle.modelData?.name ?? "",
                                                                     Desktops.currentId)
     readonly property bool deaf: Surfaces.sidebar || handle.fullScreenHere
+
+    // Pushed into, and not yet let go. A reserved strip is always lit.
+    property bool pushed: false
+    readonly property bool lit: !handle.deaf && (handle.reserves || handle.pushed)
+
     readonly property Region _deaf: Region {}
+    readonly property Region _edge: Region {
+        x: handle.leftEdge ? 0 : handle.width - handle.strip
+        y: 0
+        width: handle.strip
+        height: handle.height
+    }
 
     anchors {
         top: true
@@ -78,28 +97,59 @@ PanelWindow {
     WlrLayershell.namespace: `${Branding.slug}-sidebar-handle`
     color: "transparent"
 
-    implicitWidth: handle.strip
+    // Wider than what it takes, so the light can be seen; reserved, no wider
+    // than the space it keeps.
+    implicitWidth: handle.reserves ? handle.strip : Math.max(handle.strip, 4)
 
-    mask: handle.deaf ? handle._deaf : null
+    mask: handle.lit ? handle._edge : handle._deaf
 
-    // A hairline that says there is something here, brighter while the
-    // pointer is anywhere on the strip. Ten per cent of an accent is not
-    // decoration -- an invisible grab strip is one nobody finds.
+    Connections {
+        target: SidebarReveal
+
+        function onRevealed() {
+            if (handle.deaf || handle.reserves)
+                return;
+            handle.pushed = true;
+            dim.interval = 2000;
+            dim.restart();
+        }
+    }
+
+    // Goes out a moment after the pointer leaves it, or two seconds after the
+    // push if it never arrives. Never while it is held.
+    Timer {
+        id: dim
+        onTriggered: {
+            if (!hover.hovered && !pull.active)
+                handle.pushed = false;
+        }
+    }
+
+    // The light: down the whole edge, at the very edge.
     Rectangle {
-        anchors.centerIn: parent
-        width: parent.width
-        height: Math.min(180, parent.height * 0.22)
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        x: handle.leftEdge ? 0 : parent.width - width
+        width: Math.min(parent.width, 3)
         radius: width / 2
         color: Theme.acc
-        visible: !handle.deaf
-        opacity: pull.active ? 0.85 : hover.hovered ? 0.55 : 0.18
+        opacity: !handle.lit ? 0 : pull.active ? 0.85 : hover.hovered ? 0.6 : handle.reserves ? 0.18 : 0.45
         Behavior on opacity { NumberAnimation { duration: 120 } }
     }
 
-    // The ordinary pointer: no resize arrows, which said a window border was
-    // there, and nothing to learn -- the hairline brightening says the rest.
     HoverHandler {
         id: hover
+
+        onHoveredChanged: {
+            if (hover.hovered || handle.reserves) {
+                dim.stop();
+                return;
+            }
+            dim.interval = 700;
+            dim.restart();
+        }
     }
 
     // Pulled inwards: left edge to the right, right edge to the left. The
@@ -114,7 +164,21 @@ PanelWindow {
 
         property bool opened: false
 
-        onActiveChanged: if (!active) pull.opened = false
+        // Let go: out at once if the sidebar came, and otherwise the way
+        // leaving does -- a one-pixel strip is left as soon as the drag
+        // starts, so the hover alone would never put it out.
+        onActiveChanged: {
+            if (pull.active)
+                return;
+            const opened = pull.opened;
+            pull.opened = false;
+            if (opened) {
+                handle.pushed = false;
+                return;
+            }
+            dim.interval = 700;
+            dim.restart();
+        }
 
         onTranslationChanged: {
             if (pull.opened || !pull.active)

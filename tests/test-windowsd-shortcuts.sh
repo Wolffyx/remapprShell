@@ -129,4 +129,47 @@ on_owner(None, None, None, None, None, ("org.kde.somebodyelse", "", ":1.9"), Non
 check("another name coming and going is not ours", bus.calls, [])
 PYTEST
 
+# An edge names an action. One a key could run is run, as a key would run it;
+# one that is the shell's own -- lighting the sidebar's grab strip -- is
+# announced for the shell to hear rather than run.
+echo "== an edge, run or announced =="
+windowsd_python "$SANDBOX" <<'PYTEST'
+from windowsd import edges
+
+class Bus:
+    def __init__(self):
+        self.signals = []
+    def emit_signal(self, dest, path, iface, name, params):
+        self.signals.append((path, iface, name, params.unpack()))
+
+class Call:
+    def __init__(self):
+        self.answered = False
+    def return_value(self, value):
+        self.answered = True
+
+class Keys:
+    def __init__(self):
+        self.ran = []
+    def _run(self, action, command):
+        self.ran.append(action)
+
+keys = Keys()
+screen = edges.ScreenEdges(keys)
+bus = Bus()
+
+call = Call()
+screen.handle_call(bus, None, None, None, "Triggered", ("launcher",), call)
+check("a key's action is run", keys.ran, ["launcher"])
+check("and not announced", bus.signals, [])
+check("and answered", call.answered, True)
+
+call = Call()
+screen.handle_call(bus, None, None, None, "Triggered", ("sidebar-reveal",), call)
+check("the shell's own is announced",
+      bus.signals, [("/Edges", "com.example.T.Edges", "Reached", ("sidebar-reveal",))])
+check("and not run", keys.ran, ["launcher"])
+check("and answered too", call.answered, True)
+PYTEST
+
 harness_done
