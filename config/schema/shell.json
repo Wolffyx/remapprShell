@@ -310,9 +310,9 @@
                 },
                 "sidebar.handleReserves": {
                     "type": "bool",
-                    "default": true,
+                    "default": false,
                     "label": "Keep windows off the strip",
-                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it and nothing under it -- a scrollbar at the edge -- ever loses a click to it. Off: it lies over the edge of whatever window is there and takes the press from it."
+                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it and nothing under it -- a scrollbar at the edge -- loses a click to it, at the cost of a gap that wide down that edge. Off: no gap, and the strip lies over the edge of whatever window is there and takes a press on it."
                 },
                 "sidebar.width": {
                     "type": "int",

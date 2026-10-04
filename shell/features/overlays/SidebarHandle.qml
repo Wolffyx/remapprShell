@@ -13,17 +13,15 @@ pragma ComponentBehavior: Bound
 // being a single surface: a layer surface belongs to one output, and the
 // output it belongs to is the answer to "which screen did you drag on".
 //
-// The strip is space of its own. It reserves its width, as a panel does, so a
-// maximised window stops short of it and nothing is ever under it to lose a
-// press -- the scrollbar at the edge of a browser included. That is how a
-// shell drawn with a frame round the screen gets a drag handle for nothing:
-// the frame is reserved, and the handle is the frame. Before this the strip
-// lay over the edge of whatever was there and took the press off it, under a
-// resize cursor that said a window border was there. `sidebar.handleReserves`
-// is that old behaviour, for someone who would rather keep the pixels.
+// It lies over the edge of whatever window is there and reserves nothing:
+// the screen is the windows', and a gap down one side of it only for this was
+// dead space (2026-10-04). The cost is the one every drag handle on Wayland
+// pays -- a press on the strip is the strip's, never passed on to the window
+// under it. `sidebar.handleReserves` reserves the strip's width instead, the
+// way a shell with a frame round the screen gets its handle for nothing; off
+// by default.
 //
-// Down the whole height of the edge, since nothing is under it: pressed
-// anywhere and pulled inwards. `sidebar.handleWidth` is how wide.
+// Down the whole height of the edge: pressed anywhere and pulled inwards. `sidebar.handleWidth` is how wide.
 //
 // It goes deaf -- draws nothing, takes nothing -- while the sidebar is out and
 // over a full-screen window, without unmapping: the reserved space goes with
@@ -50,7 +48,7 @@ PanelWindow {
 
     readonly property bool leftEdge: Cards.onLeft(ConfigStore.value("sidebar.position", "right"))
     readonly property int strip: Math.max(2, Number(ConfigStore.value("sidebar.handleWidth", 6)))
-    readonly property bool reserves: ConfigStore.value("sidebar.handleReserves", true) !== false
+    readonly property bool reserves: ConfigStore.value("sidebar.handleReserves", false) === true
 
     // How far it has to be pulled before the sidebar comes out. Far enough
     // that a click at the edge is not a drag, short enough that the gesture

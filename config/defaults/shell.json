@@ -201,7 +201,7 @@
         "position": "right",
         "trigger": "drag",
         "handleWidth": 6,
-        "handleReserves": true,
+        "handleReserves": false,
         "width": 396,
         "margin": 16,
         "reserveSpace": false,

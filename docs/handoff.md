@@ -355,7 +355,14 @@ goes deaf (empty mask, nothing drawn) and keeps its zone, as the panel does,
 so maximised windows are not resized away and back. Ordinary cursor.
 `sidebar.handleReserves: false` is the old overlay, as a choice; the three
 settings of the first fix are gone. Seen working: a maximised Chrome on DP-2
-now ends at x=2554, six pixels short of the edge. **Not yet pulled by hand.**
+now ends at x=2554, six pixels short of the edge. **And then taken back the same evening:** a gap down one side of the
+screen only for the strip was dead space, and the user did not want it.
+`sidebar.handleReserves` is off by default now -- the strip lies over the
+edge again, full height, deaf over full screen, ordinary cursor -- and
+reserving is the opt-in. What that leaves is Wayland's own limit: a press
+on the strip cannot be passed on to the window under it, so either the
+edge is given up or the strip takes the last pixels of a scrollbar.
+**Not yet pulled by hand.**
 Not built: pushing the open sidebar back to the edge to close it, which
 caelestia does -- a drag on the card would have to share with the weather
 card's sideways flick.
