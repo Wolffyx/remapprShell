@@ -1,7 +1,9 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on the evening of **2026-09-27**: every N+1 in the
+sessions, and added to since -- most recently on **2026-10-04**: the keys lost to a GPU
+reset, and a sidebar grab strip that took the whole edge ("2026-10-04: the keys after a GPU
+reset"). Before that, the evening of **2026-09-27**: every N+1 in the
 tree -- a process a loop item, a write a loop item, a ladder of tests, a nest
 three deep -- and the shell taken down for twelve minutes by one of the fixes
 ("The evening of 2026-09-27: N+1"). That morning, nested loops flattened and a lint for them
@@ -307,6 +309,47 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-04: the keys after a GPU reset, and a grab strip that takes less
+
+Two of the issues filed that morning, #7 and #8, fixed the same evening.
+
+**#7: Meta and Meta+Space dead after a GPU reset -- seen live.** At 19:57
+kwin_wayland died on `GL_CONTEXT_LOST` after an amdgpu ring reset,
+`kwin_wayland_wrapper` started it again, and every Qt client, this shell
+included, reconnected. KWin's own scripts came back with it: KWin re-reads
+`[Plugins]`, and the window list kept flowing. The keys did not. kglobalaccel
+lives inside kwin_wayland, so the new one had our component on file with
+`isActive` false -- and the daemon, which registers once, in
+`on_bus_acquired`, outlived KWin and never registered again. It now watches
+`NameOwnerChanged` for `org.kde.kglobalaccel`, and on a new owner registers
+every action again and re-runs `shortcuts sync`, since KRunner may have taken
+Meta+Space back first. Tested on a recording bus (test-windowsd-shortcuts) and
+once on a private `dbus-run-session` bus with a stand-in owning the name;
+**not yet seen through a real crash**. `doctor` and `shortcuts status` name
+`rmpr windows restart` as the way back now. The old hint, `windows list`, was
+wrong for this case: it starts a daemon that is not running, and here it is.
+
+**What this session broke, and put back.** Probing the component, a
+`busctl ... Component cleanUp` went out with the read-only calls. **`cleanUp`
+on an inactive component deletes it, and writes `kglobalshortcutsrc` without
+its group** -- every binding of ours gone from the file at 20:01. The
+profile's `shortcuts.*` are the truth, and `rmpr shortcuts sync` wrote the
+group back from them, the same keys as the 2026-09-25 snapshot. Probe with
+`isActive` and `allShortcutInfos`; never `cleanUp`.
+
+**#8: the sidebar's grab strip.** It ran the full height of the edge with a
+180 px pill drawn in the middle, and every pixel of it took the press -- off
+every scrollbar against that edge and off full-screen windows too, under a
+resize cursor. The surface is the pill alone now: `sidebar.handleLength`
+(default 180, at most six tenths of the screen) placed by
+`sidebar.handleAlign`, kept clear of a panel's reserved space
+(`ExclusionMode.Normal`, zone 0). It steps aside -- unmaps -- over a
+full-screen window on its monitor, and with `sidebar.handleStepsAside: window`
+over any window reaching that edge. The cursor is an open hand, closed while
+pulling. Linted in a scratch worktree, copied into the live tree in one write,
+reloaded clean; **not yet pulled by hand**. Not built from the issue: a strip
+revealed by pushing into KWin's edge, and a touchpad swipe.
 
 ### The evening of 2026-09-27: N+1
 

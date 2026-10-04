@@ -98,7 +98,10 @@ The panel that slides in from an edge: what is playing, the day and the weather,
 | --- | --- | --- | --- |
 | `sidebar.position` | `right`, `left` | `right` | Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on. |
 | `sidebar.trigger` | `drag`, `hover`, `none` | `drag` | 'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in. |
-| `sidebar.handleWidth` | a number, 2 to 24 | `6` | How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out goes to it rather than to the window beneath. |
+| `sidebar.handleWidth` | a number, 2 to 24 | `6` | How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out on it goes to it rather than to the window beneath -- only along its length, never the rest of the edge. |
+| `sidebar.handleLength` | a number, 40 to 600 | `180` | How long the strip you pull is, in pixels, and so how much of the edge it takes from the windows against it. Never more than six tenths of the screen. |
+| `sidebar.handleAlign` | `center`, `top`, `bottom` | `center` | Where along the edge the strip sits. Kept clear of a panel on that end. |
+| `sidebar.handleStepsAside` | `fullscreen`, `window` | `fullscreen` | When the strip goes away so the window beneath gets the edge. 'fullscreen' is over a full-screen window on that monitor -- a game or a video. 'window' is whenever any window reaches that edge, such as a maximised one with its scrollbar there; the sidebar is then pulled out only over the desktop, or opened by its key. |
 | `sidebar.width` | a number, 280 to 720 | `396` | How wide the panel is, in pixels. |
 | `sidebar.margin` | a number, 0 to 64 | `16` | The gap between the panel and the screen's edges. |
 | `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape. |
