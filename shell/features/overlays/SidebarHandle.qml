@@ -13,19 +13,22 @@ pragma ComponentBehavior: Bound
 // being a single surface: a layer surface belongs to one output, and the
 // output it belongs to is the answer to "which screen did you drag on".
 //
-// It reserves nothing and takes no keyboard. What it does take is a press on
-// the edge, and only where it is drawn: the surface is the pill and nothing
-// else, `sidebar.handleLength` long and placed by `sidebar.handleAlign`. It
-// used to run the full height of the edge with a pill drawn in the middle, and
-// every pixel of that took the press -- off the scrollbar of every window
-// against that edge, and off a full-screen one too. `sidebar.handleWidth` is
-// how deep it is, `sidebar.trigger` turns it off in favour of KWin's edge or
-// of nothing.
+// The strip is space of its own. It reserves its width, as a panel does, so a
+// maximised window stops short of it and nothing is ever under it to lose a
+// press -- the scrollbar at the edge of a browser included. That is how a
+// shell drawn with a frame round the screen gets a drag handle for nothing:
+// the frame is reserved, and the handle is the frame. Before this the strip
+// lay over the edge of whatever was there and took the press off it, under a
+// resize cursor that said a window border was there. `sidebar.handleReserves`
+// is that old behaviour, for someone who would rather keep the pixels.
 //
-// And it steps aside over a full-screen window, as the panel does: a game or
-// a video owns its edges. `sidebar.handleStepsAside` widens that to any
-// window that reaches the edge, for someone who keeps a maximised window's
-// scrollbar there and opens the sidebar by key.
+// Down the whole height of the edge, since nothing is under it: pressed
+// anywhere and pulled inwards. `sidebar.handleWidth` is how wide.
+//
+// It goes deaf -- draws nothing, takes nothing -- while the sidebar is out and
+// over a full-screen window, without unmapping: the reserved space goes with
+// the surface, and every maximised window on the screen would be resized away
+// and back each time. The panel steps aside the same way, for the same reason.
 
 import QtQuick
 import Quickshell
@@ -47,77 +50,58 @@ PanelWindow {
 
     readonly property bool leftEdge: Cards.onLeft(ConfigStore.value("sidebar.position", "right"))
     readonly property int strip: Math.max(2, Number(ConfigStore.value("sidebar.handleWidth", 6)))
-    readonly property string align: ConfigStore.value("sidebar.handleAlign", "center")
-
-    // Never more than most of the screen: past that it is the full-height
-    // strip again, taking the press from everything along the edge.
-    readonly property int span: Math.min(Math.max(40, Number(ConfigStore.value("sidebar.handleLength", 180))),
-                                         Math.round((handle.modelData?.height ?? 1080) * 0.6))
+    readonly property bool reserves: ConfigStore.value("sidebar.handleReserves", true) !== false
 
     // How far it has to be pulled before the sidebar comes out. Far enough
     // that a click at the edge is not a drag, short enough that the gesture
     // feels answered rather than resisted.
     readonly property int threshold: 28
 
-    // A full-screen window on this monitor always sends it away; with
-    // "window", so does any window reaching into the strip. By output for the
-    // one and by geometry for the other, as the panel asks the same two
-    // questions (Panel.qml).
-    readonly property bool covered: {
-        const windows = WindowsService.windows;
-        if (WindowEvents.fullScreenOn(windows, handle.modelData?.name ?? "", Desktops.currentId))
-            return true;
-        if (ConfigStore.value("sidebar.handleStepsAside", "fullscreen") !== "window")
-            return false;
-        const s = handle.modelData;
-        return WindowEvents.reachesEdge(windows, Desktops.currentId,
-                                        { x: s?.x ?? 0, y: s?.y ?? 0, width: s?.width ?? 0, height: s?.height ?? 0 },
-                                        handle.leftEdge ? "left" : "right", handle.strip);
-    }
+    // A full-screen window takes the whole monitor whatever is reserved, and
+    // the edge is the game's or the video's. By output, as the panel asks.
+    readonly property bool fullScreenHere: WindowEvents.fullScreenOn(WindowsService.windows,
+                                                                    handle.modelData?.name ?? "",
+                                                                    Desktops.currentId)
+    readonly property bool deaf: Surfaces.sidebar || handle.fullScreenHere
+    readonly property Region _deaf: Region {}
 
-    // Neither top nor bottom is "center": layer shell centres a surface on an
-    // axis it is not anchored to.
     anchors {
+        top: true
+        bottom: true
         left: handle.leftEdge
         right: !handle.leftEdge
-        top: handle.align === "top"
-        bottom: handle.align === "bottom"
     }
 
-    // Kept clear of a panel's reserved space rather than drawn under it, now
-    // that it is short enough to sit at one end of the edge.
-    exclusionMode: ExclusionMode.Normal
-    exclusiveZone: 0
+    // Kept clear of a panel's reserved space either way; reserving its own
+    // only while it keeps windows off it.
+    exclusiveZone: handle.reserves ? handle.strip : 0
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     WlrLayershell.namespace: `${Branding.slug}-sidebar-handle`
     color: "transparent"
 
     implicitWidth: handle.strip
-    implicitHeight: handle.span
 
-    // Nothing to grab while the sidebar is already out: the sidebar's own
-    // close button and Escape put it away, and a handle under it would take
-    // the press meant for the card.
-    visible: !Surfaces.sidebar && !handle.covered
+    mask: handle.deaf ? handle._deaf : null
 
-    // A hairline that says there is something here, brighter under the
-    // pointer. Ten per cent of an accent is not decoration -- an invisible
-    // grab strip is one nobody finds.
+    // A hairline that says there is something here, brighter while the
+    // pointer is anywhere on the strip. Ten per cent of an accent is not
+    // decoration -- an invisible grab strip is one nobody finds.
     Rectangle {
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: parent.width
+        height: Math.min(180, parent.height * 0.22)
         radius: width / 2
         color: Theme.acc
+        visible: !handle.deaf
         opacity: pull.active ? 0.85 : hover.hovered ? 0.55 : 0.18
         Behavior on opacity { NumberAnimation { duration: 120 } }
     }
 
-    // A hand, not the resize arrows: this is something you take hold of, and
-    // the arrows said a window border was there, which is what the edge of a
-    // maximised window already says.
+    // The ordinary pointer: no resize arrows, which said a window border was
+    // there, and nothing to learn -- the hairline brightening says the rest.
     HoverHandler {
         id: hover
-        cursorShape: Qt.OpenHandCursor
     }
 
     // Pulled inwards: left edge to the right, right edge to the left. The
@@ -129,7 +113,6 @@ PanelWindow {
         target: null
         xAxis.enabled: true
         yAxis.enabled: false
-        cursorShape: Qt.ClosedHandCursor
 
         property bool opened: false
 

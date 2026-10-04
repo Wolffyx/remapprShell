@@ -338,18 +338,27 @@ profile's `shortcuts.*` are the truth, and `rmpr shortcuts sync` wrote the
 group back from them, the same keys as the 2026-09-25 snapshot. Probe with
 `isActive` and `allShortcutInfos`; never `cleanUp`.
 
-**#8: the sidebar's grab strip.** It ran the full height of the edge with a
-180 px pill drawn in the middle, and every pixel of it took the press -- off
-every scrollbar against that edge and off full-screen windows too, under a
-resize cursor. The surface is the pill alone now: `sidebar.handleLength`
-(default 180, at most six tenths of the screen) placed by
-`sidebar.handleAlign`, kept clear of a panel's reserved space
-(`ExclusionMode.Normal`, zone 0). It steps aside -- unmaps -- over a
-full-screen window on its monitor, and with `sidebar.handleStepsAside: window`
-over any window reaching that edge. The cursor is an open hand, closed while
-pulling. Linted in a scratch worktree, copied into the live tree in one write,
-reloaded clean; **not yet pulled by hand**. Not built from the issue: a strip
-revealed by pushing into KWin's edge, and a touchpad swipe.
+**#8: the sidebar's grab strip.** It ran the full height of the edge, over
+whatever window was there, and took every press on it -- off every scrollbar
+against that edge and off full-screen windows too, under a resize cursor. A
+first fix cut the surface down to the drawn pill and added three settings for
+its length, place and when it stepped aside; the user's answer was that it
+should work the way caelestia-kde's does, and that one was read (a clone, for
+the lesson only -- nothing taken). **There the handle is a frame the screen
+gives up:** four empty surfaces reserve a band on every edge, so maximised
+windows stop short of it, and the drag area is that band -- nothing is ever
+under it to lose a click. So now: the strip **reserves its own width**
+(`exclusiveZone`, `sidebar.handleWidth`, 6 px), runs the full height again,
+and is pressed anywhere down the edge and pulled inwards. It never unmaps --
+while the sidebar is out, or over a full-screen window on its monitor, it
+goes deaf (empty mask, nothing drawn) and keeps its zone, as the panel does,
+so maximised windows are not resized away and back. Ordinary cursor.
+`sidebar.handleReserves: false` is the old overlay, as a choice; the three
+settings of the first fix are gone. Seen working: a maximised Chrome on DP-2
+now ends at x=2554, six pixels short of the edge. **Not yet pulled by hand.**
+Not built: pushing the open sidebar back to the edge to close it, which
+caelestia does -- a drag on the card would have to share with the weather
+card's sideways flick.
 
 ### The evening of 2026-09-27: N+1
 

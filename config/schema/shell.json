@@ -306,46 +306,13 @@
                     "step": 1,
                     "default": 6,
                     "label": "Grab strip",
-                    "description": "How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out on it goes to it rather than to the window beneath -- only along its length, never the rest of the edge."
+                    "description": "How wide the strip you pull is, in pixels -- pressed anywhere down the edge and pulled inwards. While it keeps windows off it, this is also how much of that edge they give up."
                 },
-                "sidebar.handleLength": {
-                    "type": "int",
-                    "min": 40,
-                    "max": 600,
-                    "step": 10,
-                    "default": 180,
-                    "label": "Strip length",
-                    "description": "How long the strip you pull is, in pixels, and so how much of the edge it takes from the windows against it. Never more than six tenths of the screen."
-                },
-                "sidebar.handleAlign": {
-                    "type": "enum",
-                    "values": [
-                        "center",
-                        "top",
-                        "bottom"
-                    ],
-                    "default": "center",
-                    "label": "Strip position",
-                    "description": "Where along the edge the strip sits. Kept clear of a panel on that end.",
-                    "labels": [
-                        "Middle",
-                        "Top",
-                        "Bottom"
-                    ]
-                },
-                "sidebar.handleStepsAside": {
-                    "type": "enum",
-                    "values": [
-                        "fullscreen",
-                        "window"
-                    ],
-                    "default": "fullscreen",
-                    "label": "Strip steps aside",
-                    "description": "When the strip goes away so the window beneath gets the edge. 'fullscreen' is over a full-screen window on that monitor -- a game or a video. 'window' is whenever any window reaches that edge, such as a maximised one with its scrollbar there; the sidebar is then pulled out only over the desktop, or opened by its key.",
-                    "labels": [
-                        "Over a full-screen window",
-                        "Whenever a window reaches the edge"
-                    ]
+                "sidebar.handleReserves": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Keep windows off the strip",
+                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it and nothing under it -- a scrollbar at the edge -- ever loses a click to it. Off: it lies over the edge of whatever window is there and takes the press from it."
                 },
                 "sidebar.width": {
                     "type": "int",
