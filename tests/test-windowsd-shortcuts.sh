@@ -77,4 +77,56 @@ os.environ[shortcuts.NO_SESSION_VAR] = "1"
 check("and neither does one with no session", wanted(), False)
 PYTEST
 
+# kglobalaccel lives inside kwin_wayland, so a KWin that crashes and is started
+# again -- a GPU reset -- brings back a server that has the keys on file and no
+# owner for them. The daemon outlives KWin and has to register again by itself.
+# A bus of its own here, recording, so nothing reaches the session.
+echo "== registered again when kglobalaccel comes back =="
+windowsd_python "$SANDBOX" <<'PYTEST'
+import sys, os
+from windowsd import shortcuts
+sandbox = sys.argv[1]
+os.environ["XDG_CONFIG_HOME"] = sandbox
+open(os.path.join(sandbox, "kglobalshortcutsrc"), "w").write(
+    "[t]\nlauncher=Meta,none,Application menu\nsearch=Meta+Space,none,Search\n"
+)
+
+class Bus:
+    def __init__(self):
+        self.subscriptions = []
+        self.calls = []
+    def signal_subscribe(self, sender, iface, member, path, arg0, flags, callback, data):
+        self.subscriptions.append((sender, member, arg0, callback))
+        return len(self.subscriptions)
+    def call_sync(self, name, path, iface, method, params, *rest):
+        self.calls.append(method)
+
+bus = Bus()
+keys = shortcuts.GlobalShortcuts()
+ran = []
+keys._run = lambda action, command: ran.append(action)
+keys.start(bus)
+
+watch = [s for s in bus.subscriptions if s[1] == "NameOwnerChanged"]
+check("it watches the server's name", [(s[0], s[2]) for s in watch],
+      [("org.freedesktop.DBus", "org.kde.kglobalaccel")])
+registered = bus.calls.count("setShortcutKeys")
+check("every action is registered at start", registered, len(shortcuts.SHORTCUT_ACTIONS))
+on_owner = watch[0][3]
+
+bus.calls.clear()
+on_owner(None, None, None, None, None, ("org.kde.kglobalaccel", ":1.40", ""), None)
+check("the server going away registers nothing", bus.calls, [])
+check("and enforces nothing", ran, [])
+
+on_owner(None, None, None, None, None, ("org.kde.kglobalaccel", "", ":1.896"), None)
+check("the server coming back registers every action again",
+      bus.calls.count("setShortcutKeys"), registered)
+check("and enforces the configuration again", ran, ["sync"])
+
+bus.calls.clear()
+on_owner(None, None, None, None, None, ("org.kde.somebodyelse", "", ":1.9"), None)
+check("another name coming and going is not ours", bus.calls, [])
+PYTEST
+
 harness_done

@@ -124,7 +124,9 @@ case "$cmd" in
             false) state="NOT grabbed -- no owner is running" ;;
             *)     state="unknown -- kglobalaccel did not answer" ;;
         esac
-        printf 'component %s: %s\n\n' "$COMPONENT" "$state"
+        printf 'component %s: %s\n' "$COMPONENT" "$state"
+        [ "$active" = false ] && printf 'register them again: %s windows restart\n' "$ALIAS"
+        echo
 
         printf '%-12s %-28s %s\n' ACTION SHORTCUT 'OLD ENTRY'
         accel_read_bound

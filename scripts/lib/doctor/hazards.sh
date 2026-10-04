@@ -139,7 +139,7 @@ doctor_hazards() {
         case "$(accel_component_active "$SLUG")" in
             true)  ok "our global shortcuts have a running owner, so the keys are grabbed" ;;
             false) bad "our global shortcuts are filed but not grabbed: no owner is running"
-                   fix "the session daemon owns them; start it: $ALIAS windows list" ;;
+                   fix "the session daemon owns them; starting it again registers them: $ALIAS windows restart" ;;
             *)     warn "kglobalaccel did not say whether our shortcuts are grabbed" ;;
         esac
     fi
