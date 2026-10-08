@@ -7,6 +7,8 @@ theme/lockscreen/Options.qml
 # the project. Committed once by accident on 2026-09-14.
 .claude/pattern-decision-log.jsonl
 .claude/pattern-block-stats.jsonl
+.claude/pattern-smell-log.jsonl
+.claude/cache/
 
 # Build / scratch
 # The preview harness copies the whole shell per run and removes it on exit;

@@ -31,7 +31,11 @@ QtObject {
         // KConfig's own format, so `rmpr lockscreen set` can write it with
         // kwriteconfig6 and a person can read it. `location` rather than the
         // `fileName` Qt.labs.settings had: QtCore's Settings takes a url.
-        location: "file://@CONFIG_DIR@/lockscreen.conf"
+        //
+        // The config directory worked out here, as the shell's core/Paths.qml
+        // works it out, rather than rendered in: a rendered path was this
+        // machine's home written into the package (2026-10-08).
+        location: `${StandardPaths.writableLocation(StandardPaths.GenericConfigLocation)}/@SLUG@/lockscreen.conf`
     }
 
     // Which lock screen is drawn. LockUi knows the names; an unknown one
