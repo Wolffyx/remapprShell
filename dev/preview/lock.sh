@@ -101,7 +101,9 @@ lockscreen_probe_package "$pkg" "${LOCK_SRC:-$WT/theme/lockscreen}" "$probe" \
 # every style never means writing their lockscreen.conf seven times.
 if jq -e '.options' <<< "$cfg" >/dev/null 2>&1; then
     { echo "[Lock]"; jq -r '.options | to_entries[] | "\(.key)=\(.value)"' <<< "$cfg"; } > "$work/lockscreen.conf"
-    sed -i "s|location: \"file://[^\"]*\"|location: \"file://$work/lockscreen.conf\"|" "$dir/Options.qml"
+    sed -i -E "s|^( *location: ).*$|\1\"file://$work/lockscreen.conf\"|" "$dir/Options.qml"
+    grep -qF "location: \"file://$work/lockscreen.conf\"" "$dir/Options.qml" \
+        || { echo "could not point the copy at these options"; exit 1; }
     cfg=$(jq -c 'del(.options)' <<< "$cfg")
 fi
 

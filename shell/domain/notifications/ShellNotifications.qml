@@ -144,7 +144,7 @@ QtObject {
             Log.warn("notifications", "that notification is not in the history, so there is nothing to ask about");
             return;
         }
-        Quickshell.execDetached([Branding.ctlBin, "ask", "--notification", String(i), "--review"]);
+        Quickshell.execDetached([Paths.ctlBin, "ask", "--notification", String(i), "--review"]);
     }
 
     function dismissAll() {

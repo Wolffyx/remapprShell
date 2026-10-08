@@ -46,7 +46,7 @@ QtObject {
     function run(args) {
         root.args = (args ?? []).map(a => String(a));
         proc.running = false;
-        proc.command = [Branding.ctlBin].concat(root.args);
+        proc.command = [Paths.ctlBin].concat(root.args);
         proc.running = true;
     }
 

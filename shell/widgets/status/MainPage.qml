@@ -74,7 +74,7 @@ Column {
                 glyph: "tune"
                 iconName: "configure"
                 onActivated: {
-                    Quickshell.execDetached([Branding.ctlBin, "settings"]);
+                    Quickshell.execDetached([Paths.ctlBin, "settings"]);
                     main.widget.closePopout();
                 }
             }

@@ -22,7 +22,7 @@ QtObject {
     }
 
     readonly property FileView _view: FileView {
-        path: `${Branding.dataDir}/config/schema/shell.json`
+        path: `${Paths.dataDir}/config/schema/shell.json`
         watchChanges: true
         printErrors: false
 

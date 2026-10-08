@@ -1,11 +1,14 @@
-# Generated - never committed
-shell/core/Branding.qml
+# Generated - never committed. Branding.qml and the widget index are generated
+# too but committed: the shell reads them as it starts, from the tree it may be
+# running from (scripts/lib/generated.sh).
 theme/lockscreen/Options.qml
 
 # The pattern-check hooks' own logs: a record of local tool decisions, not of
 # the project. Committed once by accident on 2026-09-14.
 .claude/pattern-decision-log.jsonl
 .claude/pattern-block-stats.jsonl
+.claude/pattern-smell-log.jsonl
+.claude/cache/
 
 # Build / scratch
 # The preview harness copies the whole shell per run and removes it on exit;
@@ -28,7 +31,6 @@ dev/preview/switcher.*/
 *.swp
 *~
 shell/**/qmldir
-shell/widgets/index.json
 theme/colors/*.colors
 
 # Python byte code, left by importing a script to try it

@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: search
 Comment=Opens whichever search is configured
-Exec=@BIN_DIR@/@CTL_BIN@ search
+Exec=@CTL_BIN@ search
 Icon=system-search
 Terminal=false
 NoDisplay=true

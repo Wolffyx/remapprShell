@@ -22,7 +22,7 @@ CardGrid {
     // a checkout, the working tree -- so that stays a command somebody types.
     readonly property Process _check: Process {
         id: checkProc
-        command: [Branding.ctlBin, "update", "--check"]
+        command: [Paths.ctlBin, "update", "--check"]
         onRunningChanged: root.checking = running
         stdout: StdioCollector { id: checkOut }
         stderr: StdioCollector { id: checkErr }
@@ -73,9 +73,9 @@ CardGrid {
 
         Repeater {
             model: [
-                { label: "Configuration",  value: Branding.configDir },
-                { label: "Shell",          value: Branding.qsConfigDir },
-                { label: "State",          value: Branding.stateDir },
+                { label: "Configuration",  value: Paths.configDir },
+                { label: "Shell",          value: Paths.qsConfigDir },
+                { label: "State",          value: Paths.stateDir },
                 { label: "Widgets",        value: `${Object.keys(WidgetRegistry.all).length} installed` },
                 { label: "Menu opens",     value: LauncherService.appsProvider.providerId },
                 { label: "Search opens",   value: LauncherService.searchProvider.providerId }

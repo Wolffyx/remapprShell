@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: keyboard shortcuts
 Comment=Opens or closes the sheet of keyboard shortcuts
-Exec=@BIN_DIR@/@CTL_BIN@ keys
+Exec=@CTL_BIN@ keys
 Icon=preferences-desktop-keyboard-shortcut
 Terminal=false
 NoDisplay=true

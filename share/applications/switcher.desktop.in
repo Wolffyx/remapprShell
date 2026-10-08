@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: window switcher
 Comment=Alt+Tab, drawn by this shell
-Exec=@BIN_DIR@/@CTL_BIN@ switcher show
+Exec=@CTL_BIN@ switcher show
 Icon=preferences-system-windows-switcher
 Terminal=false
 NoDisplay=true

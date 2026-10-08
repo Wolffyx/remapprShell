@@ -34,38 +34,42 @@ for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$r
     # file -- taking most of the file with it and reporting the syntax error
     # that made at a line number that no longer meant anything.
     sed -i -E 's/^PanelWindow \{/Item {/; /^    anchors \{[^}]*\}$/d; /^    anchors \{$/,/^    \}$/d;
-        /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: Region|screen: |color: "transparent")/d;
+        /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: |screen: |color: "transparent")/d;
         s/^    required property var modelData/    property var modelData/' "$f"
 done
 # The profile and the state directory are the user's, and a preview is not.
-# Branding names them as absolute paths, so no variable moves them: they are
-# pointed into this run's root instead -- the profile copied, so a preview
-# still looks like this machine, and the state empty. Before this every render
-# wrote the running shell's widget-health.json ("booting", from a shell that
-# never lived past three seconds), and a target that saved a setting saved it
-# into the real profile (2026-09-24).
-branding="$root/core/Branding.qml"
-real_config=$(sed -nE 's/^ *readonly property string configDir: "(.*)"$/\1/p' "$branding")
+# Paths works them out from the XDG directories, which would move KDE's own
+# files along with them, so they are pointed into this run's root in the copy
+# instead -- the profile copied, so a preview still looks like this machine,
+# and the state empty. Before this every render wrote the running shell's
+# widget-health.json ("booting", from a shell that never lived past three
+# seconds), and a target that saved a setting saved it into the real profile
+# (2026-09-24).
+#
+# Pages that shell out run Paths.ctlBin, which is the *installed* CLI from the
+# main tree. It is pointed at this worktree's scripts the same way, so a
+# preview shows what this branch's commands say.
+paths="$root/core/Paths.qml"
+real_config=$(REPO_ROOT=$WT; source "$WT/scripts/lib/brand.sh" && printf '%s' "$CONFIG_DIR")
 mkdir -p "$root/profile" "$root/state"
 [ -n "$real_config" ] && [ -d "$real_config" ] && cp -a "$real_config/." "$root/profile/"
-sed -i -E "s|^( *readonly property string configDir: )\".*\"$|\1\"$root/profile\"|; s|^( *readonly property string stateDir: )\".*\"$|\1\"$root/state\"|" "$branding"
-grep -qF "configDir: \"$root/profile\"" "$branding" && grep -qF "stateDir: \"$root/state\"" "$branding" \
-    || { echo "preview: could not point the profile and state at a copy; not rendering" >&2; exit 1; }
-# Pages that shell out use Branding.ctlBin, which is the *installed* CLI from
-# the main tree. Point it at this worktree's scripts instead, so a preview
-# shows what this branch's commands say.
 cat > "$root/ctl-preview.sh" <<'CTL'
 #!/usr/bin/env bash
 cmd=$1; shift
 exec "$WT_SCRIPTS/$cmd.sh" "$@"
 CTL
 chmod +x "$root/ctl-preview.sh"
-sed -i -E "s|readonly property string ctlBin: \".*\"|readonly property string ctlBin: \"$root/ctl-preview.sh\"|" "$root/core/Branding.qml"
+sed -i -E "s|^( *readonly property string configDir: ).*$|\1\"$root/profile\"|
+           s|^( *readonly property string stateDir: ).*$|\1\"$root/state\"|
+           s|^( *readonly property string ctlBin: ).*$|\1\"$root/ctl-preview.sh\"|" "$paths"
+grep -qF "configDir: \"$root/profile\"" "$paths" && grep -qF "stateDir: \"$root/state\"" "$paths" \
+    && grep -qF "ctlBin: \"$root/ctl-preview.sh\"" "$paths" \
+    || { echo "preview: could not point the profile, state and CLI at this run's; not rendering" >&2; exit 1; }
 # The schema and the defaults are read from the *installed* data directory,
 # so without this a preview of the settings window shows the main tree's
 # pages rather than this branch's.
-sed -i "s|\${Branding.dataDir}/config/schema|$WT/config/schema|" "$root/domain/config/Schema.qml"
-sed -i "s|\${Branding.dataDir}/config/defaults|$WT/config/defaults|" "$root/core/Paths.qml"
+sed -i "s|\${Paths.dataDir}/config/schema|$WT/config/schema|" "$root/domain/config/Schema.qml"
+sed -i "s|\${root.dataDir}/config/defaults|$WT/config/defaults|" "$paths"
 sed -i -E 's/^FloatingWindow \{/Item {/; /^    title: /d; /^    color: Theme\.s1$/d' "$root/features/settings/SettingsWindow.qml"
 
 # PREVIEW_DEMO=1: a picture fit to publish.
@@ -100,7 +104,7 @@ PYEOF
     # would see.
     mkdir -p "$root/demo-config"
     demo "$root/core/Paths.qml" \
-        'readonly property string configDir: Branding.configDir' \
+        "readonly property string configDir: \"$root/profile\"" \
         "readonly property string configDir: \"$root/demo-config\""
 
     demo "$root/domain/session/Session.qml" \

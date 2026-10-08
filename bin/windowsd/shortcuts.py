@@ -107,6 +107,11 @@ SHORTCUT_RELEASES = {
 SET_PRESENT = 0x2
 NO_AUTOLOADING = 0x4
 
+# The shortcut server's own name. On Plasma 6 it is owned by kwin_wayland, so
+# it goes away with KWin and comes back under a new owner when KWin is started
+# again -- after a GPU reset, for one.
+KGLOBALACCEL = "org.kde.kglobalaccel"
+
 
 class GlobalShortcuts:
     """This project's keys, registered by a process that is running.
@@ -127,6 +132,7 @@ class GlobalShortcuts:
         self._bus = None
         self._subscription = None
         self._release_subscription = None
+        self._server_subscription = None
 
     def start(self, connection):
         self._bus = connection
@@ -142,7 +148,30 @@ class GlobalShortcuts:
             "globalShortcutReleased", SHORTCUT_COMPONENT_PATH, None,
             Gio.DBusSignalFlags.NONE, self._on_released, None,
         )
+        # A kglobalaccel that starts again remembers the keys from the file and
+        # nothing about who owns them, so every one of ours is filed and none
+        # is grabbed -- Meta and Meta+Space dead until the next login. KDE's
+        # own client library registers again when the server comes back; this
+        # is the same thing, done by hand.
+        self._server_subscription = connection.signal_subscribe(
+            "org.freedesktop.DBus", "org.freedesktop.DBus", "NameOwnerChanged",
+            "/org/freedesktop/DBus", KGLOBALACCEL,
+            Gio.DBusSignalFlags.NONE, self._on_server_changed, None,
+        )
         self.reload()
+
+    def _on_server_changed(self, _conn, _sender, _path, _iface, _signal, params, _data):
+        name, _old_owner, new_owner = params[0], params[1], params[2]
+        # Gone is nothing to act on: there is nobody to register with until
+        # it is back.
+        if name != KGLOBALACCEL or not new_owner:
+            return
+        print("kglobalaccel came back; registering the shortcuts again", file=sys.stderr)
+        self.reload()
+        # And the configuration enforced again, as at start: whoever registers
+        # first after a restart -- KRunner and Meta+Space -- may have taken a
+        # key of ours back.
+        self.sync_configured()
 
     # ---- reading what is bound ---------------------------------------------
 

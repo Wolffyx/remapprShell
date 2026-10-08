@@ -25,7 +25,7 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [Branding.ctlBin, "profile", "list"]
+        command: [Paths.ctlBin, "profile", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = [];
@@ -49,7 +49,7 @@ CardGrid {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [Branding.ctlBin].concat(args);
+        runProc.command = [Paths.ctlBin].concat(args);
         runProc.running = true;
     }
 

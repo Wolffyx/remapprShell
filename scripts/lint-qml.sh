@@ -96,7 +96,7 @@ if [ $# -eq 0 ]; then
     while IFS= read -r hit; do
         log_error "${hit%%:*}: a property named on<Capital> is read as a signal handler (line ${hit#*:}); name it differently, e.g. primaryFg"
         failed=$((failed + 1))
-    done < <(grep -rnoE '^\s*((readonly|required|default)\s+)*property\s+\S+\s+on[A-Z][A-Za-z0-9_]*' shell theme --include='*.qml' \
+    done < <(grep -rnoE '^\s*((readonly|required|default)\s+)*property\s+\S+\s+on[A-Z][A-Za-z0-9_]*' shell theme share --include='*.qml' \
              | sed -E 's/^([^:]+):([0-9]+):.*property\s+\S+\s+(\S+)$/\1:\2 \3/' || true)
 fi
 
@@ -148,7 +148,7 @@ lint_batch() {
 mapfile -t files < <(if [ $# -gt 0 ]; then
                          printf '%s\n' "$@"
                      else
-                         find shell theme -name '*.qml' -type f | sort
+                         find shell theme share -name '*.qml' -type f | sort
                          render_templates
                      fi)
 lint_batch

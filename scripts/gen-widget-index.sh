@@ -6,11 +6,19 @@
 # Third-party widgets are discovered at runtime -- they are the case that has
 # to be dynamic; built-ins are not, and paying that cost for them would slow
 # every launch for no benefit.
+#
+# Committed, like Branding.qml and for the same reason: the shell reads it as
+# it starts, from the tree it may be running from, and a gitignored file there
+# is one clean away from a shell with no built-in widgets. --check writes
+# nothing and fails if the committed index is not what this would write.
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$REPO_ROOT/scripts/lib/log.sh"
+source "$REPO_ROOT/scripts/lib/generated.sh"
 cd "$REPO_ROOT"
+
+[ "${1:-}" = --check ] && GEN_CHECK=1
 
 command -v jq >/dev/null 2>&1 || die "jq is required"
 
@@ -43,5 +51,6 @@ index=$(jq -n '{generated: true, widgets: [inputs
             | if (.id // "" | tostring) != $id then error("id") else . end
             | . + {id: $id, builtin: true}]}' "${manifests[@]}" < /dev/null 2>/dev/null) \
     || explain_failure
-printf '%s\n' "$index" > "$out"
+printf '%s\n' "$index" | write_generated "$out"
+[ "${GEN_CHECK:-0}" = 1 ] && exit 0
 log_step "indexed ${#manifests[@]} built-in widget(s) -> $out"

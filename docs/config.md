@@ -92,16 +92,19 @@ list of values.
 
 ### Sidebar
 
-The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.
+The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened from its edge (below), with a shortcut ('rmpr shortcuts set sidebar'), the panel's Sidebar button, or the launcher's Sidebar action.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `sidebar.position` | `right`, `left` | `right` | Which side it slides in from. A screen edge bound to the sidebar follows this, so the edge you push into is the side it appears on. |
-| `sidebar.trigger` | `drag`, `hover`, `none` | `drag` | 'drag' is a thin strip down the sidebar's own edge that you press and pull inwards -- a pointer resting there does nothing, so it cannot open by accident. 'hover' is KWin's screen edge instead ('rmpr edges shell'), which opens on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in. |
-| `sidebar.handleWidth` | a number, 2 to 24 | `6` | How wide the strip you pull is, in pixels. It sits at the very edge of the screen, so a click that far out goes to it rather than to the window beneath. |
+| `sidebar.trigger` | `drag`, `hover`, `none` | `drag` | 'drag': push the pointer against the sidebar's edge and hold it there a moment, and a short grip lights up where the pointer is -- press it and pull inwards, and the sidebar comes out under the pointer; let go before a third of the way and it goes back. Until then nothing is there, so a scrollbar or a window against that edge keeps every pixel. 'hover': push the pointer against the edge and hold it a moment, and the sidebar opens on that screen (see 'Close when the pointer leaves'). Either way on every screen: where another screen meets that side, KWin's edge barrier (on by default) holds the pointer at the edge for that moment instead of letting it cross straight over. Never over a full-screen window, whose edge is its own. 'none' leaves the shortcut, the panel button and the launcher action as the ways in. |
+| `sidebar.handleWidth` | a number, 1 to 24 | `1` | How many pixels in from the very edge the lit grip takes a press, in pixels. One is the column the pointer stops in when it is pushed into the edge. While the strip keeps windows off it, this is also how much of that edge they give up. |
+| `sidebar.handleReserves` | `true` or `false` | `false` | Reserve the strip's width, as a panel does, so maximised windows stop short of it. Nothing is ever under it then, so it is always there, the whole height of the edge and on every screen, with no push needed -- at the cost of a gap that wide down that edge. Off: no gap, and the grip takes nothing until the edge is pushed into, and then only a short stretch where the pointer is. |
+| `sidebar.closeOnLeave` | `true` or `false` | `true` | For a sidebar opened by the pointer at its edge ('Pointer at the edge'): it goes away again once the pointer has been in it and left, or if the pointer never comes to it. Opened by a pull, a key, the panel button or the launcher, it stays until it is closed. |
+| `sidebar.closeOnClickOutside` | `true` or `false` | `true` | A click anywhere off the sidebar puts it away, on any screen, as a menu's does -- and goes no further, since nothing can hand it on to the window underneath. The panel still works while it is up. Off: the windows around it keep every click and scroll while it is open, and it closes with Escape, its close button, its key or the panel button. |
 | `sidebar.width` | a number, 280 to 720 | `396` | How wide the panel is, in pixels. |
 | `sidebar.margin` | a number, 0 to 64 | `16` | The gap between the panel and the screen's edges. |
-| `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape. |
+| `sidebar.reserveSpace` | `true` or `false` | `false` | While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them, and the desktop keeps its shape. |
 | `sidebar.expanded` | a list | `["media"]` | Which cards start expanded, by id: media, day, weather, machine, notifications. Every card can be folded away and opened again from the sidebar itself; this is what it remembers. |
 | `sidebar.cards` | a list | `["media","day","weather","machine","notifications"]` | Which cards the sidebar draws, in order. Leave a card out to hide it entirely. |
 

@@ -179,7 +179,9 @@ fi
 # the first real install (2026-09-25) finished by naming `rmpr doctor` to a
 # shell that could not find it. environment.d is read by the user's systemd,
 # and the Plasma session and every terminal it opens inherit from that --
-# from the next login. The unit never needed it: it names the full path.
+# from the next login. The units do not need it: they name the path through
+# %h. The desktop entries do: they name the command alone, since a desktop
+# entry expands nothing and the full path would be this machine's home.
 PATH_CONF="$XDG_CONFIG_HOME/environment.d/60-$SLUG-path.conf"
 if [ "$MODE" = uninstall ]; then
     rm -f "$PATH_CONF"

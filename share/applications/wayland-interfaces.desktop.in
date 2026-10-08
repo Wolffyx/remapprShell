@@ -14,7 +14,9 @@
 # so this grants the two interfaces to any Quickshell shell this user runs.
 # There is no narrower way to ask: KWin compares the binary and ignores the
 # arguments, which is how one desktop file covers a shell whose config path is
-# per-install.
+# per-install. The config is named here (-c), not given by path (-p):
+# quickshell finds it by that name in the user's own config directory, and no
+# machine's home is written into the file (2026-10-08).
 #
 # NoDisplay, because nobody should find this in a menu: it launches the shell,
 # but launching the shell is `@ALIAS@ start`.
@@ -22,7 +24,7 @@
 Type=Application
 Name=@DISPLAY_NAME@ (Wayland interfaces)
 Comment=Asks KWin for the window-management and screencast protocols
-Exec=/usr/bin/quickshell -n -p @QS_CONFIG_DIR@/shell.qml
+Exec=/usr/bin/quickshell -n -c @SLUG@
 Icon=@SLUG@
 Terminal=false
 NoDisplay=true

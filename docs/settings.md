@@ -93,7 +93,7 @@ PREVIEW_PAGE=widgets dev/preview/preview.sh dev/preview/settings.qml /tmp/s.png 
 ```
 
 `PREVIEW_PAGE` is a schema section id; `light` or `dark` as the fifth argument.
-The harness points `Schema`, `Paths` and `Branding.ctlBin` at the worktree, so a
+The harness points `Schema`, `Paths` and `Paths.ctlBin` at the worktree, so a
 preview shows this tree's pages and this tree's commands rather than the
 installed ones.
 

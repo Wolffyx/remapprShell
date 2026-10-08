@@ -12,10 +12,15 @@
 #   effect <name> <edge|none>
 #                          the same as `set <edge> <name>`; with `none`, take
 #                          that effect off every edge
-#   follow                 make KWin's edges agree with the sidebar's own
-#                          settings: an edge on the side it opens from when
-#                          sidebar.trigger is "hover", and no edge at all when
-#                          it is anything else
+#   follow [<position> <trigger> <reserves>]
+#                          make KWin's edges agree with the sidebar's own
+#                          settings: on the side it opens from, an edge that
+#                          opens it ("hover"), or lights its grab strip
+#                          ("drag", unless the strip reserves its space), or
+#                          none at all. Read from the configuration unless
+#                          given -- the shell gives them, since it asks the
+#                          moment a setting changes and the file is written
+#                          a moment later
 #   snap on|off            Aero-Snap style edge tiling and maximise
 #   disable-all            the master switch: every mouse trigger off
 #   enable-all             ...and back on, exactly as they were
@@ -54,7 +59,7 @@ case "$cmd" in
     disable-all) edges_disable_all ;;
     enable-all)  edges_enable_all ;;
     shell)       edges_shell "$@" ;;
-    follow)      edges_follow ;;
+    follow)      edges_follow "$@" ;;
 
     revert)
         # The switch first: its records hold what the corners were after our

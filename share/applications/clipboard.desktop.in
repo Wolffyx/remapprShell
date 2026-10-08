@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: clipboard history
 Comment=Opens the clipboard history on the panel
-Exec=@BIN_DIR@/@CTL_BIN@ clipboard
+Exec=@CTL_BIN@ clipboard
 Icon=klipper
 Terminal=false
 NoDisplay=true

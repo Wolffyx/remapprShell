@@ -317,7 +317,7 @@ QtObject {
     function close(uuid) {
         if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(uuid ?? "")))
             return;
-        Quickshell.execDetached([Branding.ctlBin, "windows", "close", uuid]);
+        Quickshell.execDetached([Paths.ctlBin, "windows", "close", uuid]);
     }
 
     // KWin's own runner. The id it expects is the uuid in braces behind a

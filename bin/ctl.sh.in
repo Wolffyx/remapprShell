@@ -22,6 +22,7 @@ usage: @ALIAS@ <command> [options]
   report create|list|show|remove    write a local diagnostic report
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
+  rescue [--print]                  the window that says the shell could not start
   windows enable|disable|status|restart  the open-window list (needs a KWin script)
   edges status|set|shell|snap|disable-all  the screen's corners and edges
   switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
@@ -116,6 +117,7 @@ case "$cmd" in
     report)    require_repo; exec "$REPO_ROOT/scripts/report.sh" "$@" ;;
     ask)       require_repo; exec "$REPO_ROOT/scripts/ask.sh" "$@" ;;
     crash)     require_repo; exec "$REPO_ROOT/scripts/crash.sh" "$@" ;;
+    rescue)    require_repo; exec "$REPO_ROOT/scripts/rescue.sh" "$@" ;;
     windows)   require_repo; exec "$REPO_ROOT/scripts/windows.sh" "$@" ;;
     doctor)    require_repo; exec "$REPO_ROOT/scripts/doctor.sh" "$@" ;;
     preset)    require_repo; exec "$REPO_ROOT/scripts/preset.sh" "$@" ;;

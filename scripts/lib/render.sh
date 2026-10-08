@@ -36,15 +36,48 @@ render_tables() {
          | {(.[0]): [.[1], (.[2] | split(" "))]}] | add // {}' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv") || return 1
 }
 
+# Paths under the home directory are rendered through it, not as this
+# machine's: an installed file says "$HOME/.local/bin", not /home/<someone>/
+# .local/bin (2026-10-08). What stands for the home directory depends on what
+# reads the file, so each kind of template has its word for it:
+#
+#   *.sh.in, share/dbus/*  $HOME   every use is in double quotes, or in the
+#                                  sh -c a D-Bus Exec= runs
+#   *.py.in                ~       every use goes through os.path.expanduser
+#   share/systemd/*        %h      systemd's specifier for the home directory
+#
+# Anything else -- a desktop entry, a QML file, a KWin script -- expands
+# nothing, gets the absolute path, and its template must not need one.
+# Rendered with the HOME it will run under; a path outside it stays absolute.
+RENDER_HOME_PATHS=(QS_CONFIG_DIR CONFIG_DIR DATA_DIR STATE_DIR BIN_DIR REPO_ROOT)
+
+render_home_word() {   # <template>: the word for the home directory in it
+    case "$1" in
+        *.sh.in|share/dbus/*.in|*/share/dbus/*.in) printf '%s' '$HOME' ;;
+        *.py.in)                                   printf '%s' '~' ;;
+        share/systemd/*.in|*/share/systemd/*.in)   printf '%s' '%h' ;;
+    esac
+}
+
 render_template() {
-    local src=$1 dest=$2 tmp v val
+    local src=$1 dest=$2 tmp v val word
     render_tables || { log_error "could not read the tables $src may be rendered with"; return 1; }
     tmp=$(mktemp)
+
+    local -A from_home=()
+    word=$(render_home_word "$src")
+    if [ -n "$word" ]; then
+        for v in "${RENDER_HOME_PATHS[@]}"; do
+            val=${!v-}
+            [[ "$val" == "$HOME"/* ]] || continue
+            from_home[$v]="$word/${val#"$HOME"/}"
+        done
+    fi
 
     local args=()
     for v in "${RENDER_VARS[@]}"; do
         # Escape the replacement for sed: \ & and the | delimiter are special.
-        val=${!v-}
+        val=${from_home[$v]-${!v-}}
         val=${val//\\/\\\\}
         val=${val//&/\\&}
         val=${val//|/\\|}

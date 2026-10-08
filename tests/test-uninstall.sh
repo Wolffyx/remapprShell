@@ -39,6 +39,14 @@ check "the shell is in place"      "$([ -d "$QS_CONFIG_DIR" ] && echo yes)" yes
 check "and the command"            "$([ -e "$BIN_DIR/$ALIAS" ] && echo yes)" yes
 PATH_CONF="$XDG_CONFIG_HOME/environment.d/60-$SLUG-path.conf"
 check "\$BIN_DIR put on PATH"      "$(grep -c "^PATH=$BIN_DIR:" "$PATH_CONF" 2>/dev/null)" 1
+
+# Every file the install rendered names the home directory as $HOME, ~ or %h,
+# never as this machine's: an installed file is not a record of whose machine
+# made it (2026-10-08). The manifest is the list of what an install writes; a
+# copied directory, like the shell itself, is not rendered.
+rendered=$(source "$COPY/scripts/lib/manifest.sh"; manifest_entries | awk -F'|' '$1 == "template" || $1 == "package" { print $3 }')
+named_home=$(grep -rlF "$HOME/" $rendered 2>/dev/null | sed "s|^$HOME/|~/|")
+check "no rendered file names this home" "${named_home:-none}" none
 mkdir -p "$CONFIG_DIR/profiles/mine" && echo '{}' > "$CONFIG_DIR/profiles/mine/shell.json"
 
 echo "== nobody to ask =="

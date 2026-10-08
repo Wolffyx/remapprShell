@@ -49,10 +49,13 @@ one the last install made, and a module edited in the checkout reaches it the
 way an edit to this file does, through an install and a restart.
 """
 
+import os
 import sys
 
 # First, so that nothing else on the path called windowsd is found instead.
-sys.path.insert(0, "@DATA_DIR@/lib")
+# Through expanduser: the install renders a path under the home directory as
+# "~/...", so no machine's home is written into this file.
+sys.path.insert(0, os.path.expanduser("@DATA_DIR@/lib"))
 
 from windowsd.main import main  # noqa: E402
 

@@ -35,7 +35,7 @@ CardGrid {
         // wider than its column leaves one space instead of two -- which this
         // page, splitting on runs of spaces, read as part of the name. Long
         // names arrived with the date stuck to them and the date line short.
-        command: [Branding.ctlBin, "snapshot", "list", "--json"]
+        command: [Paths.ctlBin, "snapshot", "list", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -67,7 +67,7 @@ CardGrid {
 
     function run(args) {
         runProc.running = false;
-        runProc.command = [Branding.ctlBin].concat(args);
+        runProc.command = [Paths.ctlBin].concat(args);
         runProc.running = true;
     }
 

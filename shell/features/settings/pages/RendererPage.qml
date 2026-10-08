@@ -62,7 +62,7 @@ CardGrid {
 
     readonly property Process _list: Process {
         id: listProc
-        command: [Branding.ctlBin, "renderer", "list", "--json"]
+        command: [Paths.ctlBin, "renderer", "list", "--json"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -108,7 +108,7 @@ CardGrid {
             return;
         root.status = `Switching to ${rendererId}...`;
         switchProc.running = false;
-        switchProc.command = [Branding.ctlBin, "renderer", "set", rendererId, "--yes"];
+        switchProc.command = [Paths.ctlBin, "renderer", "set", rendererId, "--yes"];
         switchProc.running = true;
     }
 

@@ -5,4 +5,8 @@
 # runs until something needs it, and nothing has to be enabled or remembered.
 [D-BUS Service]
 Name=@DBUS_NAME@
-Exec=@BIN_DIR@/@WINDOWSD_BIN@
+#
+# Through sh, which is what expands $HOME: a service file expands nothing, and
+# the daemon's path is rendered under the home directory rather than as this
+# machine's. exec, so the daemon is the process the bus started.
+Exec=/bin/sh -c 'exec "@BIN_DIR@/@WINDOWSD_BIN@"'

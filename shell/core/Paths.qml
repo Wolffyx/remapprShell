@@ -3,24 +3,53 @@ pragma Singleton
 // Every path the shell reads or writes. Centralised so that a rename (which
 // moves all of them at once) touches one file, and so nothing constructs a
 // path by string-concatenating a directory somewhere far from here.
+//
+// Where this machine keeps things is worked out here, when the shell starts,
+// by the same rules as scripts/lib/brand.sh -- the XDG base directories, then
+// the project's name -- which is how the CLI works out its own, so the two
+// agree. It used to be written into Branding.qml at install, a gitignored file
+// in the tree the shell runs from: a sandbox install wrote sandbox paths into
+// it, the preview had to patch it, and `make clean` deleted it, which left the
+// next login with no shell (2026-10-08). QtCore's StandardPaths rather than
+// Quickshell.env, because this layer imports nothing that needs a running
+// shell -- the tests have none -- and StandardPaths reads XDG_CONFIG_HOME,
+// XDG_DATA_HOME and XDG_STATE_HOME itself.
 
+import QtCore
 import QtQuick
 import qs.core
 
 QtObject {
     id: root
 
+    readonly property string home: root._localPath(StandardPaths.HomeLocation)
+    readonly property string xdgConfigHome: root._localPath(StandardPaths.GenericConfigLocation)
+    readonly property string xdgDataHome: root._localPath(StandardPaths.GenericDataLocation)
+    readonly property string xdgStateHome: root._localPath(StandardPaths.GenericStateLocation)
+
     // User-authored configuration. Never written by the installer.
-    readonly property string configDir: Branding.configDir
+    readonly property string configDir: `${root.xdgConfigHome}/${Branding.slug}`
     readonly property string profilesDir: `${root.configDir}/profiles`
     readonly property string stateFile: `${root.configDir}/state.json`
 
+    // The install's own files -- the shipped schema and defaults, and the
+    // widgets the user added.
+    readonly property string dataDir: `${root.xdgDataHome}/${Branding.slug}`
+
     // Shipped, read-only.
-    readonly property string defaultsFile: `${Branding.dataDir}/config/defaults/shell.json`
+    readonly property string defaultsFile: `${root.dataDir}/config/defaults/shell.json`
+
+    // The shell itself, where the installer copied or linked it.
+    readonly property string qsConfigDir: `${root.xdgConfigHome}/quickshell/${Branding.slug}`
+
+    // The control binary. Everything the shell asks the CLI to do -- switching
+    // renderer, writing a diagnostic report -- runs this, so the shell and the
+    // terminal always take the same code path.
+    readonly property string ctlBin: `${root.home}/.local/bin/${Branding.ctlName}`
 
     // Mutable runtime state: ledgers, snapshots, health. Never in configDir,
     // which belongs to the user.
-    readonly property string stateDir: Branding.stateDir
+    readonly property string stateDir: `${root.xdgStateHome}/${Branding.slug}`
     readonly property string widgetHealthFile: `${root.stateDir}/widget-health.json`
 
     // What the launcher has been used to open, and when. State rather than
@@ -58,7 +87,14 @@ QtObject {
     // the config imported when it loaded, and not for a widget's own files,
     // which are loaded later by a Loader, nor for a singleton only such a
     // widget uses. `rmpr reload` is for those.)
-    readonly property string userWidgetsDir: `${Branding.dataDir}/widgets`
+    readonly property string userWidgetsDir: `${root.dataDir}/widgets`
+
+    // One of StandardPaths' locations as a filesystem path. It answers with an
+    // encoded file: URL -- fileUrl's output, which this undoes.
+    function _localPath(location) {
+        const url = String(StandardPaths.writableLocation(location));
+        return decodeURIComponent(url.replace(/^file:\/\//, ""));
+    }
 
     // A filesystem path as a URL.
     //

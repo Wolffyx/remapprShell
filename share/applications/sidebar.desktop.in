@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: sidebar
 Comment=Opens or closes the sidebar
-Exec=@BIN_DIR@/@CTL_BIN@ sidebar
+Exec=@CTL_BIN@ sidebar
 Icon=sidebar-show
 Terminal=false
 NoDisplay=true

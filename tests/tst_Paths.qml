@@ -1,4 +1,5 @@
-// Tests for turning a filesystem path into a URL.
+// Tests for turning a filesystem path into a URL, and for where this machine
+// keeps things.
 //
 // A bare path is not a URL, and Qt resolves one against the base URL of the
 // component that uses it -- inside qrc: for a type from a module. A screenshot
@@ -43,5 +44,27 @@ TestCase {
 
     function test_a_hash_does_not_start_a_fragment() {
         compare(Paths.fileUrl("/tmp/shot #2.png"), "file:///tmp/shot%20%232.png");
+    }
+
+    // Worked out at startup, not written in at install (2026-10-08). Whatever
+    // the machine says, each is a plain absolute path -- StandardPaths answers
+    // in file: URLs, and one of those handed to a FileView is no file at all.
+    function test_where_things_are_is_a_plain_absolute_path() {
+        const dirs = [Paths.home, Paths.xdgConfigHome, Paths.xdgDataHome, Paths.xdgStateHome,
+                      Paths.configDir, Paths.dataDir, Paths.stateDir, Paths.qsConfigDir, Paths.ctlBin];
+        for (const d of dirs) {
+            verify(d.startsWith("/"), d);
+            verify(!d.includes("file:"), d);
+            verify(!d.endsWith("/"), d);
+        }
+    }
+
+    // The rules scripts/lib/brand.sh has, so the shell and the CLI agree.
+    function test_the_project_directories_are_the_xdg_ones_and_the_slug() {
+        compare(Paths.configDir, `${Paths.xdgConfigHome}/${Branding.slug}`);
+        compare(Paths.dataDir, `${Paths.xdgDataHome}/${Branding.slug}`);
+        compare(Paths.stateDir, `${Paths.xdgStateHome}/${Branding.slug}`);
+        compare(Paths.qsConfigDir, `${Paths.xdgConfigHome}/quickshell/${Branding.slug}`);
+        compare(Paths.ctlBin, `${Paths.home}/.local/bin/${Branding.ctlName}`);
     }
 }

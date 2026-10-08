@@ -233,8 +233,12 @@ lockscreen_check() {   # <lockscreen dir> [seconds] [style]
     # is never read or written.
     if [ -n "$style" ]; then
         printf '[Lock]\nstyle=%s\n' "$style" > "$work/lockscreen.conf"
-        sed -i "s|location: \"file://[^\"]*\"|location: \"file://$work/lockscreen.conf\"|" \
+        # The whole line, whatever works the path out there; and checked, since
+        # a miss would draw the person's own style and look like a pass.
+        sed -i -E "s|^( *location: ).*$|\1\"file://$work/lockscreen.conf\"|" \
             "$pkg/contents/lockscreen/Options.qml"
+        grep -qF "location: \"file://$work/lockscreen.conf\"" "$pkg/contents/lockscreen/Options.qml" \
+            || { rm -rf "$work"; echo "could not point the copy at the style to draw"; return 1; }
     fi
 
     lockscreen_offscreen timeout "$limit" "$greeter" --testing --shell "$pkg" > "$log" 2>&1 &
