@@ -382,6 +382,17 @@ after it opened if the pointer never comes. Opened by a pull, a key, the button
 or the launcher, it stays. A push into the edge of a sidebar already open on
 that screen leaves it as it is.
 
+**A click outside closes it** (asked for the next day, 2026-10-09) --
+`SidebarCatcher`, the panel's catcher pattern: a transparent surface on every
+screen, on the top layer under the overlay-layer sidebar (two layers, so no
+mapping race), clear of the panel's reserved space so the panel's own button
+and widgets still work. Mapped only while the sidebar is open and not being
+pulled or sliding away; a press anywhere on it closes the sidebar and goes no
+further, as Plasma's popups take theirs. `sidebar.closeOnClickOutside`, on;
+off keeps the windows around it working while it is up. Under a full-screen
+window it cannot catch anything (top layer); Escape, the close button or the
+key do there. **Not yet clicked by hand.**
+
 **And `sidebar.reserveSpace` did nothing.** It set `ExclusionMode.Normal`
 with no `exclusiveZone`, which reserves 0 px. It is `Auto` now (exactly its
 width), and off is `Normal` rather than `Ignore` -- clear of the panel instead
