@@ -3,7 +3,7 @@
 Type=Application
 Name=@DISPLAY_NAME@: application menu
 Comment=Opens whichever application menu is configured
-Exec=@BIN_DIR@/@CTL_BIN@ launcher
+Exec=@CTL_BIN@ launcher
 Icon=start-here-kde
 Terminal=false
 NoDisplay=true

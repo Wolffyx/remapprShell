@@ -8,6 +8,8 @@ here, once, and the other modules take it from here rather than carrying
 placeholders of their own.
 """
 
+import os
+
 DISPLAY_NAME = "@DISPLAY_NAME@"
 SLUG = "@SLUG@"
 ENV_PREFIX = "@ENV_PREFIX@"
@@ -21,8 +23,10 @@ DBUS_NAME = "@DBUS_NAME@"
 # is what keeps the copy off the keyboard.
 BUS_NAME = "@DBUS_NAME@"
 
-# The CLI, which every shortcut and screen edge runs.
-CTL = "@BIN_DIR@/@CTL_BIN@"
+# The CLI, which every shortcut and screen edge runs. Through expanduser: a
+# path under the home directory is rendered as "~/...", and a process is
+# started from a list, with no shell to expand it.
+CTL = os.path.expanduser("@BIN_DIR@/@CTL_BIN@")
 
 # scripts/lib/keycodes.tsv as {name: Qt key code}; see keys.py.
 ACCEL_KEYCODES = @ACCEL_KEYCODES@
