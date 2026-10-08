@@ -1,7 +1,10 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-04**: the keys lost to a GPU
+sessions, and added to since -- most recently on **2026-10-08**: a login with no shell,
+because `make clean` had deleted a file it needed, and what the shell now does so that
+cannot happen and is never silent ("2026-10-08: a login with no shell"). Before that,
+**2026-10-04**: the keys lost to a GPU
 reset, and a sidebar grab strip that took the whole edge ("2026-10-04: the keys after a GPU
 reset"). Before that, the evening of **2026-09-27**: every N+1 in the
 tree -- a process a loop item, a write a loop item, a ladder of tests, a nest
@@ -309,6 +312,79 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-08: a login with no shell
+
+**What the user saw:** the PC started and the shell did not -- Plasma's
+desktop, no panel. The journal: `Type Branding unavailable` →
+`core/Branding.qml: File not found`, five starts in ten seconds, then
+`start-limit-hit`, and systemd stopped. Six diagnostic reports, read by
+nobody.
+
+**Why.** `shell/core/Branding.qml` was generated and gitignored, in the tree
+the live shell runs from. On **2026-10-07 at 09:51:56** `shell/core` and
+`theme/colors` changed in the same instant: that is `make clean`, the one
+thing that removes both. Who ran it is not known -- no Claude session touched
+the repo that day and it is not in the fish history; WebStorm started eleven
+seconds later. The running shell had the file loaded and said nothing; the
+next login could not start. Brought back with `make brand`, `reset-failed`,
+`start`.
+
+**The fix, in five parts.**
+1. **`Branding.qml` is identity only, and committed.** It had held where this
+   machine keeps things too -- the reason it could not be committed, and the
+   third time that shape went wrong (a sandbox install wrote sandbox paths into
+   it; the preview had to patch it). Now: names, ids, the version, `ctlName`.
+   `gen-branding.sh --check` says whether the committed one is current.
+2. **Where things are is worked out at start, in `core/Paths.qml`**, from
+   QtCore's `StandardPaths` -- the XDG directories and the slug, `brand.sh`'s
+   rules, so shell and CLI agree. Not `Quickshell.env`: core imports nothing
+   that needs a running shell, and **Quickshell does not load in
+   qmltestrunner** (`plugin "quickshell-coreplugin" not found`). `StandardPaths`
+   does, and reads `XDG_*` itself. `Branding.ctlBin` is `Paths.ctlBin`
+   everywhere. Same values as before on this machine, checked one by one. The
+   preview patches its copy of `Paths.qml` now, not a generated file.
+3. **The widget index is committed** too -- the only other generated file the
+   shell reads at start. Both are written whole and only when changed
+   (`scripts/lib/generated.sh`), so a regenerate never hands the live shell a
+   half file or a reload for nothing. **`lint-generated` runs first** in
+   `make lint` and in CI, before `make brand` would quietly mend the tree.
+   `make clean` leaves both alone. The qmldirs stay gitignored: Quickshell
+   makes its own; only qmllint needs them.
+4. **The launcher still self-heals** (the user's call: cheap, and a login
+   without a shell is dear). In a linked install it looks for `Branding.qml`,
+   `core/qmldir` and `widgets/index.json` and runs the generators when one is
+   missing; when they fail it says `make brand` and starts anyway.
+5. **A failed start is never silent: the rescue window.** The plan was a
+   notification, and it would have reached nobody: while the shell is down
+   **nothing owns `org.freedesktop.Notifications`** -- kdeconnect, zapzap and
+   Discover each failed to notify that morning, and activation goes to mako's
+   service file (dbus-broker keeps the first of the two that claim the name),
+   whose `mako.service` this machine skips under KDE on purpose
+   (`mako.service.d/no-kde.conf`). So the report unit, after writing its
+   report, runs `rmpr rescue --if-given-up`: once the shell's unit is
+   `failed` (not while a restart is to come) it opens `share/rescue/shell.qml`
+   -- a Quickshell config of its own, outside the shell's tree, importing
+   nothing from it -- in a transient unit, `remappr-shell-rescue`. It shows the
+   last try's `ERROR:` block, the report, and Try again (`reset-failed`, then
+   `start --no-block`) / Open report (`xdg-open`, in a scope, so it outlives the
+   window) / Close. `rmpr rescue --print` shows what it would say.
+   tests/test-rescue.sh, with stand-ins for systemctl, journalctl and
+   systemd-run. Safe mode was left out: it only skips third-party widgets,
+   which the shell quarantines itself, and cannot be passed for one start.
+
+**Traps hit.** A property named `onAccent` is read as a signal handler
+("Cannot assign a value to a signal") -- lint-qml catches it, and now looks
+at `share/` too. `git merge` refuses to overwrite an *untracked* file even
+when it is identical to the incoming one, so landing the committed
+`Branding.qml` meant removing the generated copy in the same command.
+
+**Not yet seen.** The rescue window has only been drawn offscreen; it has
+never opened from a real failed start, nor has the launcher's self-heal run
+at a real login. A drill, when the user wants one: move `shell/core/Branding.qml`
+aside and `systemctl --user restart remappr-shell` -- the self-heal should put
+it back and the shell start; to see the window, a start that fails for
+another reason is needed.
 
 ### 2026-10-04: the keys after a GPU reset, and a grab strip that takes less
 
