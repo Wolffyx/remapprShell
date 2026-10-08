@@ -32,7 +32,7 @@ CardGrid {
     // --providers` cannot disagree.
     readonly property Process _list: Process {
         id: listProc
-        command: [Branding.ctlBin, "ask", "--providers", "--json"]
+        command: [Paths.ctlBin, "ask", "--providers", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try { root.providers = JSON.parse(text); } catch (e) { root.providers = []; }
@@ -51,7 +51,7 @@ CardGrid {
 
     readonly property Process _forget: Process {
         id: forgetProc
-        command: [Branding.ctlBin, "ask", "--forget"]
+        command: [Paths.ctlBin, "ask", "--forget"]
     }
 
     Card {
@@ -183,7 +183,7 @@ CardGrid {
                 glyph: "preview"
                 iconName: "document-preview"
                 text: "See what would be sent"
-                onActivated: Quickshell.execDetached([Branding.ctlBin, "ask", "--review"])
+                onActivated: Quickshell.execDetached([Paths.ctlBin, "ask", "--review"])
             }
 
             TextButton {

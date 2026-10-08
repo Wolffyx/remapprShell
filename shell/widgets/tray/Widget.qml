@@ -444,7 +444,7 @@ BarWidget {
                 iconName: "configure"
                 text: "Manage tray icons"
                 onActivated: {
-                    Quickshell.execDetached([Branding.ctlBin, "settings", "tray"]);
+                    Quickshell.execDetached([Paths.ctlBin, "settings", "tray"]);
                     root.closePopout();
                 }
             }

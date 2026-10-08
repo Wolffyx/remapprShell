@@ -48,7 +48,7 @@ FloatingWindow {
 
     function load() {
         loadProc.running = false;
-        const cmd = [Branding.ctlBin, "ask", "--show", "--json"];
+        const cmd = [Paths.ctlBin, "ask", "--show", "--json"];
         if (root.reportName.length > 0)
             cmd.push("--report", root.reportName);
         loadProc.command = cmd;
@@ -62,7 +62,7 @@ FloatingWindow {
         root.answer = "";
         root.status = root.leaves ? `Sending to ${root.provider}...` : `Running ${root.provider}...`;
         sendProc.running = false;
-        sendProc.command = [Branding.ctlBin, "ask", "--report", root.reportName,
+        sendProc.command = [Paths.ctlBin, "ask", "--report", root.reportName,
                             "--provider", root.provider, "--yes"];
         sendProc.running = true;
     }

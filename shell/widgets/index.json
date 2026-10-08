@@ -1,0 +1,1046 @@
+{
+  "generated": true,
+  "widgets": [
+    {
+      "id": "activewindow",
+      "apiVersion": 1,
+      "name": "Active window",
+      "description": "The window you are working in on this screen, with its application's icon. On another monitor, the window last used there. Click to bring it forward. Needs the window list turned on: rmpr windows enable.",
+      "icon": "preferences-system-windows",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.windowlist"
+        }
+      },
+      "config": {
+        "maxWidth": {
+          "type": "int",
+          "default": 320,
+          "min": 80,
+          "max": 800,
+          "label": "Widest the title gets",
+          "description": "It is elided past this."
+        },
+        "showIcon": {
+          "type": "bool",
+          "default": true,
+          "label": "Show the application's icon"
+        },
+        "showAppName": {
+          "type": "bool",
+          "default": false,
+          "label": "Name the application instead of the window",
+          "description": "\"Dolphin\" rather than the folder it has open, as a macOS menu bar does."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "battery",
+      "apiVersion": 1,
+      "name": "Battery",
+      "description": "Charge, time left and the power profile. Takes no room on a machine with no battery, so it is safe to leave on a desktop's panel.",
+      "icon": "battery-080",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.battery",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "showPercentage": {
+          "type": "bool",
+          "default": false,
+          "label": "Show the percentage",
+          "description": "Beside the icon. The icon alone moves in steps of ten."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "bluetooth",
+      "apiVersion": 1,
+      "name": "Bluetooth",
+      "description": "Switches Bluetooth and connects devices already paired. Pairing a new one opens Plasma's own applet. Takes no room where there is no adapter.",
+      "icon": "network-bluetooth",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.bluetooth",
+          "inSystemTray": true
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "brightness",
+      "apiVersion": 1,
+      "name": "Brightness and Night Light",
+      "description": "A slider per screen that can be dimmed -- a laptop panel, or a monitor over DDC -- and a switch to suspend Night Light. Scroll to dim every screen at once, middle-click to suspend Night Light.",
+      "icon": "brightness-high",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.brightness",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "step": {
+          "type": "int",
+          "default": 5,
+          "min": 1,
+          "max": 20,
+          "label": "Scroll step",
+          "description": "Percent per notch of the wheel."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "clipboard",
+      "apiVersion": 1,
+      "name": "Clipboard",
+      "description": "What you copied, to copy again. Reads Plasma's clipboard history when it is running; when it is not -- under this shell's own renderer -- keeps one itself, text only and in memory.",
+      "icon": "klipper",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.clipboard",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "shown": {
+          "type": "int",
+          "default": 15,
+          "min": 5,
+          "max": 50,
+          "label": "Entries shown",
+          "description": "How many of the most recent entries the popout lists."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "clock",
+      "apiVersion": 1,
+      "name": "Clock",
+      "description": "Current time and date.",
+      "icon": "clock",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.digitalclock"
+        }
+      },
+      "config": {
+        "hour12": {
+          "type": "bool",
+          "default": false,
+          "label": "12-hour clock"
+        },
+        "showSeconds": {
+          "type": "bool",
+          "default": false,
+          "label": "Show seconds"
+        },
+        "showDate": {
+          "type": "bool",
+          "default": true,
+          "label": "Show date",
+          "description": "Under the time; beside it on a thin panel, and not at all down the side of the screen."
+        },
+        "format": {
+          "type": "string",
+          "default": "",
+          "label": "Time format of your own",
+          "description": "A Qt date/time format string, which wins over the choices above. Empty for those."
+        },
+        "dateFormat": {
+          "type": "string",
+          "default": "ddd d MMM",
+          "label": "Date format"
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "divider",
+      "apiVersion": 1,
+      "name": "Divider",
+      "description": "A thin line between groups of widgets.",
+      "icon": "distribute-horizontal-x",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "keyboard",
+      "apiVersion": 1,
+      "name": "Keyboard layout",
+      "description": "Which keyboard layout is on; click for the next one, or scroll through them. Takes no room with only one layout configured.",
+      "icon": "input-keyboard",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.keyboardlayout",
+          "inSystemTray": true
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "launcher",
+      "apiVersion": 1,
+      "name": "Application launcher",
+      "description": "Opens whichever launcher is configured: Kickoff, KRunner, the built-in one, or a command of your own.",
+      "icon": "start-here-kde",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.kickoff"
+        }
+      },
+      "config": {
+        "glyph": {
+          "type": "string",
+          "default": "blur_on",
+          "label": "Glyph",
+          "description": "A Material Symbols name, drawn on the accent tile. Empty draws the theme icon below instead."
+        },
+        "icon": {
+          "type": "string",
+          "default": "start-here-kde",
+          "label": "Theme icon",
+          "description": "Drawn when the glyph is empty, or where Material Symbols is not installed."
+        },
+        "label": {
+          "type": "string",
+          "default": "",
+          "label": "Label",
+          "description": "Shown beside the icon. Empty for icon only."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "media",
+      "apiVersion": 1,
+      "name": "Media",
+      "description": "What is playing, in any player that speaks MPRIS: middle-click to pause, click for the controls. Takes no room when nothing is open.",
+      "icon": "media-playback-start",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.mediacontroller",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "showTitle": {
+          "type": "bool",
+          "default": true,
+          "label": "Show the title",
+          "description": "Beside the icon, on a panel along the top or bottom."
+        },
+        "maxWidth": {
+          "type": "int",
+          "default": 180,
+          "min": 60,
+          "max": 400,
+          "label": "Widest the title gets",
+          "description": "It is elided past this."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "network",
+      "apiVersion": 1,
+      "name": "Network",
+      "description": "What is connected, and a Wi-Fi switch. Joining a network opens Plasma's own applet, which asks for the password.",
+      "icon": "network-wired-activated",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.networkmanagement",
+          "inSystemTray": true
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "notifications",
+      "apiVersion": 1,
+      "name": "Notification history",
+      "description": "What went past: recent notifications, readable again, and askable with AI assist on.",
+      "icon": "notifications",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.notifications",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "showCount": {
+          "type": "bool",
+          "default": false,
+          "label": "Count rather than a dot",
+          "description": "Something unseen shows as a dot on the bell; on, as the number since the list was last opened."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "power",
+      "apiVersion": 1,
+      "name": "Session",
+      "description": "Opens Plasma's own logout and shutdown prompt.",
+      "icon": "system-shutdown",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.lock_logout"
+        }
+      },
+      "config": {
+        "action": {
+          "type": "enum",
+          "values": [
+            "promptAll",
+            "promptLogout",
+            "promptReboot",
+            "promptShutDown"
+          ],
+          "labels": [
+            "Ask what to do",
+            "Log out",
+            "Restart",
+            "Shut down"
+          ],
+          "default": "promptAll",
+          "label": "Action"
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "privacy",
+      "apiVersion": 1,
+      "name": "Camera and microphone in use",
+      "description": "Appears while an application records from the camera or a microphone, and names it. Click to mute the microphone. Takes no room the rest of the time.",
+      "icon": "camera-on",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.cameraindicator",
+          "inSystemTray": true
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "search",
+      "apiVersion": 1,
+      "name": "Search",
+      "description": "A search field on the panel. It opens whatever searches for you: KRunner, the built-in launcher, or a command of your own (launcher.searchProvider).",
+      "icon": "search",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.milou"
+        }
+      },
+      "config": {
+        "label": {
+          "type": "string",
+          "default": "Search",
+          "label": "Label",
+          "description": "The word in the field. Empty for the icon alone; down the side of the screen there is never room for it."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "showdesktop",
+      "apiVersion": 1,
+      "name": "Show desktop",
+      "description": "Peeks at the desktop, Windows-style. Sits at the end of the panel.",
+      "icon": "user-desktop",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.showdesktop"
+        }
+      },
+      "config": {
+        "width": {
+          "type": "int",
+          "default": 8,
+          "min": 2,
+          "max": 40,
+          "label": "Strip width"
+        },
+        "peek": {
+          "type": "bool",
+          "default": false,
+          "label": "Peek at the desktop",
+          "description": "Rest the pointer on the strip to move the windows aside until it leaves. A click while peeking keeps the desktop."
+        },
+        "peekDelay": {
+          "type": "int",
+          "default": 500,
+          "min": 100,
+          "max": 2000,
+          "label": "Peek after (ms)"
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "sidebar",
+      "apiVersion": 1,
+      "name": "Sidebar",
+      "description": "Opens this shell's sidebar, which slides in from the right. The same panel Meta+S opens.",
+      "icon": "sidebar-expand-left",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        }
+      },
+      "config": {},
+      "builtin": true
+    },
+    {
+      "id": "status",
+      "apiVersion": 1,
+      "name": "Quick settings",
+      "description": "Network, Bluetooth, sound and battery in one place on the panel, and quick settings a click away: Wi-Fi and Ethernet, Bluetooth, the microphone, do not disturb, Night Light, and game mode and VPN where there are any, with the volume and the brightness -- each with a page of its own for the devices behind it. Choose which tiles are drawn. Scroll to change the volume, middle-click to mute.",
+      "icon": "preferences-system",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        }
+      },
+      "config": {
+        "tiles": {
+          "type": "set",
+          "values": [
+            "wifi",
+            "ethernet",
+            "bluetooth",
+            "microphone",
+            "dnd",
+            "night",
+            "game",
+            "vpn"
+          ],
+          "labels": [
+            "Wi-Fi",
+            "Ethernet",
+            "Bluetooth",
+            "Microphone",
+            "Do not disturb",
+            "Night Light",
+            "Game mode",
+            "VPN"
+          ],
+          "default": [
+            "wifi",
+            "ethernet",
+            "bluetooth",
+            "microphone",
+            "dnd",
+            "night",
+            "game",
+            "vpn"
+          ],
+          "label": "Tiles",
+          "description": "Which switches the grid draws, in this order. A tile for hardware the machine does not have is left out whether or not it is on here -- no Bluetooth adapter, no Bluetooth tile."
+        },
+        "density": {
+          "type": "enum",
+          "values": [
+            "roomy",
+            "dense"
+          ],
+          "labels": [
+            "A grid of tiles",
+            "A list of rows"
+          ],
+          "default": "roomy",
+          "label": "Quick settings",
+          "description": "roomy: a grid of tiles. dense: a list of rows, each with its switch."
+        },
+        "step": {
+          "type": "int",
+          "default": 5,
+          "min": 1,
+          "max": 25,
+          "label": "Volume step",
+          "description": "Percent per notch of the wheel."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "tasks",
+      "apiVersion": 1,
+      "name": "Open windows",
+      "description": "The windows you have open, and a click to switch to one. Needs the window list turned on: rmpr windows enable.",
+      "icon": "preferences-system-windows",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.icontasks"
+        }
+      },
+      "config": {
+        "groupByApp": {
+          "type": "bool",
+          "default": true,
+          "label": "Group windows by application",
+          "description": "One button per application, as KDE and Windows do, with a mark per window. Clicking moves through that application's windows."
+        },
+        "pinned": {
+          "type": "list",
+          "default": [],
+          "label": "Pinned applications",
+          "description": "Desktop entry ids (\"org.kde.dolphin\"), kept on the taskbar in this order whether or not they are running. Right-click a button and choose \"Pin to taskbar\" rather than typing them."
+        },
+        "thisScreenOnly": {
+          "type": "bool",
+          "default": false,
+          "label": "Only this screen's windows",
+          "description": "Each monitor's panel lists the windows on that monitor, as Windows does with \"show taskbar apps on the taskbar where the window is open\"."
+        },
+        "thisDesktopOnly": {
+          "type": "bool",
+          "default": true,
+          "label": "Only this desktop's windows",
+          "description": "The windows on the virtual desktop in front, as KDE's own task manager and Windows both do. Off lists every window on every desktop. A window set to be on all desktops is always listed."
+        },
+        "previewHeader": {
+          "type": "bool",
+          "default": false,
+          "label": "Name the application above its previews",
+          "description": "The application's icon and name over the window cards, with how many windows it has. Off, each card's own icon and title say it."
+        },
+        "previewScreen": {
+          "type": "bool",
+          "default": false,
+          "label": "Name the monitor on each preview",
+          "description": "With more than one monitor, the one a window is on (\"DP-2\") after its title. The desktop it is on is said whenever there is more than one."
+        },
+        "stackGroups": {
+          "type": "bool",
+          "default": true,
+          "label": "Stack the icon of an application with several windows",
+          "description": "A second square behind the icon when an application has more than one window open, so the count shows on the button itself."
+        },
+        "showTitles": {
+          "type": "bool",
+          "default": true,
+          "label": "Show titles",
+          "description": "The window's title beside its icon, as far as the widest a button gets. Off, buttons are icons alone and the title is one hover away."
+        },
+        "maxWidth": {
+          "type": "int",
+          "default": 230,
+          "min": 60,
+          "max": 400,
+          "label": "Widest a button gets",
+          "description": "Titles are elided past this."
+        },
+        "iconSize": {
+          "type": "int",
+          "default": 0,
+          "min": 0,
+          "max": 48,
+          "label": "Icon size",
+          "description": "0 follows the panel's thickness, so resizing the panel resizes the icons with it."
+        },
+        "iconScale": {
+          "type": "int",
+          "default": 72,
+          "min": 40,
+          "max": 100,
+          "label": "Icon size, as a share of the button",
+          "description": "How much of a button's height the icon fills, in percent. 100 leaves no room around it; the default leaves a little. Ignored when \"Icon size\" is set to an exact number of pixels."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "taskview",
+      "apiVersion": 1,
+      "name": "Task view",
+      "description": "Opens KWin's Overview -- every window and virtual desktop at once, as Windows' task view does.",
+      "icon": "view-app-grid",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        }
+      },
+      "config": {
+        "effect": {
+          "type": "enum",
+          "values": [
+            "Overview",
+            "Grid View",
+            "Expose",
+            "ExposeAll"
+          ],
+          "labels": [
+            "The Overview",
+            "The desktop grid",
+            "This desktop's windows",
+            "Every desktop's windows"
+          ],
+          "default": "Overview",
+          "label": "Opens",
+          "description": "Which of KWin's views: the Overview, the grid of virtual desktops, or the windows of this desktop (Expose) or of all of them (ExposeAll)."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "tray",
+      "apiVersion": 1,
+      "name": "System tray",
+      "description": "StatusNotifierItem icons from running applications, with the rest behind a chevron.",
+      "icon": "preferences-system-tray",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.systemtray"
+        }
+      },
+      "config": {
+        "iconSize": {
+          "type": "int",
+          "default": 0,
+          "min": 0,
+          "max": 48,
+          "label": "Icon size",
+          "description": "0 follows the panel's tray icon size."
+        },
+        "chevron": {
+          "type": "enum",
+          "values": [
+            "after",
+            "before"
+          ],
+          "labels": [
+            "After the icons",
+            "Before the icons"
+          ],
+          "default": "after",
+          "label": "The hidden-icons button sits",
+          "description": "after: at the end of the tray, past the icons, as the design has it. before: at the start, so the icons that come and go do not push it around -- which is what Plasma's tray does."
+        },
+        "pinned": {
+          "type": "list",
+          "default": [],
+          "label": "On the panel",
+          "description": "StatusNotifierItem ids shown on the panel, in this order. Empty shows every item; pin any and the rest move behind the chevron. Settings has a page that edits this by dragging, which is easier than typing ids."
+        },
+        "hidden": {
+          "type": "list",
+          "default": [],
+          "label": "Never shown",
+          "description": "Ids left out altogether, not even behind the chevron."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "volume",
+      "apiVersion": 1,
+      "name": "Volume",
+      "description": "The default output's volume. Scroll to change it, middle-click to mute, click for sliders; Plasma's own mixer is one click further.",
+      "icon": "audio-volume-high",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.volume",
+          "inSystemTray": true
+        }
+      },
+      "config": {
+        "step": {
+          "type": "int",
+          "default": 5,
+          "min": 1,
+          "max": 20,
+          "label": "Scroll step",
+          "description": "Percent per notch of the wheel."
+        },
+        "maxVolume": {
+          "type": "int",
+          "default": 0,
+          "min": 0,
+          "max": 150,
+          "label": "Loudest by scrolling",
+          "description": "Percent. 0 follows Settings → Sound, where \"Raise maximum volume\" lives and which every other slider in this shell reads; anything else is this widget's own ceiling."
+        },
+        "showMicrophone": {
+          "type": "bool",
+          "default": true,
+          "label": "Show the microphone",
+          "description": "A second slider in the popout, for the default input."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "weather",
+      "apiVersion": 1,
+      "name": "Weather",
+      "description": "The temperature now, and a forecast when you click it. Off until Settings -> Weather is turned on: it is the one widget that talks to the internet, and it asks Open-Meteo for a place and nothing else.",
+      "icon": "weather-few-clouds",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        }
+      },
+      "config": {
+        "showTemperature": {
+          "type": "bool",
+          "default": true,
+          "label": "Show the temperature",
+          "description": "Beside the icon. Off leaves the icon alone, which is narrower on a full panel."
+        },
+        "showPlace": {
+          "type": "bool",
+          "default": false,
+          "label": "Show the place",
+          "description": "The town the forecast is for, after the temperature."
+        },
+        "days": {
+          "type": "int",
+          "default": 5,
+          "min": 1,
+          "max": 6,
+          "label": "Days shown",
+          "description": "How many days of the forecast the popout lists."
+        }
+      },
+      "builtin": true
+    },
+    {
+      "id": "workspaces",
+      "apiVersion": 1,
+      "name": "Virtual desktops",
+      "description": "Switches between KWin virtual desktops.",
+      "icon": "virtual-desktops",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal",
+        "vertical"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.pager"
+        }
+      },
+      "config": {
+        "style": {
+          "type": "enum",
+          "values": [
+            "numbers",
+            "icons",
+            "dots"
+          ],
+          "labels": [
+            "Numbers",
+            "Application icons",
+            "Dots"
+          ],
+          "default": "numbers",
+          "label": "Pills show",
+          "description": "numbers: the desktop's number. icons: the icons of the windows on it. dots: a dot. An empty desktop is always a dot."
+        },
+        "maxShown": {
+          "type": "int",
+          "default": 8,
+          "min": 1,
+          "max": 20,
+          "label": "Desktops shown",
+          "description": "At most this many; the current desktop is always among them."
+        },
+        "showNames": {
+          "type": "bool",
+          "default": false,
+          "label": "Show desktop names"
+        },
+        "scrollToSwitch": {
+          "type": "bool",
+          "default": true,
+          "label": "Switch by scrolling"
+        }
+      },
+      "builtin": true
+    }
+  ]
+}

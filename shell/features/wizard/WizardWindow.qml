@@ -139,7 +139,7 @@ FloatingWindow {
         if (presetShowProc.running)
             return;   // picked up when the running read exits
         presetShowProc.name = root.preset;
-        presetShowProc.command = [Branding.ctlBin, "preset", "show", root.preset];
+        presetShowProc.command = [Paths.ctlBin, "preset", "show", root.preset];
         presetShowProc.running = true;
     }
 
@@ -169,7 +169,7 @@ FloatingWindow {
     // machine where it would fail.
     readonly property Process _providers: Process {
         id: providersProc
-        command: [Branding.ctlBin, "ask", "--providers", "--json"]
+        command: [Paths.ctlBin, "ask", "--providers", "--json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -186,7 +186,7 @@ FloatingWindow {
     // that here would mean two answers to "what presets exist".
     readonly property Process _presets: Process {
         id: presetsProc
-        command: [Branding.ctlBin, "preset", "list"]
+        command: [Paths.ctlBin, "preset", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const names = [];
@@ -210,7 +210,7 @@ FloatingWindow {
     // saving, which is the ordinary case on a real first run.
     readonly property Process _keep: Process {
         id: keepProc
-        command: [Branding.ctlBin, "profile", "keep", "before-wizard"]
+        command: [Paths.ctlBin, "profile", "keep", "before-wizard"]
         stdout: StdioCollector {
             onStreamFinished: root.kept = text.trim()
         }
@@ -235,7 +235,7 @@ FloatingWindow {
             // answers by destroying this window -- and a Process destroyed in
             // the same turn it is told to start never spawns anything, quietly.
             // The renderer the wizard was asked for was never switched to.
-            Quickshell.execDetached([Branding.ctlBin, "renderer", "set", root.renderer, "--yes"]);
+            Quickshell.execDetached([Paths.ctlBin, "renderer", "set", root.renderer, "--yes"]);
         }
 
         root._markDone();
@@ -248,7 +248,7 @@ FloatingWindow {
         root.status = "Applying...";
         if (root.preset.length > 0) {
             // `preset apply` keeps the profile it replaces; see the header.
-            applyProc.command = [Branding.ctlBin, "preset", "apply", root.preset];
+            applyProc.command = [Paths.ctlBin, "preset", "apply", root.preset];
             applyProc.running = true;   // _write runs when it exits
             return;
         }

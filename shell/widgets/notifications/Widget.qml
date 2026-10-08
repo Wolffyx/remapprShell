@@ -51,7 +51,7 @@ BarWidget {
     function ask(entry) {
         const index = NotificationWatch.entries.indexOf(entry);
         if (index >= 0)
-            Quickshell.execDetached([Branding.ctlBin, "ask", "--notification", String(index), "--review"]);
+            Quickshell.execDetached([Paths.ctlBin, "ask", "--notification", String(index), "--review"]);
     }
 
     BarButton {

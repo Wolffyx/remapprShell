@@ -465,7 +465,9 @@ Destructive code is tested against a throwaway `HOME`, never a real one.
 
 The name is a variable, not a constant. `branding.json` is the only place it exists;
 `shell/core/Branding.qml` is generated from it and `scripts/lint-slug.sh` fails the build if
-the slug is hardcoded anywhere else.
+the slug is hardcoded anywhere else. `Branding.qml` is committed and holds identity only --
+names, ids, the version; where this machine keeps things is worked out at startup in
+`shell/core/Paths.qml`, and `scripts/lint-generated.sh` fails if the committed file is stale.
 
 ### Code layout
 

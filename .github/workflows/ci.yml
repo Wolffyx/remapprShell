@@ -31,6 +31,12 @@ jobs:
       - name: Trust the checkout
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      # Branding.qml and the widget index are committed; this fails if either is
+      # not what its sources make. Before Generate, which would make them right
+      # in the checkout and hide it.
+      - name: Generated files lint
+        run: ./scripts/lint-generated.sh
+
       # Every generator, not just branding -- the same `brand` target every
       # local `make lint` and `make test` depends on. Generating less here than
       # a developer generates locally is a class of failure on its own: the

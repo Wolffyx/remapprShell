@@ -1,5 +1,6 @@
-# Generated - never committed
-shell/core/Branding.qml
+# Generated - never committed. Branding.qml and the widget index are generated
+# too but committed: the shell reads them as it starts, from the tree it may be
+# running from (scripts/lib/generated.sh).
 theme/lockscreen/Options.qml
 
 # The pattern-check hooks' own logs: a record of local tool decisions, not of
@@ -28,7 +29,6 @@ dev/preview/switcher.*/
 *.swp
 *~
 shell/**/qmldir
-shell/widgets/index.json
 theme/colors/*.colors
 
 # Python byte code, left by importing a script to try it

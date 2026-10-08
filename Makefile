@@ -3,7 +3,7 @@
 # All real work lives in scripts/ -- these targets are thin wrappers, so the
 # same commands run identically in CI.
 
-.PHONY: help setup link install uninstall run restart log lint lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults lint-launch docs brand test clean plugin plugin-clean
+.PHONY: help setup link install uninstall run restart log lint lint-generated lint-slug lint-layers lint-qml lint-docs lint-widgets lint-tests lint-defaults lint-launch docs brand test clean plugin plugin-clean
 
 SHELL := /bin/bash
 SLUG  := $(shell jq -r .slug branding.json)
@@ -47,7 +47,11 @@ restart: ## Restart the installed systemd user unit
 log: ## Follow the shell's journal
 	@journalctl --user -u $(UNIT) -f
 
-lint: lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch lint-nesting ## Run every lint
+lint: lint-generated lint-slug lint-layers lint-qml lint-widgets lint-tests lint-docs lint-defaults lint-launch lint-nesting ## Run every lint
+
+# First, before lint-qml's `brand` makes them right in the working tree.
+lint-generated: ## Fail if a committed generated file is not what its sources make
+	@scripts/lint-generated.sh
 
 lint-slug: ## Fail if the project name is hardcoded anywhere
 	@scripts/lint-slug.sh
@@ -90,7 +94,7 @@ plugin-clean: ## Remove the plugin's build directory and both installed modules
 	@printf '\033[32m==>\033[0m window previews and the input module removed\n'
 
 clean: ## Remove generated files
-	@rm -f shell/core/Branding.qml theme/colors/*.colors
+	@rm -f theme/colors/*.colors
 
 test: brand ## Run the QML test suite
 	@scripts/test.sh

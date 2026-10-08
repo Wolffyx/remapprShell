@@ -414,7 +414,7 @@ Provider {
     function openSetting(item) {
         Frecency.record("setting", item.id);
         root.close();
-        Quickshell.execDetached([Branding.ctlBin, "settings", item.id]);
+        Quickshell.execDetached([Paths.ctlBin, "settings", item.id]);
     }
 
     function _cycle(key, order, fallback) {
@@ -451,7 +451,7 @@ Provider {
             PlasmaApplets.openSettings("kcm_wallpaper");
             break;
         case "settings":
-            Quickshell.execDetached([Branding.ctlBin, "settings"]);
+            Quickshell.execDetached([Paths.ctlBin, "settings"]);
             break;
         case "taskview":
             Dbus.invokeShortcut("Overview");
