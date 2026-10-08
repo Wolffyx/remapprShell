@@ -166,10 +166,37 @@ check("and answered", call.answered, True)
 
 call = Call()
 screen.handle_call(bus, None, None, None, "Triggered", ("sidebar-reveal",), call)
-check("the shell's own is announced",
-      bus.signals, [("/Edges", "com.example.T.Edges", "Reached", ("sidebar-reveal",))])
+check("the shell's own is announced, from nowhere in particular",
+      bus.signals, [("/Edges", "com.example.T.Edges", "Reached", ("sidebar-reveal", -1, -1, ""))])
 check("and not run", keys.ran, ["launcher"])
 check("and answered too", call.answered, True)
+
+# Where the pointer was pushed in, from a script that says: the grip goes
+# there, and the sidebar onto that screen.
+bus.signals.clear()
+call = Call()
+screen.handle_call(bus, None, None, None, "TriggeredAt", ("sidebar-open", 3999, 812, "DP-3"), call)
+check("an edge that says where is announced with it",
+      bus.signals, [("/Edges", "com.example.T.Edges", "Reached", ("sidebar-open", 3999, 812, "DP-3"))])
+check("and answered", call.answered, True)
+
+call = Call()
+screen.handle_call(bus, None, None, None, "TriggeredAt", ("keys", 0, 0, "DP-2"), call)
+check("a key's action from TriggeredAt is still run", keys.ran, ["launcher", "keys"])
+check("and not announced", len(bus.signals), 1)
+
+# A shared edge: the pointer at rest in the last column, and gone again --
+# passed on as it is, for the shell to time.
+bus.signals.clear()
+call = Call()
+screen.handle_call(bus, None, None, None, "Resting", ("sidebar-reveal", 2559, 1500, "DP-2", True), call)
+screen.handle_call(bus, None, None, None, "Resting", ("sidebar-reveal", 2559, 1500, "DP-2", False), call)
+check("a resting pointer is passed on, and its leaving",
+      bus.signals, [("/Edges", "com.example.T.Edges", "Resting", ("sidebar-reveal", 2559, 1500, "DP-2", True)),
+                    ("/Edges", "com.example.T.Edges", "Resting", ("sidebar-reveal", 2559, 1500, "DP-2", False))])
+check("and answered", call.answered, True)
+screen.handle_call(bus, None, None, None, "Resting", ("launcher", 2559, 1500, "DP-2", True), call)
+check("a key's action is never run on a rest", (keys.ran, len(bus.signals)), (["launcher", "keys"], 2))
 PYTEST
 
 harness_done

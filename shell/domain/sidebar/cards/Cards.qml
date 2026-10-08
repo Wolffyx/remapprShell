@@ -64,26 +64,4 @@ QtObject {
     function edgeFor(position) {
         return root.onLeft(position) ? "Left" : "Right";
     }
-
-    // Whether `screen`'s edge on that side is the outside of the layout: no
-    // other screen meets it there along any of its height. Only such an edge
-    // can be pushed into -- KWin puts a screen edge nowhere else, and a
-    // pointer pushed through a shared one simply goes on to the next screen.
-    // Screens are {name, x, y, width, height}, in the compositor's own
-    // coordinates, as Quickshell gives them.
-    function edgeIsOuter(screen, screens, leftEdge) {
-        if (!screen)
-            return false;
-        const line = leftEdge ? screen.x : screen.x + screen.width;
-        const top = screen.y;
-        const bottom = screen.y + screen.height;
-        for (const other of screens ?? []) {
-            if (!other || other.name === screen.name)
-                continue;
-            const meets = (leftEdge ? other.x + other.width : other.x) === line;
-            if (meets && other.y < bottom && other.y + other.height > top)
-                return false;
-        }
-        return true;
-    }
 }

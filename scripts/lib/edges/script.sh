@@ -25,9 +25,10 @@ EDGES_GROUP="Script-$KWIN_EDGES_SCRIPT_ID"
 # them is rendered from, so the two can never disagree about what exists --
 # and the shell's own. Those are not commands but something the shell does to
 # a surface it already has up, so the daemon announces them rather than runs
-# them (bin/windowsd/edges.py, "Reached"): sidebar-reveal lights the sidebar's
-# grab strip, to be pulled. No key can be bound to one.
-SHELL_EDGE_ACTIONS=(sidebar-reveal)
+# them (bin/windowsd/edges.py, "Reached"), with where the pointer was:
+# sidebar-reveal lights the sidebar's grip there, to be pulled, and
+# sidebar-open opens the sidebar on that screen. No key can be bound to one.
+SHELL_EDGE_ACTIONS=(sidebar-reveal sidebar-open)
 shell_actions() { printf '%s\n' "${ACCEL_ACTIONS[@]}" "${SHELL_EDGE_ACTIONS[@]}"; }
 
 shell_bindings_raw() {
@@ -52,6 +53,22 @@ shell_install() {
     raw=$(shell_bindings_raw)
     js=$(shell_bindings_js "$raw")
     EDGE_BINDINGS=$js kwin_script_render "$EDGES_SCRIPT_SRC" "$EDGES_SCRIPT_DEST" "the edge script"
+}
+
+# Whether the installed script is what this checkout renders now. `follow`
+# runs at every start of the shell, so an update that changes the script --
+# what it hands the daemon -- reaches KWin then, and not only on the next
+# change of a setting.
+shell_current() {
+    local tmp rc=1
+    [ -f "$EDGES_SCRIPT_DEST/contents/code/main.js" ] || return 1
+    tmp=$(mktemp -d) || return 1
+    if EDGE_BINDINGS=$(shell_bindings_js "$(shell_bindings_raw)") \
+           kwin_script_render "$EDGES_SCRIPT_SRC" "$tmp" "the edge script" 2>/dev/null; then
+        cmp -s "$tmp/contents/code/main.js" "$EDGES_SCRIPT_DEST/contents/code/main.js" && rc=0
+    fi
+    rm -rf "$tmp"
+    return "$rc"
 }
 
 shell_reload() {
@@ -141,27 +158,40 @@ edges_shell() {   # [<edge> <action|none>]
 # The sidebar draws down one side (sidebar.position), and the edge on that
 # side does what sidebar.trigger says:
 #
-#   hover  opens the sidebar on a pointer that merely reaches the edge
-#   drag   lights the grab strip when the pointer is pushed into the edge, to
+#   hover  opens the sidebar on a pointer pushed against the edge, on the
+#          screen it was pushed on (sidebar-open: the shell's own, no process)
+#   drag   lights the grab strip when the pointer is pushed against the edge, to
 #          be pressed and pulled -- nothing at all at the edge until then, so
 #          a scrollbar there keeps every pixel. Unless the strip reserves its
 #          own space (sidebar.handleReserves): then it is always there, nothing
 #          is under it, and the edge has nothing to do.
 #   none   nothing
 #
-# So the edge moves with the side, and its action with the trigger; anything
+# On every screen, not only the outside of the layout: the script follows the
+# last column on that side of each screen rather than asking KWin for an edge
+# (kwin/edges, "The sidebar's side"). So the edge moves with the side, and its action with the trigger; anything
 # else bound to the sidebar is let go. Called by hand, and by the shell itself
-# when it starts and when either setting changes.
-edges_follow() {
+# when it starts and when either setting changes -- and then with the three
+# values as arguments, because the shell asks the moment a setting changes and
+# writes the file a quarter of a second later: read from the file, the edge
+# was always one setting behind (2026-10-08, "Pointer at the edge" chosen and
+# the strip's edge bound, then the strip chosen and the hover edge bound).
+edges_follow() {   # [<position> <trigger> <reserves>]
     local want side trigger reserves action raw have bound local_ifs pair
-    IFS=$'\t' read -r side trigger reserves < <(config_merged | jq -r \
-        '[.sidebar.position // "right", .sidebar.trigger // "drag", (.sidebar.handleReserves // false | tostring)] | @tsv')
+    if [ $# -ge 3 ]; then
+        side=$1 trigger=$2 reserves=$3
+    else
+        IFS=$'\t' read -r side trigger reserves < <(config_merged | jq -r \
+            '[.sidebar.position // "right", .sidebar.trigger // "drag", (.sidebar.handleReserves // false | tostring)] | @tsv')
+    fi
+    case "$side" in left|right) ;; *) die "unknown sidebar position: $side (left or right)" ;; esac
+    case "$trigger" in drag|hover|none) ;; *) die "unknown sidebar trigger: $trigger (drag, hover or none)" ;; esac
     want=Right
     [ "$side" = left ] && want=Left
 
     action=""
     case "$trigger" in
-        hover) action=sidebar ;;
+        hover) action=sidebar-open ;;
         drag)  [ "$reserves" = true ] || action=sidebar-reveal ;;
     esac
 
@@ -170,7 +200,7 @@ edges_follow() {
     local_ifs=$IFS; IFS=','
     for pair in $raw; do
         case "${pair#*:}" in
-            sidebar|sidebar-reveal) have=${pair%%:*}; bound=${pair#*:} ;;
+            sidebar|sidebar-reveal|sidebar-open) have=${pair%%:*}; bound=${pair#*:} ;;
         esac
     done
     IFS=$local_ifs
@@ -180,7 +210,7 @@ edges_follow() {
         log_info "sidebar.trigger is '$trigger'; no screen edge is the sidebar's"
         exit 0
     fi
-    if [ "$have" = "$want" ] && [ "$bound" = "$action" ]; then
+    if [ "$have" = "$want" ] && [ "$bound" = "$action" ] && shell_current; then
         log_info "the sidebar's edge is already $want ($action)"
         exit 0
     fi

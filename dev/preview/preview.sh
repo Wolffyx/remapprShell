@@ -34,7 +34,7 @@ for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$r
     # file -- taking most of the file with it and reporting the syntax error
     # that made at a line number that no longer meant anything.
     sed -i -E 's/^PanelWindow \{/Item {/; /^    anchors \{[^}]*\}$/d; /^    anchors \{$/,/^    \}$/d;
-        /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: Region|screen: |color: "transparent")/d;
+        /^    (margins\.|exclusionMode:|exclusiveZone:|WlrLayershell\.|BackgroundEffect\.|mask: |screen: |color: "transparent")/d;
         s/^    required property var modelData/    property var modelData/' "$f"
 done
 # The profile and the state directory are the user's, and a preview is not.

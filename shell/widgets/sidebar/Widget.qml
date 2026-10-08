@@ -18,7 +18,7 @@ BarWidget {
     id: root
 
     wantsHover: true
-    tooltip: Surfaces.sidebar ? "Close the sidebar" : "Sidebar"
+    tooltip: Surfaces.sidebarShown ? "Close the sidebar" : "Sidebar"
 
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight

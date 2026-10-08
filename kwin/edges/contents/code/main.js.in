@@ -36,20 +36,156 @@ const IFACE = "@DBUS_NAME@.Edges";
 // usually turned straight back on.
 const BINDINGS = @EDGE_BINDINGS@;
 
+// Where the pointer was pushed in, and on which screen. Read here because
+// nothing else can: Wayland tells a client where the pointer is only while it
+// is over that client's own surface, and at the edge it is over somebody
+// else's window. The shell puts the sidebar's grip where the pointer is, and
+// the sidebar on that screen.
+function outputAt(pos) {
+    const screens = workspace.screens;
+    for (let i = 0; i < screens.length; ++i) {
+        const g = screens[i].geometry;
+        if (pos.x >= g.x && pos.x < g.x + g.width && pos.y >= g.y && pos.y < g.y + g.height)
+            return String(screens[i].name);
+    }
+    return "";
+}
+
 // True keeps the edge armed; KWin re-approaches otherwise. There is no second
 // meaning to returning false here -- the action has already been asked for by
 // the time this returns.
 function trigger(action) {
-    callDBus(SERVICE, PATH, IFACE, "Triggered", String(action));
+    const pos = workspace.cursorPos;
+    callDBus(SERVICE, PATH, IFACE, "TriggeredAt", String(action),
+             Math.round(pos.x), Math.round(pos.y), outputAt(pos));
     return true;
+}
+
+/*
+    The sidebar's side: rested against, never a KWin edge.
+
+    The sidebar's actions on the left or the right are not given to KWin as
+    screen edges, for two reasons seen on this machine. KWin puts an edge only
+    on the outside of the whole layout, so a side that another screen meets
+    had none -- the pointer went on to the next screen, and that screen had no
+    sidebar trigger at all. And where KWin does have an edge, it draws its
+    approach glow down the whole length of it (the "screen edge" effect, the
+    theme's glowbar) every time the pointer comes near -- a bar the height of
+    the screen, on that screen alone, which was the very thing the sidebar's
+    short grip was made to stop being.
+
+    So every screen's last column on that side is followed instead, and the
+    pointer *resting* there is the push: against the outside of the layout it
+    cannot go further, and against a neighbour KWin's edge barrier (kwinrc
+    [EdgeBarrier], 100 px by default) holds it there for a moment before it
+    crosses. This says when the pointer comes to rest in such a column and when
+    it leaves, and the shell -- which has timers, as a script does not --
+    counts how long it stays (SidebarReveal). Not over a full-screen window,
+    whose edge is its own.
+
+    Anything else bound to an edge -- a key's action on the top, say -- is a
+    KWin edge as before.
+*/
+const SIDE = { "sidebar-reveal": true, "sidebar-open": true };
+const LEFT = 6;
+const RIGHT = 2;
+
+function rested(border, action) {
+    return !!SIDE[action] && (border === LEFT || border === RIGHT);
 }
 
 for (let i = 0; i < BINDINGS.length; ++i) {
     const border = BINDINGS[i][0];
     const action = BINDINGS[i][1];
+    if (rested(border, action))
+        continue;
     // The callback is built outside the loop body's scope on purpose: a
     // closure over the loop variable would hand every edge the last action.
     registerScreenEdge(border, (function (bound) {
         return function () { return trigger(bound); };
     })(action));
 }
+
+// How far the pointer may move along the edge and still be resting: further
+// is a scrollbar being dragged, not a push.
+const DRIFT = 48;
+
+let columns = [];
+let resting = null;
+let watching = false;
+
+// The last column of every screen on that side.
+function columnsFor(action, dir) {
+    const out = [];
+    const screens = workspace.screens;
+    for (let i = 0; i < screens.length; ++i) {
+        const g = screens[i].geometry;
+        out.push({ x: dir > 0 ? g.x + g.width - 1 : g.x, top: g.y, bottom: g.y + g.height,
+                   action: action, output: String(screens[i].name) });
+    }
+    return out;
+}
+
+function sideColumns() {
+    let out = [];
+    for (let i = 0; i < BINDINGS.length; ++i) {
+        const border = BINDINGS[i][0];
+        const action = BINDINGS[i][1];
+        if (rested(border, action))
+            out = out.concat(columnsFor(action, border === RIGHT ? 1 : -1));
+    }
+    return out;
+}
+
+function columnAt(p) {
+    for (let i = 0; i < columns.length; ++i) {
+        const c = columns[i];
+        if (p.x >= c.x && p.x < c.x + 1 && p.y >= c.top && p.y < c.bottom)
+            return c;
+    }
+    return null;
+}
+
+function fullScreenOn(output) {
+    const w = workspace.activeWindow;
+    return !!w && !!w.fullScreen && !!w.output && String(w.output.name) === output;
+}
+
+function tell(r, on) {
+    callDBus(SERVICE, PATH, IFACE, "Resting", r.action, r.x, r.y, r.output, on);
+}
+
+function onCursor() {
+    const p = workspace.cursorPos;
+    const hit = columnAt(p);
+    if (resting && hit && hit.output === resting.output && Math.abs(p.y - resting.y) <= DRIFT)
+        return;
+    if (resting) {
+        tell(resting, false);
+        resting = null;
+    }
+    if (!hit || fullScreenOn(hit.output))
+        return;
+    resting = { action: hit.action, x: Math.round(p.x), y: Math.round(p.y), output: hit.output };
+    tell(resting, true);
+}
+
+// Followed only while a sidebar action is bound to a side: with none, nothing
+// here follows the pointer at all.
+function refresh() {
+    columns = sideColumns();
+    const want = columns.length > 0;
+    if (want === watching)
+        return;
+    watching = want;
+    if (want)
+        workspace.cursorPosChanged.connect(onCursor);
+    else
+        workspace.cursorPosChanged.disconnect(onCursor);
+}
+
+refresh();
+if (workspace.screensChanged)
+    workspace.screensChanged.connect(refresh);
+if (workspace.virtualScreenGeometryChanged)
+    workspace.virtualScreenGeometryChanged.connect(refresh);

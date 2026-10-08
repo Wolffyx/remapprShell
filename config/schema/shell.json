@@ -267,7 +267,7 @@
             "group": "Look",
             "icon": "sidebar-show",
             "glyph": "view_sidebar",
-            "description": "The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened with a shortcut ('rmpr shortcuts set sidebar'), a screen edge ('rmpr edges shell'), or the launcher's Sidebar action.",
+            "description": "The panel that slides in from an edge: what is playing, the day and the weather, the machine, and the latest notifications. Opened from its edge (below), with a shortcut ('rmpr shortcuts set sidebar'), the panel's Sidebar button, or the launcher's Sidebar action.",
             "keys": {
                 "sidebar.position": {
                     "type": "enum",
@@ -292,11 +292,11 @@
                     ],
                     "default": "drag",
                     "label": "Opened by",
-                    "description": "'drag': push the pointer into the sidebar's edge and a strip there lights up for a moment -- press it and pull inwards. Until it is pushed it takes nothing, so a scrollbar at that edge keeps every pixel, and a pointer resting there opens nothing. Only on a screen whose edge on that side is not shared with another screen; a shared edge cannot be pushed into. 'hover' opens the sidebar on a pointer that merely reaches the edge. 'none' leaves the shortcut and the launcher action as the only ways in.",
+                    "description": "'drag': push the pointer against the sidebar's edge and hold it there a moment, and a short grip lights up where the pointer is -- press it and pull inwards, and the sidebar comes out under the pointer; let go before a third of the way and it goes back. Until then nothing is there, so a scrollbar or a window against that edge keeps every pixel. 'hover': push the pointer against the edge and hold it a moment, and the sidebar opens on that screen (see 'Close when the pointer leaves'). Either way on every screen: where another screen meets that side, KWin's edge barrier (on by default) holds the pointer at the edge for that moment instead of letting it cross straight over. Never over a full-screen window, whose edge is its own. 'none' leaves the shortcut, the panel button and the launcher action as the ways in.",
                     "labels": [
-                        "Pulled from its strip",
+                        "Pulled from its grip",
                         "Pointer at the edge",
-                        "Only a key or the launcher"
+                        "Only a key, the button or the launcher"
                     ]
                 },
                 "sidebar.handleWidth": {
@@ -305,14 +305,20 @@
                     "max": 24,
                     "step": 1,
                     "default": 1,
-                    "label": "Grab strip",
-                    "description": "How many pixels at the very edge the lit strip takes, in pixels. One is the column the pointer stops in when it is pushed into the edge. While the strip keeps windows off it, this is also how much of that edge they give up."
+                    "label": "Grip depth",
+                    "description": "How many pixels in from the very edge the lit grip takes a press, in pixels. One is the column the pointer stops in when it is pushed into the edge. While the strip keeps windows off it, this is also how much of that edge they give up."
                 },
                 "sidebar.handleReserves": {
                     "type": "bool",
                     "default": false,
                     "label": "Keep windows off the strip",
-                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it. Nothing is ever under it then, so it is simply always there, on every screen, with no push needed -- at the cost of a gap that wide down that edge. Off: no gap, and the strip takes nothing until it is pushed into."
+                    "description": "Reserve the strip's width, as a panel does, so maximised windows stop short of it. Nothing is ever under it then, so it is always there, the whole height of the edge and on every screen, with no push needed -- at the cost of a gap that wide down that edge. Off: no gap, and the grip takes nothing until the edge is pushed into, and then only a short stretch where the pointer is."
+                },
+                "sidebar.closeOnLeave": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Close when the pointer leaves",
+                    "description": "For a sidebar opened by the pointer at its edge ('Pointer at the edge'): it goes away again once the pointer has been in it and left, or if the pointer never comes to it. Opened by a pull, a key, the panel button or the launcher, it stays until it is closed."
                 },
                 "sidebar.width": {
                     "type": "int",
@@ -336,7 +342,7 @@
                     "type": "bool",
                     "default": false,
                     "label": "Push windows aside",
-                    "description": "While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them and the desktop keeps its shape."
+                    "description": "While it is open, reserve its width so maximised windows move over instead of being covered. Off: it floats above them, and the desktop keeps its shape."
                 },
                 "sidebar.expanded": {
                     "type": "list",

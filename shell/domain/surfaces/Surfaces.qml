@@ -15,7 +15,22 @@ import Quickshell
 QtObject {
     id: root
 
+    // The sidebar is up -- or on its way away: it stays mapped while it slides
+    // out, so `sidebarShown` is the one to ask "is it open".
     property bool sidebar: false
+    property bool sidebarLeaving: false
+    readonly property bool sidebarShown: root.sidebar && !root.sidebarLeaving
+
+    // How far out a pull from its edge has brought it, 0 to 1, while the
+    // pointer is still down; -1 the rest of the time. The sidebar follows this
+    // rather than its own animation while it is held (SidebarHandle).
+    property real sidebarPull: -1
+
+    // What opened it: "edge" (the pointer pushed into its edge, which puts it
+    // away again when the pointer leaves -- `sidebar.closeOnLeave`), "pull",
+    // or "" for a key, the panel button and the launcher, which leave it up
+    // until it is closed.
+    property string sidebarOpenedBy: ""
 
     // The clipboard history, opened where the pointer is rather than under a
     // panel widget. Its own flag rather than one of `_only`'s: it is a small
@@ -113,13 +128,50 @@ QtObject {
                 + ` (was ${root.windowSwitcher ? "windowSwitcher" : root.overview ? "overview" : "none"}`
                 + `, ${root.heldClosedAt > 0 ? Math.round(Date.now() - root.heldClosedAt) + "ms since the last close" : "none closed yet"})`);
 
-        root.sidebar = which === "sidebar";
+        root._sidebarTo(which === "sidebar");
         root.keys = which === "keys";
         root.session = which === "session";
         root.windowSwitcher = which === "windowSwitcher";
         root.overview = which === "overview";
-        if (screen !== undefined)
+        // Not on a close: the sidebar is still on its screen while it slides
+        // away, and moving the screen under it would drop it mid-slide.
+        if (screen !== undefined && which.length > 0)
             root.screen = screen ?? "";
+    }
+
+    // Up, or away: away is a slide, which the sidebar ends by calling
+    // finishSidebar(). A guard ends it anyway, so a sidebar that never got to
+    // draw -- its screen unplugged -- cannot leave the flag up for ever.
+    function _sidebarTo(up) {
+        if (up) {
+            root.sidebar = true;
+            root.sidebarLeaving = false;
+            root._sidebarGuard.stop();
+            return;
+        }
+        // Leaving first, then let go of the pull: the sidebar slides back
+        // from wherever the pull left it rather than heading out first.
+        if (root.sidebar && !root.sidebarLeaving) {
+            root.sidebarLeaving = true;
+            root._sidebarGuard.restart();
+        }
+        root.sidebarPull = -1;
+    }
+
+    // Gone first, then no longer leaving: in the other order it is, for a
+    // moment, a sidebar that is up and not leaving, and it heads out again.
+    function finishSidebar() {
+        if (!root.sidebarLeaving)
+            return;
+        root._sidebarGuard.stop();
+        root.sidebar = false;
+        root.sidebarLeaving = false;
+        root.sidebarOpenedBy = "";
+    }
+
+    readonly property Timer _sidebarGuard: Timer {
+        interval: 800
+        onTriggered: root.finishSidebar()
     }
 
     // Opened by a key that is still held, so it never toggles: pressing the
@@ -168,7 +220,49 @@ QtObject {
         root._only("overview", screen);
     }
 
-    function toggleSidebar(screen) { root._only(root.sidebar ? "" : "sidebar", screen); }
+    function toggleSidebar(screen) {
+        if (root.sidebarShown) {
+            root._only("");
+            return;
+        }
+        root.openSidebar(screen, "");
+    }
+
+    // Open on that screen; one already open there stays as it is, so the
+    // pointer pushed into the edge of a sidebar opened by a key does not turn
+    // it into one that closes when the pointer leaves.
+    function openSidebar(screen, by) {
+        const name = String(screen ?? "");
+        if (root.sidebarShown && (name.length === 0 || name === root.screenName))
+            return;
+        root.sidebarOpenedBy = String(by ?? "");
+        root._only("sidebar", name);
+    }
+
+    function closeSidebar() {
+        if (root.sidebarShown)
+            root._only("");
+    }
+
+    // A pull from the edge, followed: called as the pointer moves, with how
+    // far out it is (Gesture.progress), and released with whether it stays.
+    function pullSidebar(screen, progress) {
+        root.sidebarPull = Math.max(0, Math.min(1, Number(progress) || 0));
+        if (root.sidebarShown && root.sidebarOpenedBy === "pull")
+            return;
+        root.sidebarOpenedBy = "pull";
+        root._only("sidebar", String(screen ?? ""));
+    }
+
+    function releaseSidebar(stays) {
+        if (root.sidebarPull < 0)
+            return;
+        if (!stays) {
+            root._only("");
+            return;
+        }
+        root.sidebarPull = -1;
+    }
     function toggleKeys(screen) { root._only(root.keys ? "" : "keys", screen); }
 
     function openSession(kind, screen) {
