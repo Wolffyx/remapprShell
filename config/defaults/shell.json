@@ -203,6 +203,7 @@
         "handleWidth": 1,
         "handleReserves": false,
         "closeOnLeave": true,
+        "closeOnClickOutside": true,
         "width": 396,
         "margin": 16,
         "reserveSpace": false,

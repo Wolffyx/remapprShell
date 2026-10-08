@@ -320,6 +320,12 @@
                     "label": "Close when the pointer leaves",
                     "description": "For a sidebar opened by the pointer at its edge ('Pointer at the edge'): it goes away again once the pointer has been in it and left, or if the pointer never comes to it. Opened by a pull, a key, the panel button or the launcher, it stays until it is closed."
                 },
+                "sidebar.closeOnClickOutside": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Close on a click outside",
+                    "description": "A click anywhere off the sidebar puts it away, on any screen, as a menu's does -- and goes no further, since nothing can hand it on to the window underneath. The panel still works while it is up. Off: the windows around it keep every click and scroll while it is open, and it closes with Escape, its close button, its key or the panel button."
+                },
                 "sidebar.width": {
                     "type": "int",
                     "min": 280,

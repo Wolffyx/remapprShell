@@ -67,6 +67,15 @@ Scope {
         SidebarHandle {}
     }
 
+    // A click anywhere off the open sidebar closes it, on every screen -- not
+    // while a pull is still bringing it out, nor while it slides away.
+    Variants {
+        model: Surfaces.sidebarShown && Surfaces.sidebarPull < 0
+               && ConfigStore.value("sidebar.closeOnClickOutside", true) === true
+            ? Quickshell.screens : []
+        SidebarCatcher {}
+    }
+
     // The sidebar, the key sheet and the session screen: one at a time, on
     // the screen they were asked for on (Surfaces).
     Variants {
