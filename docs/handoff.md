@@ -1,7 +1,11 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-08**: a login with no shell,
+sessions, and added to since -- most recently on **2026-10-08**, twice: in the
+morning, the sidebar's edge gone over on the user's report -- a grip where the
+pointer is instead of a bar down the whole edge, a sidebar that comes out under
+the pull, and "Pointer at the edge" mended, which had always been one setting
+behind ("2026-10-08: the sidebar's edge"); before that, a login with no shell,
 because `make clean` had deleted a file it needed, and what the shell now does so that
 cannot happen and is never silent ("2026-10-08: a login with no shell"). Before that,
 **2026-10-04**: the keys lost to a GPU
@@ -153,7 +157,7 @@ and the rest still say what 2026-09-16 found.
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
 | Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
 | CI | **green, for the first time.** It had never passed: five causes, each hiding the next (see 2026-09-14 below). It now runs all six lints rather than three |
-| Screen edges | KWin's own: nothing bound, snapping on. **Ours: none, deliberately** -- `sidebar.trigger` is `drag`, so the sidebar is pulled out by its own strip and `rmpr edges follow` gave KWin's edge back. Setting the trigger to `hover` binds the edge again, on the side `sidebar.position` names |
+| Screen edges | KWin's own: nothing bound, snapping on. *(2026-10-08)* **Ours: `Right:sidebar-reveal`** -- `sidebar.trigger` is `drag`, so pushing into the right edge lights the sidebar's grip there, to be pulled. It had been `Right:sidebar` (the hover route, through `rmpr sidebar`) while the profile said `drag`: the edge was always one setting behind, see that day. `hover` binds `sidebar-open` now, on the side `sidebar.position` names. Every screen has the trigger, the same way: the pointer resting in that side's last column (against KWin's edge barrier where DP-3 meets DP-2). Not a KWin edge, so no KWin glow |
 | Shortcuts | *(2026-09-22)* **All of them were `<unbound>` at the start of that session**: the caelestia uninstall wiped this project's entries out of `kglobalshortcutsrc`, and `rmpr doctor` reported it as "19 recorded key(s) are no longer set". Rebound to the project defaults and **grabbed**: Meta (menu), Meta+Space (search), Meta+Shift+R (settings), Meta+V (clipboard), Meta+S (sidebar), Meta+/ (keys). Taken back from plasmashell, krunner and plasmawindowed, all recorded, `rmpr shortcuts revert` gives them back. **Still unbound and the user's to choose**: `switcher`, `overview`, and the three screenshot actions -- Alt+Tab is KWin's here, and the screenshot keys went back to Spectacle with the rest. Since 2026-09-22 a press is handled **in this shell**, off kglobalaccel's own signal, not by spawning the CLI |
 | `rmpr doctor` | *(2026-09-22)* no problems, 1 warning -- the recorded keys the caelestia uninstall took, which `revert` would still put back |
 
@@ -312,6 +316,121 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-08: the sidebar's edge
+
+The user, in their words: the "pulled from its strip" bar is too big; the
+pointer at the edge does not work properly, or the sidebar system is not well
+done; make it easy to use, without affecting open applications -- full-screen
+ones, ones against the edge -- while still being able to use the sidebar.
+
+**"Pointer at the edge" was one setting behind, always.** `SidebarEdge` ran
+`edges follow` the moment a setting changed, and the CLI read the setting
+from the profile -- which ConfigStore writes 250 ms later (`_writeTimer`). So
+choosing "Pointer at the edge" bound the *strip's* edge, and choosing the strip
+again bound the *hover* edge: found from the files, kwinrc written at
+11:11:02.81 with `Right:sidebar` and the profile at 11:11:02.95 with no trigger
+in it, i.e. `drag`. `edges follow` now takes the three values as arguments
+(`edges follow right hover false`), the shell passes them, and the file is
+read only when it is run by hand. `follow` also re-renders the KWin script when
+the installed one is not what the checkout renders (`shell_current`), and it
+runs at every start -- so an update to the script reaches KWin then.
+
+**Both edge routes go straight to the shell now, with where the pointer was.**
+The edge script reads `workspace.cursorPos`, finds the output, and calls the
+daemon's new `TriggeredAt(action, x, y, output)`; the daemon announces the
+shell's own actions as `Reached(siis)` (`Triggered(s)` is kept, announced at
+-1, -1, ""). Hover used to bind the key's own action, `sidebar`, so a push
+spawned `rmpr sidebar`, which loaded a one-shot KWin script for the pointer,
+which called the daemon, which signalled the shell -- and then it *toggled*,
+so a second push closed it. Hover binds `sidebar-open` now: open, not toggle,
+on the pushed screen, at once. `edges follow` treats `sidebar`,
+`sidebar-reveal` and `sidebar-open` all as the sidebar's edge.
+
+**The grip.** The lit strip was the whole height of the edge. It is a 64 px
+grip -- one 5 px bar with a darker rim, readable over a pale scrollbar and a
+dark one; a pale halo beside it was tried first and read as a second bar --
+*where
+the pointer was pushed in*, and only that grip and 28 px either side take a
+press -- `Gesture.band`. Lit for 1.5 s after the push, 0.6 s after the pointer
+leaves it. Only the handle on the pushed output lights (it used to be every
+handle). A reserved strip (`handleReserves`) is still the whole height, with
+the grip following the pointer on it. The handle ignores exclusive zones when
+not reserving, so its coordinates are the screen's and the grip lands where
+KWin says.
+
+**The pull follows the pointer** -- item 2 of the 2026-09-16 queue. Past a 6 px
+dead zone the sidebar comes out under the pointer (`Surfaces.pullSidebar`),
+and let go it stays if it was more than 35% out or flicked inwards at 600 px/s,
+and slides back otherwise (`Surfaces.releaseSidebar`, `Gesture.settlesOpen`).
+The sidebar now slides the whole way from the screen edge and slides away on
+every close (`sidebarLeaving`; it calls `Surfaces.finishSidebar()` when it is
+in, with an 800 ms guard). `Surfaces.sidebarShown` is "is it open" -- `sidebar`
+stays true for the slide.
+
+**Not in the way of applications.** The sidebar surface runs to the edge but
+takes the pointer only on its card (`mask: Region { item: card }`), so the
+margin between it and the edge is the window's -- a scrollbar there works with
+the sidebar up. It is on the **Overlay** layer now, like the key sheet and the
+session screen: on Top a full-screen window sat above it, so Meta+S over a game
+opened a sidebar nobody could see. Over a full-screen window the edge stays
+quiet (KWin's own rule, `RemainActiveOnFullscreen` off) and the handle deaf.
+
+**Opened from the edge, it goes away on its own** -- `sidebar.closeOnLeave`,
+on by default: 0.45 s after the pointer has been in it and left, or 1.8 s
+after it opened if the pointer never comes. Opened by a pull, a key, the button
+or the launcher, it stays. A push into the edge of a sidebar already open on
+that screen leaves it as it is.
+
+**And `sidebar.reserveSpace` did nothing.** It set `ExclusionMode.Normal`
+with no `exclusiveZone`, which reserves 0 px. It is `Auto` now (exactly its
+width), and off is `Normal` rather than `Ignore` -- clear of the panel instead
+of over it.
+
+What is pure is `qs.domain.sidebar.gesture` (`Gesture`, tst_Gesture.qml, 12
+tests). `dev/preview/sidebarpull.qml` draws six states offscreen -- `grip`,
+`pull`, `closing`, `stays`, `edge`, `toggle` -- and logs what each ends as;
+every one was run (preview.sh now strips any `mask:` line, which a handle
+needs). Deployed: `make link`, `rmpr windows restart` (the daemon first, so the
+new script's `TriggeredAt` is answered), then the QML; the shell's own
+`follow` at reload rebound `Right:sidebar-reveal` and loaded the new script.
+**Not yet pushed and pulled by hand.**
+
+**Then: "the sidebar trigger is only on one display".** KWin puts screen edges
+only on the outside of the layout, and DP-2's right side is DP-3's left -- the
+pointer went straight on, and DP-2 had Meta+S and nothing else. What a shared
+side does have is KWin's edge barrier (`[EdgeBarrier] EdgeBarrier`, 100 px by
+default, not set here): pushed towards DP-3, the pointer is held in DP-2's last
+column first. So the edge script now also follows the pointer -- connected to
+`workspace.cursorPosChanged` only while some screen has a neighbour on a side
+a sidebar action is bound to, so one monitor costs nothing -- and says when it
+comes to rest in such a column and when it leaves or drifts 48 px along it
+(`Resting(action, x, y, output, on)`, through the daemon as a signal). Resting
+200 ms is a push (`SidebarReveal.restMs`): the grip lights there, or the
+sidebar opens. A side shared for part of its length is checked point by point
+(DP-3's left is shared only between y 1040 and 2480). Skipped over an active
+full-screen window on that output. Every screen gets a handle now;
+`Cards.edgeIsOuter`, which kept them off shared sides, is gone with its tests.
+The script was checked in node against this layout (rest, drift, leave, the
+partly shared side, full screen, a key's action never watched) and two
+previews were added (`rest`, `rest-left`). With the edge barrier turned off a
+pointer has to be stopped exactly in that column, which is unlikely: the
+setting's description says so.
+
+**And then a full bar on DP-3** (the user's screenshot: blue, the height of the
+screen, a glow fading inwards). Not the grip -- KWin's own "screen edge"
+effect, which draws the theme's `glowbar` (ours has none, so Plasma's default,
+blue) down the whole of any edge reserved with `registerScreenEdge` as the
+pointer approaches it. DP-3's right was the only outer edge, so the only one
+KWin had reserved, so the only screen with the bar. The sidebar's actions on
+the left or the right are not KWin edges any more: the script follows the last
+column on that side of *every* screen (`rested()`, kwin/edges) and the resting
+rule covers the outside of the layout too, where the pointer cannot go further.
+One trigger, the same on every screen, no glow, and no KWin pushback at that
+edge either. A sidebar action bound to the top or the bottom by hand is still
+a KWin edge (`TriggeredAt`, Reached). The script now follows the pointer
+whenever a sidebar action is on a side, one monitor included -- a comparison
+or two per motion event, none at all under a game that holds the pointer.
 
 ### 2026-10-08: a login with no shell
 
