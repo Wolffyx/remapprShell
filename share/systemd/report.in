@@ -8,7 +8,15 @@ Description=@DISPLAY_NAME@ diagnostic report for %i
 
 [Service]
 Type=oneshot
-ExecStart=@BIN_DIR@/@CTL_BIN@ report create --reason "%i failed"
+ExecStart=-@BIN_DIR@/@CTL_BIN@ report create --reason "%i failed"
+
+# Then, once systemd has stopped restarting the shell, a window that says so.
+# Nothing serves notifications while the shell is down -- it is the server --
+# so this is the one way left to tell anyone (2026-10-08). The report's "-":
+# a report that could not be written is no reason not to say the shell is
+# down. Run at every failure, it opens nothing while a restart is still to
+# come; see scripts/rescue.sh.
+ExecStart=@BIN_DIR@/@CTL_BIN@ rescue --if-given-up
 
 # The report is written locally and nothing is sent anywhere, so a failure here
 # is worth a journal line and nothing more.
