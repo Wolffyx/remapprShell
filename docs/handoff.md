@@ -386,6 +386,40 @@ aside and `systemctl --user restart remappr-shell` -- the self-heal should put
 it back and the shell start; to see the window, a start that fails for
 another reason is needed.
 
+**Later the same day: no path of this machine in anything generated or
+installed.** The user asked for `/home/<user>` gone from everywhere. Tracked
+files and the whole history held it nowhere but one commit *message*
+(9bdc370, 2026-09-13, quoting a `qrc:/home/...` path) -- left as it is, by the
+user's choice, rather than rewrite `main` and `dev`. What carried it:
+- `theme/lockscreen/Options.qml`, rendered with the config directory. The
+  greeter works it out now from `StandardPaths`; the check and the lock
+  preview rewrite the whole `location:` line and stop if they missed it.
+  **The lock screen is enabled** (the table above is out of date) and the
+  installed copy still has the old file -- `rmpr lockscreen try`, then
+  `enable`, is the user's to run.
+- Every installed file. `render_template` writes a path under `$HOME` in the
+  word its reader expands (`render_home_word`): `$HOME` in scripts and in the
+  D-Bus service's `sh -c`, `~` through `expanduser` in the daemon, `%h` in
+  the units. Desktop entries expand nothing: the command ones name the bare
+  command (PATH, which the installer guarantees), and the Wayland-interfaces
+  one names the config with `-c`. test-uninstall fails, naming each file, if
+  a rendered file names the home.
+- Two Claude hook logs that were not ignored.
+Left alone: `build/` (CMake), `.idea/`, `.claude/` -- caches, ignored, local.
+Installed by rendering the manifest's templates and packages in place
+(not `make link`, which re-makes the live shell's link); window daemon and
+shell restarted, both came up through the new lines, doctor clean.
+
+**A loss, and its cause.** Before that install the setup was saved:
+`20261008-102214-before-home-paths`, and every installed file plus the
+config in `~/.local/state/remappr-shell/backups/20261008-before-home-paths/`.
+But **`snapshot create` prunes when `snapshots.keep` is set**, and this
+user's profile sets 10: taking one deleted two -- `20260915-005551-My shell
+setup` and `20260916-210217-before-theme`. Not recoverable (`/home` has no
+btrfs snapshots; snapper covers `/` only); each had a near neighbour minutes
+apart. **Check `snapshots.keep` before taking a snapshot**, or lock the ones
+that matter (`rmpr snapshot lock`).
+
 ### 2026-10-04: the keys after a GPU reset, and a grab strip that takes less
 
 Two of the issues filed that morning, #7 and #8, fixed the same evening.
