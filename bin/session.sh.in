@@ -27,4 +27,25 @@ if [ "${@SAFE_MODE_VAR@:-}" = "1" ]; then
     echo "@DISPLAY_NAME@: safe mode -- third-party widgets disabled" >&2
 fi
 
+# A linked install runs straight from the working tree, and a generated file
+# missing from it is a login with no shell: the running one does not notice,
+# having them loaded already, and the next start fails. It did five times in ten
+# seconds on "Type Branding unavailable" (2026-10-08), after `make clean` took
+# Branding.qml. That one and the widget index are committed now, so no clean
+# removes them; this is for whatever else does -- an rm, a checkout, a script
+# run from the wrong root -- and for the qmldirs, which are still gitignored.
+# They are made again here, from the tree the link points into, when one is
+# missing. A copied install carries its own and no tree to make them from.
+if [ -L "@QS_CONFIG_DIR@" ]; then
+    for generated in core/Branding.qml core/qmldir widgets/index.json; do
+        [ -e "@QS_CONFIG_DIR@/$generated" ] && continue
+        echo "@DISPLAY_NAME@: $generated is missing from the working tree -- generating it" >&2
+        { "@REPO_ROOT@/scripts/gen-branding.sh" \
+            && "@REPO_ROOT@/scripts/gen-qmldir.sh" \
+            && "@REPO_ROOT@/scripts/gen-widget-index.sh"; } >/dev/null \
+            || echo "@DISPLAY_NAME@: could not generate it; run \`make brand\` in @REPO_ROOT@" >&2
+        break
+    done
+fi
+
 exec /usr/bin/quickshell -n -p "@QS_CONFIG_DIR@/shell.qml" "$@"
