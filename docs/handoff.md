@@ -1,11 +1,13 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-14**: an output
-picker one device short after a system update, because a package install had
-put PulseAudio itself back on the socket beside PipeWire, and a second way to
-read sound for when it is ("2026-10-14: PulseAudio on the socket"). Before
-that, **2026-10-08**, twice: in the morning, the sidebar's edge gone over on the user's report -- a grip where the
+sessions, and added to since -- most recently on **2026-10-14**, twice: in the
+afternoon the four open bugs on GitHub, each fixed and each still to be seen
+on the real screen ("The afternoon of 2026-10-14: the open bugs"); in the
+morning an output picker one device short after a system update, because a
+package install had put PulseAudio itself back on the socket beside PipeWire,
+and a second way to read sound for when it is ("2026-10-14: PulseAudio on the
+socket"). Before that, **2026-10-08**, twice: in the morning, the sidebar's edge gone over on the user's report -- a grip where the
 pointer is instead of a bar down the whole edge, a sidebar that comes out under
 the pull, and "Pointer at the edge" mended, which had always been one setting
 behind ("2026-10-08: the sidebar's edge"); before that, a login with no shell,
@@ -319,6 +321,63 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### The afternoon of 2026-10-14: the open bugs
+
+The user: fix the other open bugs. The four labelled `bug` on GitHub -- #13,
+#15, #20, #22 -- had not been touched by any commit since they were filed;
+#15 was done here, the other three each by an agent in a worktree of its own,
+reviewed and cherry-picked onto `dev`. **None of the four is closed on
+GitHub**, and none has been seen working on the real screen yet. What to try
+is under each.
+
+**#15, show desktop (`a7d0230`).** The call and the read-back were sound; the
+target was not. The strip sits 12 px short of the corner on a full panel and
+28 px short and 14 px up on a floating one -- outside its own input mask --
+and a pointer thrown at the corner stops in the corner. A widget can now own
+the corner beyond it (`BarWidget.ownsCorner`, show-desktop's is on):
+`CornerCatcher` in PanelSurface covers from it to the screen's corner across
+the panel's whole depth and hands everything to the slot, whose pointer
+handling moved into functions for it. The catcher is in `PanelSurface.input`,
+the mask, not in `shape`, the blur. *Try*: throw the pointer into the
+bottom-right corner of either screen and click, twice.
+
+**#22, the yellow bar on the lock screen (`6823f7e`).** The greeter makes the
+lock screen at 800x600 and sizes it after; the critical-battery banner was
+hidden by standing a height above the screen, so the resize slid it from one
+hidden place to another, through the top 29 px. It slides a 0-1 fraction now,
+and `LockUi.settled` (the greeter's `viewVisible`, which comes after the
+resize) gates the size-bound Behaviors -- the glass clock's, the minimal
+field's. Measured in the real greeter offscreen at 2560x1440. *Try*: `rmpr
+lockscreen try` -- the installed copy is still the old build until it is
+tried; `status` says the source has changed.
+
+**#13, the panel and full screen (`b1628a4`, `c0200f4`, `b6a8ca9`).** Filling
+the edge counts a window only by its `output` now, and never a full-screen
+one: a window a pixel over from the other monitor no longer changes this
+panel's reserved space, and a game going full screen no longer resizes the
+maximised windows behind it, twice. The step-aside was already instant in
+QML; the delay was the KWin script's 50 ms settle, restarted by every move
+of a game going full screen, so `fullScreenChanged` publishes on the next
+event-loop pass instead (installed: `rmpr windows enable` was run). Panel
+float and size animations follow `theme.animationMs`. *Unproven*: what
+actually moved DP-3 -- both panels were already filling their edges in the
+live list. If it still moves, read `busctl --user --json=short call
+com.remappr.Shell /Windows com.remappr.Shell.Windows List` while it does.
+
+**#20, windows at 0,0 -- the tray part (`0ff5650`, `5bb16c6`).** Three
+fallbacks sent a tray click to 0,0. Negative points were clamped because
+busctl took a leading minus for an option: `Dbus.callArgs` puts `--` after
+`call` now, which also fixes any call with an argument like `-x`. A click on
+an item not yet looked up could be answered by a lookup begun before the
+item registered; lookups are numbered and only a later one answers
+(`TrayClick.due`), with a 2 s busctl timeout instead of 25. No screen is the
+middle of a screen, not the origin. The rest of #20 -- X11 apps asking for
+their own position, apps restoring a saved one -- is **not built**: the
+proposal is an opt-in KWin script that moves a normal window landing exactly
+on its output's origin, by the configured policy, default off; or a
+`kwinrulesrc` "ignore requested geometry" rule per app. Either wants the user
+to say which applications do it.
 
 ### 2026-10-14: PulseAudio on the socket
 
