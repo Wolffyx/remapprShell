@@ -23,6 +23,15 @@
 #                                 ledger, and KWin asked to read it again
 #   behaviour revert              put every one of them back
 #
+# One of them is not a kwinrc key but a window rule: placeGames. A game run
+# through Steam's Proton is an X11 window that often asks for a position of its
+# own -- World of Tanks' launcher asks for the middle of everything the screens
+# span, which with a portrait screen beside a landscape one is the top edge of
+# one of them -- and KWin gives an X11 window the position it asks for. The
+# rule tells KWin to ignore that for windows whose class starts steam_app_, so
+# they are placed like every other window. Its own scope in the ledger
+# (windows-games); `behaviour revert` takes it out with the rest.
+#
 # The behaviour half configures KWin and reimplements nothing: these are the
 # keys System Settings' "Window Behaviour" page writes, and the ones a shell
 # can honestly offer. What KWin does not have -- window gaps, rounded window
@@ -46,6 +55,10 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
+
+# The window rule behind `behaviour set placeGames`, by the name it has in
+# kwinrulesrc.
+GAMES_RULE="$SLUG-steam-games"
 SCRIPT_DEST="$KWIN_SCRIPTS_DIR/$KWIN_SCRIPT_ID"
 
 install_script() {
@@ -190,6 +203,7 @@ JS
             "autoRaiseDelay|Windows|AutoRaiseInterval|int|0 3000|750"
             "borderlessMaximized|Windows|BorderlessMaximizedWindows|bool||false"
             "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Centered"
+            "placeGames|@rule|$GAMES_RULE|bool||true"
         )
 
         behaviour_spec() {
@@ -210,8 +224,26 @@ JS
             BEHAVIOUR_VALUES=()
             for spec in "${BEHAVIOUR_KEYS[@]}"; do
                 IFS='|' read -r _ group key _ _ fallback <<< "$spec"
+                if [ "$group" = "@rule" ]; then
+                    BEHAVIOUR_VALUES+=("$spec" "$(kwin_rule_present "$key" && echo true || echo false)")
+                    continue
+                fi
                 BEHAVIOUR_VALUES+=("$spec" "${rc[$group:$key]-$fallback}")
             done
+        }
+
+        # The Proton games rule, on or off. Ignore the position the window
+        # asks for (Force), for a normal window whose class contains
+        # steam_app_ -- Steam names every Proton game's windows that way.
+        games_rule() {   # true|false
+            if [ "$1" = true ]; then
+                kwin_rule_add windows-games "$GAMES_RULE" \
+                    "Description=$DISPLAY_NAME: Steam games are placed by KWin" \
+                    wmclass=steam_app_ wmclassmatch=2 types=1 \
+                    ignoregeometry=true ignoregeometryrule=2
+            else
+                kwin_rule_remove windows-games "$GAMES_RULE"
+            fi
         }
 
         behaviour_status_json() {
@@ -258,6 +290,16 @@ JS
                           [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
                     enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
                 esac
+                if [ "$group" = "@rule" ]; then
+                    [ "$(kwin_rule_present "$key" && echo true || echo false)" = "$value" ] && {
+                        log_info "$id is already $value"
+                        exit 0
+                    }
+                    games_rule "$value"
+                    kwin_reconfigure
+                    log_step "$id: $value (windows opened from now on)"
+                    exit 0
+                fi
                 [ "$(kreadconfig6 --file kwinrc --group "$group" --key "$key" --default "$fallback")" = "$value" ] && {
                     log_info "$id is already $value"
                     exit 0
@@ -269,6 +311,7 @@ JS
 
             revert)
                 kconfig_revert windows-behaviour
+                games_rule false
                 kwin_reconfigure
                 log_step "KWin's window behaviour is back as it was"
                 ;;

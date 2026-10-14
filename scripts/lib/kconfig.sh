@@ -226,6 +226,21 @@ kconfig_purge_group() {
 # Kept for callers that mean "undo everything".
 kconfig_revert_all() { kconfig_revert --all; }
 
+# kconfig_forget <scope>
+#
+# Drops a scope's records without writing anything back, for a key the scope
+# no longer has to itself. KWin's list of window rules is the case: the
+# person adds to it in System Settings, and putting it back as it was before
+# this project touched it would take their rules out with ours. The caller
+# takes its own entry out of the list instead, and lets go of "before".
+kconfig_forget() {
+    local scope=$1 led tmp
+    led=$(kconfig_ledger)
+    [ -s "$led" ] || return 0
+    tmp=$(mktemp)
+    jq --arg s "$scope" '.entries |= map(select(.scope != $s))' "$led" > "$tmp" && mv "$tmp" "$led"
+}
+
 kconfig_ledger_summary() {
     local led
     led=$(kconfig_ledger)

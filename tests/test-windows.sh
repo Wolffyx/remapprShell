@@ -46,6 +46,40 @@ check "and the other one too"               "$(kwinrc_key BorderlessMaximizedWin
 check "the ledger is empty again"           "$(ledger_count windows-behaviour)" "0"
 check "nothing reached KDE"                 "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
 
+# placeGames is a window rule, not a kwinrc key: a group of its own in
+# kwinrulesrc and its id in [General] rules, beside whatever rules the person
+# has made. Off and revert take out ours alone: putting the list back as it
+# was before would take out a rule made since.
+echo "== Steam games placed by KWin =="
+GAMES="$SLUG-steam-games"
+rules() { kread kwinrulesrc General rules; }
+game_key() { kread kwinrulesrc "$GAMES" "$1"; }
+games_status() { behave status --json | jq -r ".settings[] | select(.id==\"placeGames\") | .$1"; }
+
+check "off until it is set"               "$(games_status value)" "false"
+check "and on by default"                 "$(games_status default)" "true"
+behave set placeGames true >/dev/null
+check "on: the rule is listed"            "$(rules)" "$GAMES"
+check "for Proton games, position ignored" \
+    "$(game_key wmclass):$(game_key wmclassmatch):$(game_key ignoregeometry):$(game_key ignoregeometryrule)" \
+    "steam_app_:2:true:2"
+check "status reads it back"              "$(games_status value)" "true"
+behave set placeGames false >/dev/null
+check "off: the list is as it was"        "$(rules)" "<unset>"
+check "and the group is gone"             "$(grep -c "^\[$GAMES\]" "$XDG_CONFIG_HOME/kwinrulesrc" 2>/dev/null)" "0"
+check "and the ledger let go"             "$(ledger_count windows-games)" "0"
+
+behave set placeGames true >/dev/null
+kwriteconfig6 --file kwinrulesrc --group General --key rules "$GAMES,theirs"
+kwriteconfig6 --file kwinrulesrc --group General --key count 2
+kwriteconfig6 --file kwinrulesrc --group theirs --key Description "a rule of their own"
+behave revert >/dev/null
+check "revert takes out ours alone"       "$(rules)" "theirs"
+check "and counts what is left"           "$(kread kwinrulesrc General count)" "1"
+check "theirs is untouched"               "$(kread kwinrulesrc theirs Description)" "a rule of their own"
+check "nothing of ours in the ledger"     "$(ledger_count windows-games)" "0"
+check "still nothing reached KDE"         "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
+
 # Closing a window writes the id into a KWin script's source, so anything
 # that is not exactly a uuid must be refused before it gets that far -- and
 # with no session, nothing may reach KWin at all.

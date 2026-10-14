@@ -7,6 +7,54 @@
 
 # KWin reads kwinrc when asked to. The KWin is the user's own whatever HOME
 # says, so a test must not be able to ask it.
+# ---- window rules ------------------------------------------------------------
+#
+# A window rule of this project's is a group of its own in kwinrulesrc, named
+# in [General] rules beside every rule the person has made in System Settings.
+# The group is ours alone and goes whole. The list is shared: the first write
+# to it is ledgered under <scope>, so that with nothing else in it, taking
+# ours out puts the list back exactly as it was -- and with something else in
+# it, ours is taken out by name and the record let go (kconfig_forget), since
+# putting back "before" would take the person's rules out with ours.
+
+kwin_rule_ids() {   # the ids in [General] rules, one a line
+    kreadconfig6 --file kwinrulesrc --group General --key rules 2>/dev/null | tr ',' '\n' | sed '/^$/d'
+}
+
+kwin_rule_present() {   # <id>
+    kwin_rule_ids | grep -qxF -- "$1"
+}
+
+# kwin_rule_add <scope> <id> <key=value>...
+kwin_rule_add() {
+    local scope=$1 id=$2 kv
+    shift 2
+    for kv in "$@"; do
+        kwriteconfig6 --file kwinrulesrc --group "$id" --key "${kv%%=*}" "${kv#*=}"
+    done
+    kwin_rule_present "$id" && return 0
+    local -a ids
+    mapfile -t ids < <(kwin_rule_ids)
+    ids+=("$id")
+    kconfig_set "$scope" kwinrulesrc General rules "$(IFS=,; printf '%s' "${ids[*]}")"
+    kconfig_set "$scope" kwinrulesrc General count "${#ids[@]}"
+}
+
+# kwin_rule_remove <scope> <id>
+kwin_rule_remove() {
+    local scope=$1 id=$2
+    local -a rest
+    mapfile -t rest < <(kwin_rule_ids | grep -vxF -- "$id")
+    if [ ${#rest[@]} -eq 0 ]; then
+        kconfig_revert "$scope" >/dev/null
+    else
+        kwriteconfig6 --file kwinrulesrc --group General --key rules "$(IFS=,; printf '%s' "${rest[*]}")"
+        kwriteconfig6 --file kwinrulesrc --group General --key count "${#rest[@]}"
+        kconfig_forget "$scope"
+    fi
+    kconfig_purge_group kwinrulesrc "$id"
+}
+
 kwin_reconfigure() {
     session_available || return 0
     qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 \
