@@ -1,8 +1,11 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-08**, twice: in the
-morning, the sidebar's edge gone over on the user's report -- a grip where the
+sessions, and added to since -- most recently on **2026-10-14**: an output
+picker one device short after a system update, because a package install had
+put PulseAudio itself back on the socket beside PipeWire, and a second way to
+read sound for when it is ("2026-10-14: PulseAudio on the socket"). Before
+that, **2026-10-08**, twice: in the morning, the sidebar's edge gone over on the user's report -- a grip where the
 pointer is instead of a bar down the whole edge, a sidebar that comes out under
 the pull, and "Pointer at the edge" mended, which had always been one setting
 behind ("2026-10-08: the sidebar's edge"); before that, a login with no shell,
@@ -316,6 +319,54 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-14: PulseAudio on the socket
+
+The user, after a system update: the sound selector does not display all
+audio devices. The Scarlett 2i2 -- the default output and input -- was gone
+from it.
+
+**The shell was right and the system was two sound servers.** At 09:39 a
+batch of AUR installs brought in `pulseaudio` and six of its modules as
+dependencies (`blueman-git` lists it as optional; something asked for a
+provider and got the daemon), and `pipewire-pulse`, which conflicts with it,
+was removed. `pacman.log` has no line for that transaction -- the log jumps
+from 09:23 to 09:51 -- so `/var/lib/pacman/local/*/desc` install dates are what
+told it. At login both daemons ran. PulseAudio opened the USB interface first
+and held it; WirePlumber kept the device with no nodes on it, so PipeWire --
+and this shell, which read only PipeWire -- had two outputs and one input, and
+WirePlumber's remembered defaults pointed at nodes that did not exist (the
+input read as empty). `wpctl status` shows the device with nothing under it;
+`pactl info` saying `Server Name: pulseaudio` rather than `PulseAudio (on
+PipeWire ...)` is the tell. The user swapped `pipewire-pulse` back in and the
+picker had all six devices again.
+
+**And then: can it work with PulseAudio?** It can now. `AudioStatus` is a
+front for two readers with one shape -- `PipewireBackend` (what it was) and
+`PulseBackend`, which reads through `pactl` (`subscribe` for events, one
+`-f json` read of info, sinks and sources after a burst settles, coalesced
+writes so a dragged slider sends one level, not every step). Devices are
+objects kept per name across reads, so the widgets' `modelData === current`
+and the OSD's `sink !== _lastSink` hold for it exactly as for a PipeWire node.
+`pactl` is the same binary whichever server answers, so the reader is right
+under `pipewire-pulse` too -- it was proven there, offscreen, against this
+machine: the same three outputs, three inputs, defaults and levels as PipeWire's.
+
+Which one is `audio.backend` (Settings → Sound → Sound server): `auto` asks
+the socket once a minute who is answering, and reads PulseAudio only when it is
+PulseAudio's own; `pipewire` and `pulse` hold it. The pure part --
+`PactlState`, the choice included -- is in `qs.domain.status.audio`, tested in
+`tst_PactlState.qml`. `rmpr ipc status audio` now says `backend` and `server`.
+
+Learned the hard way: `pactl -f json` ends its output **without a newline**,
+so a `@sinks` echoed after it lands on the end of the info JSON and nothing
+parses -- each is followed by an `echo`. Designed in, not yet felt on a real
+PulseAudio: a level is drawn where it was asked for at once, and a read that
+lands while a write is still queued is dropped, because it is the level before
+the write and a slider being dragged would jump back to it.
+
+**Not done, and worth doing**: `rmpr doctor` says nothing when both servers
+run. It would have named this in one line.
 
 ### 2026-10-08: the sidebar's edge
 
