@@ -40,9 +40,10 @@ QtObject {
     readonly property int rounding: ConfigStore.value("theme.rounding", 28)
 
     // How long a surface takes to appear: a popout rising out of the panel,
-    // the switcher, the overview. One number rather than one per surface, so
-    // the shell moves at a single speed and a person who wants it immediate
-    // says so once.
+    // the switcher, the overview, a floating panel filling its edge or
+    // floating off it, a hidden one coming back. One number rather than one
+    // per surface, so the shell moves at a single speed and a person who
+    // wants it immediate says so once.
     readonly property int animationMs: Math.max(0, ConfigStore.value("theme.animationMs", 180))
 
     // ---- which scheme ------------------------------------------------------

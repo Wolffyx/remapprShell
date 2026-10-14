@@ -62,7 +62,7 @@
                     "max": 400,
                     "step": 20,
                     "label": "How long things take to appear",
-                    "description": "In milliseconds: a popout rising out of the panel, the switcher, the desktop overview. 0 makes them appear at once, which is the fastest the shell can feel and the least it can explain -- a surface that simply exists gives no hint about where it came from."
+                    "description": "In milliseconds: a popout rising out of the panel, the switcher, the desktop overview, a floating panel filling its edge or floating off it, a hidden one coming back. 0 makes them appear at once, which is the fastest the shell can feel and the least it can explain -- a surface that simply exists gives no hint about where it came from."
                 },
                 "theme.desktop.enabled": {
                     "type": "bool",

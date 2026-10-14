@@ -71,9 +71,9 @@ PanelWindow {
 
     // 1 floating, 0 against the edge; PanelSurface draws the margins, the
     // corners and the strip's depth from it, so the change is a movement
-    // rather than a jump.
+    // rather than a jump -- at the shell's one speed, `theme.animationMs`.
     property real floatAmount: root.style === "full" ? 0 : 1
-    Behavior on floatAmount { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on floatAmount { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
 
     // What is drawn, moving with floatAmount; `extent` is what is reserved,
     // which changes once rather than every frame -- each change resizes the
@@ -134,7 +134,10 @@ PanelWindow {
     //
     // Stepping aside is drawing nothing and taking no clicks, not unmapping:
     // the surface keeps its exclusive zone, so the maximised windows behind
-    // the full-screen one are not resized away and back.
+    // the full-screen one are not resized away and back. It is at once, with
+    // no fade: the game is already on screen by the time the window list
+    // says so, and a panel fading out would be drawn over it that much
+    // longer.
     readonly property bool fullScreenBelow: PanelModel.hidesForFullScreen(root.screenName)
                                             && WindowEvents.fullScreenOn(WindowsService.windows, root.screenName,
                                                                          Desktops.currentId)
@@ -164,8 +167,8 @@ PanelWindow {
     implicitHeight: root.horizontal ? root.visibleThickness : 0
     implicitWidth: root.horizontal ? 0 : root.visibleThickness
 
-    Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-    Behavior on implicitWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on implicitHeight { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
+    Behavior on implicitWidth { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
 
     // Reserve the strip so maximised windows stop at the panel rather than
     // being covered by it -- unless it hides, in which case reserving it would
