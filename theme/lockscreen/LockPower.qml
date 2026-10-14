@@ -197,12 +197,22 @@ Item {
     // --- critical: a banner -----------------------------------------------
 
     Rectangle {
+        id: banner
+
+        // How far out it is, 0 to 1: the slide animates this, not `y`.
+        // Hidden was a `y` one height above the screen, and the height
+        // follows the screen -- the greeter sizes the frame after making it,
+        // so hidden slid to hidden, and the bottom of a banner nobody asked
+        // for crossed the top of every lock. A fraction is hidden at any
+        // height.
+        property real out: power.critical ? 1 : 0
+
         width: parent.width
         height: Math.round(76 * power.unit)
         color: "#e0c98a"
-        y: power.critical ? 0 : -height
-        visible: y > -height
-        Behavior on y { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic } }
+        y: -banner.height * (1 - banner.out)
+        visible: banner.out > 0
+        Behavior on out { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic } }
 
         Row {
             anchors.left: parent.left

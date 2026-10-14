@@ -62,6 +62,15 @@ Item {
     required property var config
     // SessionManagement: sleep, hibernate, switch user.
     required property var session
+    // Whether the greeter has put the first frame on screen -- its
+    // `viewVisible`. Until then the frame is still being sized: the greeter
+    // makes the lock screen at LockScreen.qml's fallback 800x600 and only
+    // then sizes it to the screen, so a Behavior on anything placed by the
+    // size played that resize as a slide at the start of every lock. A
+    // Behavior on where something is waits for this, and the first frame has
+    // everything where it belongs. Measured on 6.7.5, offscreen at
+    // 2560x1440: the resize, then the first frame, then this.
+    required property bool settled
 
     function setting(name, fallback) {
         const v = ui.config ? ui.config[name] : undefined;

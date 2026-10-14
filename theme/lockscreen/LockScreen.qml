@@ -137,6 +137,7 @@ Item {
                 wallpaper: root.greeterWallpaper
                 config: root.greeterConfig
                 session: sessionManagement
+                settled: root.viewVisible
             }
         }
     }

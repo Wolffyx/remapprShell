@@ -176,7 +176,12 @@ LockStyle {
         opacity: minimal.shown ? 1 : 0
         transform: Translate {
             y: minimal.shown ? 0 : Math.round(12 * minimal.unit)
-            Behavior on y { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+            // Scaled by the height, so not while the greeter is still
+            // setting it (LockUi's `settled`).
+            Behavior on y {
+                enabled: minimal.ui.settled
+                NumberAnimation { duration: 450; easing.type: Easing.OutCubic }
+            }
         }
 
         Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.InOutQuad } }
