@@ -379,6 +379,34 @@ on its output's origin, by the configured policy, default off; or a
 `kwinrulesrc` "ignore requested geometry" rule per app. Either wants the user
 to say which applications do it.
 
+**Parked, by the user's choice: one to two seconds of black before the lock
+screen**, after Meta+L or the shell's own Lock. Not ours, as far as it was
+measured. A read-only watcher (`dbus-monitor` on `org.kde.screensaver`
+AboutToLock and ScreenSaver ActiveChanged, plus a 10 ms poll for the greeter
+process and its arguments) timed real locks: the greeter is spawned 60-100 ms
+after AboutToLock (`--immediateLock --graceTime 900000 --ksldfd N`), ours logs
+`lock screen: ready` at ~0.3 s, and KWin reports the lock shown
+(ActiveChanged true) at ~0.5 s -- and Plasma's own lock screen, back to back
+through `lockscreen disable`/`enable`, came in within 30 ms of ours, and the
+user saw much the same black. In the greeter's testing mode both come up with
+only a flash of black. VRR off on DP-2 changed nothing. So the black is after
+KWin has the greeter's surfaces, in the real lock path only. Untried: the lock
+wallpaper (`kscreenlockerrc` still names a caelestia image that is gone, so
+every lock falls back to `Next` and decodes its 5120x2880 PNG), KWin's own
+screen-locker logging (needs KWin started with the logging rule), and one
+monitor alone. Offscreen, ours spends ~245 ms building QML the greeter never
+caches (`~/.cache/kscreenlocker_greet` has no `qmlcache`), about 40 ms more
+than Plasma's.
+
+**Found on the way, not ours and not changed**: `kscreenlockerrc
+[Daemon] LockGrace=900` -- fifteen minutes in which an idle-locked session
+unlocks without a password; Plasma's default is 5. And a mistake to not
+repeat: timing Plasma's lock screen with `timeout kscreenlocker_greet
+--testing` on the real screen started PAM (it does on the pointer hovering,
+not only on a key) and the kill logged two `pam_unix ... authentication
+failure` lines. faillock had no tally afterwards, but only ever run a greeter
+with the stand-in authenticator.
+
 ### 2026-10-14: PulseAudio on the socket
 
 The user, after a system update: the sound selector does not display all
