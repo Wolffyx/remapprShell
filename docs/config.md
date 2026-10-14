@@ -184,10 +184,11 @@ The volume and brightness popup. Plasma draws it by default and works well; ours
 
 ### Sound
 
-What a volume control here may do. PipeWire will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
+Where the volume and the devices are read from, and what a volume control here may do. A sound server will amplify past 100% and distort doing it, so nothing in this shell offers that headroom until it is asked for -- the same choice, under the same name, as Plasma's own applet.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `audio.backend` | `auto`, `pipewire`, `pulse` | `auto` | Where the volume, the mute and the list of devices are read from. 'auto' asks who answers the PulseAudio socket: PulseAudio itself is read through pactl, because the devices it holds are ones PipeWire cannot open, and anything else -- PipeWire's own pipewire-pulse, or nobody -- is read from PipeWire directly. 'pipewire' and 'pulse' hold it to one. Both servers running at once is a broken setup whichever is read: each holds devices the other cannot open, and applications play through whichever owns the socket. |
 | `audio.raiseMaxVolume` | `true` or `false` | `false` | Lets every volume slider in this shell go to 150% instead of stopping at 100%. Above 100% the sound is amplified in software, which distorts on most hardware. A level something else has already set above the ceiling is always shown, switch or no switch. |
 
 ### Switching windows

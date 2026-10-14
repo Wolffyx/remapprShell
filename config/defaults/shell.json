@@ -127,6 +127,7 @@
         "pinned": []
     },
     "audio": {
+        "backend": "auto",
         "raiseMaxVolume": false
     },
     "osd": {
