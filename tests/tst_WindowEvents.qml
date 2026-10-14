@@ -311,8 +311,10 @@ TestCase {
     // ---- a window reaching a floating panel's edge ------------------------
 
     // DP-2 as KWin reported it: below DP-3's top, 2560x1440. The panel is at
-    // the bottom and reserves 66 px.
-    readonly property var dp2: ({ x: 0, y: 1040, width: 2560, height: 1440 })
+    // the bottom and reserves 66 px. DP-3 is the portrait one to its right,
+    // its bottom edge 80 px lower.
+    readonly property var dp2: ({ name: "DP-2", x: 0, y: 1040, width: 2560, height: 1440 })
+    readonly property var dp3: ({ name: "DP-3", x: 2560, y: 0, width: 1440, height: 2560 })
 
     function at(uuid, x, y, w, h, props) {
         return Object.assign({ uuid: uuid, output: "DP-2", minimized: false, x: x, y: y, width: w, height: h },
@@ -342,8 +344,45 @@ TestCase {
     function test_only_windows_on_this_screen_and_desktop_count() {
         compare(WindowEvents.reachesEdge([at("min", 0, 1040, 2560, 1440, { minimized: true })], "d1", dp2, "bottom", 66), false);
         compare(WindowEvents.reachesEdge([at("away", 0, 1040, 2560, 1440, { desktops: ["d2"] })], "d1", dp2, "bottom", 66), false);
-        compare(WindowEvents.reachesEdge([at("dp3", 2560, 0, 1440, 2560)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("dp3", 2560, 0, 1440, 2560, { output: "DP-3" })], "d1", dp2, "bottom", 66), false);
         compare(WindowEvents.reachesEdge([at("all", 0, 1040, 2560, 1440, { desktops: [] })], "d1", dp2, "bottom", 66), true);
+    }
+
+    // The report: a game full screen on one monitor, and the other monitor's
+    // panel moved. A window KWin has on DP-3 whose frame comes a pixel over
+    // into DP-2's strip -- an edge rounded the other way -- or one spanning
+    // the whole layout while a game changes mode, is not DP-2's.
+    function test_a_window_on_the_other_monitor_never_fills_this_edge() {
+        compare(WindowEvents.reachesEdge([at("over", 2559, 0, 1441, 2560, { output: "DP-3" })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("span", 0, 0, 4000, 2560, { output: "DP-2" })], "d1", dp3, "bottom", 66), false);
+        // The same frames on the monitor KWin has them on do.
+        compare(WindowEvents.reachesEdge([at("over", 2559, 0, 1441, 2560, { output: "DP-3" })], "d1", dp3, "bottom", 66), true);
+        compare(WindowEvents.reachesEdge([at("span", 0, 0, 4000, 2560, { output: "DP-2" })], "d1", dp2, "bottom", 66), true);
+    }
+
+    // A window from a script too old to say which monitor it is on is on
+    // none of them.
+    function test_a_window_on_no_monitor_reaches_no_edge() {
+        compare(WindowEvents.reachesEdge([at("old", 0, 1040, 2560, 1440, { output: "" })], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("max", 0, 1040, 2560, 1374)], "d1",
+                                         { x: 0, y: 1040, width: 2560, height: 1440 }, "bottom", 66), false);
+    }
+
+    // A full-screen window covers the edge whatever the panel reserves; the
+    // panel steps aside for it rather than filling the edge, so what it
+    // reserves -- and every maximised window behind the game -- stays put.
+    function test_a_full_screen_window_steps_the_panel_aside_rather_than_filling_the_edge() {
+        const game = at("game", 0, 1040, 2560, 1440, { fullScreen: true, stacking: 9 });
+        compare(WindowEvents.reachesEdge([game], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.fullScreenOn([game], "DP-2", "d1"), true);
+        // A maximised window behind it keeps the edge filled, as it was
+        // before the game went full screen: nothing changes underneath.
+        const max = at("max", 0, 1040, 2560, 1374, { stacking: 4 });
+        compare(WindowEvents.reachesEdge([game, max], "d1", dp2, "bottom", 66), true);
+        compare(WindowEvents.fullScreenOn([game, max], "DP-2", "d1"), true);
+        // And the other monitor's panel neither moves nor steps aside.
+        compare(WindowEvents.reachesEdge([game, max], "d1", dp3, "bottom", 66), false);
+        compare(WindowEvents.fullScreenOn([game, max], "DP-3", "d1"), false);
     }
 
     function test_each_edge() {

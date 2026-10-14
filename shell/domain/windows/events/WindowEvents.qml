@@ -229,16 +229,30 @@ QtObject {
         return top !== null && top.fullScreen === true;
     }
 
-    // Whether a window on the desktop `desktopId` reaches into the strip
-    // `depth` pixels deep along `edge` of `screen` ({x, y, width, height}).
-    // A floating panel fills its edge while one does, as Plasma's does.
+    // Whether a window on `screen` ({name, x, y, width, height}), on the
+    // desktop `desktopId`, reaches into the strip `depth` pixels deep along
+    // `edge`. A floating panel fills its edge while one does, as Plasma's
+    // does.
     //
     // The strip is a pixel deeper than asked: a maximised window stops where
     // the panel's reserved space begins, which is touching it, not inside it.
-    // By geometry rather than by `output`, so a window hanging over from the
-    // next monitor counts on the monitor it reaches into.
+    //
+    // On the screen by `output`, KWin's own answer, and only then by
+    // geometry. Geometry alone counted any window whose frame crossed into
+    // the strip from wherever: a window on the next monitor a pixel over the
+    // line -- an edge rounded the other way under fractional scaling, a game
+    // spanning both while it changes mode -- filled this edge, and the space
+    // reserved changing resized every maximised window here, for a window
+    // on the other screen. The cost is that a window hanging over from the
+    // next monitor leaves this panel floating over it.
+    //
+    // A full-screen window does not count either. It covers the edge whatever
+    // the panel reserves, and while it is on top the panel steps aside for it
+    // or KWin puts it above; filling the edge for it changed only the space
+    // reserved underneath, resizing the maximised windows behind the game on
+    // the way in and again on the way out.
     function reachesEdge(windows, desktopId, screen, edge, depth) {
-        if (!screen || !(depth > 0))
+        if (!screen || !screen.name || !(depth > 0))
             return false;
         const d = depth + 1;
         const sx = screen.x, sy = screen.y, sw = screen.width, sh = screen.height;
@@ -250,7 +264,9 @@ QtObject {
         };
         const strip = strips[edge] ?? strips.bottom;
         for (const w of windows ?? []) {
-            if (!w || w.minimized || !(w.width > 0) || !(w.height > 0))
+            if (!w || w.minimized || w.fullScreen === true || w.output !== screen.name)
+                continue;
+            if (!(w.width > 0) || !(w.height > 0))
                 continue;
             const on = w.desktops ?? [];
             if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)

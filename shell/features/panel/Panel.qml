@@ -55,10 +55,16 @@ PanelWindow {
     // full strip while a window on this monitor reaches into the panel's
     // space -- a maximised one always does, stopping where the reserved space
     // starts -- and float again when none does. `panel.defloat` turns it off.
+    //
+    // A window on the other monitor never does, however far it hangs over,
+    // and nor does a full-screen one: the panel steps aside for it, or KWin
+    // puts it above the panel, and either way what the panel reserves stays
+    // as it was (see WindowEvents.reachesEdge).
     readonly property bool defloated: root.configuredStyle !== "full"
                                       && PanelModel.defloatsFor(root.screenName)
                                       && WindowEvents.reachesEdge(WindowsService.windows, Desktops.currentId,
-                                                                  { x: root.modelData.x, y: root.modelData.y,
+                                                                  { name: root.screenName,
+                                                                    x: root.modelData.x, y: root.modelData.y,
                                                                     width: root.modelData.width,
                                                                     height: root.modelData.height },
                                                                   root.position, root.floatExtent)
