@@ -60,6 +60,13 @@ Item {
     // widget happened to be under the pointer.
     property bool wantsRightClick: false
 
+    // Whether the screen's corner beyond this widget is this widget's too,
+    // when nothing else stands between them at that end of the panel. A
+    // pointer thrown into a corner stops exactly there, so the corner is the
+    // easiest target on the screen -- show-desktop is used that way, and
+    // claims it. See CornerCatcher.
+    property bool ownsCorner: false
+
     // Shown when the widget is activated. Null means the widget has no popout.
     // The panel builds the window; the widget supplies only the contents, so a
     // widget never has to know where on the panel it sits or which edge the

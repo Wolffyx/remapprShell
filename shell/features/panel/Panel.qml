@@ -168,11 +168,12 @@ PanelWindow {
 
     color: "transparent"
 
-    // Only what is drawn takes the pointer. The margin a floating bar keeps
-    // from the edge, and the gaps between islands, let a click through to the
-    // window beneath. While hidden, the whole sliver is the target.
+    // Only what is drawn takes the pointer, and a corner a widget owns. The
+    // margin a floating bar keeps from the edge, and the gaps between islands,
+    // let a click through to the window beneath. While hidden, the whole
+    // sliver is the target.
     mask: root.fullScreenBelow ? root._deaf
-        : root.revealed && root.style !== "full" ? surface.shape : null
+        : root.revealed && root.style !== "full" ? surface.input : null
 
     // Blurred behind, where the compositor offers it -- KWin does, through
     // ext-background-effect -- so a translucent panel reads as frosted glass

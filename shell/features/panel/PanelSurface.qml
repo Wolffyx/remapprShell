@@ -61,6 +61,16 @@ Item {
         regions: root.style === "islands" ? [root._leftIsland, root._middleIsland, root._rightIsland] : []
     }
     readonly property Region _leftIsland: Region { item: leftIsland; radius: root.islandRadius }
+
+    // What takes the pointer: what is drawn, and a corner a widget owns. Not
+    // what is blurred, which is `shape` alone -- a corner drawn as frosted
+    // glass would be a pane of nothing at the edge of the screen.
+    readonly property Region input: Region {
+        regions: [root.shape].concat(startCorner.slot ? [root._startCorner] : [])
+                             .concat(endCorner.slot ? [root._endCorner] : [])
+    }
+    readonly property Region _startCorner: Region { item: startCorner }
+    readonly property Region _endCorner: Region { item: endCorner }
     readonly property Region _middleIsland: Region { item: middleIsland; radius: root.islandRadius }
     readonly property Region _rightIsland: Region { item: rightIsland; radius: root.islandRadius }
 
@@ -216,6 +226,33 @@ Item {
         horizontal: root.horizontal
         x: root.horizontal ? root.middleStart : root.body.x + (root.body.width - width) / 2
         y: root.horizontal ? root.body.y + (root.body.height - height) / 2 : root.middleStart
+    }
+
+    // ---- the corners -------------------------------------------------------
+    //
+    // From the far end of each end zone to the end of the screen, across the
+    // whole depth of the panel -- a floating bar's margin from the edge
+    // included, since that is where a pointer thrown at the corner stops. Each
+    // is only there while a widget owns it; see CornerCatcher.
+
+    CornerCatcher {
+        id: startCorner
+        slot: leftZone.cornerSlot
+        readonly property real reach: root.startOf(leftZone)
+        x: 0
+        y: 0
+        width: root.horizontal ? reach : root.width
+        height: root.horizontal ? root.height : reach
+    }
+
+    CornerCatcher {
+        id: endCorner
+        slot: rightZone.cornerSlot
+        readonly property real from: root.startOf(rightZone) + root.lengthOf(rightZone)
+        x: root.horizontal ? from : 0
+        y: root.horizontal ? 0 : from
+        width: root.horizontal ? root.width - from : root.width
+        height: root.horizontal ? root.height : root.height - from
     }
 
     ZoneRow {

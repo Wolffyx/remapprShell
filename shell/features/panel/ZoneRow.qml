@@ -70,6 +70,17 @@ Item {
         return total + Math.max(0, count - 1) * layout.spacing;
     }
 
+    // The slot at the panel's end of this zone -- the last one shown for the
+    // right zone, the first for the left -- when its widget owns the screen's
+    // corner beyond it; null otherwise, and always for the middle. What
+    // PanelSurface's corner catchers hand the corner to.
+    readonly property var cornerSlot: {
+        const shown = Array.prototype.filter.call(layout.children, c => c !== slots && c.visible);
+        const end = root.zone === "right" ? shown[shown.length - 1]
+                  : root.zone === "left" ? shown[0] : undefined;
+        return end && end.widget?.ownsCorner ? end : null;
+    }
+
     // See the Repeater below for why this is a string and not the list.
     readonly property string entriesKey: JSON.stringify(PanelModel.entriesForScreen(root.screenName, root.zone))
     property var entries: []
