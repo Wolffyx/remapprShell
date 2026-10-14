@@ -372,12 +372,22 @@ busctl took a leading minus for an option: `Dbus.callArgs` puts `--` after
 an item not yet looked up could be answered by a lookup begun before the
 item registered; lookups are numbered and only a later one answers
 (`TrayClick.due`), with a 2 s busctl timeout instead of 25. No screen is the
-middle of a screen, not the origin. The rest of #20 -- X11 apps asking for
-their own position, apps restoring a saved one -- is **not built**: the
-proposal is an opt-in KWin script that moves a normal window landing exactly
-on its output's origin, by the configured policy, default off; or a
-`kwinrulesrc` "ignore requested geometry" rule per app. Either wants the user
-to say which applications do it.
+middle of a screen, not the origin. The rest of #20 was World of Tanks, and **is built (`4408ebc`)**: its
+Wargaming launcher is a Proton (X11) window whose WM_NORMAL_HINTS give a
+"program specified location" -- the middle of the whole 4000x2560 X screen,
+(1448, 937), above DP-2 -- and KWin honours a position an X11 window asks
+for, then pushed it onto DP-2's top edge. `windows behaviour set placeGames`
+adds one KWin rule (class contains `steam_app_`, normal windows, ignore
+requested geometry: Force), **on by default** by the user's choice: setup
+applies it, the Windows page has the switch, `behaviour revert` takes it out.
+The `[General] rules` list is shared with the person's own rules, so ours
+goes out of it by name (`kconfig_forget`). Which monitor: KWin's active
+screen -- where the game was launched from -- **by the user's choice**; a
+full-screen game picks DP-2 itself (Wine's primary). Pinning to a monitor
+was offered and declined: KWin's rule stores a screen *index*, and the
+alternative was our window-list script moving windows, which it has never
+done. The 0,0-rescue script proposed earlier is dropped: World of Tanks was
+never at 0,0.
 
 **Parked, by the user's choice: one to two seconds of black before the lock
 screen**, after Meta+L or the shell's own Lock. Not ours, as far as it was
