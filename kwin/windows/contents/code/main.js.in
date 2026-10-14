@@ -128,6 +128,26 @@ function publishSoon() {
     settle.start();
 }
 
+// A window going full screen, or leaving it, is sent as soon as KWin has
+// finished the change -- not a moment after the last of the moves and
+// restacks it sets off. A game going full screen can keep those coming for
+// a while, each one starting the settle again, and a panel waiting on the
+// list to step aside stayed drawn over the game for all of it.
+//
+// Still not from inside the signal, for the reason above: KWin says so
+// before the window has its new layer and size, which land as the call that
+// changed it returns. By the event loop's next pass they have. Whatever
+// moves after that still goes through the settle, in a second list a
+// moment later.
+const prompt = new QTimer();
+prompt.singleShot = true;
+prompt.interval = 0;
+prompt.timeout.connect(publish);
+
+function publishPromptly() {
+    prompt.start();
+}
+
 // Per-window signals matter as much as the list changing: a title changing or
 // a window being minimised leaves the set identical, and a task manager that
 // only watched the set would show a stale title until something else happened.
@@ -136,7 +156,7 @@ function watch(window) {
         return;
     window.captionChanged.connect(publish);
     window.minimizedChanged.connect(publish);
-    window.fullScreenChanged.connect(publishSoon);
+    window.fullScreenChanged.connect(publishPromptly);
     // `stacking` is only worth sending if it is current: what is on top of a
     // monitor decides whether its panel steps aside for a full-screen window.
     window.stackingOrderChanged.connect(publishSoon);
