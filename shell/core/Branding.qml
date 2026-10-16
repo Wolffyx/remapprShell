@@ -19,7 +19,7 @@ QtObject {
     readonly property string dbusName: "com.remappr.Shell"
     readonly property string envPrefix: "REMAPPR_SHELL"
     readonly property string shellPackageId: "remappr-shell.desktop"
-    readonly property string version: "0.2.0"
+    readonly property string version: "0.2.1"
 
     // The control binary's name. Where it is installed is Paths.ctlBin.
     readonly property string ctlName: "remappr-shell-ctl"
