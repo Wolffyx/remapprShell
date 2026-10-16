@@ -23,6 +23,23 @@
     - When PAM lets the session go without asking anything, nothing quits
       until the person confirms: a lock screen that vanished on its own would
       look like it had never been locked.
+
+    Plasma 6.8 added three rules of its own, and they are kept only where the
+    greeter is that one -- asked of the authenticator, not of a version, by
+    the property 6.8 brought in to pick an authenticator with. Before it,
+    nothing below is done and nothing above changes.
+
+    - While the prompt shows, startAuthenticating() is called every second,
+      to keep the backend from going quiet. 6.8's own fallback locker, which
+      draws when a lock screen does not load, dropped every password as
+      "Received prompt response, but no pending prompt was found!" and never
+      unlocked (2026-10-16).
+    - On success, stopAuthenticating() first: whatever else is still
+      authenticating, a reader or a timeout, is stopped before the greeter
+      goes.
+    - A password typed while the authenticator says its PAM conversation has
+      timed out (`pamTimeout`, which 6.8's lock screen reads before any
+      kscreenlocker has it) is held, and sent once it has not.
 */
 pragma ComponentBehavior: Bound
 
@@ -40,6 +57,17 @@ Item {
     property int restMs: 3000
     property int messageMs: 3000
     property int idleMs: 10000
+    property int awakeMs: 1000
+
+    // The greeter from Plasma 6.8 on: see the top of this file.
+    readonly property bool keepsAwake: !!unlock.authenticator && ("authenticator" in unlock.authenticator)
+
+    // Let in: nothing is started again after this.
+    property bool letIn: false
+
+    // A password held while the PAM conversation has timed out, or empty.
+    property string held: ""
+    readonly property bool sending: unlock.held !== ""
 
     // Set by the prompt while something would be lost by hiding it: typed
     // text, the on-screen keyboard.
@@ -102,6 +130,7 @@ Item {
 
     // Escape: hide the prompt and forget what was typed.
     function dismiss() {
+        unlock.held = "";
         unlock.hide();
         unlock.clearPassword();
     }
@@ -116,10 +145,27 @@ Item {
             unlock.poke();
             return false;
         }
-        if (unlock.resting || unlock.unlockedWithoutPassword || !password)
+        if (unlock.resting || unlock.sending || unlock.unlockedWithoutPassword || !password)
             return false;
+        if (unlock.timedOut()) {
+            unlock.held = password;
+            unlock.authenticator.startAuthenticating();
+            return true;
+        }
         unlock.authenticator.respond(password);
         return true;
+    }
+
+    function timedOut(): bool {
+        return unlock.authenticator?.pamTimeout === true;
+    }
+
+    // The held password, once the conversation is back.
+    function sendHeld() {
+        if (!unlock.sending || unlock.timedOut())
+            return;
+        unlock.authenticator.respond(unlock.held);
+        unlock.held = "";
     }
 
     // The button shown when PAM asked for nothing.
@@ -177,6 +223,10 @@ Item {
         }
 
         function onSucceeded() {
+            unlock.letIn = true;
+            unlock.held = "";
+            if (unlock.keepsAwake)
+                unlock.authenticator.stopAuthenticating();
             unlock.lockedUntil = 0;
             unlock.lockedSpan = 0;
             if (unlock.authenticator.hadPrompt) {
@@ -217,10 +267,23 @@ Item {
         id: idleTimer
         interval: unlock.idleMs
         onTriggered: {
-            if (unlock.keepShown || unlock.resting)
+            if (unlock.keepShown || unlock.resting || unlock.sending)
                 restart();
             else
                 unlock.hide();
+        }
+    }
+
+    // Plasma 6.8's heartbeat, and the held password's way out. Not while
+    // resting: authentication starts again when the rest ends, as before.
+    Timer {
+        id: awakeTimer
+        interval: unlock.awakeMs
+        repeat: true
+        running: (unlock.keepsAwake || unlock.sending) && unlock.shown && !unlock.resting && !unlock.letIn
+        onTriggered: {
+            unlock.authenticator.startAuthenticating();
+            unlock.sendHeld();
         }
     }
 }

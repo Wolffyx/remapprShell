@@ -2,7 +2,7 @@
     SPDX-License-Identifier: GPL-3.0-or-later
 
     What the keyboard is doing, and what is playing: Caps Lock, the keyboard
-    layout, and the media players.
+    layout, KWin's on-screen keyboard, and the media players.
 
     Plasma's own objects, each made once. The greeter draws one view per
     screen from one QML engine (see PasswordSync), so a singleton is one Caps
@@ -64,6 +64,16 @@ QtObject {
         if (keys.layouts.length > 1)
             keys.keyboardLayout.switchToNextLayout();
     }
+
+    // --- the on-screen keyboard -------------------------------------------
+
+    // KWin's, through the singleton Plasma's own lock screen uses, which the
+    // layout module has had all through Plasma 6. A singleton cannot be made,
+    // so it is held by an object that can. Null where it is missing.
+    // LockVirtualKeyboard is what uses it.
+    readonly property var kwinKeyboardHolder: keys.make(
+        "import QtQml; import org.kde.plasma.workspace.keyboardlayout; QtObject { readonly property var it: KWinVirtualKeyboard }")
+    readonly property var kwinKeyboard: keys.kwinKeyboardHolder?.it ?? null
 
     // --- what is playing --------------------------------------------------
 

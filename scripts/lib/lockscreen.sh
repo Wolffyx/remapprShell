@@ -157,7 +157,7 @@ QML
 
     Component.onCompleted: {
         const lacks = under.lacks(typeof authenticator !== "undefined" ? authenticator : null);
-        if (under.greeterInterface < 2)
+        if (under.interfaceTooOld)
             lacks.push("interface version 2");
         if (lacks.length > 0)
             console.warn("lock screen: this greeter lacks", lacks.join(", "));
