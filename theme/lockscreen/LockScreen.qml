@@ -40,8 +40,12 @@ Item {
     property string greeterUserImage: typeof kscreenlocker_userImage !== "undefined" ? kscreenlocker_userImage : ""
     property var greeterConfig: typeof config !== "undefined" ? config : null
     property Item greeterWallpaper: typeof wallpaper !== "undefined" ? wallpaper : null
+    // The greeter said which version of its interface it offered up to
+    // Plasma 6.7, and 6.8 stopped saying. One that says less than 2 is too
+    // old; one that says nothing (-1) is judged by its authenticator alone.
     readonly property int greeterInterface: typeof org_kde_plasma_screenlocker_greeter_interfaceVersion !== "undefined"
-        ? org_kde_plasma_screenlocker_greeter_interfaceVersion : 0
+        ? org_kde_plasma_screenlocker_greeter_interfaceVersion : -1
+    readonly property bool interfaceTooOld: root.greeterInterface >= 0 && root.greeterInterface < 2
 
     // What this lock screen cannot do without, from an authenticator.
     // `lockscreen check` asks it of the greeter's real one, which it only
@@ -57,7 +61,7 @@ Item {
 
     readonly property var missing: {
         const l = root.lacks(root.greeterAuthenticator);
-        if (root.greeterInterface < 2)
+        if (root.interfaceTooOld)
             l.push("interface version 2");
         return l;
     }
@@ -137,6 +141,7 @@ Item {
                 wallpaper: root.greeterWallpaper
                 config: root.greeterConfig
                 session: sessionManagement
+                settled: root.viewVisible
             }
         }
     }

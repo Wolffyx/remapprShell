@@ -2,6 +2,8 @@ singleton PasswordSync 1.0 PasswordSync.qml
 Unlock 1.0 Unlock.qml
 LockUi 1.0 LockUi.qml
 LockOsd 1.0 LockOsd.qml
+LockVirtualKeyboard 1.0 LockVirtualKeyboard.qml
+LockX11Keyboard 1.0 LockX11Keyboard.qml
 MediaCard 1.0 MediaCard.qml
 singleton Options 1.0 Options.qml
 singleton LockKeys 1.0 LockKeys.qml

@@ -29,6 +29,7 @@ BarWidget {
     property bool peeking: false
 
     wantsHover: true
+    ownsCorner: true
 
     tooltip: root.peeking ? "Click to keep the desktop"
            : root.showing ? "Bring the windows back"

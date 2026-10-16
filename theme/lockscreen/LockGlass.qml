@@ -35,7 +35,12 @@ LockStyle {
         timeSize: Math.round(132 * glass.unit)
         dateSize: Math.round(22 * glass.unit)
 
-        Behavior on y { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic } }
+        // A share of the height, so not until the frame has its real one:
+        // the clock slid down from where it sat at 800x600, at every lock.
+        Behavior on y {
+            enabled: glass.ui.settled
+            NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+        }
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration } }
     }
 

@@ -16,40 +16,58 @@ TestCase {
 
     Component {
         id: fakeAuthenticator
+        Fake {}
+    }
 
-        QtObject {
-            property int state: 0            // 0 idle, 1 authenticating
-            property bool hadPrompt: false
-            property string prompt: ""
-            property string promptForSecret: ""
-            property string infoMessage: ""
-            property string errorMessage: ""
-            property int authenticatorTypes: 0
-            property var calls: []
-            // What a password did: "sent" while authenticating, "lost" when idle.
-            property var responses: []
-
-            signal succeeded()
-            signal failed(int kind, var source)
-            signal noninteractiveError(int kind, var source)
-
-            function startAuthenticating() {
-                calls = calls.concat(["start"]);
-                if (state === 1)
-                    return;
-                state = 1;
-                hadPrompt = true;
-                promptForSecret = promptForSecret === "Password: " ? "Password:" : "Password: ";
-            }
-            function respond(password) {
-                responses = responses.concat([(state === 1 ? "sent:" : "lost:") + password]);
-            }
-            function wrongPassword() {
-                state = 0;
-                failed(0, null);
-            }
-            function starts() { return calls.filter(c => c === "start").length; }
+    // Plasma 6.8's: it has an authenticator to pick, which is how Unlock
+    // knows it, and may say its PAM conversation has timed out.
+    Component {
+        id: fakeAuthenticator68
+        Fake {
+            property int authenticator: 0
+            property bool pamTimeout: false
         }
+    }
+
+    component Fake: QtObject {
+        property int state: 0            // 0 idle, 1 authenticating
+        property bool hadPrompt: false
+        property string prompt: ""
+        property string promptForSecret: ""
+        property string infoMessage: ""
+        property string errorMessage: ""
+        property int authenticatorTypes: 0
+        property var calls: []
+        // What a password did: "sent" while authenticating, "lost" when idle
+        // or when the conversation has timed out.
+        property var responses: []
+
+        signal succeeded()
+        signal failed(int kind, var source)
+        signal noninteractiveError(int kind, var source)
+
+        function startAuthenticating() {
+            calls = calls.concat(["start"]);
+            if (state === 1)
+                return;
+            state = 1;
+            hadPrompt = true;
+            promptForSecret = promptForSecret === "Password: " ? "Password:" : "Password: ";
+        }
+        function stopAuthenticating() {
+            calls = calls.concat(["stop"]);
+            state = 0;
+        }
+        function respond(password) {
+            const listening = state === 1 && this["pamTimeout"] !== true;
+            responses = responses.concat([(listening ? "sent:" : "lost:") + password]);
+        }
+        function wrongPassword() {
+            state = 0;
+            failed(0, null);
+        }
+        function starts() { return calls.filter(c => c === "start").length; }
+        function stops() { return calls.filter(c => c === "stop").length; }
     }
 
     Component {
@@ -58,14 +76,19 @@ TestCase {
             restMs: 40
             messageMs: 40
             idleMs: 80
+            awakeMs: 20
         }
     }
 
-    function make() {
-        const auth = createTemporaryObject(fakeAuthenticator, tc);
+    function make(fake) {
+        const auth = createTemporaryObject(fake ?? fakeAuthenticator, tc);
         const unlock = createTemporaryObject(unlockComponent, tc, { authenticator: auth });
         verify(unlock, "Unlock instantiated");
         return { auth, unlock };
+    }
+
+    function make68() {
+        return make(fakeAuthenticator68);
     }
 
     function spy(target, signalName) {
@@ -243,6 +266,105 @@ TestCase {
         compare(auth.state, 1);
         verify(unlock.submit("right"));
         compare(auth.responses, ["sent:right"]);
+    }
+
+    // ---- Plasma 6.8's greeter ---------------------------------------------
+
+    function test_before_6_8_nothing_keeps_it_awake() {
+        const { auth, unlock } = make();
+        verify(!unlock.keepsAwake);
+        unlock.keepShown = true;
+        unlock.poke();
+        wait(120);
+        compare(auth.starts(), 1);
+    }
+
+    function test_6_8_is_kept_awake_while_the_prompt_shows() {
+        const { auth, unlock } = make68();
+        verify(unlock.keepsAwake);
+        unlock.poke();
+        tryVerify(() => auth.starts() >= 3, 1000);
+        unlock.hide();
+        const hidden = auth.starts();
+        wait(120);
+        compare(auth.starts(), hidden, "not while it is hidden");
+    }
+
+    function test_6_8_is_not_kept_awake_while_resting() {
+        const { auth, unlock } = make68();
+        unlock.keepShown = true;
+        unlock.poke();
+        auth.wrongPassword();
+        const failedAt = auth.starts();
+        verify(unlock.resting);
+        wait(25);
+        compare(auth.starts(), failedAt, "nothing started during the rest");
+        tryVerify(() => !unlock.resting, 1000);
+        compare(auth.state, 1, "started again when the rest ends");
+        verify(unlock.submit("right"));
+        compare(auth.responses, ["sent:right"]);
+    }
+
+    function test_6_8_success_stops_authenticating_and_the_heartbeat() {
+        const { auth, unlock } = make68();
+        const finished = spy(unlock, "finished");
+        unlock.keepShown = true;
+        unlock.poke();
+        unlock.submit("right");
+        auth.succeeded();
+        compare(auth.stops(), 1);
+        compare(finished.count, 1);
+        const after = auth.starts();
+        wait(120);
+        compare(auth.starts(), after);
+    }
+
+    function test_before_6_8_success_stops_nothing() {
+        const { auth, unlock } = make();
+        unlock.poke();
+        unlock.submit("right");
+        auth.succeeded();
+        compare(auth.stops(), 0);
+    }
+
+    function test_6_8_without_a_prompt_waits_without_a_heartbeat() {
+        const { auth, unlock } = make68();
+        unlock.keepShown = true;
+        auth.hadPrompt = false;
+        auth.succeeded();
+        verify(unlock.unlockedWithoutPassword);
+        verify(unlock.shown);
+        const after = auth.starts();
+        wait(120);
+        compare(auth.starts(), after);
+    }
+
+    function test_a_password_typed_while_timed_out_is_held_then_sent() {
+        const { auth, unlock } = make68();
+        unlock.keepShown = true;
+        unlock.poke();
+        auth.pamTimeout = true;
+        verify(unlock.submit("right"));
+        verify(unlock.sending);
+        verify(!unlock.submit("again"), "one at a time");
+        wait(60);
+        compare(auth.responses, [], "not sent into a timed-out conversation");
+        auth.pamTimeout = false;
+        tryCompare(unlock, "sending", false, 1000);
+        compare(auth.responses, ["sent:right"]);
+    }
+
+    function test_escape_forgets_a_held_password() {
+        const { auth, unlock } = make68();
+        unlock.poke();
+        auth.pamTimeout = true;
+        unlock.submit("right");
+        unlock.dismiss();
+        verify(!unlock.sending);
+        auth.pamTimeout = false;
+        unlock.poke();
+        wait(60);
+        compare(auth.responses, []);
     }
 
     // ---- other ways in ----------------------------------------------------

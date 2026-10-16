@@ -55,19 +55,25 @@ PanelWindow {
     // full strip while a window on this monitor reaches into the panel's
     // space -- a maximised one always does, stopping where the reserved space
     // starts -- and float again when none does. `panel.defloat` turns it off.
+    //
+    // A window on the other monitor never does, however far it hangs over,
+    // and nor does a full-screen one: the panel steps aside for it, or KWin
+    // puts it above the panel, and either way what the panel reserves stays
+    // as it was (see WindowEvents.reachesEdge).
     readonly property bool defloated: root.configuredStyle !== "full"
                                       && PanelModel.defloatsFor(root.screenName)
                                       && WindowEvents.reachesEdge(WindowsService.windows, Desktops.currentId,
-                                                                  { x: root.modelData.x, y: root.modelData.y,
+                                                                  { name: root.screenName,
+                                                                    x: root.modelData.x, y: root.modelData.y,
                                                                     width: root.modelData.width,
                                                                     height: root.modelData.height },
                                                                   root.position, root.floatExtent)
 
     // 1 floating, 0 against the edge; PanelSurface draws the margins, the
     // corners and the strip's depth from it, so the change is a movement
-    // rather than a jump.
+    // rather than a jump -- at the shell's one speed, `theme.animationMs`.
     property real floatAmount: root.style === "full" ? 0 : 1
-    Behavior on floatAmount { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on floatAmount { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
 
     // What is drawn, moving with floatAmount; `extent` is what is reserved,
     // which changes once rather than every frame -- each change resizes the
@@ -128,7 +134,10 @@ PanelWindow {
     //
     // Stepping aside is drawing nothing and taking no clicks, not unmapping:
     // the surface keeps its exclusive zone, so the maximised windows behind
-    // the full-screen one are not resized away and back.
+    // the full-screen one are not resized away and back. It is at once, with
+    // no fade: the game is already on screen by the time the window list
+    // says so, and a panel fading out would be drawn over it that much
+    // longer.
     readonly property bool fullScreenBelow: PanelModel.hidesForFullScreen(root.screenName)
                                             && WindowEvents.fullScreenOn(WindowsService.windows, root.screenName,
                                                                          Desktops.currentId)
@@ -158,21 +167,27 @@ PanelWindow {
     implicitHeight: root.horizontal ? root.visibleThickness : 0
     implicitWidth: root.horizontal ? 0 : root.visibleThickness
 
-    Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-    Behavior on implicitWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on implicitHeight { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
+    Behavior on implicitWidth { NumberAnimation { duration: Theme.animationMs; easing.type: Easing.OutCubic } }
 
     // Reserve the strip so maximised windows stop at the panel rather than
     // being covered by it -- unless it hides, in which case reserving it would
     // defeat the point.
     exclusiveZone: root.autoHide ? 0 : root.extent
 
+    // A dock to KWin, not a window: Show Desktop leaves it on screen, and the
+    // show-desktop strip's click no longer turns Show Desktop straight back
+    // off. See Layers.
+    WlrLayershell.namespace: Layers.chrome
+
     color: "transparent"
 
-    // Only what is drawn takes the pointer. The margin a floating bar keeps
-    // from the edge, and the gaps between islands, let a click through to the
-    // window beneath. While hidden, the whole sliver is the target.
+    // Only what is drawn takes the pointer, and a corner a widget owns. The
+    // margin a floating bar keeps from the edge, and the gaps between islands,
+    // let a click through to the window beneath. While hidden, the whole
+    // sliver is the target.
     mask: root.fullScreenBelow ? root._deaf
-        : root.revealed && root.style !== "full" ? surface.shape : null
+        : root.revealed && root.style !== "full" ? surface.input : null
 
     // Blurred behind, where the compositor offers it -- KWin does, through
     // ext-background-effect -- so a translucent panel reads as frosted glass
@@ -355,6 +370,7 @@ PanelWindow {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        WlrLayershell.namespace: Layers.chrome
         color: "transparent"
 
         MouseArea {

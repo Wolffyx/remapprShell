@@ -122,6 +122,16 @@ Column {
         Hint {
             text: "Least overlap puts a new window where it covers the fewest others -- which, on a screen already full of large windows, is a corner."
         }
+
+        // A window rule rather than a kwinrc key, but the same kind of
+        // setting: KWin's own behaviour, through `windows behaviour`. See
+        // placeGames in scripts/windows.sh for why it exists.
+        ToggleRow {
+            label: "Place Steam games like other windows"
+            description: "Games run through Proton often ask for a spot of their own -- World of Tanks' launcher asks for the middle of everything the screens span, which can be the edge of one of them. A KWin window rule has KWin ignore that. From the next window a game opens."
+            checked: root.boolOf("placeGames")
+            onToggled: value => root.set("placeGames", value)
+        }
     }
 
     Card {

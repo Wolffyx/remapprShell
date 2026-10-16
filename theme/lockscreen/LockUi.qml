@@ -4,7 +4,7 @@
     The frame every lock screen style is drawn in.
 
     This file owns what must exist exactly once and must not vary with the
-    look: the wallpaper and its blur, waking on a key or the pointer, Plasma's
+    look: the wallpaper and its blur, waking on a key or the pointer, the
     on-screen keyboard and the StackView it moves, the shake when a password
     is refused, the OSD, and the binding that keeps the prompt up while
     something is half-typed. It draws no layout at all.
@@ -45,7 +45,6 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Effects
 import org.kde.kirigami as Kirigami
-import org.kde.breeze.components as Breeze
 
 Item {
     id: ui
@@ -62,6 +61,15 @@ Item {
     required property var config
     // SessionManagement: sleep, hibernate, switch user.
     required property var session
+    // Whether the greeter has put the first frame on screen -- its
+    // `viewVisible`. Until then the frame is still being sized: the greeter
+    // makes the lock screen at LockScreen.qml's fallback 800x600 and only
+    // then sizes it to the screen, so a Behavior on anything placed by the
+    // size played that resize as a slide at the start of every lock. A
+    // Behavior on where something is waits for this, and the first frame has
+    // everything where it belongs. Measured on 6.7.5, offscreen at
+    // 2560x1440: the resize, then the first frame, then this.
+    required property bool settled
 
     function setting(name, fallback) {
         const v = ui.config ? ui.config[name] : undefined;
@@ -270,16 +278,19 @@ Item {
 
     // --- the style -------------------------------------------------------
 
-    // Plasma's on-screen keyboard moves this up out of its way, which is why
-    // the style sits in a StackView of one page -- and why the StackView's id
-    // must be `mainStack`: VirtualKeyboardLoader resolves that name as an id
-    // through the creating context.
+    // The style sits in a StackView of one page, which the on-screen keyboard
+    // moves up out of its way where it is drawn in this window (X11; see
+    // LockVirtualKeyboard).
     QQC2.StackView {
         id: mainStack
+        y: keyboard.lift
         width: ui.width
         height: ui.height
         focus: true
         initialItem: stylePage
+        Behavior on y {
+            NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad }
+        }
         // The shutter. A transform rather than `y`, which the on-screen
         // keyboard moves for its own reasons.
         transform: Translate { id: lift }
@@ -337,31 +348,35 @@ Item {
         NumberAnimation { target: ui.prompt?.shakeTarget ?? null; property: "x"; to: 0; duration: 40 }
     }
 
-    Breeze.VirtualKeyboardLoader {
-        id: inputPanel
+    // The password field takes the focus whenever the keyboard comes up, by
+    // the button or by itself, or its keys would go nowhere.
+    LockVirtualKeyboard {
+        id: keyboard
+        anchors.fill: parent
         z: 1
-        screenRoot: ui
-        mainStack: mainStack
-        mainBlock: stylePage
-        passwordField: ui.prompt?.field ?? null
+        visibleBoundary: stylePage.visibleBoundary
+        onShownChanged: {
+            if (keyboard.shown)
+                ui.focusPassword();
+        }
     }
 
     // For the styles, which draw the button that shows and hides it: whether
-    // Plasma's keyboard loaded at all, whether it is up, and the press. The
+    // there is a keyboard to show at all, whether it is up, and the press. The
     // password field is focused first, so that the first key typed on the
     // keyboard goes into the password rather than nowhere.
-    readonly property bool keyboardAvailable: inputPanel.status === Loader.Ready
-    readonly property bool keyboardShown: inputPanel.keyboardActive
+    readonly property bool keyboardAvailable: keyboard.available
+    readonly property bool keyboardShown: keyboard.shown
 
     function toggleKeyboard(): void {
         ui.focusPassword();
-        inputPanel.showHide();
+        keyboard.toggle();
     }
 
     Binding {
         target: ui.unlock
         property: "keepShown"
-        value: (ui.prompt?.text.length ?? 0) > 0 || inputPanel.keyboardActive || ui.unlock.unlockedWithoutPassword
+        value: (ui.prompt?.text.length ?? 0) > 0 || keyboard.shown || ui.unlock.unlockedWithoutPassword
     }
 
     // --- over every style -------------------------------------------------

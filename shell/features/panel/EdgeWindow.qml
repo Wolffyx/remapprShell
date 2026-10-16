@@ -157,6 +157,9 @@ PanelWindow {
     // told PanelModel it is open -- see WidgetSlot. Mapping both in one turn
     // is what the overlay layer used to paper over.
     WlrLayershell.layer: WlrLayer.Top
+    // Part of the panel: a dock to KWin, so Show Desktop neither hides it nor
+    // ends when it opens. See Layers.
+    WlrLayershell.namespace: Layers.chrome
     color: "transparent"
 
     onVisibleChanged: {

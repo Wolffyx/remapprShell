@@ -64,8 +64,29 @@ QtObject {
     // step with the first of them and then did the opposite of what it said.
     property bool showingDesktop: false
 
+    // Through KWin's own action, the one Meta+D runs, and only when it would
+    // change anything: the action toggles.
+    //
+    // Not KWin's D-Bus `showDesktop`. KWin watches whoever calls that, and
+    // puts the windows back the moment the caller leaves the bus
+    // (dbusinterface.cpp) -- and every call from here is a busctl that leaves
+    // as soon as it has sent it. The desktop showed for one to three
+    // milliseconds, every click (#15, measured with dbus-monitor 2026-10-16).
+    //
+    // What was asked for is taken as the state at once, so a peek that ends
+    // before KWin's answer has been read back still undoes itself; KWin's
+    // answer, and a read shortly after, put it right if it was not so.
     function showDesktop(show) {
-        Dbus.send(root.service, "/KWin", "org.kde.KWin", "showDesktop", "b", [show ? "true" : "false"]);
+        if (show === root.showingDesktop)
+            return;
+        root.showingDesktop = show;
+        Dbus.invokeShortcut("Show Desktop");
+        root._settle.restart();
+    }
+
+    readonly property Timer _settle: Timer {
+        interval: 400
+        onTriggered: root._showing.refresh()
     }
 
     readonly property DbusProperty _showing: DbusProperty {

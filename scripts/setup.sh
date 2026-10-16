@@ -333,6 +333,7 @@ plan=$(
     printf '%s\n' "panel:      $renderer"
     printf '%s\n' "keys:       $(printf '%s ' $keys_chosen | sed 's/ $//'; [ -n "$keys_chosen" ] || printf none)"
     printf '%s\n' "windows:    $([ $windowlist = 0 ] && echo 'listed on the taskbar' || echo 'not listed')"
+    printf '%s\n' "games:      placed like other windows (a KWin rule; Settings > Windows)"
     printf '%s\n' "previews:   $([ $plugin = 0 ] && echo 'built' || echo 'not built')"
     printf '%s\n' "Alt+Tab:    $alttab"
     printf '%s\n' "theme:      $([ $theme = 0 ] && echo 'apply' || echo 'leave alone')"
@@ -364,6 +365,12 @@ case "$mode" in
 esac
 
 [ $windowlist = 0 ] && step "the window list" "$REPO_ROOT/scripts/windows.sh" enable
+
+# On by default, the user's choice of 2026-10-14: Proton games are X11 windows
+# that ask for their own position, and on two screens of different shapes the
+# one they ask for is an edge. Not a question -- the settings page turns it
+# off, and an uninstall takes it out with the rest of KWin's behaviour.
+step "Steam games placed by KWin" "$REPO_ROOT/scripts/windows.sh" behaviour set placeGames true
 
 # --yes: the plan that said "built" was the question. deps.sh returns at once
 # when everything is there.

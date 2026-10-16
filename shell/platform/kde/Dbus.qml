@@ -26,8 +26,12 @@ QtObject {
         return root.busctl.concat(["set-property", service, path, iface, name, signature, String(value)]);
     }
 
+    // `--` ends busctl's own options. Without it busctl reads any argument
+    // that starts with a minus as one of them, wherever it stands, and
+    // refuses the call: a negative number -- a tray click on a screen left
+    // of the origin -- or a string such as "-x".
     function callArgs(service, path, iface, method, signature, args) {
-        return root.busctl.concat(["call", service, path, iface, method, signature ?? ""])
+        return root.busctl.concat(["call", "--", service, path, iface, method, signature ?? ""])
                           .concat((args ?? []).map(a => String(a)));
     }
 

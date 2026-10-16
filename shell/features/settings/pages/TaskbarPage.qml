@@ -91,7 +91,7 @@ Column {
 
         ConfigToggleRow {
             label: "Fill the edge when a window reaches it"
-            description: root.floats ? "A full-width strip while a window touches the panel's space -- a maximised one always does -- and floating again when none does."
+            description: root.floats ? "A full-width strip while a window on its monitor touches the panel's space -- a maximised one always does -- and floating again when none does."
                                      : "Only matters for the floating bar and islands."
             enabled: root.floats
             fallback: true

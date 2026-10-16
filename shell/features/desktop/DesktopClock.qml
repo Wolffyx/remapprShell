@@ -46,7 +46,10 @@ PanelWindow {
     exclusiveZone: 0
     mask: Region {}
     WlrLayershell.layer: WlrLayer.Background
-    WlrLayershell.namespace: `${Branding.slug}-desktop-clock`
+    // A dock to KWin, so Show Desktop -- of all things -- does not hide it.
+    // Not "desktop": KWin gives a desktop the keyboard when it shows one,
+    // and this takes no input. See Layers.
+    WlrLayershell.namespace: Layers.chrome
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     color: "transparent"
 

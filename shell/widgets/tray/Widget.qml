@@ -36,6 +36,7 @@ import Quickshell.Services.SystemTray
 import qs.core
 import qs.domain.theme
 import qs.domain.tray.activation
+import qs.domain.tray.click
 import qs.domain.tray.layout
 import qs.ui.primitives
 import qs.ui.controls
@@ -193,24 +194,20 @@ BarWidget {
     // Where on the screen a click `along` this widget was, as the tray spec's
     // Activate wants it: the icon's place along the panel, at the panel's
     // inner edge -- which is where Plasma says too, and where an application
-    // that opens beside its icon puts its window. The panel spans its screen
-    // edge to edge, so a position in the panel's window is one on the screen.
+    // that opens beside its icon puts its window. TrayClick.point works it
+    // out.
+    //
+    // The panel's screen is the one to use, and there is always one under a
+    // click. Should it be missing -- a screen going away as it is clicked --
+    // the screen this widget was made for is looked up by its name, and with
+    // neither the point is the middle of a screen. It was 0,0, which is the
+    // top-left corner of the whole layout: an application opened there
+    // whatever KWin's placement policy said.
     function screenPoint(along) {
         const bar = root.bar;
-        const s = bar?.screenObject;
-        if (!bar || !s)
-            return { x: 0, y: 0 };
-        const p = root.mapToItem(null, bar.horizontal ? along : 0, bar.horizontal ? 0 : along);
-        switch (bar.position) {
-        case "top":
-            return { x: s.x + p.x, y: s.y + bar.extent };
-        case "left":
-            return { x: s.x + bar.extent, y: s.y + p.y };
-        case "right":
-            return { x: s.x + s.width - bar.extent, y: s.y + p.y };
-        default:
-            return { x: s.x + p.x, y: s.y + s.height - bar.extent };
-        }
+        const screen = bar?.screenObject ?? Quickshell.screens.find(s => s.name === root.screenName) ?? null;
+        const local = bar ? root.mapToItem(null, bar.horizontal ? along : 0, bar.horizontal ? 0 : along) : null;
+        return TrayClick.point(screen, bar?.position, bar?.extent, local, Quickshell.screens);
     }
 
     // What a click does, in one place, so an icon behaves the same on the

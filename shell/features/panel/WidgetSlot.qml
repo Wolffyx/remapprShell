@@ -67,12 +67,13 @@ Item {
     }
 
     // A widget that takes hover from the panel gets it through the MouseArea
-    // below, which then hides the pointer from the widget's own handlers.
+    // below, which then hides the pointer from the widget's own handlers. A
+    // corner the widget owns is hovered for it the same way.
     Binding {
         target: root.widget
         property: "hostHovered"
-        value: mouse.containsMouse
-        when: root.widget !== null && root.wantsHover
+        value: (root.wantsHover && mouse.containsMouse) || root.cornerHovered
+        when: root.widget !== null && (root.wantsHover || root.cornerHovered)
     }
 
     // The same calls the pointer makes, asked for by name, so a click or a
@@ -132,7 +133,8 @@ Item {
     // listening for hover. Each is read from where it actually arrives, so
     // neither route can hide the pointer from the tooltip.
     readonly property string tooltipText: root.widget?.tooltip ?? ""
-    readonly property bool pointerOver: root.wantsHover ? mouse.containsMouse : (root.widget?.hovered ?? false)
+    readonly property bool pointerOver: root.cornerHovered
+        || (root.wantsHover ? mouse.containsMouse : (root.widget?.hovered ?? false))
 
     property bool tooltipDue: false
     property bool tooltipForced: false
@@ -188,41 +190,60 @@ Item {
                 root.widget.handleHover(root.bar.horizontal ? event.x : event.y, root.bar.horizontal);
         }
 
-        onExited: if (root.wantsHover) root.widget.dismissPopout()
+        onExited: root.pointerExited()
+        onPressed: root.pointerPressed()
+        onWheel: event => root.pointerWheel(event)
+        onClicked: event => root.pointerClicked(event.button, mouse, event.x, event.y)
+    }
 
-        onPressed: {
-            root.tooltipDue = false;
-            root.tooltipForced = false;
-            // A press on any other widget closes the popout that is open, as
-            // clicking the taskbar closes the Start menu.
-            PanelModel.pressed(root);
-        }
+    // ---- the pointer, by name ----------------------------------------------
+    //
+    // What a press, a click, a wheel and the pointer leaving do to this slot.
+    // Functions rather than the MouseArea's own handlers, because the corner
+    // of the screen beyond a widget that owns it (CornerCatcher) is caught
+    // outside this slot and must do exactly what the widget does.
 
-        onWheel: event => {
-            if (!root.wantsWheel) {
-                event.accepted = false;
-                return;
-            }
-            // Normalise to steps: touchpads report pixel deltas, wheels report
-            // 120ths of a degree. Widgets should not have to know which.
-            const delta = event.angleDelta.y !== 0 ? event.angleDelta.y / 120
-                                                   : event.pixelDelta.y / 50;
-            root.widget.handleWheel(delta);
-        }
+    // The pointer is on the corner this slot's widget owns.
+    property bool cornerHovered: false
 
-        // A right click the widget has no use for opens the panel's own menu,
-        // as it would have done had the click landed between two widgets.
-        // Without this the strip above and below a widget -- which is the
-        // widget's target now, and which is where a pointer thrown at the
-        // screen edge lands -- swallowed the click and answered nothing.
-        onClicked: event => {
-            if (event.button === Qt.RightButton && !(root.widget?.wantsRightClick ?? false)) {
-                const p = root.mapToItem(null, event.x, event.y);
-                PanelModel.menuRequested(root.screenName, (root.bar?.horizontal ?? true) ? p.x : p.y);
-                return;
-            }
-            root.widget?.handleActivate(event.button);
+    function pointerExited() {
+        if (root.wantsHover)
+            root.widget.dismissPopout();
+    }
+
+    function pointerPressed() {
+        root.tooltipDue = false;
+        root.tooltipForced = false;
+        // A press on any other widget closes the popout that is open, as
+        // clicking the taskbar closes the Start menu.
+        PanelModel.pressed(root);
+    }
+
+    function pointerWheel(event) {
+        if (!root.wantsWheel) {
+            event.accepted = false;
+            return;
         }
+        // Normalise to steps: touchpads report pixel deltas, wheels report
+        // 120ths of a degree. Widgets should not have to know which.
+        const delta = event.angleDelta.y !== 0 ? event.angleDelta.y / 120
+                                               : event.pixelDelta.y / 50;
+        root.widget.handleWheel(delta);
+    }
+
+    // A right click the widget has no use for opens the panel's own menu,
+    // as it would have done had the click landed between two widgets.
+    // Without this the strip above and below a widget -- which is the
+    // widget's target now, and which is where a pointer thrown at the
+    // screen edge lands -- swallowed the click and answered nothing. `x` and
+    // `y` are in `from`'s coordinates, and place the menu.
+    function pointerClicked(button, from, x, y) {
+        if (button === Qt.RightButton && !(root.widget?.wantsRightClick ?? false)) {
+            const p = from.mapToItem(null, x, y);
+            PanelModel.menuRequested(root.screenName, (root.bar?.horizontal ?? true) ? p.x : p.y);
+            return;
+        }
+        root.widget?.handleActivate(button);
     }
 
     // A widget that declares a popout gets a window for it, beside itself. The

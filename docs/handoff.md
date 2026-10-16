@@ -1,8 +1,16 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-08**, twice: in the
-morning, the sidebar's edge gone over on the user's report -- a grip where the
+sessions, and added to since -- most recently on **2026-10-16**: Plasma 6.8
+locked the user out, because our lock screen stopped loading and the greeter's
+own fallback cannot unlock ("2026-10-16: Plasma 6.8 and the lock screen").
+Before that, **2026-10-14**, twice: in the
+afternoon the four open bugs on GitHub, each fixed and each still to be seen
+on the real screen ("The afternoon of 2026-10-14: the open bugs"); in the
+morning an output picker one device short after a system update, because a
+package install had put PulseAudio itself back on the socket beside PipeWire,
+and a second way to read sound for when it is ("2026-10-14: PulseAudio on the
+socket"). Before that, **2026-10-08**, twice: in the morning, the sidebar's edge gone over on the user's report -- a grip where the
 pointer is instead of a bar down the whole edge, a sidebar that comes out under
 the pull, and "Pointer at the edge" mended, which had always been one setting
 behind ("2026-10-08: the sidebar's edge"); before that, a login with no shell,
@@ -152,7 +160,7 @@ and the rest still say what 2026-09-16 found.
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | *(2026-09-23)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on and Plasma is keeping up, only GTK's theme and dark preference and our Plasma desktop theme. When Plasma's switch misses a sunset (it did, on 2026-09-22; see that night's entry) `theme.desktop.rescuePlasmaSwitch` writes the variant after twenty seconds' grace. When the switch fires and its *colours* do not follow (2026-09-23: every name light, every `[Colors:*]` group dark), `plasma_fill_colours` copies them in -- the name is checked and so is the value, because only the value is what applications draw. Every write to kdeglobals is **announced** on the bus (`org.kde.kconfig.notify.ConfigChanged`, `busctl` not `gdbus`, see that day's part two): without it KWin's decorations and the desktop portal keep the old colours, and Chrome, Electron and Claude Code with them. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
-| Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
+| Lock screen | *(2026-10-16)* **off**: the user ran `disable` at 14:54 after Plasma 6.8 locked them out (see that day). Fixed in the source; `rmpr lockscreen try`, then `enable`, is the user's to run. *(Older:)* **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- put back twice now, on 2026-09-15 after a restore and on **2026-09-22** after the caelestia uninstall unset the kwinrc key again. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it. *(2026-09-22)* **The hover previews draw real windows for the first time**: the compiled `KWinScreencast` module had been installed and unreachable since the day it was built, because `~/.local/lib/qt6/qml` was not on the session's `QML2_IMPORT_PATH` |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
 | Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
@@ -316,6 +324,231 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-16: Plasma 6.8 and the lock screen
+
+**Plasma 6.7.5 -> 6.8.0 that morning, and twice the session could not be
+unlocked** (14:17, and after a reset at 14:46). Our lock screen named
+`Breeze.VirtualKeyboardLoader`, which 6.8 took out of
+`org.kde.breeze.components`, so the greeter refused the whole file and drew
+its **built-in fallback locker -- which in 6.8 cannot unlock**: every password
+went to `Received prompt response, but no pending prompt was found!`, after
+`Worker not ready yet, cannot authenticate.` The user got out through tty2 and
+ran `lockscreen disable`. So "should ours fail to load, the greeter draws its
+built-in locker" is no safety net on 6.8: a lock screen that does not load is
+a lockout there.
+
+What changed, for every Plasma 6 rather than for 6.8 alone -- each thing found
+at run time, never a version number:
+
+- **The on-screen keyboard** (`LockVirtualKeyboard.qml`, new). Wayland, every
+  release: KWin's, through Plasma's `KWinVirtualKeyboard` singleton (in
+  `org.kde.plasma.workspace.keyboardlayout` on 6.7.5 and 6.8 alike), made at
+  run time in `LockKeys` so a missing module costs only the button.
+  `forceActivate()` where it exists (6.8), `InputMethod.show()` where not, as
+  6.7's Breeze file did. X11 (6.7 and before): Qt's own keyboard,
+  `LockX11Keyboard.qml`, made only on `xcb` with `Qt.createComponent`, so a
+  machine without qt6-virtualkeyboard loses the button and not the lock
+  screen. The button is shown wherever the singleton exists, as 6.8's own
+  lock screen does -- not by KWin's `available`, which nobody here could
+  test true, and a touch-only person without a keyboard button cannot get in.
+- **The interface version.** 6.8 no longer sets
+  `org_kde_plasma_screenlocker_greeter_interfaceVersion`; `LockScreen.qml`
+  had read "missing" as "older than 2" and would have drawn Plasma's instead.
+  Now only a greeter that *says* less than 2 is refused; one that says
+  nothing is judged by its authenticator (`interfaceTooOld`, also in the
+  check's probe).
+- **The unlock protocol** (`Unlock.qml`). 6.8's lock screen calls
+  `startAuthenticating()` every second while the prompt shows, and
+  `stopAuthenticating()` before quitting on success. Ours does both where the
+  authenticator has 6.8's `authenticator` selector property (6.7.5 has no
+  `authenticatorChanged` in its binary; 6.8 has) -- and nothing new before
+  it. The heartbeat is not optional on 6.8: an offscreen 6.8 greeter logs
+  "Worker not ready yet" by itself at start, so a single start can be lost,
+  which is the fallback locker's failure. 6.8's QML also reads
+  `authenticator.pamTimeout`, which kscreenlocker 6.8.0's qmltypes do not
+  have: a password typed while it is true is held and sent when it is not,
+  so the day it arrives it is already handled. Eight new cases in
+  `tst_LockUnlock.qml`, against a 6.8 fake beside the 6.7 one.
+
+Measured: `lockscreen check --all`, all twelve styles, in the real 6.8 greeter;
+a read-only probe of the real 6.8 authenticator (selector yes, pamTimeout no,
+stopAuthenticating yes, interface version undefined); `make lint`; the whole
+suite. **Not** measured: an unlock with a real password -- that is `try`, and
+the user's. Nor X11 or a real input method: the X11 file was loaded and
+toggled offscreen only. Upstream, not ours: 6.8's fallback locker not
+unlocking.
+
+**Done the same afternoon, by the user:** `rmpr lockscreen try` unlocked with
+the real password under kscreenlocker 6.8.0 (build `690556d8f52177e8`, 15:14),
+and `rmpr lockscreen enable` put it in both packages. Still unseen: a real lock
+(Meta+L) and unlock on 6.8, which is the path that failed in the morning.
+
+**Show desktop (#15), found still broken and fixed (`c327c8d`, `2ed5a9b`).**
+`a7d0230` had moved the strip into the corner, but a click still did nothing.
+Two causes, both KWin's rules, both measured with `dbus-monitor` on the
+user's clicks:
+
+- **Every click was undone by KWin within 1 to 3 ms.** KWin's D-Bus
+  `showDesktop` watches its caller and turns Show Desktop off when that caller
+  leaves the bus (dbusinterface.cpp). Ours was a one-shot `busctl`.
+  `Desktops.showDesktop` now invokes KWin's own "Show Desktop" action (Meta+D's)
+  through kglobalaccel, only when the state would change. Seen working on the
+  real screen.
+- **Meta+D hid the panel.** KWin types a layer surface by namespace alone,
+  `dock`/`desktop`/a few others; anything else, our unnamed `quickshell`
+  included, is Normal and is hidden by Show Desktop. A Normal surface mapping
+  while it shows also ends it. Panel chrome is `Layers.chrome` ("dock") now,
+  in `shell/core/Layers.qml`, which says which surfaces are and why.
+  User-opened overlays stay windows, as KRunner is.
+
+**Learned:** a fire-and-forget `busctl` is the wrong caller for any KWin call
+that tracks its caller. And a KWin script loaded through
+`org.kde.kwin.Scripting.loadScript`, run, then `unloadScript`, is a read-only
+way to ask KWin what it thinks a window is.
+
+### The afternoon of 2026-10-14: the open bugs
+
+The user: fix the other open bugs. The four labelled `bug` on GitHub -- #13,
+#15, #20, #22 -- had not been touched by any commit since they were filed;
+#15 was done here, the other three each by an agent in a worktree of its own,
+reviewed and cherry-picked onto `dev`. **None of the four is closed on
+GitHub**, and none has been seen working on the real screen yet. What to try
+is under each.
+
+**#15, show desktop (`a7d0230`).** The call and the read-back were sound; the
+target was not. The strip sits 12 px short of the corner on a full panel and
+28 px short and 14 px up on a floating one -- outside its own input mask --
+and a pointer thrown at the corner stops in the corner. A widget can now own
+the corner beyond it (`BarWidget.ownsCorner`, show-desktop's is on):
+`CornerCatcher` in PanelSurface covers from it to the screen's corner across
+the panel's whole depth and hands everything to the slot, whose pointer
+handling moved into functions for it. The catcher is in `PanelSurface.input`,
+the mask, not in `shape`, the blur. *Try*: throw the pointer into the
+bottom-right corner of either screen and click, twice.
+
+**#22, the yellow bar on the lock screen (`6823f7e`).** The greeter makes the
+lock screen at 800x600 and sizes it after; the critical-battery banner was
+hidden by standing a height above the screen, so the resize slid it from one
+hidden place to another, through the top 29 px. It slides a 0-1 fraction now,
+and `LockUi.settled` (the greeter's `viewVisible`, which comes after the
+resize) gates the size-bound Behaviors -- the glass clock's, the minimal
+field's. Measured in the real greeter offscreen at 2560x1440. *Try*: `rmpr
+lockscreen try` -- the installed copy is still the old build until it is
+tried; `status` says the source has changed.
+
+**#13, the panel and full screen (`b1628a4`, `c0200f4`, `b6a8ca9`).** Filling
+the edge counts a window only by its `output` now, and never a full-screen
+one: a window a pixel over from the other monitor no longer changes this
+panel's reserved space, and a game going full screen no longer resizes the
+maximised windows behind it, twice. The step-aside was already instant in
+QML; the delay was the KWin script's 50 ms settle, restarted by every move
+of a game going full screen, so `fullScreenChanged` publishes on the next
+event-loop pass instead (installed: `rmpr windows enable` was run). Panel
+float and size animations follow `theme.animationMs`. *Unproven*: what
+actually moved DP-3 -- both panels were already filling their edges in the
+live list. If it still moves, read `busctl --user --json=short call
+com.remappr.Shell /Windows com.remappr.Shell.Windows List` while it does.
+
+**#20, windows at 0,0 -- the tray part (`0ff5650`, `5bb16c6`).** Three
+fallbacks sent a tray click to 0,0. Negative points were clamped because
+busctl took a leading minus for an option: `Dbus.callArgs` puts `--` after
+`call` now, which also fixes any call with an argument like `-x`. A click on
+an item not yet looked up could be answered by a lookup begun before the
+item registered; lookups are numbered and only a later one answers
+(`TrayClick.due`), with a 2 s busctl timeout instead of 25. No screen is the
+middle of a screen, not the origin. The rest of #20 was World of Tanks, and **is built (`4408ebc`)**: its
+Wargaming launcher is a Proton (X11) window whose WM_NORMAL_HINTS give a
+"program specified location" -- the middle of the whole 4000x2560 X screen,
+(1448, 937), above DP-2 -- and KWin honours a position an X11 window asks
+for, then pushed it onto DP-2's top edge. `windows behaviour set placeGames`
+adds one KWin rule (class contains `steam_app_`, normal windows, ignore
+requested geometry: Force), **on by default** by the user's choice: setup
+applies it, the Windows page has the switch, `behaviour revert` takes it out.
+The `[General] rules` list is shared with the person's own rules, so ours
+goes out of it by name (`kconfig_forget`). Which monitor: KWin's active
+screen -- where the game was launched from -- **by the user's choice**; a
+full-screen game picks DP-2 itself (Wine's primary). Pinning to a monitor
+was offered and declined: KWin's rule stores a screen *index*, and the
+alternative was our window-list script moving windows, which it has never
+done. The 0,0-rescue script proposed earlier is dropped: World of Tanks was
+never at 0,0.
+
+**Parked, by the user's choice: one to two seconds of black before the lock
+screen**, after Meta+L or the shell's own Lock. Not ours, as far as it was
+measured. A read-only watcher (`dbus-monitor` on `org.kde.screensaver`
+AboutToLock and ScreenSaver ActiveChanged, plus a 10 ms poll for the greeter
+process and its arguments) timed real locks: the greeter is spawned 60-100 ms
+after AboutToLock (`--immediateLock --graceTime 900000 --ksldfd N`), ours logs
+`lock screen: ready` at ~0.3 s, and KWin reports the lock shown
+(ActiveChanged true) at ~0.5 s -- and Plasma's own lock screen, back to back
+through `lockscreen disable`/`enable`, came in within 30 ms of ours, and the
+user saw much the same black. In the greeter's testing mode both come up with
+only a flash of black. VRR off on DP-2 changed nothing. So the black is after
+KWin has the greeter's surfaces, in the real lock path only. Untried: the lock
+wallpaper (`kscreenlockerrc` still names a caelestia image that is gone, so
+every lock falls back to `Next` and decodes its 5120x2880 PNG), KWin's own
+screen-locker logging (needs KWin started with the logging rule), and one
+monitor alone. Offscreen, ours spends ~245 ms building QML the greeter never
+caches (`~/.cache/kscreenlocker_greet` has no `qmlcache`), about 40 ms more
+than Plasma's.
+
+**Found on the way, not ours and not changed**: `kscreenlockerrc
+[Daemon] LockGrace=900` -- fifteen minutes in which an idle-locked session
+unlocks without a password; Plasma's default is 5. And a mistake to not
+repeat: timing Plasma's lock screen with `timeout kscreenlocker_greet
+--testing` on the real screen started PAM (it does on the pointer hovering,
+not only on a key) and the kill logged two `pam_unix ... authentication
+failure` lines. faillock had no tally afterwards, but only ever run a greeter
+with the stand-in authenticator.
+
+### 2026-10-14: PulseAudio on the socket
+
+The user, after a system update: the sound selector does not display all
+audio devices. The Scarlett 2i2 -- the default output and input -- was gone
+from it.
+
+**The shell was right and the system was two sound servers.** At 09:39 a
+batch of AUR installs brought in `pulseaudio` and six of its modules as
+dependencies (`blueman-git` lists it as optional; something asked for a
+provider and got the daemon), and `pipewire-pulse`, which conflicts with it,
+was removed. `pacman.log` has no line for that transaction -- the log jumps
+from 09:23 to 09:51 -- so `/var/lib/pacman/local/*/desc` install dates are what
+told it. At login both daemons ran. PulseAudio opened the USB interface first
+and held it; WirePlumber kept the device with no nodes on it, so PipeWire --
+and this shell, which read only PipeWire -- had two outputs and one input, and
+WirePlumber's remembered defaults pointed at nodes that did not exist (the
+input read as empty). `wpctl status` shows the device with nothing under it;
+`pactl info` saying `Server Name: pulseaudio` rather than `PulseAudio (on
+PipeWire ...)` is the tell. The user swapped `pipewire-pulse` back in and the
+picker had all six devices again.
+
+**And then: can it work with PulseAudio?** It can now. `AudioStatus` is a
+front for two readers with one shape -- `PipewireBackend` (what it was) and
+`PulseBackend`, which reads through `pactl` (`subscribe` for events, one
+`-f json` read of info, sinks and sources after a burst settles, coalesced
+writes so a dragged slider sends one level, not every step). Devices are
+objects kept per name across reads, so the widgets' `modelData === current`
+and the OSD's `sink !== _lastSink` hold for it exactly as for a PipeWire node.
+`pactl` is the same binary whichever server answers, so the reader is right
+under `pipewire-pulse` too -- it was proven there, offscreen, against this
+machine: the same three outputs, three inputs, defaults and levels as PipeWire's.
+
+Which one is `audio.backend` (Settings → Sound → Sound server): `auto` asks
+the socket once a minute who is answering, and reads PulseAudio only when it is
+PulseAudio's own; `pipewire` and `pulse` hold it. The pure part --
+`PactlState`, the choice included -- is in `qs.domain.status.audio`, tested in
+`tst_PactlState.qml`. `rmpr ipc status audio` now says `backend` and `server`.
+
+Learned the hard way: `pactl -f json` ends its output **without a newline**,
+so a `@sinks` echoed after it lands on the end of the info JSON and nothing
+parses -- each is followed by an `echo`. Designed in, not yet felt on a real
+PulseAudio: a level is drawn where it was asked for at once, and a read that
+lands while a write is still queued is dropped, because it is the level before
+the write and a slider being dragged would jump back to it.
+
+**Not done, and worth doing**: `rmpr doctor` says nothing when both servers
+run. It would have named this in one line.
 
 ### 2026-10-08: the sidebar's edge
 
