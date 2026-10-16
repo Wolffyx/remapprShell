@@ -175,6 +175,11 @@ PanelWindow {
     // defeat the point.
     exclusiveZone: root.autoHide ? 0 : root.extent
 
+    // A dock to KWin, not a window: Show Desktop leaves it on screen, and the
+    // show-desktop strip's click no longer turns Show Desktop straight back
+    // off. See Layers.
+    WlrLayershell.namespace: Layers.chrome
+
     color: "transparent"
 
     // Only what is drawn takes the pointer, and a corner a widget owns. The
@@ -365,6 +370,7 @@ PanelWindow {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        WlrLayershell.namespace: Layers.chrome
         color: "transparent"
 
         MouseArea {

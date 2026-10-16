@@ -118,7 +118,9 @@ PanelWindow {
     exclusionMode: handle.reserves ? ExclusionMode.Auto : ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.namespace: `${Branding.slug}-sidebar-handle`
+    // A dock to KWin, so Show Desktop neither hides the grip nor ends when it
+    // lights. See Layers.
+    WlrLayershell.namespace: Layers.chrome
     color: "transparent"
 
     // Wider than what it takes, so the grip can be seen; reserved, no wider

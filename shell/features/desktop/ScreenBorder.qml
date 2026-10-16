@@ -38,7 +38,8 @@ PanelWindow {
     exclusiveZone: 0
     mask: Region {}
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: `${Branding.slug}-border`
+    // A dock to KWin, so Show Desktop leaves the frame on. See Layers.
+    WlrLayershell.namespace: Layers.chrome
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     color: "transparent"
 
