@@ -1,7 +1,10 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-14**, twice: in the
+sessions, and added to since -- most recently on **2026-10-16**: Plasma 6.8
+locked the user out, because our lock screen stopped loading and the greeter's
+own fallback cannot unlock ("2026-10-16: Plasma 6.8 and the lock screen").
+Before that, **2026-10-14**, twice: in the
 afternoon the four open bugs on GitHub, each fixed and each still to be seen
 on the real screen ("The afternoon of 2026-10-14: the open bugs"); in the
 morning an output picker one device short after a system update, because a
@@ -157,7 +160,7 @@ and the rest still say what 2026-09-16 found.
 | Notifications | `notifications.history` is on in the profile, so the eavesdrop runs; `ai.enabled` is off. Night Light is **on**, automatic, 4000K -- which is what `theme.mode: auto` now follows |
 | Crash dumps | none. Five were written before the `image-data` fix, all with the same stack; they have been cleared |
 | Theme | *(2026-09-23)* **Plasma switches light and dark, and we fill the gaps.** "Switch to Dark Mode at Night" (`kdeglobals [KDE] AutomaticLookAndFeel`) is **on**, pointed at our two packages, and is the user's to set -- `theme variant` writes nothing into kdeglobals while it is on and Plasma is keeping up, only GTK's theme and dark preference and our Plasma desktop theme. When Plasma's switch misses a sunset (it did, on 2026-09-22; see that night's entry) `theme.desktop.rescuePlasmaSwitch` writes the variant after twenty seconds' grace. When the switch fires and its *colours* do not follow (2026-09-23: every name light, every `[Colors:*]` group dark), `plasma_fill_colours` copies them in -- the name is checked and so is the value, because only the value is what applications draw. Every write to kdeglobals is **announced** on the bus (`org.kde.kconfig.notify.ConfigChanged`, `busctl` not `gdbus`, see that day's part two): without it KWin's decorations and the desktop portal keep the old colours, and Chrome, Electron and Claude Code with them. With it off, nothing switches unless `theme.desktop.followMode` says so (off by default; **on** in this user's profile, which is moot while Plasma's switch is on). In force: **`remappr-shell-light`**, GTK **adw-gtk3**. `remappr-shell-theme.service` is **enabled** and settles the variant at login before any application starts. `kde-material-you-colors` is disabled |
-| Lock screen | **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
+| Lock screen | *(2026-10-16)* **off**: the user ran `disable` at 14:54 after Plasma 6.8 locked them out (see that day). Fixed in the source; `rmpr lockscreen try`, then `enable`, is the user's to run. *(Older:)* **built, tried twice on a real screen, and still not on**: Plasma's draws. `rmpr lockscreen try` was run twice on 2026-09-13 and **unlocked with the user's real password both times** -- build `b80537960ca3deb1`, recorded, so `enable` will now be accepted. faillock empty after both. It has never been enabled: that wants a text console logged in and waiting (item 22) |
 | Window list | KWin script loaded, daemon answering, 10 windows -- put back twice now, on 2026-09-15 after a restore and on **2026-09-22** after the caelestia uninstall unset the kwinrc key again. `rmpr windows enable` is the whole fix; `rmpr doctor` is the only thing that reports it. *(2026-09-22)* **The hover previews draw real windows for the first time**: the compiled `KWinScreencast` module had been installed and unreachable since the day it was built, because `~/.local/lib/qt6/qml` was not on the session's `QML2_IMPORT_PATH` |
 | Also running | **nothing else, and caelestia is now fully out of the way**: autostart `Hidden=true`, its kglobalaccel component cleaned up, `kde-material-you-colors` (which its installer created) disabled. Its `kwin_workspace_tracker` KWin effect is the one piece left, retrying a socket every 2s. krohnkite is installed but **not loaded** |
 | Branches | **`dev` is where work goes now**, `main` only moves on a release -- they are the channels `rmpr update --channel` follows. See docs/releasing.md. A session that commits to `main` out of habit is working against that |
@@ -321,6 +324,64 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-16: Plasma 6.8 and the lock screen
+
+**Plasma 6.7.5 -> 6.8.0 that morning, and twice the session could not be
+unlocked** (14:17, and after a reset at 14:46). Our lock screen named
+`Breeze.VirtualKeyboardLoader`, which 6.8 took out of
+`org.kde.breeze.components`, so the greeter refused the whole file and drew
+its **built-in fallback locker -- which in 6.8 cannot unlock**: every password
+went to `Received prompt response, but no pending prompt was found!`, after
+`Worker not ready yet, cannot authenticate.` The user got out through tty2 and
+ran `lockscreen disable`. So "should ours fail to load, the greeter draws its
+built-in locker" is no safety net on 6.8: a lock screen that does not load is
+a lockout there.
+
+What changed, for every Plasma 6 rather than for 6.8 alone -- each thing found
+at run time, never a version number:
+
+- **The on-screen keyboard** (`LockVirtualKeyboard.qml`, new). Wayland, every
+  release: KWin's, through Plasma's `KWinVirtualKeyboard` singleton (in
+  `org.kde.plasma.workspace.keyboardlayout` on 6.7.5 and 6.8 alike), made at
+  run time in `LockKeys` so a missing module costs only the button.
+  `forceActivate()` where it exists (6.8), `InputMethod.show()` where not, as
+  6.7's Breeze file did. X11 (6.7 and before): Qt's own keyboard,
+  `LockX11Keyboard.qml`, made only on `xcb` with `Qt.createComponent`, so a
+  machine without qt6-virtualkeyboard loses the button and not the lock
+  screen. The button is shown wherever the singleton exists, as 6.8's own
+  lock screen does -- not by KWin's `available`, which nobody here could
+  test true, and a touch-only person without a keyboard button cannot get in.
+- **The interface version.** 6.8 no longer sets
+  `org_kde_plasma_screenlocker_greeter_interfaceVersion`; `LockScreen.qml`
+  had read "missing" as "older than 2" and would have drawn Plasma's instead.
+  Now only a greeter that *says* less than 2 is refused; one that says
+  nothing is judged by its authenticator (`interfaceTooOld`, also in the
+  check's probe).
+- **The unlock protocol** (`Unlock.qml`). 6.8's lock screen calls
+  `startAuthenticating()` every second while the prompt shows, and
+  `stopAuthenticating()` before quitting on success. Ours does both where the
+  authenticator has 6.8's `authenticator` selector property (6.7.5 has no
+  `authenticatorChanged` in its binary; 6.8 has) -- and nothing new before
+  it. The heartbeat is not optional on 6.8: an offscreen 6.8 greeter logs
+  "Worker not ready yet" by itself at start, so a single start can be lost,
+  which is the fallback locker's failure. 6.8's QML also reads
+  `authenticator.pamTimeout`, which kscreenlocker 6.8.0's qmltypes do not
+  have: a password typed while it is true is held and sent when it is not,
+  so the day it arrives it is already handled. Eight new cases in
+  `tst_LockUnlock.qml`, against a 6.8 fake beside the 6.7 one.
+
+Measured: `lockscreen check --all`, all twelve styles, in the real 6.8 greeter;
+a read-only probe of the real 6.8 authenticator (selector yes, pamTimeout no,
+stopAuthenticating yes, interface version undefined); `make lint`; the whole
+suite. **Not** measured: an unlock with a real password -- that is `try`, and
+the user's. Nor X11 or a real input method: the X11 file was loaded and
+toggled offscreen only. Upstream, not ours: 6.8's fallback locker not
+unlocking.
+
+**To do, the user's:** `rmpr lockscreen try` (the greeter changed, so the old
+record is refused anyway), then `rmpr lockscreen enable`, with a text console
+logged in the first time.
 
 ### The afternoon of 2026-10-14: the open bugs
 
