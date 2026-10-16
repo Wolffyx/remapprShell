@@ -379,9 +379,33 @@ the user's. Nor X11 or a real input method: the X11 file was loaded and
 toggled offscreen only. Upstream, not ours: 6.8's fallback locker not
 unlocking.
 
-**To do, the user's:** `rmpr lockscreen try` (the greeter changed, so the old
-record is refused anyway), then `rmpr lockscreen enable`, with a text console
-logged in the first time.
+**Done the same afternoon, by the user:** `rmpr lockscreen try` unlocked with
+the real password under kscreenlocker 6.8.0 (build `690556d8f52177e8`, 15:14),
+and `rmpr lockscreen enable` put it in both packages. Still unseen: a real lock
+(Meta+L) and unlock on 6.8, which is the path that failed in the morning.
+
+**Show desktop (#15), found still broken and fixed (`c327c8d`, `2ed5a9b`).**
+`a7d0230` had moved the strip into the corner, but a click still did nothing.
+Two causes, both KWin's rules, both measured with `dbus-monitor` on the
+user's clicks:
+
+- **Every click was undone by KWin within 1 to 3 ms.** KWin's D-Bus
+  `showDesktop` watches its caller and turns Show Desktop off when that caller
+  leaves the bus (dbusinterface.cpp). Ours was a one-shot `busctl`.
+  `Desktops.showDesktop` now invokes KWin's own "Show Desktop" action (Meta+D's)
+  through kglobalaccel, only when the state would change. Seen working on the
+  real screen.
+- **Meta+D hid the panel.** KWin types a layer surface by namespace alone,
+  `dock`/`desktop`/a few others; anything else, our unnamed `quickshell`
+  included, is Normal and is hidden by Show Desktop. A Normal surface mapping
+  while it shows also ends it. Panel chrome is `Layers.chrome` ("dock") now,
+  in `shell/core/Layers.qml`, which says which surfaces are and why.
+  User-opened overlays stay windows, as KRunner is.
+
+**Learned:** a fire-and-forget `busctl` is the wrong caller for any KWin call
+that tracks its caller. And a KWin script loaded through
+`org.kde.kwin.Scripting.loadScript`, run, then `unloadScript`, is a read-only
+way to ask KWin what it thinks a window is.
 
 ### The afternoon of 2026-10-14: the open bugs
 
