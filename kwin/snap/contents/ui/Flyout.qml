@@ -24,6 +24,7 @@ pragma ComponentBehavior: Bound
 */
 import QtQuick
 import org.kde.kirigami as Kirigami
+import "layouts.js" as Layouts
 
 Item {
     id: flyout
@@ -170,8 +171,8 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        visible: flyout.numbered && flyout.armed === card.index
-                        text: zone.index + 1
+                        visible: flyout.numbered && flyout.armed === card.index && text !== ""
+                        text: Layouts.digitLabel(zone.index)
                         color: zone.lit ? flyout.surfaceColor : flyout.ink
                         font.pixelSize: 11
                         font.bold: true
@@ -188,6 +189,7 @@ Item {
                 required property var modelData
                 required property int index
 
+                visible: Layouts.digitLabel(index) !== ""
                 x: modelData.x + (modelData.width - width) / 2
                 y: modelData.y + (modelData.height - height) / 2
                 width: 20
@@ -199,7 +201,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: parent.index + 1
+                    text: Layouts.digitLabel(parent.index)
                     color: flyout.ink
                     font.pixelSize: 11
                     font.bold: true

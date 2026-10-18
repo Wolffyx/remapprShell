@@ -139,8 +139,8 @@ Item {
     // chooses a layout by its number and then a zone of it by its own, as
     // Windows has it; Enter or Space takes the zone; Escape closes.
     function layoutsKey(key) {
-        const digit = key - Qt.Key_1;
-        if (digit >= 0 && digit < 9)
+        const digit = Layouts.digitIndex(key - Qt.Key_0);
+        if (digit >= 0)
             return picker.pickDigit(digit);
         const direction = picker.arrows[key];
         if (direction)

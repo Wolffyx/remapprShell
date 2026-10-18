@@ -85,6 +85,81 @@ function presets(portrait) {
     });
 }
 
+// ---- layouts of the user's own ---------------------------------------------
+//
+// Drawn in Settings > Tiling and kept, as JSON, in the script's own kwinrc
+// group (`Layouts`) by `rmpr windows snap layouts save`: a list of
+// { name, screen, tree }, in the presets' tree format. `screen` is "any" --
+// drawn wide and turned on its side on a tall screen, as the presets are --
+// or "wide" or "tall", shown only on a screen of that shape, as drawn.
+
+// KWin 6.8 makes no tile this narrow or short, as a fraction of the screen
+// (a tile's `minimumSize`): every zone must be more. Asked to size a tile to
+// exactly 0.15 it leaves it as it was, and 0.1500001 it takes (the rig,
+// 2026-10-18). The CLI refuses such a layout and the editor never draws one.
+const MIN_ZONE = 0.15;
+// At most this many: thirteen cards with KWin's own, four rows of four,
+// still a panel that fits under the top of a screen.
+const MAX_CUSTOM = 6;
+const SCREENS = ["any", "wide", "tall"];
+// Fractions written by hand, or a third, are allowed this much off.
+const SLACK = 1e-4;
+
+// What is wrong with a tree, or "" when nothing is: every node splits one
+// way into at least two parts, the other way from its parent (KWin's split()
+// of a tile inside a split the same way adds a sibling instead), the parts
+// add up to the whole, and every zone is more than MIN_ZONE either way.
+function treeError(tree) {
+    const shape = nodeError(tree, "");
+    if (shape)
+        return shape;
+    const small = zonesOf(tree).find(z => Math.min(z.width, z.height) - MIN_ZONE < 1e-6);
+    return small ? `a zone is no more than ${MIN_ZONE} of the screen` : "";
+}
+
+function nodeError(node, parentDir) {
+    if (!node || typeof node !== "object" || (node.dir !== "h" && node.dir !== "v"))
+        return "a split is neither h nor v";
+    if (node.dir === parentDir)
+        return "a split inside a split the same way";
+    if (!Array.isArray(node.parts) || node.parts.length < 2)
+        return "a split has fewer than two parts";
+    const sizes = node.parts.map(p => typeof p === "number" ? p : (p && p.size));
+    if (!sizes.every(s => typeof s === "number" && s > 0))
+        return "a part has no size";
+    if (Math.abs(sizes.reduce((a, b) => a + b, 0) - 1) > SLACK)
+        return "a split's parts do not add up to 1";
+    for (const part of node.parts) {
+        const inner = typeof part === "number" ? "" : nodeError(part, node.dir);
+        if (inner)
+            return inner;
+    }
+    return "";
+}
+
+// The user's layouts from what kwinrc holds, for a screen of this shape,
+// each with its zones worked out. Anything unreadable or invalid is left
+// out rather than drawn wrong: the CLI writes nothing else, but kwinrc is a
+// text file anyone can edit.
+function custom(json, portrait) {
+    let list = [];
+    try {
+        list = JSON.parse(json || "[]");
+    } catch (e) {
+        return [];
+    }
+    if (!Array.isArray(list))
+        return [];
+    const shape = portrait ? "tall" : "wide";
+    return list.slice(0, MAX_CUSTOM)
+        .filter(l => l && typeof l.name === "string" && treeError(l.tree) === "")
+        .filter(l => (l.screen || "any") === "any" || l.screen === shape)
+        .map(l => {
+            const tree = portrait && (l.screen || "any") === "any" ? transpose(l.tree) : l.tree;
+            return { id: `custom:${l.name}`, name: l.name, tree: tree, zones: zonesOf(tree) };
+        });
+}
+
 function close(a, b) {
     return Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON
         && Math.abs(a.width - b.width) < EPSILON && Math.abs(a.height - b.height) < EPSILON;
@@ -284,6 +359,21 @@ function build(root, tree, directions) {
 }
 
 // ---- the keyboard, and Snap Assist ------------------------------------------
+
+// The digit that chooses the i-th layout or zone, as the panel shows it:
+// 1 to 9, then 0 for the tenth, and none past it -- with the user's own
+// layouts there can be thirteen cards, and those are the arrows' and the
+// pointer's.
+function digitLabel(i) {
+    return i < 9 ? String(i + 1) : i === 9 ? "0" : "";
+}
+
+// And back: the index a digit pressed (0..9) chooses, or -1.
+function digitIndex(digit) {
+    if (digit < 0 || digit > 9)
+        return -1;
+    return digit === 0 ? 9 : digit - 1;
+}
 
 // Every zone of the panel, card by card, each with the layout and zone it is
 // -- the list the arrow keys move through.

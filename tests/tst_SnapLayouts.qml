@@ -412,4 +412,87 @@ TestCase {
         compare(w.tile, null);
         compare(w.frameGeometry.width, 960);
     }
+
+    // ---- layouts of the user's own ------------------------------------------
+
+    function fixtures() {
+        const req = new XMLHttpRequest();
+        req.open("GET", Qt.resolvedUrl("fixtures/snap-trees.json"), false);
+        req.send(null);
+        return JSON.parse(req.responseText);
+    }
+
+    // The same trees test-windows.sh hands the CLI, with the same answers.
+    function test_a_tree_is_checked_as_the_cli_checks_it() {
+        for (const f of fixtures())
+            compare(Layouts.treeError(f.tree) === "", f.ok, `${f.why}: ${Layouts.treeError(f.tree)}`);
+    }
+
+    function test_a_zone_too_small_says_so() {
+        compare(Layouts.treeError({ dir: "h", parts: [0.9, 0.1] }), "a zone is no more than 0.15 of the screen");
+        compare(Layouts.treeError({ dir: "h", parts: [0.5, { size: 0.5, dir: "h", parts: [0.5, 0.5] }] }),
+                "a split inside a split the same way");
+    }
+
+    readonly property string saved: JSON.stringify([
+        { name: "Main", screen: "any", tree: { dir: "h", parts: [0.6, { size: 0.4, dir: "v", parts: [0.5, 0.5] }] } },
+        { name: "Wide", screen: "wide", tree: { dir: "h", parts: [0.25, 0.25, 0.25, 0.25] } },
+        { name: "Tall", screen: "tall", tree: { dir: "v", parts: [0.3, 0.7] } }
+    ])
+
+    function test_the_users_layouts_for_a_wide_screen() {
+        const list = Layouts.custom(saved, false);
+        compare(list.map(l => l.id).join(" "), "custom:Main custom:Wide");
+        compare(list[0].zones[0], { x: 0, y: 0, width: 0.6, height: 1 });
+        compare(list[1].zones.length, 4);
+    }
+
+    // A layout for any screen is turned on its side on a tall one, as the
+    // six are; one drawn for tall screens is shown as drawn.
+    function test_the_users_layouts_for_a_tall_screen() {
+        const list = Layouts.custom(saved, true);
+        compare(list.map(l => l.name).join(" "), "Main Tall");
+        compare(list[0].zones[0], { x: 0, y: 0, width: 1, height: 0.6 });
+        compare(list[1].zones[1], { x: 0, y: 0.3, width: 1, height: 0.7 });
+    }
+
+    function test_what_cannot_be_used_is_left_out() {
+        compare(Layouts.custom("", false), []);
+        compare(Layouts.custom("oops", false), []);
+        compare(Layouts.custom("{}", false), []);
+        const mixed = JSON.stringify([{ name: "Bad", tree: { dir: "h", parts: [0.95, 0.05] } },
+                                      { tree: { dir: "h", parts: [0.5, 0.5] } },
+                                      { name: "Good", tree: { dir: "h", parts: [0.5, 0.5] } }]);
+        compare(Layouts.custom(mixed, false).map(l => l.name), ["Good"]);
+        const many = JSON.stringify([1, 2, 3, 4, 5, 6, 7].map(n => ({ name: `L${n}`, tree: { dir: "v", parts: [0.5, 0.5] } })));
+        compare(Layouts.custom(many, false).length, Layouts.MAX_CUSTOM);
+    }
+
+    // The most the panel can have -- the six, six of the user's own and
+    // KWin's -- is four rows of four, and still a small panel.
+    function test_thirteen_cards_still_fit() {
+        const list = new Array(13).fill(preset("halves"));
+        const wide = Layouts.arrange(list, 16 / 9, metrics);
+        compare(wide.cards.length, 13);
+        verify(wide.width <= 480 && wide.height <= 300, `${wide.width}x${wide.height}`);
+        const tall = Layouts.arrange(list, 9 / 16, metrics);
+        verify(tall.width <= 300 && tall.height <= 480, `${tall.width}x${tall.height}`);
+        verifyApart(wide.cards, "cards");
+    }
+
+    function test_the_digits_go_to_ten() {
+        compare([0, 8, 9, 10, 12].map(i => Layouts.digitLabel(i)), ["1", "9", "0", "", ""]);
+        compare([1, 9, 0, -1, 10].map(d => Layouts.digitIndex(d)), [0, 8, 9, -1, -1]);
+    }
+
+    // A layout of the user's own is built into tiles as the six are: three
+    // deep, and zones a hair over KWin's smallest.
+    function test_tiles_made_into_a_layout_of_the_users_own() {
+        const trees = fixtures().filter(f => f.ok).map(f => f.tree);
+        for (const tree of trees) {
+            const root = kwinDefault();
+            verify(Layouts.build(root, tree, directions), JSON.stringify(tree));
+            verify(Layouts.sameZones(Layouts.tileZones(root), Layouts.zonesOf(tree)), JSON.stringify(tree));
+        }
+    }
 }

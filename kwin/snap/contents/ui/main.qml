@@ -51,6 +51,10 @@ Item {
     // setting for them all. Unset (-1) leaves each as KWin has it. In the
     // same group.
     readonly property int gap: Number(KWin.readConfig("Gap", -1))
+    // The layouts of the user's own, drawn in Settings > Tiling: JSON, read
+    // by Layouts.custom, which leaves out anything it cannot use. Shown after
+    // the six. Written by `rmpr windows snap layouts`, which reloads this.
+    readonly property string customLayouts: String(KWin.readConfig("Layouts", "[]"))
 
     // KWin's Tile.LayoutDirection, as the scripting API numbers it.
     readonly property var directions: ({ h: 1, v: 2 })
@@ -171,12 +175,14 @@ Item {
         return Workspace.activeScreen;
     }
 
-    // The presets for this screen's shape, and the layout its tiles make
-    // now when that is none of them -- one made in Meta+T, say -- first.
+    // The presets for this screen's shape, then the user's own, and the
+    // layout its tiles make now when that is none of them -- one made in
+    // Meta+T, say -- first.
     // The one the tiles make now is marked: a window snapped into it joins
     // the windows already there, where any other layout lets them go.
     function layoutsFor(output, area) {
-        const list = Layouts.presets(area.height > area.width);
+        const portrait = area.height > area.width;
+        const list = Layouts.presets(portrait).concat(Layouts.custom(root.customLayouts, portrait));
         const top = root.rootTile(output);
         const current = top ? Layouts.tileZones(top) : [];
         if (current.length > 0 && !list.some(l => Layouts.sameZones(l.zones, current)))

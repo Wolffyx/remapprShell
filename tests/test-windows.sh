@@ -147,6 +147,52 @@ check "and KWin's switch is as it was"    "$(kread kwinrc Plugins "$SLUG-snapEna
 check "the reveal stays as chosen"        "$(snap_status snapReveal)" "drag"
 check "a refresh of nothing installed"    "$(snap_refresh; [ -d "$SNAP_DIR" ] && echo there || echo gone)" "gone"
 
+# Layouts of the user's own: a JSON list in the script's group, through the
+# ledger. layouts.js reads the same list and checks each tree as the CLI
+# does; tests/fixtures/snap-trees.json holds both to the same answers
+# (tst_SnapLayouts.qml reads it too).
+echo "== snap layouts of the user's own =="
+LAYOUTS=("$REPO_ROOT/scripts/windows.sh" snap layouts)
+layouts() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${LAYOUTS[@]}" "$@" 2>&1; }
+refused() { layouts "$@" >/dev/null 2>&1; echo $?; }
+MAIN='{"dir":"h","parts":[0.6,{"size":0.4,"dir":"v","parts":[0.5,0.5]}]}'
+
+before=$(ledger_count windows-behaviour)
+check "none until one is saved"           "$(layouts status --json | jq -c .layouts)" "[]"
+check "and the limits are said"           "$(layouts status --json | jq -c '[.max, .minZone]')" "[6,0.15]"
+layouts save "Main and two" "$MAIN" >/dev/null
+check "saved, in the script's own group" \
+    "$(kread kwinrc "Script-$SLUG-snap" Layouts | jq -c '.[0] | [.name, .screen, .tree.parts[0]]')" '["Main and two","any",0.6]'
+check "listed with its zones"             "$(layouts status)" "$(printf 'Main and two\tany\t3 zones')"
+check "through the ledger"                "$(ledger_count windows-behaviour)" "$((before + 1))"
+layouts save "Main and two" '{"dir":"v","parts":[0.5,0.5]}' tall >/dev/null
+check "a name saved again is replaced"    "$(layouts status --json | jq -c '[.layouts[] | [.name, .screen, .tree.dir]]')" '[["Main and two","tall","v"]]'
+
+fixture_ok() { jq -c '.[] | select(.ok == '"$1"') | .tree' "$REPO_ROOT/tests/fixtures/snap-trees.json"; }
+while read -r tree; do
+    check "the CLI takes $tree" "$(refused save probe "$tree")" "0"
+done < <(fixture_ok true)
+while read -r tree; do
+    check "the CLI refuses $tree" "$(refused save refused "$tree")" "1"
+done < <(fixture_ok false)
+check "a refused layout is not saved"     "$(layouts status --json | jq -r '[.layouts[].name] | index("refused")')" "null"
+check "and says why"                      "$(layouts save small '{"dir":"h","parts":[0.9,0.1]}' | grep -c 'no more than 0.15')" "1"
+check "not JSON is refused"               "$(refused save broken '{dir:h')" "1"
+check "nor a screen it does not know"     "$(refused save sideways "$MAIN" sideways)" "1"
+check "nor an empty name"                 "$(refused save "" "$MAIN")" "1"
+check "nor one with a space at the end"   "$(refused save "trailing " "$MAIN")" "1"
+for n in 3 4 5 6; do layouts save "L$n" "$MAIN" >/dev/null; done
+check "six is the most"                   "$(layouts status --json | jq '.layouts | length')" "6"
+check "a seventh is refused"              "$(refused save L7 "$MAIN")" "1"
+check "but one saved again still is not"  "$(refused save L6 "$MAIN" wide)" "0"
+check "renamed in its place"              "$(layouts save L6b "$MAIN" any L6 >/dev/null; layouts status --json | jq -r '.layouts[5].name')" "L6b"
+check "but not to another's name"         "$(refused save L5 "$MAIN" any L6b)" "1"
+layouts remove L6b >/dev/null
+check "removed"                           "$(layouts status --json | jq -r '[.layouts[].name] | join(",")')" "Main and two,probe,L3,L4,L5"
+check "a name it does not have"           "$(refused remove nosuch)" "1"
+check "an unreadable list reads as none"  "$(kwriteconfig6 --file kwinrc --group "Script-$SLUG-snap" --key Layouts 'oops'; layouts status --json | jq -c .layouts)" "[]"
+layouts save "Main and two" "$MAIN" >/dev/null
+
 behave set snapLayouts true >/dev/null
 behave revert >/dev/null
 check "revert turns it off" \
@@ -154,6 +200,7 @@ check "revert turns it off" \
 check "and puts the reveal back"          "$(kread kwinrc "Script-$SLUG-snap" Reveal)" "<unset>"
 check "and Snap Assist"                   "$(kread kwinrc "Script-$SLUG-snap" Assist)" "<unset>"
 check "and the gap"                       "$(kread kwinrc "Script-$SLUG-snap" Gap)" "<unset>"
+check "and the layouts of the user's own" "$(kread kwinrc "Script-$SLUG-snap" Layouts)" "<unset>"
 check "nothing of it in the ledger"       "$(ledger_count windows-snap)" "0"
 check "and still nothing reached KDE"     "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
 

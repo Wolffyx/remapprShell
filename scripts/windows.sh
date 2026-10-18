@@ -28,6 +28,16 @@
 #                                 runs, since KWin keeps its own copy
 #   snap pick                     the snap layouts panel for the active
 #                                 window: what Meta+Z runs
+#   snap layouts [status [--json]]
+#                                 the layouts of the user's own, shown in
+#                                 the panel after the six
+#   snap layouts save <name> <tree-json> [any|wide|tall] [<old name>]
+#                                 one of them, drawn in Settings > Tiling:
+#                                 replaced if the name (or the old name,
+#                                 for a rename) is taken, refused if
+#                                 a zone is 0.15 of the screen a side or less
+#                                 or there are six already
+#   snap layouts remove <name>    and taken away again
 #   tile refresh                  the same for the auto-tiling script
 #   tile edit                     KWin's own tile editor (Meta+T), for the
 #                                 screen under the pointer
@@ -388,7 +398,8 @@ JS
         case "${1:-}" in
             refresh) snap_refresh ;;
             pick)    snap_pick ;;
-            *) die "unknown command: snap ${1:-} (expected refresh or pick)" ;;
+            layouts) shift; snap_layouts_cmd "$@" ;;
+            *) die "unknown command: snap ${1:-} (expected refresh, pick or layouts)" ;;
         esac
         ;;
 

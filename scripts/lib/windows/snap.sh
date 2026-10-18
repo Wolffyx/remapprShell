@@ -173,6 +173,118 @@ snap_pick() {
         invokeShortcut s "$SNAP_PICK_ACTION" >/dev/null
 }
 
+# Layouts of the user's own, drawn in Settings > Tiling and shown in the
+# panel after the six: a JSON list of { name, screen, tree } in the script's
+# group (Layouts), the tree in layouts.js's format. Ledgered with the rest of
+# the behaviour, so `behaviour revert` takes them away too. The script reads
+# them when it loads, so a change reloads it. layouts.js's `treeError` is the
+# same check, for what it reads; tests/test-windows.sh holds the two to it.
+SNAP_LAYOUTS_MAX=6
+SNAP_MIN_ZONE=0.15
+
+# What is wrong with a layout's tree, as jq: "" when nothing is. Every split
+# is h or v, the other way from its parent, in two parts or more adding up
+# to 1, and every zone is more than SNAP_MIN_ZONE of the screen either way
+# -- KWin 6.8 makes no tile that small (layouts.js's MIN_ZONE says what was
+# measured).
+SNAP_TREE_JQ='
+def size: if type == "number" then . else (.size? // null) end;
+def err($pdir):
+  if type != "object" or (.dir != "h" and .dir != "v") then "a split is neither h nor v"
+  elif .dir == $pdir then "a split inside a split the same way"
+  elif (.parts | type) != "array" or (.parts | length) < 2 then "a split has fewer than two parts"
+  elif (.parts | map(size) | all(type == "number" and . > 0)) | not then "a part has no size"
+  elif ((.parts | map(size) | add) - 1 | fabs) > 1e-4 then "a split'"'"'s parts do not add up to 1"
+  else .dir as $d | ([.parts[] | select(type == "object") | err($d)] | map(select(. != "")) | first // "")
+  end;
+def zones($box):
+  . as $n
+  | reduce .parts[] as $p ({off: 0, out: []};
+      ($p | size) as $s
+      | (if $n.dir == "h" then {w: ($s * $box.w), h: $box.h, x: ($box.x + .off * $box.w), y: $box.y}
+         else {w: $box.w, h: ($s * $box.h), x: $box.x, y: ($box.y + .off * $box.h)} end) as $b
+      | .off += $s
+      | .out += (if ($p | type) == "number" then [$b] else ($p | zones($b)) end))
+  | .out;
+def tree_error:
+  err("") as $e
+  | if $e != "" then $e
+    elif [zones({x: 0, y: 0, w: 1, h: 1})[] | select(([.w, .h] | min) - $min < 1e-6)] | length > 0
+    then "a zone is no more than \($min) of the screen"
+    else "" end;
+'
+
+# The list as kwinrc has it, compact; [] when there is none or it is not a
+# list of layouts.
+snap_layouts() {
+    kreadconfig6 --file kwinrc --group "$SNAP_GROUP" --key Layouts --default '[]' \
+        | jq -c 'if type == "array" then . else [] end' 2>/dev/null || echo '[]'
+}
+
+snap_layouts_write() {   # <json>
+    kconfig_set windows-behaviour kwinrc "$SNAP_GROUP" Layouts "$1"
+    snap_enabled || return 0
+    snap_load
+}
+
+snap_layouts_status() {   # [--json]
+    if [ "${1:-}" = --json ]; then
+        snap_layouts | jq -c --argjson max "$SNAP_LAYOUTS_MAX" --argjson min "$SNAP_MIN_ZONE" \
+            '{layouts: ., max: $max, minZone: $min}'
+        return
+    fi
+    snap_layouts | jq -r --argjson min "$SNAP_MIN_ZONE" "$SNAP_TREE_JQ"'
+        .[] | "\(.name)\t\(.screen // "any")\t\(.tree | zones({x: 0, y: 0, w: 1, h: 1}) | length) zones"'
+}
+
+# Saved under its name: a layout of that name already there is replaced, in
+# its place in the list. Given the name it had, a layout renamed is replaced
+# where it was, and refused if the new name is another's.
+snap_layouts_save() {   # <name> <tree-json> [any|wide|tall] [<old name>]
+    local name=$1 tree=$2 screen=${3:-any} old=${4:-} problem list key
+    [[ "$name" =~ ^[^[:cntrl:]]{1,40}$ ]] && [ "$name" = "$(printf '%s' "$name" | sed 's/^ *//; s/ *$//')" ] \
+        || die "a layout's name is 1 to 40 characters, with no space at either end"
+    case "$screen" in any|wide|tall) ;; *) die "a layout is for any, wide or tall screens, not '$screen'" ;; esac
+    problem=$(printf '%s' "$tree" | jq -r --argjson min "$SNAP_MIN_ZONE" "$SNAP_TREE_JQ"'tree_error' 2>/dev/null) \
+        || die "not a layout: '$tree' is not JSON"
+    [ -z "$problem" ] || die "not a layout: $problem"
+    list=$(snap_layouts)
+    key=$name
+    snap_layouts_has "$list" "$old" && key=$old
+    [ "$key" = "$name" ] || ! snap_layouts_has "$list" "$name" || die "there is a layout named '$name' already"
+    if ! snap_layouts_has "$list" "$key" && [ "$(jq length <<< "$list")" -ge "$SNAP_LAYOUTS_MAX" ]; then
+        die "there are $SNAP_LAYOUTS_MAX layouts of your own already, the most the panel has room for: remove one first"
+    fi
+    list=$(jq -c --arg k "$key" --arg n "$name" --arg s "$screen" --argjson t "$tree" \
+        '({name: $n, screen: $s, tree: $t}) as $l
+         | if any(.[]; .name == $k) then map(if .name == $k then $l else . end) else . + [$l] end' <<< "$list")
+    snap_layouts_write "$list"
+}
+
+snap_layouts_has() {   # <list> <name>
+    [ -n "$2" ] && jq -e --arg n "$2" 'any(.[]; .name == $n)' <<< "$1" >/dev/null
+}
+
+snap_layouts_remove() {   # <name>
+    local list
+    list=$(snap_layouts)
+    snap_layouts_has "$list" "$1" || die "no layout named '$1'"
+    snap_layouts_write "$(jq -c --arg n "$1" 'map(select(.name != $n))' <<< "$list")"
+}
+
+snap_layouts_cmd() {   # status [--json] | save <name> <tree> [screen] [old name] | remove <name>
+    local sub=${1:-status}
+    [ $# -gt 0 ] && shift
+    case "$sub" in
+        status|list) snap_layouts_status "$@" ;;
+        save)   [ $# -ge 2 ] || die "usage: $ALIAS windows snap layouts save <name> <tree-json> [any|wide|tall] [<old name>]"
+                snap_layouts_save "$@" && log_step "layout saved: $1" ;;
+        remove) [ $# -ge 1 ] || die "usage: $ALIAS windows snap layouts remove <name>"
+                snap_layouts_remove "$1" && log_step "layout removed: $1" ;;
+        *) die "unknown command: snap layouts $sub (expected status, save or remove)" ;;
+    esac
+}
+
 # After an install or an update: the package again, if it is installed and
 # no longer what the checkout renders, and KWin told.
 snap_refresh() {
