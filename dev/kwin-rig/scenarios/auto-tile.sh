@@ -45,8 +45,8 @@ check "the owner gone: d has its place back" "$(tile d)" "1440,540,480,540"
 
 echo "== the keys"
 activate d
-invoke "Focus Left"
-check "focus left of d is c" "$(active)" "c"
+"$REPO_ROOT/scripts/windows.sh" tile focus left; sleep 0.6
+check "focus left of d is c, through the CLI the key runs" "$(active)" "c"
 invoke "Focus Up"
 check "focus up from c is b" "$(active)" "b"
 invoke "Swap Left"

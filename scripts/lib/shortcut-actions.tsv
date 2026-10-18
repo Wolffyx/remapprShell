@@ -25,3 +25,17 @@ screenshot	Screenshot, choosing an area	screenshot region
 screenshot-screen	Screenshot of the screen	screenshot screen
 screenshot-window	Screenshot, choosing a window	screenshot window
 snap	Snap layouts for the active window	windows snap pick
+tile-focus-left	Auto-tiling: focus the window to the left	windows tile focus left
+tile-focus-right	Auto-tiling: focus the window to the right	windows tile focus right
+tile-focus-up	Auto-tiling: focus the window above	windows tile focus up
+tile-focus-down	Auto-tiling: focus the window below	windows tile focus down
+tile-move-left	Auto-tiling: move the window to the left	windows tile move left
+tile-move-right	Auto-tiling: move the window to the right	windows tile move right
+tile-move-up	Auto-tiling: move the window up	windows tile move up
+tile-move-down	Auto-tiling: move the window down	windows tile move down
+tile-swap-left	Auto-tiling: swap with the window to the left	windows tile swap left
+tile-swap-right	Auto-tiling: swap with the window to the right	windows tile swap right
+tile-swap-up	Auto-tiling: swap with the window above	windows tile swap up
+tile-swap-down	Auto-tiling: swap with the window below	windows tile swap down
+tile-float	Auto-tiling: float the window, or tile it again	windows tile float
+tile-desktop	Auto-tiling: off or on for this desktop	windows tile desktop

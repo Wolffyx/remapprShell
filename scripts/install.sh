@@ -176,10 +176,12 @@ if session_available && [ "$MODE" != uninstall ] && command -v busctl >/dev/null
 fi
 
 # KWin keeps its own copy of a script, so an update that changes the snap
-# layouts script reaches it only if the copy is made again -- which this does
-# when one is installed and differs, and reloads it when there is a session.
+# layouts or the auto-tiling script reaches it only if the copy is made
+# again -- which this does when one is installed and differs, and reloads it
+# when there is a session.
 if [ "$MODE" != uninstall ]; then
     "$REPO_ROOT/scripts/windows.sh" snap refresh || failed=1
+    "$REPO_ROOT/scripts/windows.sh" tile refresh || failed=1
 fi
 
 # The commands live in $BIN_DIR, which Arch, for one, does not put on PATH:

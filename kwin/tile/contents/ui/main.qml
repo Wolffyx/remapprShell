@@ -179,18 +179,31 @@ Item {
             entry.focus = "";
         const w = root.known[id];
         if (w && w.deleted !== true)
-            root.letGo(w);
+            root.letGo(w, entry);
         root.touch(key);
+    }
+
+    // The tile a window is in, in one tree's tiles. Not `window.tile` alone:
+    // KWin 6.8 gives that for the desktop in front only, so a window tiled on
+    // another desktop has none there (measured in the rig, 2026-10-18).
+    function tileOf(w, entry) {
+        if (w.tile)
+            return w.tile;
+        const top = root.rootTile(entry.output, entry.desktop);
+        if (!top)
+            return null;
+        return Layouts.leaves(top).find(t => Layouts.windowsIn(t, root.windows()).indexOf(w) >= 0) || null;
     }
 
     // Out of its tile and left where it is, as the snap layouts let go of a
     // window: KWin would otherwise hand it to the tile above.
-    function letGo(w) {
-        if (!w.tile)
+    function letGo(w, entry) {
+        const tile = root.tileOf(w, entry);
+        if (!tile)
             return;
         const g = w.frameGeometry;
         const kept = Qt.rect(g.x, g.y, g.width, g.height);
-        Layouts.unmanage(w.tile, w);
+        Layouts.unmanage(tile, w);
         if (w.fullScreen !== true)
             w.frameGeometry = kept;
     }
@@ -425,7 +438,7 @@ Item {
         for (const id of Object.keys(root.placed)) {
             const w = root.known[id];
             if (w && w.deleted !== true)
-                root.letGo(w);
+                root.letGo(w, root.trees[root.placed[id]]);
         }
         root.placed = {};
     }

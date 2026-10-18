@@ -197,6 +197,21 @@ Column {
             onToggled: value => root.set("snapKey", value)
         }
 
+        ToggleRow {
+            label: "Auto-tiling"
+            description: root.tilingScripts.length > 0
+                ? `Off while ${root.tilingScripts.join(", ")} is enabled: two tiling scripts would undo each other at every window that opens.`
+                : "Every window is tiled as it opens, as Hyprland's dwindle layout does: each new one takes half of the focused window, split along its longer side. Dialogs and windows of one size float. Snap layouts step aside while it is on."
+            checked: root.boolOf("autoTile")
+            enabled: root.boolOf("autoTile") || root.tilingScripts.length === 0
+            onToggled: value => root.set("autoTile", value)
+        }
+
+        Hint {
+            visible: root.boolOf("autoTile")
+            text: "Meta+Alt and an arrow moves the focus that way, with Shift it moves the window, with Ctrl it swaps the two. Meta+Alt+Space floats the active window or tiles it again, and Meta+Alt+T turns tiling off or on for this desktop. The keys can be changed on the Shortcuts page."
+        }
+
         SliderRow {
             label: "Gap around tiled windows"
             from: 0

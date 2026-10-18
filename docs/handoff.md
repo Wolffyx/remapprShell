@@ -329,6 +329,89 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### 2026-10-18: auto-tiling, as Hyprland's dwindle
+
+**Asked for by the user after the tile gap**: tiling "like Hyprland". Built
+on its own branch (`claude/auto-tiling-206833`), tried only in the rig,
+never on the real desktop, and off unless turned on.
+
+`kwin/tile/` is a declarative KWin script (`$SLUG-tile`). Every normal
+window takes half of the focused one, split along that one's longer side
+in pixels, the newcomer second (right or below); a window that goes gives
+its half to its sibling. Per screen and per virtual desktop. Floating,
+always: dialogs, transient and modal windows, windows that cannot resize
+or have one size, full-screen and minimised ones, ones on every desktop,
+and KWin's own (pid -1, no class). A window dragged onto another tiled one
+swaps with it; dragged anywhere else it goes back to its tile; dragging
+the edge two tiled windows share moves both (KWin's) and the tree takes
+the new edge (`adopt`), so the next window keeps it.
+
+**The tree is ours, the tiles are KWin's.** `dwindle.js` is the tree --
+`insert`, `remove`, `swap`, `move`, `neighbour`, `adopt`, and `layout`,
+which gives it the snap layouts' shape -- and every change rebuilds the
+screen's tiles through `layouts.js`'s `build`, the snap layouts' own,
+measured on 2026-10-17. `kwin/tile/contents/ui/layouts.js` is a link to
+that file; `kwin_package_render` copies a link as its file now. A split
+inside a split the same way is folded into its parent, because KWin's
+`split()` on such a tile adds a sibling instead (as the snap layouts'
+entry says). The gap is KWin's tile padding: `tileGap` is copied into the
+script's group (`Gap`) and given to every root tile the script uses.
+
+**Keys**: fourteen actions in `shortcut-actions.tsv` (`tile-focus-*`,
+`tile-move-*`, `tile-swap-*` each way, `tile-float`, `tile-desktop`),
+unbound in the defaults. Turning auto-tiling on binds each one the profile
+leaves unbound -- Meta+Alt+arrow focus (KWin's own "switch to the window"
+keys, taken through the ledger), +Shift move, +Ctrl swap, Meta+Alt+Space
+float, Meta+Alt+T the desktop -- and off unbinds them. Each runs `windows
+tile <verb> [direction]`, which invokes a KWin action the script
+registers (`Auto Tile: Focus Left`, ...) as Meta+Z does the snap layouts'.
+`test-windows.sh` checks the CLI's names and the script's agree.
+
+**The setting**: `rmpr windows behaviour set autoTile true|false`
+(Settings > Windows > Tiling), default false: it changes where every
+window goes. Ledgered in a scope of its own (`windows-tile`): the plugin
+switch, the gap's copy, and `AutoTile=true` in the snap layouts' group,
+which makes them snap nothing while auto-tiling places the windows (they
+would rebuild the tiles under it). **Refused while krohnkite, bismuth,
+polonium or kzones is enabled**, with that said; doctor names one enabled
+beside it as a fault. `behaviour revert` turns it off.
+
+What KWin 6.8 does, measured in the rig:
+
+- **`window.tile` is the tile on the desktop in front only.** A window
+  tiled on desktop 2 is in that desktop's root tile's `windows`, and has
+  `tile` null while desktop 1 is shown. So the script finds a window's
+  tile through the tree's own root tile when `tile` is null.
+- **An enabled script that is unloaded comes back by itself** when the
+  unloading changes tiles: letting the windows go saves KWin's layout,
+  KWin reconfigures, and `Scripting::start()` loads every enabled script
+  not running -- this one, which tiled everything again. `tile_off`
+  switches kwinrc off before it unloads.
+- **KWin's default root tile has three children (25/50/25)**, and
+  `split()` on a root with children appends two more over them. Nothing
+  here splits a tile with children: `build` removes them first.
+- `focus` is `Item`'s own property: a function of that name on the
+  script's root is shadowed, and calling it throws.
+
+**The rig**: `scenarios/auto-tile.sh` (28 checks: four windows opening,
+a dialog, the keys -- one through the real `windows.sh tile` on the rig's
+bus -- floating, closing, the desktop's switch) and
+`scenarios/auto-tile-drag.sh` (16: the gap, a drag-swap, a drop at the
+top with the snap layouts loaded, the shared edge dragged, a window of
+one size, a second desktop, the script unloaded). `tst_Dwindle.qml` has
+the tree, and `build` against the stand-in `tst_SnapLayouts.qml` uses.
+`rig.sh` gained `active`.
+
+**Not measured:** any of it on the real screen; two screens (each has its
+own tree, and a window dragged to the other should join that tree beside
+the window it is let go over -- never run); X11, and Plasma before 6.8
+(the tile calls are feature-detected, and without tiles each window is
+sized to its place, never run); the keys through the session daemon, and
+how long the fourteen `shortcuts.sh set`s at turning it on take on the
+real kglobalaccel. Whether a window that asks to be maximised fights its
+tile was not looked at. `make test`'s test-nesting fails on the snap
+layouts' files in the snapshot this branch started from, not on these.
+
 ### 2026-10-18: Snap Assist, and Meta+Z
 
 **The two snap features Windows 11 has after the layouts panel**, built

@@ -137,6 +137,7 @@ JS
 snap_gap_set() {   # <pixels>
     kconfig_set windows-behaviour kwinrc "$SNAP_GROUP" Gap "$1"
     snap_gap_apply "$1" || return 1
+    tile_gap_follow "$1" || return 1
     snap_enabled || return 0
     snap_load
 }

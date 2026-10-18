@@ -41,6 +41,10 @@ Item {
     // Snap Assist, unless `rmpr windows behaviour` has turned it off: on, as
     // Windows has it. In the same group.
     readonly property bool assistOn: String(KWin.readConfig("Assist", true)) === "true"
+    // Auto-tiling (kwin/tile) is on: it places every window it tiles, and a
+    // snap would rebuild the tiles under it -- so nothing is snapped. Written
+    // here by `rmpr windows behaviour set autoTile`, which reloads this.
+    readonly property bool autoTiled: String(KWin.readConfig("AutoTile", false)) === "true"
     // The gap around a tiled window, in pixels: KWin's tile padding, given
     // to every screen's tiles on every desktop. KWin keeps a padding per
     // screen and desktop, 4 px unless Meta+T changed it, and has no one
@@ -84,9 +88,10 @@ Item {
 
     // What a zone can be given: a window the user could have sized there
     // by hand. Not a dialog that cannot resize, not a panel, not a popup --
-    // the chooser among them, which KWin lists as a normal window.
+    // the chooser among them, which KWin lists as a normal window. Nothing,
+    // while auto-tiling places the windows.
     function snappable(w) {
-        return !!w && w.normalWindow === true && w.moveable === true && w.resizeable === true
+        return !!w && !root.autoTiled && w.normalWindow === true && w.moveable === true && w.resizeable === true
             && w.fullScreen !== true && w.popupWindow !== true && w.specialWindow !== true
             && !root.isKWinsOwn(w);
     }

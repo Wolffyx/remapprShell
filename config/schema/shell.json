@@ -550,7 +550,7 @@
             "icon": "preferences-system-windows",
             "glyph": "select_window",
             "page": "windows",
-            "description": "What KWin does with windows: how focus is given, when one is raised, where a new one lands, whether a maximised window keeps its border, and snap layouts -- a panel at the top of the screen while a window is dragged or on Meta+Z, whose zones are KWin's own tiles, and Snap Assist after a snap, offering the other windows for the zones left empty. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps and rounded window corners are not KWin's to give, and are not offered here."
+            "description": "What KWin does with windows: how focus is given, when one is raised, where a new one lands, whether a maximised window keeps its border, and snap layouts -- a panel at the top of the screen while a window is dragged or on Meta+Z, whose zones are KWin's own tiles, Snap Assist after a snap, offering the other windows for the zones left empty, and auto-tiling -- off unless turned on -- which tiles every window as it opens, in Hyprland's dwindle layout, in the same tiles. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps and rounded window corners are not KWin's to give, and are not offered here."
         },
         {
             "id": "launcher",
@@ -868,7 +868,7 @@
             "icon": "preferences-desktop-keyboard-shortcut",
             "glyph": "keyboard",
             "page": "shortcuts",
-            "description": "Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu, Meta+Space the search and Meta+Z the snap layouts by default.",
+            "description": "Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu, Meta+Space the search and Meta+Z the snap layouts by default; auto-tiling's keys are bound when it is turned on.",
             "keys": {
                 "shortcuts.launcher": {
                     "type": "string",
@@ -959,6 +959,90 @@
                     "default": "Meta+Z",
                     "label": "Snap layouts for the active window",
                     "description": "The key, as KDE writes it (\"Meta+Space\", \"Meta+/\"). Empty leaves it to KDE's shortcut settings; \"none\" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it, and so does Settings > Windows > Tiling, which binds Meta+Z or unbinds it. It does nothing while snap layouts are off."
+                },
+                "shortcuts.tile-focus-left": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: focus the window to the left",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Left, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-focus-right": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: focus the window to the right",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Right, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-focus-up": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: focus the window above",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Up, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-focus-down": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: focus the window below",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Down, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-move-left": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: move the window to the left",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Left, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-move-right": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: move the window to the right",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Right, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-move-up": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: move the window up",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Up, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-move-down": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: move the window down",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Down, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-swap-left": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: swap with the window to the left",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Left, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-swap-right": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: swap with the window to the right",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Right, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-swap-up": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: swap with the window above",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Up, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-swap-down": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: swap with the window below",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Down, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-float": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: float the window, or tile it again",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+Space, and turning it off unbinds it. It does nothing while auto-tiling is off."
+                },
+                "shortcuts.tile-desktop": {
+                    "type": "string",
+                    "default": "",
+                    "label": "Auto-tiling: off or on for this desktop",
+                    "description": "The key, as KDE writes it. Turning auto-tiling on (Settings > Windows > Tiling) binds it, when nothing is, to Meta+Alt+T, and turning it off unbinds it. It does nothing while auto-tiling is off."
                 }
             }
         },

@@ -311,7 +311,8 @@ kwin_script_render() {   # <source dir> <destination dir> <what>
 
 # Renders a whole package, for a script of more than one file: the metadata,
 # and everything under contents/ as it is, a *.in template rendered and named
-# without its .in. Made beside the destination and moved into place, so KWin
+# without its .in, and a link copied as the file it points at -- auto-tiling
+# shares the snap layouts' layouts.js that way. Made beside the destination and moved into place, so KWin
 # never loads a package half copied.
 kwin_package_render() {   # <source dir> <destination dir> <what>
     local src=$1 dest=$2 what=$3 tmp f rel
@@ -332,6 +333,19 @@ kwin_package_render() {   # <source dir> <destination dir> <what>
     find "$tmp" -type f -exec chmod 644 {} +
     rm -rf "$dest"
     mv "$tmp" "$dest"
+}
+
+# Whether an installed package is what this checkout renders now: an update
+# that changes a script reaches KWin only if something installs it again.
+kwin_package_current() {   # <source dir> <installed dir>
+    local tmp rc=1
+    [ -d "$2" ] || return 1
+    tmp=$(mktemp -d) || return 1
+    if kwin_package_render "$1" "$tmp/pkg" "$(basename "$2")" 2>/dev/null; then
+        diff -rq "$tmp/pkg" "$2" >/dev/null 2>&1 && rc=0
+    fi
+    rm -rf "$tmp"
+    return "$rc"
 }
 
 # Runs a script once, from stdin, and takes it away again. For what only KWin

@@ -28,6 +28,11 @@
 #                                 runs, since KWin keeps its own copy
 #   snap pick                     the snap layouts panel for the active
 #                                 window: what Meta+Z runs
+#   tile refresh                  the same for the auto-tiling script
+#   tile <verb> [direction]       one of auto-tiling's keys: focus, move or
+#                                 swap with left|right|up|down, float, or
+#                                 desktop (tiling off or on for the desktop
+#                                 in front) -- what the keys run
 #
 # Four of them are a KWin script of this project's: snapLayouts, Windows 11's
 # snap layouts -- drag a window to the top of a screen and pick a zone for it
@@ -35,7 +40,10 @@
 # windows are offered for the zones a snap left empty, and snapKey, whether
 # Meta+Z opens the panel for the active window. See lib/windows/snap.sh. So
 # is tileGap, the gap around a tiled window in pixels -- KWin's tile padding,
-# given to every screen and desktop's tiles; KWin's own is 4.
+# given to every screen and desktop's tiles; KWin's own is 4. And autoTile,
+# Hyprland's dwindle layout -- every window tiled as it opens, each new one
+# splitting the focused one -- off unless turned on, and refused while
+# another tiling script is enabled. See lib/windows/tile.sh.
 #
 # One of them is not a kwinrc key but a window rule: placeGames. A game run
 # through Steam's Proton is an X11 window that often asks for a position of its
@@ -70,6 +78,7 @@ source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/windows/snap.sh"
+source "$REPO_ROOT/scripts/lib/windows/tile.sh"
 
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 
@@ -226,7 +235,13 @@ JS
             "snapAssist|@snap|assist|bool||true"
             "snapKey|@snap|key|bool||true"
             "tileGap|@snap|gap|int|0 64|4"
+            "autoTile|@tile|enabled|bool||false"
         )
+
+        # The settings a script of this project's keeps, by the group name
+        # BEHAVIOUR_KEYS gives them: how each is read, and how written.
+        declare -A SCRIPT_VALUE=([@snap]=snap_value [@tile]=tile_value)
+        declare -A SCRIPT_APPLY=([@snap]=snap_apply [@tile]=tile_apply)
 
         behaviour_spec() {
             local want=$1 spec
@@ -250,8 +265,8 @@ JS
                     BEHAVIOUR_VALUES+=("$spec" "$(kwin_rule_present "$key" && echo true || echo false)")
                     continue
                 fi
-                if [ "$group" = "@snap" ]; then
-                    BEHAVIOUR_VALUES+=("$spec" "$(snap_value "$key")")
+                if [ -n "${SCRIPT_VALUE[$group]+x}" ]; then
+                    BEHAVIOUR_VALUES+=("$spec" "$("${SCRIPT_VALUE[$group]}" "$key")")
                     continue
                 fi
                 BEHAVIOUR_VALUES+=("$spec" "${rc[$group:$key]-$fallback}")
@@ -316,12 +331,12 @@ JS
                           [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
                     enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
                 esac
-                if [ "$group" = "@snap" ]; then
-                    [ "$(snap_value "$key")" = "$value" ] && {
+                if [ -n "${SCRIPT_VALUE[$group]+x}" ]; then
+                    [ "$("${SCRIPT_VALUE[$group]}" "$key")" = "$value" ] && {
                         log_info "$id is already $value"
                         exit 0
                     }
-                    snap_apply "$key" "$value" || die "could not set $id"
+                    "${SCRIPT_APPLY[$group]}" "$key" "$value" || die "could not set $id"
                     log_step "$id: $value"
                     exit 0
                 fi
@@ -346,6 +361,7 @@ JS
 
             revert)
                 gap=$(snap_gap)
+                tile_off
                 snap_off
                 kconfig_revert windows-behaviour
                 # KWin keeps the padding it was given with its layouts, so
@@ -365,6 +381,14 @@ JS
             refresh) snap_refresh ;;
             pick)    snap_pick ;;
             *) die "unknown command: snap ${1:-} (expected refresh or pick)" ;;
+        esac
+        ;;
+
+    tile)
+        case "${1:-}" in
+            refresh) tile_refresh ;;
+            "") die "usage: $ALIAS windows tile <focus|move|swap> <left|right|up|down>, tile float, tile desktop, or tile refresh" ;;
+            *) tile_invoke "$@" ;;
         esac
         ;;
 

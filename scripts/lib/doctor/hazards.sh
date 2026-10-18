@@ -146,7 +146,11 @@ doctor_hazards() {
 
     if command -v kreadconfig6 >/dev/null 2>&1; then
         tilers=$(kwin_tiling_scripts | tr '\n' ' ')
-        if [ -n "$tilers" ]; then
+        if [ -n "$tilers" ] && kwin_plugin_enabled "$KWIN_TILE_SCRIPT_ID"; then
+            bad "tiling script enabled beside our auto-tiling: $tilers"
+            fix "the two arrange the same windows and undo each other; turn one off:"
+            fix "$ALIAS windows behaviour set autoTile false, or the other in System Settings > KWin Scripts"
+        elif [ -n "$tilers" ]; then
             warn "tiling script enabled: $tilers"
             fix "it and KWin's edge snapping can both claim a window dragged to an edge;"
             fix "turn snapping off in: $ALIAS settings edges"

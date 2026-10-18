@@ -6,7 +6,10 @@
 #                                     sidebar, keys, switcher, switcher-reverse,
 #                                     overview, overview-reverse, screenshot,
 #                                     screenshot-screen, screenshot-window,
-#                                     snap)
+#                                     snap, and auto-tiling's: tile-focus-*,
+#                                     tile-move-*, tile-swap-* -- each with
+#                                     left, right, up or down -- tile-float,
+#                                     tile-desktop)
 #   clear <action>      unbind one
 #   sync [--quiet]      make KDE's shortcuts match the shell's configuration
 #   migrate             move keys off the old desktop-file entries
