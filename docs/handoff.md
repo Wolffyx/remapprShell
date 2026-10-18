@@ -329,6 +329,43 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### The evening of 2026-10-18: auto-tiling on the real screen
+
+Merged into `dev` (cherry-picked, without the branch's snapshot of the
+uncommitted snap work), and tiling given a settings page of its own
+(Settings > Tiling: auto-tiling, snap layouts, gaps, KWin's own). The user
+then tried it, and three things came of it.
+
+- **Turning it on and off was slow**: fourteen `shortcuts.sh set`s, each a
+  process, a reload of the keys and a write of the profile -- so the shell
+  read its configuration fourteen times. `shortcuts.sh set` and `clear` take
+  several keys now, and auto-tiling makes one call (1.3 s to 0.6 s in the
+  test sandbox). Keeping the script loaded and switching it by an event was
+  offered; the user asked to measure first. In the rig the load itself
+  stalls KWin 26 ms at most, so what is left of the freeze on the real
+  screen is most likely every window being resized at once -- WebStorm and
+  Discord are slow to resize at any time, the user found.
+- **KWin makes no tile under 0.15 of the screen a side** (6.8; a tile's
+  `minimumSize` says so). Asked to, it made a 288 px tile and four of none,
+  and the fifth window on stayed where it had opened -- the scenario had
+  opened four. Dwindle splits the other way when the longer side has no
+  room, then the largest place that has, and a window with no room
+  floats until a tiled one goes (`overflow`). And `layouts.js` `grow`,
+  which builds both scripts' tiles, halved the last tile over and over on
+  the way to a column of six, through an eighth of the screen: it sizes the
+  finished tiles and gives the last all the rest before splitting it again.
+- **"More or less tiling apps"**: `autoTileLayout` (dwindle, or master and
+  stack), `autoTileMax` (0: as many as fit -- 16 in dwindle, a column of 6
+  beside the master) and `autoTileRatio` (a new window's share, or the
+  master's), in the script's group and ledgered with the window behaviour.
+  `rmpr windows tile edit` opens KWin's own tile editor, and the page has a
+  button for it. A layout editor of our own for the snap layouts was asked
+  for in the same message.
+
+The rig: `scenarios/auto-tile-limits.sh` (eight windows, Max, master).
+Resizing tiled WebStorm or Discord stays slow; that is the applications
+(XWayland, Electron), not the tiles.
+
 ### 2026-10-18: auto-tiling, as Hyprland's dwindle
 
 **Asked for by the user after the tile gap**: tiling "like Hyprland". Built

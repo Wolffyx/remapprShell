@@ -144,9 +144,32 @@ tile_set() {   # true|false
     esac
 }
 
-# One setting, as `windows behaviour` names it in its table.
-declare -A TILE_GET=([enabled]=tile_enabled_value)
-declare -A TILE_SET=([enabled]=tile_set)
+# How it tiles, in the script's group and ledgered with the rest of the window
+# behaviour, so turning auto-tiling off keeps them for the next time: the
+# layout (dwindle, or master and stack), the most windows tiled on a screen
+# and desktop (0: as many as KWin's smallest tile allows), and a share in
+# percent -- a new window's of the split it makes, or the master's of the
+# width. The script reads them when it loads, so a change reloads it.
+tile_option() {   # <key> <default>
+    kreadconfig6 --file kwinrc --group "$TILE_GROUP" --key "$1" --default "$2"
+}
+
+tile_option_set() {   # <key> <value>
+    kconfig_set windows-behaviour kwinrc "$TILE_GROUP" "$1" "$2"
+    tile_enabled || return 0
+    tile_load
+}
+
+tile_layout() { tile_option Layout dwindle; }
+tile_max() { tile_option Max 0; }
+tile_ratio() { tile_option Ratio 50; }
+tile_layout_set() { tile_option_set Layout "$1"; }
+tile_max_set() { tile_option_set Max "$1"; }
+tile_ratio_set() { tile_option_set Ratio "$1"; }
+
+# The settings, as `windows behaviour` names them in its table.
+declare -A TILE_GET=([enabled]=tile_enabled_value [layout]=tile_layout [max]=tile_max [ratio]=tile_ratio)
+declare -A TILE_SET=([enabled]=tile_set [layout]=tile_layout_set [max]=tile_max_set [ratio]=tile_ratio_set)
 
 tile_value() { "${TILE_GET[$1]}"; }        # <setting>
 tile_apply() { "${TILE_SET[$1]}" "$2"; }   # <setting> <value>
@@ -169,6 +192,15 @@ tile_invoke() {   # <verb> [direction]
         || die "auto-tiling is not loaded (turn it on: $ALIAS windows behaviour set autoTile true)"
     busctl --user call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component \
         invokeShortcut s "${TILE_ACTION[$action]}" >/dev/null
+}
+
+# KWin's own tile editor -- Meta+T -- for the screen under the pointer: the
+# tiles themselves, which the snap layouts and auto-tiling both fill. KWin's
+# action, invoked as a key bound to it would be.
+tile_edit() {
+    session_available || die "no session to edit tiles in"
+    busctl --user call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component \
+        invokeShortcut s "Edit Tiles" >/dev/null
 }
 
 # After an install or an update: the package again, if it is installed and no

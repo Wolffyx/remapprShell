@@ -243,4 +243,92 @@ TestCase {
             compare(Layouts.leaves(top).length, 5);
         }
     }
+
+    // ---- KWin's smallest tile, a share, and master and stack -------------
+
+    // KWin 6.8's, as a tile's minimumSize says: past it, KWin made a 288 px
+    // tile and four of none, and every window after the fourth stayed where
+    // it opened (the rig, 2026-10-18).
+    readonly property var kwin: ({ aspect: 16 / 9, min: { width: 0.15, height: 0.15 } })
+
+    function openedShaped(names, shape) {
+        let tree = null;
+        let last = "";
+        for (const n of names) {
+            tree = Dwindle.insert(tree, n, last, shape);
+            last = n;
+        }
+        return tree;
+    }
+
+    function test_no_place_is_smaller_than_kwin_allows() {
+        const names = Array.from({ length: 20 }, (_, i) => `w${i}`);
+        const tree = openedShaped(names, kwin);
+        const all = Dwindle.places(tree);
+        for (const p of all)
+            verify(p.rect.width >= 0.15 - 1e-9 && p.rect.height >= 0.15 - 1e-9, `${p.id}: ${JSON.stringify(p.rect)}`);
+        // Every quarter of a quarter: sixteen, and the rest left out.
+        compare(all.length, 16);
+        verify(!Dwindle.contains(tree, "w16"));
+    }
+
+    // The sixth window cannot halve the fifth, a quarter by a quarter: it
+    // takes the largest place that still has room -- the first half.
+    function test_a_window_with_no_room_splits_the_largest_place_instead() {
+        const tree = openedShaped(["a", "b", "c", "d", "e", "f"], kwin);
+        compare(at(tree, "e"), "0.75,0.75,0.25,0.25");
+        compare(at(tree, "a"), "0,0,0.5,0.5");
+        compare(at(tree, "f"), "0,0.5,0.5,0.5");
+    }
+
+    function test_the_tree_as_it_was_when_nothing_has_room() {
+        const full = { aspect: 1, min: { width: 0.6, height: 0.6 } };
+        const tree = openedShaped(["a"], full);
+        compare(Dwindle.insert(tree, "b", "a", full), tree);
+    }
+
+    function test_a_move_with_no_room_leaves_the_tree_alone() {
+        const tree = openedShaped(["a", "b", "c", "d", "e"], kwin);
+        // e, left: into c, a quarter wide, which halved is narrower than
+        // KWin allows.
+        compare(Dwindle.move(tree, "e", "left", kwin), tree);
+    }
+
+    function test_the_new_window_takes_its_share() {
+        const tree = Dwindle.insert(Dwindle.insert(null, "a", "", kwin), "b", "a",
+                                    { aspect: 16 / 9, ratio: 0.7 });
+        compare(at(tree, "a"), "0,0,0.7,1");
+        compare(at(tree, "b"), "0.7,0,0.3,1");
+    }
+
+    function test_master_and_a_column_beside_it() {
+        let tree = null;
+        for (const n of ["a", "b", "c", "d"])
+            tree = Dwindle.insertMaster(tree, n, { aspect: wide, ratio: 0.55 });
+        compare(at(tree, "a"), "0,0,0.55,1");
+        compare(at(tree, "b"), "0.55,0,0.45,0.333");
+        compare(at(tree, "d"), "0.55,0.667,0.45,0.333");
+        // KWin has one column of three, not three splits.
+        compare(Dwindle.layout(tree), { dir: "h", parts: [0.55, { size: 0.45, dir: "v",
+                parts: [1 / 3, (2 / 3) * 0.5, (2 / 3) * 0.5] }] });
+    }
+
+    function test_the_master_goes_and_the_next_takes_its_place() {
+        let tree = null;
+        for (const n of ["a", "b", "c"])
+            tree = Dwindle.insertMaster(tree, n, { aspect: wide, ratio: 0.6 });
+        tree = Dwindle.removeMaster(tree, "a", 0.5);
+        compare(at(tree, "b"), "0,0,0.6,1");
+        compare(at(tree, "c"), "0.6,0,0.4,1");
+        tree = Dwindle.removeMaster(tree, "b", 0.5);
+        compare(at(tree, "c"), "0,0,1,1");
+    }
+
+    function test_the_column_stops_at_kwins_smallest_tile() {
+        let tree = null;
+        for (const n of ["m", "s1", "s2", "s3", "s4", "s5", "s6", "s7"])
+            tree = Dwindle.insertMaster(tree, n, kwin);
+        compare(Dwindle.ids(tree).length, 7);
+        verify(!Dwindle.contains(tree, "s7"));
+    }
 }

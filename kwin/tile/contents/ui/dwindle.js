@@ -11,6 +11,9 @@
     here gives a new tree and leaves the one it was given alone, so a test can
     keep the old one to compare against.
 
+    Hyprland's master layout is here too, as the same kind of tree: see
+    `master`.
+
     No QML and nothing of KWin's, so tests/tst_Dwindle.qml reads this file as
     it is. Turning the tree into KWin's tiles is layouts.js's (`build`, the
     snap layouts' own, measured against KWin 6.8): `layout` here gives it the
@@ -73,29 +76,84 @@ function mapLeaf(node, id, replace) {
     return { dir: node.dir, ratio: node.ratio, a: mapLeaf(node.a, id, replace), b: mapLeaf(node.b, id, replace) };
 }
 
-// A window into the tree, splitting `target` -- the last window when
-// `target` is not in it. Along the target's longer side in pixels, which is
-// why `aspect`, the screen's width over its height, is wanted: a half of a
-// wide screen is a fraction wide and a fraction tall, and only the pixels
-// say which is longer. `side`, when given, overrides both the direction and
-// which half the newcomer gets: "left", "right", "up" or "down" of the target.
-function insert(node, id, target, aspect, side) {
+// How a split is made: `aspect`, the screen's width over its height; `min`,
+// the smallest tile KWin makes, in fractions of the screen ({width,
+// height}: KWin 6.8's is 0.15 a side, and past it KWin makes tiles that
+// overlap and windows it never places -- measured in the rig, 2026-10-18);
+// and `ratio`, the share of a split the window already there keeps. A bare
+// number is the aspect alone, as the first callers passed it.
+function shapeOf(shape) {
+    const s = typeof shape === "number" || shape === undefined ? { aspect: shape } : shape;
+    return {
+        aspect: s.aspect || 1,
+        min: s.min || { width: 0, height: 0 },
+        ratio: s.ratio > 0 && s.ratio < 1 ? s.ratio : 0.5
+    };
+}
+
+// Whether a box split along `dir` at `ratio` leaves both parts at least
+// KWin's smallest tile.
+function fits(r, dir, ratio, min) {
+    const part = Math.min(ratio, 1 - ratio);
+    return dir === "h" ? r.width * part >= min.width - 1e-9 : r.height * part >= min.height - 1e-9;
+}
+
+// The way to split a window's place: along its longer side in pixels, or
+// the other way when that would be smaller than KWin allows. Null when
+// neither fits.
+function splitOf(p, s) {
+    const longer = p.rect.width * s.aspect >= p.rect.height ? "h" : "v";
+    const other = longer === "h" ? "v" : "h";
+    const dir = [longer, other].find(d => fits(p.rect, d, s.ratio, s.min));
+    return dir ? { at: p, dir: dir, ratio: s.ratio, first: false } : null;
+}
+
+// Where a newcomer goes: splitting `target` -- the last window when it is
+// not in the tree -- or, when that one has no room left, the largest place
+// that has. Null when no place has room.
+function choose(all, target, s) {
+    const at = all.find(p => p.id === target) || all[all.length - 1];
+    const area = p => p.rect.width * s.aspect * p.rect.height;
+    const rest = all.filter(p => p !== at).sort((x, y) => area(y) - area(x));
+    for (const p of [at].concat(rest)) {
+        const split = splitOf(p, s);
+        if (split)
+            return split;
+    }
+    return null;
+}
+
+// A window into the tree, splitting `target` along its longer side in
+// pixels, which is why the shape's aspect is wanted: a half of a wide screen
+// is a fraction wide and a fraction tall, and only the pixels say which is
+// longer. `side`, when given, overrides both the direction and which half
+// the newcomer gets: "left", "right", "up" or "down" of the target, in two
+// equal halves. The tree as it was when there is no room for another
+// window: the caller leaves that one floating.
+function insert(node, id, target, shape, side) {
     if (!node)
         return leaf(id);
     if (contains(node, id))
         return node;
+    const s = shapeOf(shape);
     const all = places(node);
-    const at = all.find(p => p.id === target) || all[all.length - 1];
-    const r = at.rect;
-    const dir = side ? (side === "left" || side === "right" ? "h" : "v")
-                     : (r.width * (aspect || 1) >= r.height ? "h" : "v");
-    const first = side === "left" || side === "up";
-    return mapLeaf(node, at.id, old => ({
-        dir: dir,
-        ratio: 0.5,
-        a: first ? leaf(id) : old,
-        b: first ? old : leaf(id)
+    const split = side ? sideOf(all, target, side, s.min) : choose(all, target, s);
+    if (!split)
+        return node;
+    return mapLeaf(node, split.at.id, old => ({
+        dir: split.dir,
+        ratio: split.ratio,
+        a: split.first ? leaf(id) : old,
+        b: split.first ? old : leaf(id)
     }));
+}
+
+function sideOf(all, target, side, min) {
+    const at = all.find(p => p.id === target) || all[all.length - 1];
+    const dir = side === "left" || side === "right" ? "h" : "v";
+    if (!fits(at.rect, dir, 0.5, min))
+        return null;
+    return { at: at, dir: dir, ratio: 0.5, first: side === "left" || side === "up" };
 }
 
 // A window out of the tree: its sibling takes the whole of their split.
@@ -169,11 +227,61 @@ function neighbour(node, id, direction, aspect) {
 // A window moved one step: out of its place and in past its neighbour that
 // way, splitting the neighbour's place -- Hyprland's movewindow. The tree as
 // it was when there is no neighbour that way.
-function move(node, id, direction, aspect) {
-    const next = neighbour(node, id, direction, aspect);
+function move(node, id, direction, shape) {
+    const s = shapeOf(shape);
+    const next = neighbour(node, id, direction, s.aspect);
     if (next === null)
         return node;
-    return insert(remove(node, id), id, next, aspect, direction);
+    const moved = insert(remove(node, id), id, next, s, direction);
+    return contains(moved, id) ? moved : node;
+}
+
+// ---- master and stack ------------------------------------------------------
+//
+// The other of Hyprland's layouts: the first window, the master, on the left
+// at `ratio` of the width, and every other one in a column beside it, one
+// above another in equal shares. The tree is made again from the order of
+// the windows at every change, keeping the master's share as a resize left
+// it; a split of the column into k is the same tree dwindle's are, so the
+// tiles, the keys and `adopt` all work on it unchanged.
+
+function column(list) {
+    if (list.length === 1)
+        return leaf(list[0]);
+    return { dir: "v", ratio: 1 / list.length, a: leaf(list[0]), b: column(list.slice(1)) };
+}
+
+function master(list, ratio) {
+    if (list.length === 0)
+        return null;
+    if (list.length === 1)
+        return leaf(list[0]);
+    return { dir: "h", ratio: ratio, a: leaf(list[0]), b: column(list.slice(1)) };
+}
+
+// The master's share as the tree has it now, or `fallback`.
+function masterRatio(node, fallback) {
+    return node && !isLeaf(node) && node.dir === "h" ? node.ratio : fallback;
+}
+
+// A window into a master layout: at the bottom of the column. The tree as it
+// was when the column has no room for another window of KWin's smallest.
+function insertMaster(node, id, shape) {
+    if (contains(node, id))
+        return node;
+    const s = shapeOf(shape);
+    const list = ids(node).concat([id]);
+    const stack = list.length - 1;
+    const ratio = masterRatio(node, s.ratio);
+    if (stack > 0 && (1 / stack < s.min.height - 1e-9 || Math.min(ratio, 1 - ratio) < s.min.width - 1e-9))
+        return node;
+    return master(list, ratio);
+}
+
+function removeMaster(node, id, fallback) {
+    if (!contains(node, id))
+        return node;
+    return master(ids(node).filter(other => other !== id), masterRatio(node, fallback));
 }
 
 function bounds(rects) {

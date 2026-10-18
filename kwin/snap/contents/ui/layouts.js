@@ -204,23 +204,33 @@ function leafFor(root, zone) {
 
 // Gives a tile the shape of a node, splitting it as KWin's own tile editor
 // does. Splitting a leaf makes two children; splitting the last child again
-// the same way adds a third beside it. Then each child is sized, first to
-// last: KWin moves a child's neighbour along with the edge they share, so
-// sizing them in order leaves every one where it should be.
+// the same way adds a sibling beside it. After each split the children but
+// the last are given their sizes and the last all the room left, before it
+// is split again: halving the last child over and over made an eighth of
+// the screen on the way to six parts, under KWin's smallest tile (0.15 a
+// side in 6.8), and KWin made tiles that overlapped (the rig, 2026-10-18).
+// KWin moves a child's neighbour along with the edge they share, so sizing
+// them first to last leaves every one where it should be.
 function grow(tile, node, box, directions) {
     const dir = directions[node.dir];
+    const parts = boxes(node, box);
     tile.split(dir);
-    while (childrenOf(tile).length < node.parts.length) {
-        const kids = childrenOf(tile);
-        const before = kids.length;
+    for (let kids = childrenOf(tile); ; kids = childrenOf(tile)) {
+        kids.forEach((kid, i) => kid.relativeGeometry = asRect(i < kids.length - 1 ? parts[i] : union(parts.slice(i))));
+        if (kids.length >= parts.length)
+            break;
         kids[kids.length - 1].split(dir);
-        if (childrenOf(tile).length === before)
+        if (childrenOf(tile).length === kids.length)
             return false;
     }
     const kids = childrenOf(tile);
-    const parts = boxes(node, box);
-    parts.forEach((part, i) => kids[i].relativeGeometry = asRect(part));
     return node.parts.every((part, i) => typeof part === "number" || grow(kids[i], part, parts[i], directions));
+}
+
+function union(rects) {
+    const x = Math.min(...rects.map(r => r.x));
+    const y = Math.min(...rects.map(r => r.y));
+    return rect(x, y, Math.max(...rects.map(r => r.x + r.width)) - x, Math.max(...rects.map(r => r.y + r.height)) - y);
 }
 
 // A window into a tile, and out of one. KWin 6.8 has the tile do it, and

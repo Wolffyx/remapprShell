@@ -41,6 +41,17 @@ Item {
     // later comes with KWin's own 4. -1, unset, leaves KWin's padding alone.
     readonly property int gap: Number(KWin.readConfig("Gap", -1))
 
+    // Settings > Tiling, through `rmpr windows behaviour`, in this script's
+    // group. The layout: "dwindle", or "master" -- one window on the left and
+    // the rest in a column beside it. The most windows tiled on a screen and
+    // desktop, 0 for as many as KWin's smallest tile allows; a window past
+    // either floats until one of the tiled ones goes. And a share, in
+    // percent: a new window's of the split it makes (dwindle), or the
+    // master's of the width.
+    readonly property string layoutName: String(KWin.readConfig("Layout", "dwindle")) === "master" ? "master" : "dwindle"
+    readonly property int maxTiled: Math.max(0, Number(KWin.readConfig("Max", 0)) || 0)
+    readonly property real share: Math.min(0.8, Math.max(0.2, (Number(KWin.readConfig("Ratio", 50)) || 50) / 100))
+
     // KWin's Tile.LayoutDirection, as the scripting API numbers it.
     readonly property var directions: ({ h: 1, v: 2 })
 
@@ -82,6 +93,9 @@ Item {
     property var known: ({})
     // What each window was doing when a move or resize began, by id.
     property var gesture: ({})
+    // The windows that would be tiled but found no room, by id: the key of
+    // the tree they wait for. Tried again when a window leaves that tree.
+    property var overflow: ({})
 
     function idOf(w) {
         return String(w.internalId);
@@ -145,6 +159,46 @@ Item {
         return a.width / Math.max(1, a.height);
     }
 
+    // How a split is made in this tree: dwindle.js's shapeOf. KWin's
+    // smallest tile from KWin, where it says (6.8: 0.15 a side); none where
+    // the windows are sized by hand.
+    function shapeOf(entry) {
+        const top = root.rootTile(entry.output, entry.desktop);
+        const m = top && top.minimumSize;
+        return {
+            aspect: root.aspectOf(entry),
+            min: m ? { width: m.width, height: m.height } : { width: 0, height: 0 },
+            ratio: root.layoutName === "master" ? root.share : 1 - root.share
+        };
+    }
+
+    // The tree with one more window, or as it was when there is no room.
+    function grown(entry, id, target) {
+        if (root.maxTiled > 0 && Dwindle.ids(entry.tree).length >= root.maxTiled)
+            return entry.tree;
+        const shape = root.shapeOf(entry);
+        if (root.layoutName === "master")
+            return Dwindle.insertMaster(entry.tree, id, shape);
+        return Dwindle.insert(entry.tree, id, target, shape);
+    }
+
+    function shrunk(entry, id) {
+        if (root.layoutName === "master")
+            return Dwindle.removeMaster(entry.tree, id, root.share);
+        return Dwindle.remove(entry.tree, id);
+    }
+
+    // The windows waiting for room in a tree, given another go.
+    function retry(key) {
+        const waiting = Object.keys(root.overflow).filter(id => root.overflow[id] === key);
+        for (const id of waiting) {
+            delete root.overflow[id];
+            const w = root.known[id];
+            if (w && w.deleted !== true)
+                root.consider(w);
+        }
+    }
+
     // ---- keeping the trees -------------------------------------------------
 
     // A window's place made to agree with what it is now: tiled where it
@@ -157,13 +211,20 @@ Item {
         const have = root.placed[id] || "";
         if (want === have)
             return;
+        delete root.overflow[id];
         if (have !== "")
             root.takeOut(id, have);
         if (want === "")
             return;
         const entry = root.treeFor(w.output, w.desktops[0]);
         const target = near && Dwindle.contains(entry.tree, near) ? near : entry.focus;
-        entry.tree = Dwindle.insert(entry.tree, id, target, root.aspectOf(entry));
+        const tree = root.grown(entry, id, target);
+        if (!Dwindle.contains(tree, id)) {
+            // No room: it floats where it opened, until a tiled one goes.
+            root.overflow[id] = want;
+            return;
+        }
+        entry.tree = tree;
         root.placed[id] = want;
         root.known[id] = w;
         root.touch(want);
@@ -174,13 +235,14 @@ Item {
         delete root.placed[id];
         if (!entry)
             return;
-        entry.tree = Dwindle.remove(entry.tree, id);
+        entry.tree = root.shrunk(entry, id);
         if (entry.focus === id)
             entry.focus = "";
         const w = root.known[id];
         if (w && w.deleted !== true)
             root.letGo(w, entry);
         root.touch(key);
+        root.retry(key);
     }
 
     // The tile a window is in, in one tree's tiles. Not `window.tile` alone:
@@ -302,6 +364,7 @@ Item {
         delete root.known[id];
         delete root.floating[id];
         delete root.gesture[id];
+        delete root.overflow[id];
         root.hooks = root.hooks.filter(h => h[0] !== w);
     }
 
@@ -378,8 +441,10 @@ Item {
             return;
         const aspect = root.aspectOf(at.entry);
         const before = at.entry.tree;
-        if (how === "move") {
-            at.entry.tree = Dwindle.move(before, at.id, direction, aspect);
+        // A master layout has its places fixed by the order: moving a
+        // window there is trading places with the one next to it.
+        if (how === "move" && root.layoutName !== "master") {
+            at.entry.tree = Dwindle.move(before, at.id, direction, root.shapeOf(at.entry));
         } else {
             const next = Dwindle.neighbour(before, at.id, direction, aspect);
             if (next !== null)

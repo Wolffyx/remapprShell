@@ -191,6 +191,19 @@ check "the gap, copied to its group"      "$(kread kwinrc "$TILE_GROUP" Gap)" "6
 check "the snap layouts are told"         "$(kread kwinrc "Script-$SLUG-snap" AutoTile)" "true"
 behave set tileGap 2 >/dev/null
 check "and the gap follows a change"      "$(kread kwinrc "$TILE_GROUP" Gap)" "2"
+
+check "dwindle until another is chosen"   "$(snap_status autoTileLayout)" "dwindle"
+check "a layout it does not have"         "$(behave set autoTileLayout spiral >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileLayout master >/dev/null
+check "master, in the script's group"     "$(kread kwinrc "$TILE_GROUP" Layout)" "master"
+check "as many as fit until a most"       "$(snap_status autoTileMax)" "0"
+check "no more than sixteen"              "$(behave set autoTileMax 17 >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileMax 4 >/dev/null
+check "a most, in the script's group"     "$(kread kwinrc "$TILE_GROUP" Max)" "4"
+check "a share of 50% until set"          "$(snap_status autoTileRatio)" "50"
+check "no share under 20%"                "$(behave set autoTileRatio 10 >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileRatio 60 >/dev/null
+check "status reads the share back"       "$(snap_status autoTileRatio)" "60"
 check "a key bound to each action" \
     "$(jq -r '[.shortcuts | to_entries[] | select(.key | startswith("tile-")) | .value] | map(select(. != "" and . != "none")) | length' "$SNAP_PROFILE")" "14"
 check "focus left is Meta+Alt+Left, as ours" \

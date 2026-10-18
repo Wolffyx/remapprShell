@@ -10,6 +10,8 @@ pragma ComponentBehavior: Bound
 // change is ledgered and `revert` puts the desktop back.
 
 import QtQuick
+import Quickshell
+import qs.core
 import qs.platform.kde
 import qs.platform.system
 import qs.ui.primitives
@@ -67,10 +69,48 @@ Column {
 
         ToggleRow {
             label: "Tile every window as it opens"
-            description: "As Hyprland's dwindle layout does: each new window takes half of the focused one, split along its longer side. Dialogs and windows of one size float. Snap layouts step aside while it is on."
+            description: "As Hyprland does. Dialogs and windows of one size float. Snap layouts step aside while it is on."
             checked: root.boolOf("autoTile")
             enabled: root.boolOf("autoTile") || !root.otherTiler
             onToggled: value => root.set("autoTile", value)
+        }
+
+        Segmented {
+            width: parent.width
+            values: ["dwindle", "master"]
+            labels: ["Dwindle", "Master and stack"]
+            current: root.valueOf("autoTileLayout", "dwindle")
+            onPicked: value => root.set("autoTileLayout", value)
+        }
+
+        Hint {
+            text: root.valueOf("autoTileLayout", "dwindle") === "master"
+                ? "The first window on the left, every other one in a column beside it. A window that closes gives its place to the next."
+                : "Each new window takes part of the focused one, split along its longer side. A window that closes gives its part back."
+        }
+
+        SliderRow {
+            label: root.valueOf("autoTileLayout", "dwindle") === "master" ? "Master's share of the width" : "New window's share of the split"
+            unit: "%"
+            from: 20
+            to: 80
+            stepSize: 5
+            value: root.numberOf("autoTileRatio", 50)
+            onMoved: value => root.set("autoTileRatio", Math.round(value))
+        }
+
+        SliderRow {
+            label: "Most windows tiled on a screen"
+            unit: ""
+            from: 0
+            to: 16
+            stepSize: 1
+            value: root.numberOf("autoTileMax", 0)
+            onMoved: value => root.set("autoTileMax", Math.round(value))
+        }
+
+        Hint {
+            text: "0 tiles as many as fit: KWin makes no tile smaller than 15% of the screen either way, which is 16 in dwindle and a column of 6 beside the master. A window past the limit floats until a tiled one closes."
         }
 
         Hint {
@@ -150,7 +190,14 @@ Column {
         SectionLabel { text: "KWin's own" }
 
         Hint {
-            text: "KWin also snaps a window dragged to a screen edge, and Shift while dragging shows the screen's tiles. Meta+T edits the tiles themselves."
+            text: "KWin also snaps a window dragged to a screen edge, and Shift while dragging shows the screen's tiles. Its tile editor draws a screen's tiles by hand; a layout made there is offered first in the snap layouts panel."
+        }
+
+        TextButton {
+            glyph: "dashboard"
+            iconName: "view-grid"
+            text: "Edit the tiles (Meta+T)…"
+            onActivated: Quickshell.execDetached([Paths.ctlBin, "windows", "tile", "edit"])
         }
 
         TextButton {

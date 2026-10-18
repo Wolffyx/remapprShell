@@ -29,6 +29,8 @@
 #   snap pick                     the snap layouts panel for the active
 #                                 window: what Meta+Z runs
 #   tile refresh                  the same for the auto-tiling script
+#   tile edit                     KWin's own tile editor (Meta+T), for the
+#                                 screen under the pointer
 #   tile <verb> [direction]       one of auto-tiling's keys: focus, move or
 #                                 swap with left|right|up|down, float, or
 #                                 desktop (tiling off or on for the desktop
@@ -43,7 +45,10 @@
 # given to every screen and desktop's tiles; KWin's own is 4. And autoTile,
 # Hyprland's dwindle layout -- every window tiled as it opens, each new one
 # splitting the focused one -- off unless turned on, and refused while
-# another tiling script is enabled. See lib/windows/tile.sh.
+# another tiling script is enabled, with autoTileLayout (dwindle, or master
+# and stack), autoTileMax (the most windows tiled on a screen, 0 for as many
+# as KWin's tiles allow) and autoTileRatio (a share, in percent). See
+# lib/windows/tile.sh.
 #
 # One of them is not a kwinrc key but a window rule: placeGames. A game run
 # through Steam's Proton is an X11 window that often asks for a position of its
@@ -236,6 +241,9 @@ JS
             "snapKey|@snap|key|bool||true"
             "tileGap|@snap|gap|int|0 64|4"
             "autoTile|@tile|enabled|bool||false"
+            "autoTileLayout|@tile|layout|enum|dwindle master|dwindle"
+            "autoTileMax|@tile|max|int|0 16|0"
+            "autoTileRatio|@tile|ratio|int|20 80|50"
         )
 
         # The settings a script of this project's keeps, by the group name
@@ -387,7 +395,8 @@ JS
     tile)
         case "${1:-}" in
             refresh) tile_refresh ;;
-            "") die "usage: $ALIAS windows tile <focus|move|swap> <left|right|up|down>, tile float, tile desktop, or tile refresh" ;;
+            edit)    tile_edit ;;
+            "") die "usage: $ALIAS windows tile <focus|move|swap> <left|right|up|down>, tile float, tile desktop, tile edit, or tile refresh" ;;
             *) tile_invoke "$@" ;;
         esac
         ;;
