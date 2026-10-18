@@ -155,12 +155,13 @@ Item {
     function applyGap() {
         if (!(root.gap >= 0) || typeof Workspace.rootTile !== "function")
             return;
-        for (const output of Workspace.screens) {
-            for (const desktop of Workspace.desktops) {
-                const top = Workspace.rootTile(output, desktop);
-                if (top && top.padding !== root.gap)
-                    top.padding = root.gap;
-            }
+        // No flatMap in KWin's QML engine.
+        const desktops = Array.from(Workspace.desktops);
+        const tops = [].concat(...Array.from(Workspace.screens).map(
+            output => desktops.map(desktop => Workspace.rootTile(output, desktop))));
+        for (const top of tops) {
+            if (top && top.padding !== root.gap)
+                top.padding = root.gap;
         }
     }
 

@@ -35,14 +35,17 @@ TestCase {
 
     // Every zone of a layout is somewhere a window can go, and together they
     // are the whole screen: nothing left over, nothing counted twice.
+    // No two of `rects` overlap. (No flatMap in Qt's engine: concat.)
+    function verifyApart(rects, what) {
+        const pairs = [].concat(...rects.map((a, i) => rects.slice(i + 1).map((b, k) => [a, b, i, i + 1 + k])));
+        for (const [a, b, i, j] of pairs)
+            verify(!overlap(a, b), `${what}: ${i} and ${j} overlap`);
+    }
+
     function test_every_layout_covers_the_screen_once() {
-        for (const portrait of [false, true]) {
-            for (const p of Layouts.presets(portrait)) {
-                fuzzyCompare(area(p.zones), 1, 1e-9, `${p.id} covers it all`);
-                for (let i = 0; i < p.zones.length; ++i)
-                    for (let j = i + 1; j < p.zones.length; ++j)
-                        verify(!overlap(p.zones[i], p.zones[j]), `${p.id}: zones ${i} and ${j} overlap`);
-            }
+        for (const p of [].concat(...[false, true].map(portrait => Layouts.presets(portrait)))) {
+            fuzzyCompare(area(p.zones), 1, 1e-9, `${p.id} covers it all`);
+            verifyApart(p.zones, `${p.id}: zones`);
         }
     }
 
@@ -105,13 +108,10 @@ TestCase {
     // third did to the rounding: a gap that wanders by a pixel shows.
     function test_neighbouring_zones_keep_one_gap() {
         const a = Layouts.arrange(Layouts.presets(false), 16 / 9, metrics);
-        for (const card of a.cards) {
-            for (const z of card.zones) {
-                const right = card.zones.find(w => w.x > z.x + z.width && Math.abs(w.y - z.y) < 1);
-                if (right)
-                    compare(right.x - (z.x + z.width), 2 * metrics.inset);
-            }
-        }
+        const rights = [].concat(...a.cards.map(card => card.zones.map(
+            z => [z, card.zones.find(w => w.x > z.x + z.width && Math.abs(w.y - z.y) < 1)])));
+        for (const [z, right] of rights.filter(([, right]) => right))
+            compare(right.x - (z.x + z.width), 2 * metrics.inset);
     }
 
     function test_the_zone_under_the_pointer() {
@@ -214,23 +214,23 @@ TestCase {
     function test_cells_fit_the_zone() {
         const boxes = [{ x: 960, y: 0, width: 960, height: 1080 }, { x: 640, y: 0, width: 640, height: 1080 },
                        { x: 0, y: 540, width: 960, height: 540 }, { x: 0, y: 0, width: 1080, height: 960 }];
-        for (const box of boxes) {
-            for (let n = 1; n <= 12; ++n) {
-                const cells = Layouts.grid(n, box, assist).cells;
-                const what = `${n} in ${JSON.stringify(box)}`;
-                compare(cells.length, n, what);
-                for (const c of cells) {
-                    compare([c.width, c.height], [cells[0].width, cells[0].height], what);
-                    verify(c.width <= assist.cell, what);
-                    compare(c.height, Math.round(c.width / assist.aspect) + assist.label, what);
-                    verify(c.x >= box.x + assist.pad - 1 && c.x + c.width <= box.x + box.width - assist.pad + 1, what);
-                    verify(c.y >= box.y + assist.pad - 1 && c.y + c.height <= box.y + box.height - assist.pad + 1, what);
-                }
-                for (let i = 0; i < n; ++i)
-                    for (let j = i + 1; j < n; ++j)
-                        verify(!overlap(cells[i], cells[j]), `${what}: cells ${i} and ${j} overlap`);
-            }
+        const counts = Array.from({ length: 12 }, (_, i) => i + 1);
+        for (const [box, n] of [].concat(...boxes.map(box => counts.map(n => [box, n]))))
+            verifyCells(box, n);
+    }
+
+    function verifyCells(box, n) {
+        const cells = Layouts.grid(n, box, assist).cells;
+        const what = `${n} in ${JSON.stringify(box)}`;
+        compare(cells.length, n, what);
+        for (const c of cells) {
+            compare([c.width, c.height], [cells[0].width, cells[0].height], what);
+            verify(c.width <= assist.cell, what);
+            compare(c.height, Math.round(c.width / assist.aspect) + assist.label, what);
+            verify(c.x >= box.x + assist.pad - 1 && c.x + c.width <= box.x + box.width - assist.pad + 1, what);
+            verify(c.y >= box.y + assist.pad - 1 && c.y + c.height <= box.y + box.height - assist.pad + 1, what);
         }
+        verifyApart(cells, `${what}: cells`);
     }
 
     // Five in a half are two columns of three rows, the last row's one cell

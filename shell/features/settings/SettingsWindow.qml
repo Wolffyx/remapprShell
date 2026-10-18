@@ -309,6 +309,7 @@ FloatingWindow {
                                 case "appearance": return appearancePage;
                                 case "taskbar":   return taskbarPage;
                                 case "windows":   return windowsPage;
+                                case "tiling":    return tilingPage;
                                 case "launcher":  return launcherPage;
                                 case "notifications": return notificationsPage;
                                 case "lock":      return lockPage;
@@ -346,6 +347,13 @@ FloatingWindow {
                         }
                     }
                     Component { id: windowsPage;   WindowsPage   { width: parent.width } }
+                    Component {
+                        id: tilingPage
+                        TilingPage {
+                            width: parent.width
+                            openPage: id => root.currentIndex = Math.max(0, root.sections.findIndex(s => s.id === id))
+                        }
+                    }
                     Component { id: launcherPage;  LauncherPage  { width: parent.width } }
                     Component { id: notificationsPage; NotificationsPage { width: parent.width } }
                     Component { id: lockPage;      LockPage      { width: parent.width } }

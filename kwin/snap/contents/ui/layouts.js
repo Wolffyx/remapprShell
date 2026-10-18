@@ -143,10 +143,9 @@ function hit(arrangement, x, y, inset) {
         const card = arrangement.cards[i];
         if (!inside(card, x, y))
             continue;
-        for (let j = 0; j < card.zones.length; ++j) {
-            if (inside(card.zones[j], x, y, inset))
-                return { layout: i, zone: j };
-        }
+        const j = card.zones.findIndex(z => inside(z, x, y, inset));
+        if (j >= 0)
+            return { layout: i, zone: j };
     }
     return null;
 }

@@ -8,11 +8,10 @@ pragma ComponentBehavior: Bound
 // through `rmpr windows behaviour`, so every change is ledgered and
 // `revert` puts the desktop back.
 //
-// What the mockup showed and KWin does not have -- window gaps, rounded
-// window corners -- is not offered. Saying so is more use than a control
-// that writes a key nothing reads. Snap layouts are offered because the
-// zones are KWin's own tiles: only the panel to pick them from is ours
-// (kwin/snap).
+// What the mockup showed and KWin does not have -- rounded window corners --
+// is not offered. Saying so is more use than a control that writes a key
+// nothing reads. Tiling -- auto-tiling, snap layouts, the gap -- is a page
+// of its own, TilingPage.
 
 import QtQuick
 import qs.platform.kde
@@ -33,7 +32,6 @@ Column {
     }
 
     readonly property var settings: root.ctl.state?.settings ?? []
-    readonly property var tilingScripts: root.ctl.state?.tilingScripts ?? []
 
     function valueOf(id, fallback) {
         return (root.settings.find(s => s.id === id)?.value) ?? fallback;
@@ -157,85 +155,6 @@ Column {
             iconName: "preferences-system-windows"
             text: "Window decorations…"
             onActivated: PlasmaApplets.openSettings("kcm_kwindecoration")
-        }
-    }
-
-    Card {
-        width: root.width
-
-        SectionLabel { text: "Tiling" }
-
-        ToggleRow {
-            label: "Snap layouts"
-            description: "Drag a window toward the top of a screen and a panel of layouts opens there; let it go over a zone and the window takes that zone. The zones are KWin's own tiles, the ones Meta+T edits, so a window dragged out of one gets its size back."
-            checked: root.boolOf("snapLayouts")
-            onToggled: value => root.set("snapLayouts", value)
-        }
-
-        Segmented {
-            visible: root.boolOf("snapLayouts")
-            width: parent.width
-            values: ["top", "drag"]
-            labels: ["When the window nears the top", "As soon as a window is dragged"]
-            current: root.valueOf("snapReveal", "top")
-            onPicked: value => root.set("snapReveal", value)
-        }
-
-        ToggleRow {
-            visible: root.boolOf("snapLayouts")
-            label: "Snap Assist"
-            description: "Once a window is snapped into a layout with zones still empty, the other windows on that screen are offered for the next one. Click one, or choose it with the arrow keys and Enter; Esc or a click anywhere else puts it away."
-            checked: root.boolOf("snapAssist")
-            onToggled: value => root.set("snapAssist", value)
-        }
-
-        ToggleRow {
-            visible: root.boolOf("snapLayouts")
-            label: "Meta+Z opens the layouts"
-            description: "The same panel for the active window, with no drag: click a zone, or move between zones with the arrow keys and press Enter -- or press a layout's number and then a zone's. The key itself can be changed on the Shortcuts page."
-            checked: root.boolOf("snapKey")
-            onToggled: value => root.set("snapKey", value)
-        }
-
-        ToggleRow {
-            label: "Auto-tiling"
-            description: root.tilingScripts.length > 0
-                ? `Off while ${root.tilingScripts.join(", ")} is enabled: two tiling scripts would undo each other at every window that opens.`
-                : "Every window is tiled as it opens, as Hyprland's dwindle layout does: each new one takes half of the focused window, split along its longer side. Dialogs and windows of one size float. Snap layouts step aside while it is on."
-            checked: root.boolOf("autoTile")
-            enabled: root.boolOf("autoTile") || root.tilingScripts.length === 0
-            onToggled: value => root.set("autoTile", value)
-        }
-
-        Hint {
-            visible: root.boolOf("autoTile")
-            text: "Meta+Alt and an arrow moves the focus that way, with Shift it moves the window, with Ctrl it swaps the two. Meta+Alt+Space floats the active window or tiles it again, and Meta+Alt+T turns tiling off or on for this desktop. The keys can be changed on the Shortcuts page."
-        }
-
-        SliderRow {
-            label: "Gap around tiled windows"
-            from: 0
-            to: 64
-            stepSize: 1
-            value: root.numberOf("tileGap", 4)
-            onMoved: value => root.set("tileGap", Math.round(value))
-        }
-
-        Hint {
-            text: "Between tiled windows and at the screen's edges, on every screen and desktop. 0 puts tiled windows edge to edge and against the panel; KWin's own is 4."
-        }
-
-        Hint {
-            text: root.tilingScripts.length > 0
-                ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge or into a layout may go to it instead.`
-                : "KWin also snaps a window dragged to a screen edge, and Shift while dragging shows the screen's tiles."
-        }
-
-        TextButton {
-            glyph: "tune"
-            iconName: "preferences-system-windows-actions"
-            text: "Plasma's window behaviour…"
-            onActivated: PlasmaApplets.openSettings("kcm_kwinoptions")
         }
     }
 
