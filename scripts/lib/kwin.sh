@@ -326,9 +326,9 @@ kwin_package_render() {   # <source dir> <destination dir> <what>
         case "$f" in
             *.in) render_template "$f" "$tmp/${rel%.in}" \
                       || { log_error "could not render $what: $rel"; rm -rf "$tmp"; return 1; } ;;
-            *)    cp "$f" "$tmp/$rel" ;;
+            *)    cp -L "$f" "$tmp/$rel" ;;
         esac
-    done < <(find "$src/contents" -type f -print0)
+    done < <(find "$src/contents" \( -type f -o -type l \) -print0)
     find "$tmp" -type f -exec chmod 644 {} +
     rm -rf "$dest"
     mv "$tmp" "$dest"

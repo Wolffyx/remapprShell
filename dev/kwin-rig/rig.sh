@@ -10,6 +10,7 @@
 #   kwin_windows                      how many windows KWin is drawing itself
 #   tile <title>                      just the tile, "x,y,width,height" or "none"
 #   activate <title>                  make it the active window
+#   active                            the active window's title
 #   load <kwin/dir> [Key=value...]    render one of this project's KWin
 #                                     packages into the rig, set keys in its
 #                                     kwinrc group, and load it
@@ -112,6 +113,15 @@ activate() {
     kjs activate <<JS
 for (const w of workspace.windowList()) if (w.caption === "$1") workspace.activeWindow = w;
 JS
+}
+
+active() {
+    local tag="ACTIVE$RANDOM"
+    kjs active <<JS
+print("$tag " + (workspace.activeWindow ? workspace.activeWindow.caption : "none"));
+JS
+    sleep 0.2
+    grep -a "$tag " "$RUN/kwin.log" | tail -1 | sed "s/.*$tag //"
 }
 
 load() {   # <kwin/dir> [Key=value...]
