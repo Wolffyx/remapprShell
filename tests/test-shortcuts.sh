@@ -48,6 +48,20 @@ echo "== clear =="
 sc clear launcher >/dev/null
 check "cleared to none, keeping its name" "$(binding launcher)" "none,none,Application menu"
 
+# Several at once, as auto-tiling binds its fourteen: one call, every key in
+# KDE's file and in the profile. A bad pair refuses the whole call.
+echo "== several at once =="
+PROFILE_JSON="$XDG_CONFIG_HOME/$SLUG/profiles/default/shell.json"
+check "an odd count is refused"         "$(sc set tile-float Meta+Alt+Space tile-desktop >/dev/null && echo ran || echo refused)" "refused"
+check "a bad key refuses them all" \
+    "$(sc set tile-float Meta+Alt+Space tile-desktop Meta+Banana >/dev/null && echo ran || echo refused):$(binding tile-float)" "refused:<unset>"
+sc set tile-float Meta+Alt+Space tile-desktop Meta+Alt+T >/dev/null
+check "both bound"                      "$(binding tile-float | cut -d, -f1) $(binding tile-desktop | cut -d, -f1)" "Meta+Alt+Space Meta+Alt+T"
+check "both in the profile"             "$(jq -r '.shortcuts["tile-float"] + " " + .shortcuts["tile-desktop"]' "$PROFILE_JSON")" "Meta+Alt+Space Meta+Alt+T"
+sc clear tile-float tile-desktop >/dev/null
+check "both cleared"                    "$(binding tile-float | cut -d, -f1) $(binding tile-desktop | cut -d, -f1)" "none none"
+check "both none in the profile"        "$(jq -r '.shortcuts["tile-float"] + " " + .shortcuts["tile-desktop"]' "$PROFILE_JSON")" "none none"
+
 # The form this project used before: a desktop file's launch shortcut, which
 # kglobalaccel reads only when it starts and therefore never grabs when it is
 # added afterwards.

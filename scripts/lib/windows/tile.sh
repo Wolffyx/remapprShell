@@ -80,21 +80,27 @@ tile_keys_held() {
 }
 
 # Every key action of auto-tiling the profile leaves unbound gets its key;
-# one chosen on the Shortcuts page stays. Off unbinds every one bound.
+# one chosen on the Shortcuts page stays. Off unbinds every one bound. Each
+# in one call of shortcuts.sh, for all fourteen: a call a key made turning
+# auto-tiling on or off take seconds.
 tile_keys_bind() {
-    local action have
+    local action have pairs=()
     while read -r action have; do
         [ -z "$have" ] || [ "$have" = none ] || continue
-        "$REPO_ROOT/scripts/shortcuts.sh" set "$action" "${TILE_KEY[$action]}" || return 1
+        pairs+=("$action" "${TILE_KEY[$action]}")
     done < <(tile_keys_held)
+    [ ${#pairs[@]} -gt 0 ] || return 0
+    "$REPO_ROOT/scripts/shortcuts.sh" set "${pairs[@]}"
 }
 
 tile_keys_clear() {
-    local action have
+    local action have bound=()
     while read -r action have; do
         [ -z "$have" ] || [ "$have" = none ] && continue
-        "$REPO_ROOT/scripts/shortcuts.sh" clear "$action" || return 1
+        bound+=("$action")
     done < <(tile_keys_held)
+    [ ${#bound[@]} -gt 0 ] || return 0
+    "$REPO_ROOT/scripts/shortcuts.sh" clear "${bound[@]}"
 }
 
 tile_on() {
