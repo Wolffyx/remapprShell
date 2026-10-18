@@ -18,7 +18,9 @@ load kwin/windows
 # Snap Assist off: it would offer `right` once `left` is snapped, and its
 # window would take the press that starts the next drag. It has a scenario
 # of its own, snap-assist.sh.
-load kwin/snap Assist=false
+# Opened as it was before snapApproach and snapDelay (72 px, no wait): the
+# drags here go straight to a card. snap-trigger.sh has the trigger itself.
+load kwin/snap Assist=false Approach=72 Delay=0
 input_start
 
 echo "== the panel is no window of the taskbar's"

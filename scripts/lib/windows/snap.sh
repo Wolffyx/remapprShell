@@ -9,13 +9,14 @@
 # Sourced by windows.sh, never executed. Requires brand.sh, log.sh,
 # kconfig.sh, kwin.sh, render.sh and config.sh.
 #
-# Five settings. Three are in kwinrc and ledgered: the script's plugin switch,
+# Seven settings. Five are in kwinrc and ledgered: the script's plugin switch,
 # which is what makes KWin load it at login, in a scope of its own
 # (windows-snap) so turning it off puts back exactly that; and how the panel
-# opens (Reveal) and whether Snap Assist follows a snap (Assist), both in the
+# opens (Reveal, and for "top" how near the top -- Approach -- and for how
+# long -- Delay) and whether Snap Assist follows a snap (Assist), all in the
 # script's own group, with the rest of the window behaviour
-# (windows-behaviour). The script reads those two when it loads, so a change
-# to either reloads it. The fourth is Meta+Z, which is a key of this
+# (windows-behaviour). The script reads them when it loads, so a change to
+# any reloads it. The fourth is Meta+Z, which is a key of this
 # project's like any other -- the `snap` action, `shortcuts.snap` in the
 # profile -- and so is bound and unbound by shortcuts.sh, which `shortcuts
 # revert` undoes. The fifth is the gap around a tiled window (Gap, in the
@@ -36,6 +37,16 @@ snap_reveal() {
 
 snap_assist() {
     kreadconfig6 --file kwinrc --group "$SNAP_GROUP" --key Assist --default true
+}
+
+# How the panel opens at the top: within Approach px of the top of the
+# screen, kept there for Delay ms. main.qml's defaults, 24 and 250.
+snap_approach() {
+    kreadconfig6 --file kwinrc --group "$SNAP_GROUP" --key Approach --default 24
+}
+
+snap_delay() {
+    kreadconfig6 --file kwinrc --group "$SNAP_GROUP" --key Delay --default 250
 }
 
 # On when the profile binds the `snap` action to a key: "none" is unbound, and
@@ -108,6 +119,18 @@ snap_assist_set() {   # true|false
     snap_load
 }
 
+snap_approach_set() {   # <pixels>
+    kconfig_set windows-behaviour kwinrc "$SNAP_GROUP" Approach "$1"
+    snap_enabled || return 0
+    snap_load
+}
+
+snap_delay_set() {   # <milliseconds>
+    kconfig_set windows-behaviour kwinrc "$SNAP_GROUP" Delay "$1"
+    snap_enabled || return 0
+    snap_load
+}
+
 # The gap around a tiled window: KWin's tile padding, which KWin keeps per
 # screen and desktop with no one setting for them all. Given to every root
 # tile at once by a one-shot script -- setting a root's padding sets its
@@ -154,10 +177,12 @@ snap_key_set() {   # true|false
 
 snap_enabled_value() { snap_enabled && echo true || echo false; }
 
-# The five settings, as `windows behaviour` names them in its table: how each
+# The settings, as `windows behaviour` names them in its table: how each
 # is read, and how each is written.
-declare -A SNAP_GET=([enabled]=snap_enabled_value [reveal]=snap_reveal [assist]=snap_assist [key]=snap_key [gap]=snap_gap)
-declare -A SNAP_SET=([enabled]=snap_set [reveal]=snap_reveal_set [assist]=snap_assist_set [key]=snap_key_set [gap]=snap_gap_set)
+declare -A SNAP_GET=([enabled]=snap_enabled_value [reveal]=snap_reveal [assist]=snap_assist [key]=snap_key [gap]=snap_gap
+                     [approach]=snap_approach [delay]=snap_delay)
+declare -A SNAP_SET=([enabled]=snap_set [reveal]=snap_reveal_set [assist]=snap_assist_set [key]=snap_key_set [gap]=snap_gap_set
+                     [approach]=snap_approach_set [delay]=snap_delay_set)
 
 snap_value() { "${SNAP_GET[$1]}"; }        # <setting>
 snap_apply() { "${SNAP_SET[$1]}" "$2"; }   # <setting> <value>

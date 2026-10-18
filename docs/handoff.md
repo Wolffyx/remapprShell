@@ -329,6 +329,60 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### Later the same night: what opens the snap layouts panel
+
+The user, trying the snap layouts: "the activation of the windows tiling
+dialog trigger is way too sensitive. We should have some settings about that
+dialog too". It opened the moment a dragged window's pointer came within
+72 px of the top, which a drag across the top of the screen does on its way
+anywhere. On the same branch as the editor, rig only.
+
+- **`snapApproach`** (px, 4..150, **24** unless set): how near the top of
+  the screen's free area the pointer must come. `Approach` in the script's
+  group.
+- **`snapDelay`** (ms, 0..1000, **250** unless set): how long it must stay
+  that near before the panel opens. `Delay` in the same group. A `Timer`
+  in main.qml (`wantsPanel`, `dwelt`) starts when the pointer comes near,
+  stops when it leaves, and is stopped at the start and end of every drag;
+  once open, the panel stays open while the pointer is near *it* (the
+  `margin` of 48 px around it, unchanged -- the open panel is at least 166
+  px tall with its margins, more than the largest approach). Moving within
+  the zone does not start the wait again: resting is being near, not being
+  still.
+- Both in `BEHAVIOUR_KEYS` as `@snap` rows, ledgered in `windows-behaviour`,
+  reloading the script; `behaviour revert` puts them back. Two sliders on
+  the Snap layouts card, shown only while the panel opens at the top
+  (`snapReveal` "drag" uses neither). **The defaults changed what the panel
+  did for everyone**: 72 px and no wait before, 24 px and 250 ms now, as
+  asked. snap.sh, snap-assist.sh and snap-custom.sh load the script with
+  `Approach=72 Delay=0`, since their drags go straight to a card.
+
+**A third reveal, "only while a key is held", was asked for and is not
+there: a KWin 6.8 script cannot see the keys held during a drag.** Measured
+in the rig: `Workspace` has `cursorPos` and nothing about keys or
+modifiers, `KWin` nothing, `Options` only `keyCmdAllModKey` (the modifier of
+its own window-drag actions, a setting, not a state). A `HoverHandler` in a
+script's own window does see Ctrl (`point.modifiers` 0x04000000) while
+the pointer is merely over it -- but during an interactive move KWin holds
+the pointer and the keyboard, and that window got no event at all for the
+whole drag. Nothing else reaches a script mid-drag; a modifier on its own
+is no kglobalaccel shortcut. The hint under the sliders says so.
+
+**The rig:** `scenarios/snap-trigger.sh` (8 checks): with the defaults, a
+fast pass over the top and 50 ms at it leave the panel shut, 400 ms opens
+it; 40 px from the top opens nothing however long, 20 px does; and through
+the real `windows.sh behaviour set`, 60 px and no wait open it on a fast
+pass 55 px down. A window let go where it was pressed has not moved and
+snaps nothing, which made two of these fail for the wrong reason at first:
+each drag of the same window holds its title bar somewhere else. Three runs
+in a row passed; one earlier run, with that mistake still in it, had the
+last check fail in a way not explained. `test-windows.sh` has the range
+checks and the revert.
+
+**Not measured:** how 24 px and 250 ms feel with a real hand and mouse --
+the user's to judge, and the sliders are there for it; a screen with a panel
+along its top (the approach is from the top of the free area, as before).
+
 ### The night of 2026-10-18: snap layouts of your own
 
 **The layout editor the user asked for with the auto-tiling settings**,

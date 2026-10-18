@@ -110,6 +110,16 @@ check "a reveal it does not have is refused" "$(behave set snapReveal sideways >
 behave set snapReveal drag >/dev/null
 check "reveal written to its own group"   "$(kread kwinrc "Script-$SLUG-snap" Reveal)" "drag"
 
+check "24 px from the top until it is set" "$(snap_status snapApproach)" "24"
+check "and a wait of 250 ms"              "$(snap_status snapDelay)" "250"
+check "no nearer than 4 px"               "$(behave set snapApproach 2 >/dev/null 2>&1; echo $?)" "1"
+check "no wait over a second"             "$(behave set snapDelay 1500 >/dev/null 2>&1; echo $?)" "1"
+behave set snapApproach 60 >/dev/null
+behave set snapDelay 0 >/dev/null
+check "the distance in the script's group" "$(kread kwinrc "Script-$SLUG-snap" Approach)" "60"
+check "and the wait"                      "$(kread kwinrc "Script-$SLUG-snap" Delay)" "0"
+check "status reads both back"            "$(snap_status snapApproach) $(snap_status snapDelay)" "60 0"
+
 check "Snap Assist on until it is set"    "$(snap_status snapAssist)" "true"
 check "and takes only true or false"      "$(behave set snapAssist maybe >/dev/null 2>&1; echo $?)" "1"
 behave set snapAssist false >/dev/null
@@ -199,6 +209,7 @@ check "revert turns it off" \
     "$([ -d "$SNAP_DIR" ] && echo there || echo gone):$(kread kwinrc Plugins "$SLUG-snapEnabled")" "gone:<unset>"
 check "and puts the reveal back"          "$(kread kwinrc "Script-$SLUG-snap" Reveal)" "<unset>"
 check "and Snap Assist"                   "$(kread kwinrc "Script-$SLUG-snap" Assist)" "<unset>"
+check "and how near and how long"         "$(kread kwinrc "Script-$SLUG-snap" Approach),$(kread kwinrc "Script-$SLUG-snap" Delay)" "<unset>,<unset>"
 check "and the gap"                       "$(kread kwinrc "Script-$SLUG-snap" Gap)" "<unset>"
 check "and the layouts of the user's own" "$(kread kwinrc "Script-$SLUG-snap" Layouts)" "<unset>"
 check "nothing of it in the ledger"       "$(ledger_count windows-snap)" "0"

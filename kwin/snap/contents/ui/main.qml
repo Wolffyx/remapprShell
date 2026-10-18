@@ -67,10 +67,14 @@ Item {
     // none: it hangs from the edge, as a drop-down does (10 px was "too far
     // from the edge", the user on 2026-10-17) -- and how close the pointer
     // must come to it: within `approach` of the top, over the panel's width
-    // give or take `margin`, opens it; leaving it by more than `margin`
-    // closes it again.
+    // give or take `margin`, and kept there for `delay` ms, opens it; leaving
+    // it by more than `margin` closes it again. 72 px and no wait was "way
+    // too sensitive" (the user, 2026-10-18): every drag across the top of
+    // the screen opened it. Both are `rmpr windows behaviour` settings, in
+    // the script's group; `reveal` "drag" uses neither.
     readonly property int topGap: 0
-    readonly property int approach: 72
+    readonly property int approach: root.configNumber("Approach", 24, 4, 150)
+    readonly property int delay: root.configNumber("Delay", 250, 0, 1000)
     readonly property int margin: 48
 
     property var dragged: null         // the window being dragged, or null
@@ -85,6 +89,13 @@ Item {
     // Where the window would go, in the screen's pixels, or null.
     readonly property var target: root.hover
         ? Layouts.place(root.layouts[root.hover.layout].zones[root.hover.zone], root.area) : null
+
+    // A number from the script's group, within lo..hi; the fallback for
+    // anything that is not one.
+    function configNumber(key, fallback, lo, hi) {
+        const n = Number(KWin.readConfig(key, fallback));
+        return isNaN(n) ? fallback : Math.max(lo, Math.min(hi, n));
+    }
 
     function windows() {
         return typeof Workspace.windowList === "function" ? Workspace.windowList() : Workspace.stackingOrder;
@@ -209,6 +220,7 @@ Item {
         root.startGeometry = Qt.rect(g.x, g.y, g.width, g.height);
         root.settle(root.outputAt(Workspace.cursorPos));
         root.revealed = root.reveal === "drag";
+        dwell.stop();
         root.hover = null;
         root.dragged = w;
         root.track();
@@ -239,13 +251,47 @@ Item {
         const output = root.outputAt(point);
         if (output && output !== root.output)
             root.settle(output);
-        root.revealed = root.reveal === "drag" || root.near(point);
+        root.revealed = root.wantsPanel(point);
         const target = root.revealed ? root.zoneAt(point, panel, flyout) : null;
         if (!Layouts.sameHit(target, root.hover))
             root.hover = target;
     }
 
+    // Whether the panel is open at this point. Coming near opens it once the
+    // pointer has stayed near for `delay`: a drag that only passes through
+    // the top of the screen leaves it shut. The wait starts again each time
+    // the pointer comes near, and stops when it leaves; once open, the panel
+    // stays open while the pointer is near it.
+    function wantsPanel(point) {
+        if (root.reveal === "drag")
+            return true;
+        if (!root.near(point)) {
+            dwell.stop();
+            return false;
+        }
+        if (root.revealed || root.delay <= 0)
+            return true;
+        if (!dwell.running)
+            dwell.start();
+        return false;
+    }
+
+    function dwelt() {
+        if (root.dragged === null || !root.near(Workspace.cursorPos))
+            return;
+        root.revealed = true;
+        root.track();
+    }
+
+    Timer {
+        id: dwell
+
+        interval: Math.max(1, root.delay)
+        onTriggered: root.dwelt()
+    }
+
     function reset() {
+        dwell.stop();
         root.dragged = null;
         root.hover = null;
         root.revealed = false;

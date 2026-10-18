@@ -48,7 +48,8 @@
 #
 # Four of them are a KWin script of this project's: snapLayouts, Windows 11's
 # snap layouts -- drag a window to the top of a screen and pick a zone for it
-# -- snapReveal, how that panel opens, snapAssist, whether the screen's other
+# -- snapReveal, how that panel opens (and snapApproach and snapDelay, how
+# near the top and for how long, in px and ms), snapAssist, whether the screen's other
 # windows are offered for the zones a snap left empty, and snapKey, whether
 # Meta+Z opens the panel for the active window. See lib/windows/snap.sh. So
 # is tileGap, the gap around a tiled window in pixels -- KWin's tile padding,
@@ -247,6 +248,8 @@ JS
             "placeGames|@rule|$GAMES_RULE|bool||true"
             "snapLayouts|@snap|enabled|bool||false"
             "snapReveal|@snap|reveal|enum|top drag|top"
+            "snapApproach|@snap|approach|int|4 150|24"
+            "snapDelay|@snap|delay|int|0 1000|250"
             "snapAssist|@snap|assist|bool||true"
             "snapKey|@snap|key|bool||true"
             "tileGap|@snap|gap|int|0 64|4"

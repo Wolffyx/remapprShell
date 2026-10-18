@@ -17,7 +17,9 @@
 window a 900 600 steelblue
 window b 700 500 seagreen
 window c 600 400 indianred
-load kwin/snap
+# Opened as it was before snapApproach and snapDelay (72 px, no wait): the
+# drags here go straight to a card. snap-trigger.sh has the trigger itself.
+load kwin/snap Approach=72 Delay=0
 input_start
 
 fields() { geom "$1" | cut -d' ' -f1-4; }
@@ -66,7 +68,7 @@ check "nothing was put in the bottom-left quarter" "$(tile b):$(tile c)" "none:n
 check "and neither window moved" "$(fields b):$(fields c)" "$b_was:$c_was"
 
 echo "== switched off, a snap offers nothing"
-load kwin/snap Assist=false
+load kwin/snap Assist=false Approach=72 Delay=0
 activate c
 drag c 826 35
 check "c: the left half" "$(tile c)" "0,0,960,1080"

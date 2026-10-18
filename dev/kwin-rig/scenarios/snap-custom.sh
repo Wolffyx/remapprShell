@@ -18,7 +18,9 @@
 
 window a 900 600 steelblue
 window b 700 500 seagreen
-load kwin/snap Assist=false
+# Opened as it was before snapApproach and snapDelay (72 px, no wait): the
+# drags here go straight to a card. snap-trigger.sh has the trigger itself.
+load kwin/snap Assist=false Approach=72 Delay=0
 input_start
 
 layouts() { "$REPO_ROOT/scripts/windows.sh" snap layouts "$@" >/dev/null 2>&1; sleep 0.4; }

@@ -149,6 +149,32 @@ Column {
             onPicked: value => root.set("snapReveal", value)
         }
 
+        SliderRow {
+            visible: root.boolOf("snapLayouts") && root.valueOf("snapReveal", "top") === "top"
+            label: "How near the top"
+            from: 4
+            to: 150
+            stepSize: 2
+            value: root.numberOf("snapApproach", 24)
+            onMoved: value => root.set("snapApproach", Math.round(value))
+        }
+
+        SliderRow {
+            visible: root.boolOf("snapLayouts") && root.valueOf("snapReveal", "top") === "top"
+            label: "Wait before it opens"
+            unit: "ms"
+            from: 0
+            to: 1000
+            stepSize: 50
+            value: root.numberOf("snapDelay", 250)
+            onMoved: value => root.set("snapDelay", Math.round(value))
+        }
+
+        Hint {
+            visible: root.boolOf("snapLayouts") && root.valueOf("snapReveal", "top") === "top"
+            text: "The panel opens once a dragged window's pointer has stayed that near the top of the screen for that long, so a drag that only passes the top leaves it shut. Nearer and longer make it harder to open by accident. No modifier key opens it: KWin tells a script nothing of the keys held during a drag."
+        }
+
         ToggleRow {
             visible: root.boolOf("snapLayouts")
             label: "Snap Assist"

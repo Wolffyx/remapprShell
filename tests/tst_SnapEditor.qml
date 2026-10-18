@@ -182,22 +182,25 @@ TestCase {
     function test_whatever_is_drawn_is_a_layout() {
         let seed = 7;
         const next = n => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
-        for (const p of SnapEditor.presets) {
-            let t = p.tree;
-            for (let i = 0; i < 300; ++i) {
-                const zones = SnapEditor.zones(t);
-                const z = zones[next(zones.length)];
-                const edges = SnapEditor.edges(t);
-                const ops = [
-                    () => SnapEditor.split(t, z.path, "h"),
-                    () => SnapEditor.split(t, z.path, "v"),
-                    () => SnapEditor.merge(t, z.path),
-                    () => edges.length ? SnapEditor.moveEdge(t, edges[next(edges.length)], next(1000) / 1000) : t
-                ];
-                t = ops[next(ops.length)]();
-                if (SnapEditor.isLayout(t))
-                    valid(SnapEditor.tidy(t), `${p.id}, step ${i}`);
-            }
+        for (const p of SnapEditor.presets)
+            editAtRandom(p, next);
+    }
+
+    function editAtRandom(preset, next) {
+        let t = preset.tree;
+        for (let i = 0; i < 300; ++i) {
+            const zones = SnapEditor.zones(t);
+            const z = zones[next(zones.length)];
+            const edges = SnapEditor.edges(t);
+            const ops = [
+                () => SnapEditor.split(t, z.path, "h"),
+                () => SnapEditor.split(t, z.path, "v"),
+                () => SnapEditor.merge(t, z.path),
+                () => edges.length ? SnapEditor.moveEdge(t, edges[next(edges.length)], next(1000) / 1000) : t
+            ];
+            t = ops[next(ops.length)]();
+            if (SnapEditor.isLayout(t))
+                valid(SnapEditor.tidy(t), `${preset.id}, step ${i}`);
         }
     }
 
