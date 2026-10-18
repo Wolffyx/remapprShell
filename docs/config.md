@@ -137,7 +137,14 @@ Where the weather comes from. Off until you turn it on, because it is the one pa
 
 ### Windows
 
-What KWin does with windows: how focus is given, when one is raised, where a new one lands, whether a maximised window keeps its border, and snap layouts -- a panel at the top of the screen while a window is dragged or on Meta+Z, whose zones are KWin's own tiles, Snap Assist after a snap, offering the other windows for the zones left empty, and auto-tiling -- off unless turned on -- which tiles every window as it opens, in Hyprland's dwindle layout, in the same tiles. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps and rounded window corners are not KWin's to give, and are not offered here.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Tiling has a page of its own. Rounded window corners are not KWin's to give, and are not offered here.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Tiling
+
+Windows in KWin's own tiles, the ones Meta+T edits: auto-tiling -- off unless turned on -- which tiles every window as it opens in Hyprland's dwindle layout; snap layouts, a panel at the top of the screen while a window is dragged or on Meta+Z, and Snap Assist after a snap; layouts of your own for that panel, drawn here; and the gap around a tiled window. Written through the ledger by `rmpr windows behaviour` and `rmpr windows snap layouts`, so every change can be undone.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.

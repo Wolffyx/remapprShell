@@ -3,7 +3,8 @@ pragma ComponentBehavior: Bound
 // Tiling: every way a window is put into one of KWin's tiles, on a page of
 // its own -- it grew past a card on the Windows page with auto-tiling.
 //
-// Auto-tiling (kwin/tile), snap layouts (kwin/snap) and the gap around a
+// Auto-tiling (kwin/tile), snap layouts (kwin/snap) and the layouts of the
+// user's own drawn for them (TilingLayoutsCard), and the gap around a
 // tiled window. All three are KWin's own tiles, the ones Meta+T edits: the
 // scripts only decide which tile a window goes to. Read and written through
 // `rmpr windows behaviour`, as the Windows page's settings are, so every
@@ -163,6 +164,10 @@ Column {
             checked: root.boolOf("snapKey")
             onToggled: value => root.set("snapKey", value)
         }
+    }
+
+    TilingLayoutsCard {
+        width: root.width
     }
 
     Card {

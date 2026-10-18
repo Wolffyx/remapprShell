@@ -329,6 +329,95 @@ started from the panel lives there and dies with it.
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
 
+### The night of 2026-10-18: snap layouts of your own
+
+**The layout editor the user asked for with the auto-tiling settings**,
+built on its own branch (`claude/snap-layout-editor-2c06a5`), tried in the
+rig and in offscreen previews, never on the real desktop.
+
+Settings > Tiling has a card, **Your layouts**, between the snap layouts and
+the gaps. "New layout…" opens an editor: a name, which screens it is for, a
+row of starting points (the whole screen, or any of the six), and the layout
+drawn at the screen's shape. A click chooses a zone; "Split side by side",
+"Split top and bottom" and "Merge into its neighbour" act on it; the line two
+zones share is dragged to move it, on steps of half a percent. Each zone
+says its number -- the one the panel's keys use -- and its size. A layout
+saved is a small card above the button; a click on one edits it (renaming
+it replaces it where it was), and the editor has Delete. Six at most.
+
+**Orientation: a layout is for "any screen", "wide screens only" or "tall
+screens only".** Any screen is the default and does what the six do: drawn
+wide, turned on its side on a tall screen. The other two are drawn at that
+shape and shown on no other, for someone who wants a different layout on a
+portrait screen. Changing to or from tall turns the drawing with it.
+
+**Storage** is the script's kwinrc group, `Layouts`: a JSON list of `{ name,
+screen, tree }`, the tree in `layouts.js`'s own format. Written by `rmpr
+windows snap layouts save <name> <tree-json> [any|wide|tall] [<old name>]`
+and `remove <name>` (`status [--json]` lists them), through the ledger in the
+`windows-behaviour` scope, so `behaviour revert` takes them away; a change
+reloads the script, which reads them when it loads. The settings card talks
+to that command as the other controls do (`CtlSession` for the list, a
+`CtlRun` for the writes, whose exit says whether to close the editor).
+
+**In the panel** they come after the six, in the order saved, and before
+them only KWin's own layout when it is none of these (a layout of the
+user's own that the tiles make now is marked like a preset). Hit testing,
+the arrows and Snap Assist are the six's, untouched: a custom layout is one
+more entry in the list `layoutsFor` hands them. **The digits go 1 to 9,
+then 0 for the tenth**, and nothing past that: thirteen cards (six, six and
+KWin's) are reached by the arrows or the pointer. `arrange` makes them four
+across; thirteen is 442x268 px on a wide screen.
+
+**What KWin 6.8 does, measured in the rig:** it makes no tile of **0.15 of
+the screen or less** -- not "under 0.15", as the auto-tiling entry has it.
+Asked to size a tile to exactly 0.15 it leaves it as it was; 0.1500001 it
+takes. So a layout with a zone of 0.15 either way is refused by the CLI
+(`SNAP_TREE_JQ`), left out by the script (`layouts.js` `treeError`, the same
+rules), and never drawn by the editor, whose smallest is 0.155 -- a split
+that would go under it is greyed out, and a dragged line stops there. The
+other rules: every split in two parts or more, adding up to 1, the other way
+from its parent (KWin's `split()` of a tile inside a split the same way adds
+a sibling, so the editor folds such a split into its parent). `kwinrc` takes
+the JSON as it is: `kwriteconfig6` and `kreadconfig6` round-trip it, and
+`KWin.readConfig` gives the script the same string.
+
+**Where it is.** `kwin/snap/contents/ui/layouts.js` (`treeError`, `custom`,
+`digitLabel`/`digitIndex`, `MIN_ZONE`, `MAX_CUSTOM`); `main.qml` (reads
+`Layouts`); `Picker.qml` and `Flyout.qml` (the tenth digit); the CLI in
+`scripts/lib/windows/snap.sh`. The editor's arithmetic is
+`qs.domain.windows.snap` `SnapEditor` (split, merge, edges and how far each
+can go, transpose, tidy) -- its own copy of the presets and limits, because a
+copied install of the shell has nothing outside `shell/`, and
+`tst_SnapEditor.qml` holds it to `layouts.js`'s (the presets, the limits,
+and 1,800 random edits from every preset, each checked by `treeError`). The
+card is `TilingLayoutsCard.qml`, the drawing `SnapLayoutCanvas.qml` (one
+MouseArea for clicks and drags: every step of a drag makes new edges, and a
+handle per edge was destroyed under the pointer), the small cards
+`SnapLayoutThumb.qml`.
+
+**Tests:** `tests/fixtures/snap-trees.json` is one list of trees, good and
+bad, that both `test-windows.sh` (the CLI) and `tst_SnapLayouts.qml` (the
+script) answer the same way; `test-windows.sh` has the save, rename, limit,
+refusal and revert; `tst_SnapLayouts.qml` the parsing, the orientations, the
+thirteen-card panel, the digits and building the tiles. The rig:
+`scenarios/snap-custom.sh` (14 checks) saves three layouts through the real
+CLI -- one tall-only, which must not show on the rig's wide screen -- drags
+windows into a 0.155 zone either side and a stack, picks a zone of the
+eighth layout by its number on Meta+Z's panel, and removes one. snap,
+snap-key, snap-assist, reload, tile-gap, auto-tile and auto-tile-drag still
+pass. The card was looked at offscreen (dark, light, tall), and driven
+there through the canvas's `press`/`drag`/`release`/`click`.
+
+**Not measured:** any of it on the real screen or with a real pointer --
+the drag was driven through the canvas's functions in a preview, not by a
+mouse, and hover cursors were never seen; the editor saving to the live
+kwinrc and the live KWin reloading (the rig did both, through the same
+command); the panel with thirteen cards on a real screen; a portrait screen
+in the rig (`RIG_W`/`RIG_H` would do it; the tests have the arithmetic);
+two screens; X11 and a Plasma before 6.8. The CLI's checks are jq and the
+script's are JavaScript: the shared fixture is what keeps them the same.
+
 ### The evening of 2026-10-18: auto-tiling on the real screen
 
 Merged into `dev` (cherry-picked, without the branch's snapshot of the

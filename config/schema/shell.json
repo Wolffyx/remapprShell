@@ -559,7 +559,7 @@
             "icon": "view-grid",
             "glyph": "dashboard",
             "page": "tiling",
-            "description": "Windows in KWin's own tiles, the ones Meta+T edits: auto-tiling -- off unless turned on -- which tiles every window as it opens in Hyprland's dwindle layout; snap layouts, a panel at the top of the screen while a window is dragged or on Meta+Z, and Snap Assist after a snap; and the gap around a tiled window. Written through the ledger by `rmpr windows behaviour`, so every change can be undone."
+            "description": "Windows in KWin's own tiles, the ones Meta+T edits: auto-tiling -- off unless turned on -- which tiles every window as it opens in Hyprland's dwindle layout; snap layouts, a panel at the top of the screen while a window is dragged or on Meta+Z, and Snap Assist after a snap; layouts of your own for that panel, drawn here; and the gap around a tiled window. Written through the ledger by `rmpr windows behaviour` and `rmpr windows snap layouts`, so every change can be undone."
         },
         {
             "id": "launcher",
