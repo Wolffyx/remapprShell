@@ -84,8 +84,20 @@ QtObject {
             // no size either, so nothing reads such a window as reaching an
             // edge.
             x: typeof entry.x === "number" ? entry.x : 0,
-            y: typeof entry.y === "number" ? entry.y : 0
+            y: typeof entry.y === "number" ? entry.y : 0,
+            // The KWin tile it is in, {x, y, width, height}, or null: untiled,
+            // or from a script older than the field.
+            tile: root._rect(entry.tile)
         };
+    }
+
+    function _rect(value) {
+        if (!value || typeof value !== "object")
+            return null;
+        const r = { x: value.x, y: value.y, width: value.width, height: value.height };
+        if (![r.x, r.y, r.width, r.height].every(n => typeof n === "number") || !(r.width > 0) || !(r.height > 0))
+            return null;
+        return r;
     }
 
     // A desktop file the daemon read, as {variable, path, id, name, icon,
@@ -246,6 +258,11 @@ QtObject {
     // on the other screen. The cost is that a window hanging over from the
     // next monitor leaves this panel floating over it.
     //
+    // A tiled window counts by its tile. KWin keeps it its tile padding
+    // short of the tile's edge, which at the screen's edge is short of the
+    // reserved space: a window tiled into the bottom half stopped 4 px above
+    // the strip, and the panel went on floating over it.
+    //
     // A full-screen window does not count either. It covers the edge whatever
     // the panel reserves, and while it is on top the panel steps aside for it
     // or KWin puts it above; filling the edge for it changed only the space
@@ -266,13 +283,14 @@ QtObject {
         for (const w of windows ?? []) {
             if (!w || w.minimized || w.fullScreen === true || w.output !== screen.name)
                 continue;
-            if (!(w.width > 0) || !(w.height > 0))
+            const r = w.tile ?? w;
+            if (!(r.width > 0) || !(r.height > 0))
                 continue;
             const on = w.desktops ?? [];
             if (on.length > 0 && desktopId && on.indexOf(desktopId) < 0)
                 continue;
-            if (w.x < strip.x + strip.w && w.x + w.width > strip.x
-                && w.y < strip.y + strip.h && w.y + w.height > strip.y)
+            if (r.x < strip.x + strip.w && r.x + r.width > strip.x
+                && r.y < strip.y + strip.h && r.y + r.height > strip.y)
                 return true;
         }
         return false;

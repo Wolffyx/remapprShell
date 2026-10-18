@@ -137,7 +137,7 @@ Where the weather comes from. Off until you turn it on, because it is the one pa
 
 ### Windows
 
-What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, whether a maximised window keeps its border, and snap layouts -- a panel at the top of the screen while a window is dragged or on Meta+Z, whose zones are KWin's own tiles, and Snap Assist after a snap, offering the other windows for the zones left empty. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps and rounded window corners are not KWin's to give, and are not offered here.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.
@@ -214,7 +214,7 @@ list of values.
 
 ### Shortcuts
 
-Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu and Meta+Space the search by default.
+Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu, Meta+Space the search and Meta+Z the snap layouts by default.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
@@ -232,6 +232,7 @@ Every global shortcut this shell can take, and what each is bound to. The keys a
 | `shortcuts.screenshot` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 | `shortcuts.screenshot-screen` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 | `shortcuts.screenshot-window` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.snap` | text | `Meta+Z` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it, and so does Settings > Windows > Tiling, which binds Meta+Z or unbinds it. It does nothing while snap layouts are off. |
 
 ### Lock & session
 

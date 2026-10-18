@@ -1,7 +1,11 @@
 # Where the project stands
 
 A snapshot for picking the work up fresh. Written 2026-09-10, across two
-sessions, and added to since -- most recently on **2026-10-16**: Plasma 6.8
+sessions, and added to since -- most recently on **2026-10-17**: Windows 11's
+snap layouts, drawn by a KWin script whose zones are KWin's own tiles, and a
+headless KWin to try KWin scripts in without a window on the desktop
+("2026-10-17: snap layouts, and a KWin to test them in"). Before that,
+**2026-10-16**: Plasma 6.8
 locked the user out, because our lock screen stopped loading and the greeter's
 own fallback cannot unlock ("2026-10-16: Plasma 6.8 and the lock screen").
 Before that, **2026-10-14**, twice: in the
@@ -324,6 +328,236 @@ started from the panel lives there and dies with it.
    Variants model it was being created from -- a binding loop on `model` in
    the journal. Both switchers commit a turn later now. Proven by the same
    key press as item 1's leftover.
+
+### 2026-10-18: Snap Assist, and Meta+Z
+
+**The two snap features Windows 11 has after the layouts panel**, built
+into `kwin/snap` and tried only in the rig, never on the real desktop.
+
+- **Snap Assist.** Once a window is snapped -- by a drag or by Meta+Z --
+  into a layout with zones still empty, the first empty zone (in the
+  layout's own order) holds the other windows on that screen and desktop,
+  top of the stack first, minimised ones included (and restored when
+  chosen); the other empty zones are outlined. A click on one, or the
+  arrows and Enter/Space, puts it in that zone's tile and makes it active,
+  and Snap Assist goes on to the next empty zone until the layout is full or
+  nothing is left to offer. Escape, a click on anything but a window, any
+  other mouse button, a desktop switch or a new drag puts it away. Each
+  window is KWin's `WindowThumbnail` over a line with its icon and title.
+- **Meta+Z** opens the same panel of layouts for the active window, with no
+  drag, at the same place, numbered: a click on a zone, or the arrows (the
+  first press lands on the first zone of the layout the tiles make now) and
+  Enter, or a layout's number and then a zone's, as Windows has it. Escape,
+  a click off the cards, or Meta+Z again closes it. Snap Assist follows a
+  zone chosen this way as it follows a drag. Unlike Windows it opens at the
+  top of the screen, not under the window's maximise button.
+
+**How the key gets there.** Meta+Z is a key of this project's like every
+other: the `snap` action in `scripts/lib/shortcut-actions.tsv`, `Meta+Z` in
+the shipped `shortcuts.snap`, held by the session daemon and enforced by
+`shortcuts sync`. Pressing it runs `rmpr windows snap pick` (about 30 ms of
+bash), which asks KWin whether the script is loaded and then has kglobalaccel
+invoke a KWin action the script registers, `Snap Layouts: Active Window`
+under `/component/kwin`, with no key of its own -- a KWin script can call
+D-Bus and never be called, and an invoked action is the way in. That action
+therefore also shows, unbound, in System Settings' KWin shortcuts; the name
+is in `Picker.qml` and `lib/windows/snap.sh`, and `test-windows.sh` checks
+they agree.
+
+**Settings** (Settings > Windows > Tiling, under Snap layouts):
+`snapAssist` is `Assist` in the script's kwinrc group, default true, ledgered
+with the rest of the behaviour and reloading the script; `snapKey` binds the
+shipped key or unbinds it through `shortcuts.sh` -- so it is on while
+`shortcuts.snap` names a key, a key chosen on the Shortcuts page stays, and
+`shortcuts revert`, not `behaviour revert`, undoes it.
+
+**Where it is.** `Picker.qml` (both features' logic, reached from main.qml
+as `picker`), `Chooser.qml` (the window that takes clicks and keys),
+`Assist.qml`, `Thumbnail.qml`, and `Preview.qml` (the zone preview, moved out
+of main.qml so both windows draw it). The arithmetic is in `layouts.js` and
+`tst_SnapLayouts.qml`: `zoneList` and `nearest` (where an arrow goes: the
+nearest centre that way, a step sideways counting double), `grid` (Snap
+Assist's cells, as large as fit up to 300 px, rows centred), `matches`, and
+`manage`/`unmanage`/`windowsIn`.
+
+What KWin 6.8 does, each measured in the rig:
+
+- **`KWin.registerShortcut` does not exist in a declarative script.**
+  `ShortcutHandler` (org.kde.kwin) does, takes an empty `sequence`, and
+  `invokeShortcut` reaches its `activated`. It is made at run time with
+  `Qt.createQmlObject`, so a KWin without it loads the rest.
+- **Which window gets keys.** `Qt.BypassWindowManagerHint` (the drag
+  panel's): clicks, never keys. Frameless alone: KWin places it as it likes
+  and it loses focus at once. **`Qt.Popup`: keys and clicks, the active
+  window stays active, and keys go back to it once the popup is gone**; KWin
+  cancels the popup (`close()`) on a click outside it. The chooser is a popup
+  covering the screen's free area.
+- **A hidden popup still says it is active**, and reopening it in that state
+  lost keys; it is put away with `close()`, as KWin does, so each one is new.
+  **Asking KWin to activate a popup already up** -- Snap Assist moving to
+  the next zone -- lost it the keyboard: the next Enter went nowhere. It is
+  activated once, when shown.
+- **The chooser is a window of KWin's own** to KWin, as the drag panel is
+  (pid -1, no resource class; the entry below): `isKWinsOwn()` keeps both out
+  of `watch()` and out of `snappable()`, so Snap Assist never offers either.
+- **A tile lists its windows in `windows`**, which is how Snap Assist tells
+  a filled zone from an empty one; `window.tile` where a tile has no list,
+  and the window's place where KWin had no tiles. The placing itself uses
+  `tile.manage` where it exists (the entry below).
+- **`WindowThumbnail`** has `wId` and `client`; under the rig's software
+  renderer it draws nothing, which is why the icon is beside the title too.
+- **KWin compiles a QML file once per path and keeps it while it runs.** A
+  declarative script unloaded and loaded again from the same path runs the
+  code it had: the first `make link` of this reloaded the snap layouts KWin
+  had compiled at login, with no error, and Meta+Z's action never appeared.
+  `kwin_declarative_reload` now loads a copy named by its content
+  (`~/.cache/<slug>/kwin/<id>-<hash>`), so new code is a new path, and drops
+  older copies; the installed package is what a new KWin loads at login.
+  `scenarios/reload.sh` shows both halves (6 checks).
+
+**The rig** grew for this: a scenario with a line `# rig: global-shortcuts`
+gets KWin's kglobalaccel (on the rig's bus, reading the rig's
+kglobalshortcutsrc); fakeinput takes `press`/`release` for held keys; and
+`click`, `tile` and `activate` helpers. `scenarios/snap-assist.sh` (16
+checks) and `scenarios/snap-key.sh` (11, running the real `windows.sh snap
+pick` against the rig's bus) pass, and so does `scenarios/snap.sh` (12,
+the two added the same night included), which now loads the script with
+`Assist=false`, since Snap Assist's window would take the press that starts
+its next drag.
+
+**Loaded live at the user's go-ahead**, after `make link`, `rmpr windows
+restart` and `rmpr shortcuts sync`, and a `snap_load` from the new copy (the
+cache above): KWin reports the script loaded from
+`~/.cache/remappr-shell/kwin/remappr-shell-snap-*`, kglobalaccel has
+`Snap Layouts: Active Window`, and `shortcuts status` has `snap  Meta+Z`
+grabbed. It replaced the patched copy the session before had loaded
+(`build/kwin-rig/fix/snap`), whose fixes are all in it.
+
+**Not measured:** any of it on the real screen -- thumbnails on a GPU
+included -- and a real press of Meta+Z through the daemon; that is the user's
+to try. Nor two screens, X11, or a Plasma before 6.8
+-- every call that could be missing is feature-detected, but none of those
+paths has run. Whether kglobalaccel drops the KWin action again when the
+script is turned off was not looked at.
+
+### 2026-10-17: snap layouts, and a KWin to test them in
+
+**Windows 11's snap layouts, asked for by the user with a screenshot of
+them.** Drag a window toward the top of a screen: a handle there grows into a
+panel of six layouts (halves, two thirds, thirds, one beside two, quarters,
+a half between quarters); let go over a zone and the window takes it. On a
+portrait screen the layouts turn on their side. `snapReveal` `drag` opens the
+panel as soon as a window moves instead of near the top.
+
+It is `kwin/snap/`, a **declarative** KWin script (`$SLUG-snap`) -- KWin
+draws it and KWin places the window; the shell is not involved, which is the
+only way it can work: during a drag KWin has the pointer, so no surface of
+ours could see it. **A zone is a KWin tile.** Letting go makes the screen's
+tiles that layout (the tiles Meta+T edits and Shift-dragging fills) unless
+they already are, and sets `window.tile`; so a window dragged out of a zone
+gets its old size back, the gap is KWin's tile padding, and the edge between
+two tiled windows moves both -- all KWin's, none of it ours. A layout made in
+Meta+T that is none of the six is shown first, and the layout the tiles make
+now has an accent bar under it (snapping into it keeps the windows already
+tiled; any other lets them go, where they are). Where a KWin has no tiles to
+give, the window is sized to the zone instead. Colours are Kirigami.Theme's,
+as the window switcher's are.
+
+Switched by `rmpr windows behaviour set snapLayouts true|false` and
+`snapReveal top|drag` (Settings > Windows > Tiling); `setup` turns it on, as
+this project's default; `behaviour revert`, and so an uninstall, turns it
+off. KWin keeps its own copy of a script, so `install.sh` (and with it
+`make link` and `rmpr update`) runs `windows snap refresh`, which installs it
+again when the checkout renders it differently and reloads it. Tests:
+`tst_SnapLayouts.qml` (the layouts, the panel, the hit test, and building
+tiles against a stand-in that splits as KWin's were measured to) and a snap
+section in `test-windows.sh`.
+
+What KWin 6.8 does, each measured, not read:
+
+- **The tile API works from a script.** `workspace.rootTile(output,
+  desktop)` (the same object as `tilingForScreen(output).rootTile`); a tile's
+  `split(1|2)` (side by side, stacked) makes a leaf two halves, or adds a
+  sibling when its parent is split the same way; `remove()`; a writable
+  `relativeGeometry`, in fractions of the screen, that moves the neighbour's
+  shared edge with it. KWin's default layout is 25/50/25.
+- **Removing a tile hands its windows to the tile above** -- for a layout of
+  one level, the whole screen. A window snapped left came back full-screen
+  when another was snapped into thirds. `release()` takes them out of their
+  tiles first and leaves them where they are.
+- **`Workspace.showOutline` draws -- and KWin takes the outline down at every
+  step of a drag** not over one of its own snapping edges. The preview is
+  ours, inside the same window as the panel.
+- **QML in a KWin script:** `Window` there is KWin's (and cannot be made):
+  import `QtQuick.Window as QuickWindow`, as KWin's own outline does. A
+  window declared inside the script's Item waits for that Item's window to
+  be shown, which never happens: `transientParent: null`. `property var
+  window` on an Item is shadowed by Item's own; `layer` is FINAL.
+  `PlasmaCore.Dialog` grew in width and not in height when its content grew,
+  so the window is the open panel's size from the start and the surface
+  grows inside it. Handlers connected with `signal.connect()` outlive an
+  unloaded script and throw at every drag after a reload: they are kept in
+  a list and let go of in `Component.onDestruction`.
+
+- **A window a script shows is a normal window to KWin** -- `normalWindow`
+  true, `skipTaskbar` false, so the window list put the panel on the taskbar
+  for as long as a drag lasted (the user's first report, the same evening).
+  It belongs to no process (`pid` -1) and no application (`resourceClass`
+  ""), which no window a person opened does: kwin/windows skips those now,
+  and so does kwin/snap's own watching. KWin 6.8 reads no `kwin_windowType`
+  property, and no Qt flag changes what it calls the window.
+- **`Scripting::start()` unloads every installed script kwinrc does not
+  enable** -- and it runs at every reconfigure (a saved tile layout is one)
+  and at every one-shot script's `start`. So a script loaded by hand and not
+  switched on in `[Plugins]` disappears at the next of either; the rig did
+  exactly that until `load` enabled what it loads. An installed and enabled
+  script is safe.
+- **Writing `window.tile` is deprecated in 6.8**; `tile.manage(window)` and
+  `unmanage` are the calls, used where they exist.
+
+The user's second report: the panel sat 10 px below the top edge, "too far".
+It hangs from the edge now, square-cornered at the top.
+
+The user's third report (2026-10-18): a window snapped into the bottom half
+left the floating panel floating, where a maximised one fills the edge.
+**KWin keeps a tiled window its tile padding (4 px) short of its tile** --
+the full padding at a screen edge, half between tiles -- so it stopped 4 px
+above the reserved strip, and `reachesEdge` looks a pixel deep. kwin/windows
+sends a tiled window's tile now (`tile`, its `absoluteGeometry`, null
+untiled), and a tiled window counts by its tile. Measured in the rig
+(`scenarios/windows-tile.sh`): bottom tile 0,540,1920,540, frame
+4,542,1912,534.
+
+The panel filled the edge after that, and the user asked next for the gap
+itself to be a setting: **`tileGap`** (`rmpr windows behaviour set tileGap
+0..64`, Settings > Windows > Tiling; unset is KWin's 4). KWin keeps a tile
+padding per screen and desktop with no one setting for them all; setting a
+root tile's `padding` from a script sets its tiles' too, tiles split later
+take it from their parent, and KWin saves it with the layout -- measured in
+the rig (`scenarios/tile-gap.sh`). So the setting is written to the snap
+script's group (`Gap`), given to every root tile at once by a one-shot
+script, and given again by the snap script when it loads and when a screen
+or desktop is added. `behaviour revert` puts KWin's 4 back, since the ledger
+restoring the key leaves KWin's saved paddings as they were. Hyprland-style
+auto-tiling was asked for in the same breath and is its own piece of work.
+
+**The rig** (`dev/kwin-rig/`) is how all of that was seen without a window
+on the desktop: `kwin_wayland --virtual` under `dbus-run-session` with a bus
+that can start nothing (a portal it started held the pipe open after KWin
+had gone), its own XDG directories, and `QT_QUICK_BACKEND=software` -- without
+it KWin aborts the moment a script shows a window ("Failed to allocate a
+graphics buffer for a swapchain"). The pointer is `org_kde_kwin_fake_input`
+(`KWIN_WAYLAND_NO_PERMISSION_CHECKS=1`), one process for a whole scenario so
+a held button survives between steps; the screen is KWin's ScreenShot2.
+`dev/kwin-rig/run.sh scenarios/snap.sh` drags real windows into zones and
+prints where they landed.
+
+**Not measured:** any of it on the real screen -- the panel has been seen
+only in the rig, software-rendered, at 1920x1080 and 1080x1920. Nor two
+screens at once, X11, or a Plasma before 6.8 (the tile calls are
+feature-detected, and a KWin without them gets the window sized to the zone).
+krohnkite and other tiling scripts are not detected against it; doctor
+already names an enabled one.
 
 ### 2026-10-16: Plasma 6.8 and the lock screen
 

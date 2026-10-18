@@ -24,3 +24,4 @@ overview-reverse	Desktops (backwards)	switcher overview --reverse
 screenshot	Screenshot, choosing an area	screenshot region
 screenshot-screen	Screenshot of the screen	screenshot screen
 screenshot-window	Screenshot, choosing a window	screenshot window
+snap	Snap layouts for the active window	windows snap pick

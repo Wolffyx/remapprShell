@@ -248,6 +248,7 @@
         "overview-reverse": "",
         "screenshot": "",
         "screenshot-screen": "",
-        "screenshot-window": ""
+        "screenshot-window": "",
+        "snap": "Meta+Z"
     }
 }

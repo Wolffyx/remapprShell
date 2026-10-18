@@ -9,8 +9,10 @@ pragma ComponentBehavior: Bound
 // `revert` puts the desktop back.
 //
 // What the mockup showed and KWin does not have -- window gaps, rounded
-// window corners, a tiling layout of its own -- is not offered. Saying so is
-// more use than a control that writes a key nothing reads.
+// window corners -- is not offered. Saying so is more use than a control
+// that writes a key nothing reads. Snap layouts are offered because the
+// zones are KWin's own tiles: only the panel to pick them from is ours
+// (kwin/snap).
 
 import QtQuick
 import qs.platform.kde
@@ -163,10 +165,55 @@ Column {
 
         SectionLabel { text: "Tiling" }
 
+        ToggleRow {
+            label: "Snap layouts"
+            description: "Drag a window toward the top of a screen and a panel of layouts opens there; let it go over a zone and the window takes that zone. The zones are KWin's own tiles, the ones Meta+T edits, so a window dragged out of one gets its size back."
+            checked: root.boolOf("snapLayouts")
+            onToggled: value => root.set("snapLayouts", value)
+        }
+
+        Segmented {
+            visible: root.boolOf("snapLayouts")
+            width: parent.width
+            values: ["top", "drag"]
+            labels: ["When the window nears the top", "As soon as a window is dragged"]
+            current: root.valueOf("snapReveal", "top")
+            onPicked: value => root.set("snapReveal", value)
+        }
+
+        ToggleRow {
+            visible: root.boolOf("snapLayouts")
+            label: "Snap Assist"
+            description: "Once a window is snapped into a layout with zones still empty, the other windows on that screen are offered for the next one. Click one, or choose it with the arrow keys and Enter; Esc or a click anywhere else puts it away."
+            checked: root.boolOf("snapAssist")
+            onToggled: value => root.set("snapAssist", value)
+        }
+
+        ToggleRow {
+            visible: root.boolOf("snapLayouts")
+            label: "Meta+Z opens the layouts"
+            description: "The same panel for the active window, with no drag: click a zone, or move between zones with the arrow keys and press Enter -- or press a layout's number and then a zone's. The key itself can be changed on the Shortcuts page."
+            checked: root.boolOf("snapKey")
+            onToggled: value => root.set("snapKey", value)
+        }
+
+        SliderRow {
+            label: "Gap around tiled windows"
+            from: 0
+            to: 64
+            stepSize: 1
+            value: root.numberOf("tileGap", 4)
+            onMoved: value => root.set("tileGap", Math.round(value))
+        }
+
+        Hint {
+            text: "Between tiled windows and at the screen's edges, on every screen and desktop. 0 puts tiled windows edge to edge and against the panel; KWin's own is 4."
+        }
+
         Hint {
             text: root.tilingScripts.length > 0
-                ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge may go to it rather than to KWin's snapping.`
-                : "KWin has no tiling layouts of its own: it has snapping at the edges, and custom tiles under Meta+T. Gaps between windows and rounded window corners come from a tiling script, not from a shell, so nothing here pretends to set them."
+                ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge or into a layout may go to it instead.`
+                : "KWin also snaps a window dragged to a screen edge, and Shift while dragging shows the screen's tiles."
         }
 
         TextButton {

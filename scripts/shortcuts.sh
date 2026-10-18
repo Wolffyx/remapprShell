@@ -5,14 +5,16 @@
 #   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard,
 #                                     sidebar, keys, switcher, switcher-reverse,
 #                                     overview, overview-reverse, screenshot,
-#                                     screenshot-screen, screenshot-window)
+#                                     screenshot-screen, screenshot-window,
+#                                     snap)
 #   clear <action>      unbind one
 #   sync [--quiet]      make KDE's shortcuts match the shell's configuration
 #   migrate             move keys off the old desktop-file entries
 #   revert              undo everything this project bound
 #
 # The keys are the shell's configuration: `shortcuts.<action>` in the profile,
-# with Meta for the menu and Meta+Space for search shipped as the defaults. A
+# with Meta for the menu, Meta+Space for search and Meta+Z for the snap layouts
+# shipped as the defaults. A
 # key there is enforced -- `sync` takes it from whoever holds it, and the
 # session daemon runs `sync` whenever it starts, so a key another program
 # took back while the shell was not looking (KRunner and Meta+Space) is ours

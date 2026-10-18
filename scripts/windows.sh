@@ -22,6 +22,20 @@
 #   behaviour set <key> <value>   one of those, written to kwinrc through the
 #                                 ledger, and KWin asked to read it again
 #   behaviour revert              put every one of them back
+#   snap refresh                  install the snap layouts script again if
+#                                 this checkout renders it differently, and
+#                                 reload it -- what an install or an update
+#                                 runs, since KWin keeps its own copy
+#   snap pick                     the snap layouts panel for the active
+#                                 window: what Meta+Z runs
+#
+# Four of them are a KWin script of this project's: snapLayouts, Windows 11's
+# snap layouts -- drag a window to the top of a screen and pick a zone for it
+# -- snapReveal, how that panel opens, snapAssist, whether the screen's other
+# windows are offered for the zones a snap left empty, and snapKey, whether
+# Meta+Z opens the panel for the active window. See lib/windows/snap.sh. So
+# is tileGap, the gap around a tiled window in pixels -- KWin's tile padding,
+# given to every screen and desktop's tiles; KWin's own is 4.
 #
 # One of them is not a kwinrc key but a window rule: placeGames. A game run
 # through Steam's Proton is an X11 window that often asks for a position of its
@@ -35,8 +49,9 @@
 # The behaviour half configures KWin and reimplements nothing: these are the
 # keys System Settings' "Window Behaviour" page writes, and the ones a shell
 # can honestly offer. What KWin does not have -- window gaps, rounded window
-# corners, a tiling layout -- is not offered here, however much a mockup of
-# another desktop's shell may show it.
+# corners -- is not offered here, however much a mockup of another desktop's
+# shell may show it. Snap layouts are the exception that proves it: the
+# zones are KWin's own tiles, and only the panel to pick them from is ours.
 #
 # Why any of this exists is written at the top of bin/windowsd.py.in. The short
 # version: KWin is the only thing that knows what windows exist, a KWin script
@@ -53,6 +68,8 @@ source "$REPO_ROOT/scripts/lib/brand.sh"
 source "$REPO_ROOT/scripts/lib/render.sh"
 source "$REPO_ROOT/scripts/lib/kconfig.sh"
 source "$REPO_ROOT/scripts/lib/kwin.sh"
+source "$REPO_ROOT/scripts/lib/config.sh"
+source "$REPO_ROOT/scripts/lib/windows/snap.sh"
 
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 
@@ -204,6 +221,11 @@ JS
             "borderlessMaximized|Windows|BorderlessMaximizedWindows|bool||false"
             "placement|Windows|Placement|enum|Smart Centered Maximizing Random ZeroCornered UnderMouse|Centered"
             "placeGames|@rule|$GAMES_RULE|bool||true"
+            "snapLayouts|@snap|enabled|bool||false"
+            "snapReveal|@snap|reveal|enum|top drag|top"
+            "snapAssist|@snap|assist|bool||true"
+            "snapKey|@snap|key|bool||true"
+            "tileGap|@snap|gap|int|0 64|4"
         )
 
         behaviour_spec() {
@@ -226,6 +248,10 @@ JS
                 IFS='|' read -r _ group key _ _ fallback <<< "$spec"
                 if [ "$group" = "@rule" ]; then
                     BEHAVIOUR_VALUES+=("$spec" "$(kwin_rule_present "$key" && echo true || echo false)")
+                    continue
+                fi
+                if [ "$group" = "@snap" ]; then
+                    BEHAVIOUR_VALUES+=("$spec" "$(snap_value "$key")")
                     continue
                 fi
                 BEHAVIOUR_VALUES+=("$spec" "${rc[$group:$key]-$fallback}")
@@ -285,11 +311,20 @@ JS
                 IFS='|' read -r _id group key kind choices fallback <<< "$spec"
                 case "$kind" in
                     bool) [ "$value" = true ] || [ "$value" = false ] || die "$id takes true or false" ;;
-                    int)  [[ "$value" =~ ^[0-9]+$ ]] || die "$id takes a number of milliseconds"
+                    int)  [[ "$value" =~ ^[0-9]+$ ]] || die "$id takes a whole number"
                           lo=${choices%% *}; hi=${choices##* }
                           [ "$value" -ge "$lo" ] && [ "$value" -le "$hi" ] || die "$id takes $lo..$hi" ;;
                     enum) printf '%s\n' $choices | grep -qxF "$value" || die "$id takes one of: $choices" ;;
                 esac
+                if [ "$group" = "@snap" ]; then
+                    [ "$(snap_value "$key")" = "$value" ] && {
+                        log_info "$id is already $value"
+                        exit 0
+                    }
+                    snap_apply "$key" "$value" || die "could not set $id"
+                    log_step "$id: $value"
+                    exit 0
+                fi
                 if [ "$group" = "@rule" ]; then
                     [ "$(kwin_rule_present "$key" && echo true || echo false)" = "$value" ] && {
                         log_info "$id is already $value"
@@ -310,7 +345,12 @@ JS
                 ;;
 
             revert)
+                gap=$(snap_gap)
+                snap_off
                 kconfig_revert windows-behaviour
+                # KWin keeps the padding it was given with its layouts, so
+                # the ledger putting the key back is not enough.
+                [ "$(snap_gap)" = "$gap" ] || snap_gap_apply "$(snap_gap)"
                 games_rule false
                 kwin_reconfigure
                 log_step "KWin's window behaviour is back as it was"
@@ -320,5 +360,13 @@ JS
         esac
         ;;
 
-    *) die "unknown command: $cmd (expected enable, disable, status, show, close or behaviour)" ;;
+    snap)
+        case "${1:-}" in
+            refresh) snap_refresh ;;
+            pick)    snap_pick ;;
+            *) die "unknown command: snap ${1:-} (expected refresh or pick)" ;;
+        esac
+        ;;
+
+    *) die "unknown command: $cmd (expected enable, disable, status, show, close, behaviour or snap)" ;;
 esac
