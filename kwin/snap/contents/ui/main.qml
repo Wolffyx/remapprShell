@@ -366,10 +366,17 @@ Item {
     // since org.kde.kwin has a Window of its own that cannot be made. It
     // takes no keys, and needs none: KWin holds the pointer and the keyboard
     // for the whole drag.
+    //
+    // Nor the pointer: the zones are found from KWin's cursorPos. Without
+    // WindowTransparentForInput it lay over the screen under every drag and
+    // was what a drop landed on -- a Chrome tab dragged out of its window and
+    // back is a window moved and a drop at once, and no tab strip under it
+    // ever saw the tab (the user, 2026-10-21; in the rig, a click through
+    // such a window reached the window under it only with the flag).
     QuickWindow.Window {
         id: panel
 
-        flags: Qt.BypassWindowManagerHint | Qt.FramelessWindowHint
+        flags: Qt.BypassWindowManagerHint | Qt.FramelessWindowHint | Qt.WindowTransparentForInput
         // Declared inside an Item, a window takes that item's window as its
         // transient parent and waits for it to be shown -- and the item this
         // script is has none, so it would wait for ever.
