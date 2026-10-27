@@ -6,7 +6,9 @@
 #   revert                 put every key back and remove the package
 #   variant [light|dark|auto] [--if-following]
 #                          which of light and dark the desktop is in
-#   daylight [--json]      whether it is day: KDE's schedule, else the sun here
+#   daylight [--json|--where]
+#                          whether it is day: KDE's schedule, else the sun here;
+#                          --where: only where this machine is, the OS's way
 #   osd ours|plasma        which OSD draws when our package is active
 #   style [<id>|revert]    the Qt style every application is drawn in
 #   install-style <id> [--run]
@@ -78,6 +80,7 @@ WITH_JSON=0
 RUN_INSTALL=0
 VARIANT_ARG=""
 IF_FOLLOWING=0
+WITH_WHERE=0
 positional=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -87,6 +90,7 @@ while [ $# -gt 0 ]; do
         --run) RUN_INSTALL=1 ;;
         --variant) VARIANT_ARG=${2:-}; shift ;;
         --if-following) IF_FOLLOWING=1 ;;
+        --where) WITH_WHERE=1 ;;
         -*) die "unknown option: $1" ;;
         *) positional+=("$1") ;;
     esac

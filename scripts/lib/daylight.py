@@ -7,6 +7,12 @@
 --no-bus asks neither KDE nor GeoClue: what the CLI passes when there is no
 session to ask, so the test suites never reach the developer's own desktop.
 
+    daylight.py --locate [--cache FILE] [--desktop-id ID] [--timeout S]
+
+prints only where this machine is, the OS's way -- { "known": true,
+"latitude": ..., "longitude": ..., "location": "geoclue" | "cache" } -- for
+the weather, which asks the internet only when this has no answer.
+
 Prints one JSON object and exits 0 when something knows, 3 when nothing does:
 
     { "known": true, "daylight": false, "source": "kde", "location": "kde",
@@ -359,7 +365,8 @@ def parse(argv):
     opts = {"prefer": "kde", "coordinates": "", "cache": "", "desktop_id": "daylight",
             "timeout": "5", "now": None}
     opts["no_bus"] = "--no-bus" in argv
-    args = [a for a in argv if a != "--no-bus"]
+    opts["locate"] = "--locate" in argv
+    args = [a for a in argv if a not in ("--no-bus", "--locate")]
     while args:
         arg = args.pop(0)
         if arg not in FLAGS or not args:
@@ -448,9 +455,27 @@ def from_us(Gio, GLib, opts, because):
     return sun_answer(lat, lon, opts["now"], said_by, f"{because}; the sun, {SAID_BY[said_by]}")
 
 
+def locate(Gio, GLib, opts):
+    """--locate: only where this machine is, the OS's way, for the weather.
+
+    GeoClue, or the place it gave last. Not the typed coordinates -- the
+    weather reads its own -- and never the internet: a caller with no answer
+    here decides for itself whether to ask one.
+    """
+    where = where_we_are(Gio, GLib, dict(opts, coordinates=""))
+    if where is None:
+        print(json.dumps({"known": False}))
+        return EXIT_UNKNOWN
+    lat, lon, said_by = where
+    print(json.dumps({"known": True, "latitude": lat, "longitude": lon, "location": said_by}))
+    return EXIT_OK
+
+
 def main(argv):
     opts = parse(argv)
     Gio, GLib = (None, None) if opts["no_bus"] else gio()
+    if opts["locate"]:
+        return locate(Gio, GLib, opts)
     answer, because = from_kde(Gio, GLib, opts)
     if answer is None:
         answer = from_us(Gio, GLib, opts, because)

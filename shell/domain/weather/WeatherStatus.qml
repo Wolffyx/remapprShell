@@ -10,9 +10,13 @@ pragma Singleton
 //   - A place you have named is turned into coordinates once, by Open-Meteo's
 //     own geocoder. Coordinates you typed yourself are used as they are and
 //     nothing is looked up at all.
-//   - Only when neither is set is this machine's IP address used to guess
-//     where it is -- one call, cached, and the setting that avoids it is one
-//     line of text away.
+//   - When neither is set, the OS is asked where this machine is: GeoClue,
+//     the same location service KDE's night time and Night Light use, through
+//     `theme daylight --where`. Nothing leaves the machine for that beyond
+//     what GeoClue itself does.
+//   - Only when the OS cannot say -- no GeoClue, or it would not answer -- is
+//     this machine's IP address used to guess where it is: one call, cached,
+//     and the setting that avoids it is one line of text away.
 //
 // The answer is cached in the state directory with the time it was fetched, so
 // a restart of the shell draws yesterday's forecast immediately and replaces
@@ -39,7 +43,7 @@ QtObject {
     readonly property int refreshMinutes: Math.max(10, Number(ConfigStore.value("weather.refresh", 30)) || 30)
 
     // Where the forecast is for: { latitude, longitude, name, source }.
-    // `source` is "coordinates", "place" or "ip", which is what the settings
+    // `source` is "coordinates", "place", "os" or "ip", which is what the settings
     // page shows so nobody has to guess whether they were geolocated.
     property var location: null
 
@@ -107,6 +111,11 @@ QtObject {
             search.running = true;
             return;
         }
+        osWhere.run(["theme", "daylight", "--where"]);
+    }
+
+    // The OS had no answer: the internet's guess, asked once and kept.
+    function _locateByIp() {
         if (root.location?.source === "ip") {
             root._fetch();
             return;
@@ -141,11 +150,39 @@ QtObject {
         Log.warn("weather", root.error);
     }
 
+    // Where the OS says this machine is. Asked every time, unlike the IP
+    // guess: it is local, and a laptop moves.
+    readonly property CtlRun _osWhere: CtlRun {
+        id: osWhere
+        tag: "weather"
+        label: "theme daylight --where"
+        level: "debug"
+        onFinished: (code, stdout) => {
+            let data = null;
+            try {
+                data = JSON.parse(stdout);
+            } catch (e) {
+                data = null;
+            }
+            if (data?.known !== true) {
+                root._locateByIp();
+                return;
+            }
+            root._located({
+                latitude: Number(data.latitude),
+                longitude: Number(data.longitude),
+                name: "",
+                source: "os"
+            });
+        }
+    }
+
     readonly property Process _locate: Process {
         id: locate
         // ipapi.co answers a bare GET with the caller's own city and
-        // coordinates. Asked once, and only when nothing else says where we
-        // are; the answer is cached like the forecast.
+        // coordinates. Asked once, and only when nothing else -- the OS
+        // included -- says where we are; the answer is cached like the
+        // forecast.
         command: ["curl", "-fsS", "--max-time", "10", "https://ipapi.co/json/"]
         stdout: StdioCollector {
             onStreamFinished: {

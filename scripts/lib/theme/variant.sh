@@ -34,10 +34,23 @@ daylight_now() {   # [seconds]
     daylight_json "${1:-5}" 2>/dev/null | jq -r 'if .known then (.daylight | tostring) else "" end' 2>/dev/null
 }
 
+# `theme daylight --where`: where this machine is, from GeoClue or the place
+# it gave last, as JSON -- the weather's first question, before it asks the
+# internet. Exits 3 when the OS cannot say.
+theme_where() {
+    local bus=()
+    session_available || bus=(--no-bus)
+    python3 "$DAYLIGHT_HELPER" --locate "${bus[@]+"${bus[@]}"}" \
+        --cache "$STATE_DIR/daylight-place.json" \
+        --desktop-id "$SLUG" \
+        --timeout 10
+}
+
 # `theme daylight [--json]`: whether it is day, who said so, and when that
 # changes. The shell runs this; a person reads the plain form.
 theme_daylight() {
     local out rc
+    [ "$WITH_WHERE" = 1 ] && { theme_where; exit $?; }
     out=$(daylight_json 5); rc=$?
     [ -n "$out" ] || die "the daylight helper gave no answer (exit $rc)"
     if [ "$WITH_JSON" = 1 ]; then

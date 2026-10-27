@@ -91,6 +91,13 @@ contains "--prefer shell skips KDE"       "$(jq -r .why <<< "$out")" "theme.dayl
 out=$(python3 "$HELPER" --now "$NOON" --no-bus --coordinates "38.72,-9.14" 2>/dev/null)
 contains "--no-bus asks nobody"           "$(jq -r .why <<< "$out")" "no session to ask KDE in"
 
+echo "== --locate: the OS's place, for the weather =="
+out=$(python3 "$HELPER" --locate --no-bus 2>/dev/null); rc=$?
+check "no OS and nothing kept is no place" "$rc" "3"
+out=$(python3 "$HELPER" --locate --no-bus --cache "$CACHE" --coordinates "69.65,18.96" 2>/dev/null); rc=$?
+check "the kept place answers"            "$rc" "0"
+check "and typed coordinates are not its" "$(jq -c '[.known, .latitude, .location]' <<< "$out")" '[true,38.72,"cache"]'
+
 python3 "$HELPER" --prefer gnome >/dev/null 2>&1; rc=$?
 check "a source it does not know"         "$rc" "64"
 python3 "$HELPER" --timeout soon >/dev/null 2>&1; rc=$?

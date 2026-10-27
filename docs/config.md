@@ -126,12 +126,12 @@ What this shell draws on the desktop itself: a rounded frame over the screen's c
 
 ### Weather
 
-Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.
+Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key). A place you have not named is asked of the OS first -- GeoClue, the location service KDE's night time uses -- and only when the OS cannot say is it looked up once from this machine's IP address.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `weather.enabled` | `true` or `false` | `false` | Fetches a forecast for your place. Nothing is sent but the coordinates being asked about; nothing is stored but the answer, in memory. |
-| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the place is worked out once from this machine's IP address, which is a guess a network can get wrong; naming it is exact and asks nobody. |
+| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the OS's own location service (GeoClue) says where you are, and only without one is the place guessed once from this machine's IP address -- a guess a network can get wrong. Naming it is exact and asks nobody. |
 | `weather.coordinates` | text | `` | "46.77,23.60" -- latitude, longitude. Set, this wins over the place and no lookup of any kind is made. |
 | `weather.units` | `metric`, `imperial` | `metric` | Celsius and km/h, or Fahrenheit and mph. |
 | `weather.refresh` | a number, 10 to 360 | `30` | Minutes between forecasts. The forecast itself changes hourly at best. |
