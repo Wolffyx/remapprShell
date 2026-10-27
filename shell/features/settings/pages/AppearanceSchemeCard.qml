@@ -20,6 +20,31 @@ import qs.ui.controls
 Card {
     id: root
 
+    // Where the place came from, when the shell worked the sunset out itself.
+    readonly property var _placeSaid: ({
+        geoclue: "where GeoClue says you are",
+        cache: "where GeoClue last said you were",
+        coordinates: "at the weather's coordinates"
+    })
+
+    // Who decided it is day or night, why it was them, and when it changes.
+    function _daylightText(): string {
+        const a = Daylight.answer;
+        if (!Daylight.known)
+            return a.why
+                ? `Nothing knows when night is: ${a.why}. Set a place in KDE's night time settings, or coordinates under Weather.`
+                : "Asking when night is…";
+        const now = Daylight.daylight ? "Day" : "Night";
+        const until = Daylight.next > 0
+            ? ` ${Daylight.daylight ? "Night" : "Day"} comes at ${Qt.formatTime(new Date(Daylight.next), "hh:mm")}.`
+            : "";
+        if (Daylight.source === "kde")
+            return `${now}, by KDE's night time schedule -- the one Night Light and Plasma follow.${until}`;
+        const reason = String(a.why ?? "").split(";")[0];
+        const place = root._placeSaid[a.location] ?? "where you are";
+        return `${now}, by the sun ${place}: ${reason}.${until}`;
+    }
+
     spacing: 12
 
     SectionLabel { text: "Colour scheme" }
@@ -31,7 +56,7 @@ Card {
 
         Repeater {
             model: [
-                { id: "auto", label: "Auto", sub: "Follows Plasma" },
+                { id: "auto", label: "Auto", sub: "Day and night" },
                 { id: "light", label: "Light", sub: "Always light" },
                 { id: "dark", label: "Dark", sub: "Always dark" }
             ]
@@ -121,12 +146,46 @@ Card {
             const now = `The shell is ${Theme.mode} now`;
             if (Theme.modeSetting !== "auto")
                 return `${now}, whatever Plasma does.`;
+            if (Daylight.known)
+                return `${now}: light by day, dark by night.`;
             const plasma = PlasmaColors.loaded ? `, because Plasma's colour scheme is ${Scheme.isDark(PlasmaColors.background.toString()) ? "dark" : "light"}` : "";
             return PlasmaColors.automaticLookAndFeel
                 ? `${now}${plasma}. Plasma switches between its light and dark theme by itself, and the shell follows it.`
-                : `${now}${plasma}. Plasma can also switch between a light and a dark theme by itself at sunset, and the shell will follow it: that is in Plasma's global theme settings.`;
+                : `${now}${plasma}: nothing says when night is, so the shell follows Plasma's colour scheme.`;
         }
         lineHeight: 1
+    }
+
+    // Whose sunset auto follows. Only auto has one, so the rest of the time
+    // this is drawn but not offered.
+    Column {
+        width: parent.width
+        spacing: 8
+        opacity: Theme.modeSetting === "auto" ? 1 : 0.45
+        enabled: Theme.modeSetting === "auto"
+
+        SectionLabel { text: "Day and night from" }
+
+        ConfigSegmented {
+            width: parent.width
+            values: ["kde", "shell"]
+            labels: ["KDE, else the shell", "Always the shell"]
+            path: "theme.daylight.source"
+            fallback: "kde"
+        }
+
+        Hint {
+            width: parent.width
+            text: root._daylightText()
+            lineHeight: 1
+        }
+    }
+
+    TextButton {
+        glyph: "bedtime"
+        iconName: "preferences-desktop-display-nightcolor"
+        text: "KDE's night time settings"
+        onActivated: PlasmaApplets.openSettings("kcm_nighttime")
     }
 
     TextButton {

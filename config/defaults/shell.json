@@ -2,6 +2,9 @@
     "schemaVersion": 2,
     "theme": {
         "mode": "auto",
+        "daylight": {
+            "source": "kde"
+        },
         "accent": "plasma",
         "translucent": true,
         "shadows": false,

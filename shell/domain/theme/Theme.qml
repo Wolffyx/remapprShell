@@ -5,11 +5,11 @@ pragma Singleton
 // Material Design 3 roles in a light and a dark scheme, from one accent.
 //
 // With `theme.mode` at "auto" the shell is light by day and dark by night, on
-// KWin's Night Light schedule -- the same sunset that warms the screen, so
-// there is no second clock deciding when night is. Plasma itself has no
-// automatic light/dark switching; its sunset belongs to the wallpaper. With
-// Night Light off there is no schedule to follow, and auto falls back to
-// turning dark exactly when the Plasma colour scheme is dark.
+// KDE's night time schedule -- the same sunset that warms the screen, so
+// there is no second clock deciding when night is. When KDE has no schedule,
+// or has lost its location, the sun at this machine's own place decides
+// instead (see Daylight). With nothing to say where that is, auto falls back
+// to turning dark exactly when the Plasma colour scheme is dark.
 //
 // PlasmaColors is still what reads the desktop; this turns what it read into
 // the shell's own palette. The arithmetic is in Scheme, where it is tested.
@@ -48,10 +48,10 @@ QtObject {
 
     // ---- which scheme ------------------------------------------------------
 
-    // "auto" follows Night Light's day and night when Night Light is on, and
-    // the Plasma colour scheme's own darkness when it is not.
+    // "auto" follows Daylight's day and night when it knows, and the Plasma
+    // colour scheme's own darkness when it does not.
     //
-    // Neither has answered in the first moments of a session: Night Light's
+    // Neither has answered in the first moments of a session: Daylight's
     // reply is still on its way, and kdeglobals has not been read. The
     // fallback palette in PlasmaColors is a dark one -- chosen so a shell that
     // cannot read the desktop is still legible -- so resolving "auto" against
@@ -66,12 +66,12 @@ QtObject {
     // So "auto" does not answer until something has: the last mode stands
     // until then, rather than a placeholder getting a vote.
     readonly property bool modeKnown: root.modeSetting !== "auto"
-                                      || PlasmaColors.loaded || NightLight.known
+                                      || PlasmaColors.loaded || Daylight.known
 
     readonly property string _resolvedMode: root.modeKnown
         ? Scheme.resolveMode(root.modeSetting,
                              PlasmaColors.background.toString(),
-                             NightLight.known ? NightLight.daylight : undefined)
+                             Daylight.known ? Daylight.daylight : undefined)
         : ""
 
     // Light while nothing is known, and not arbitrarily: of the two guesses
