@@ -80,6 +80,225 @@ check "theirs is untouched"               "$(kread kwinrulesrc theirs Descriptio
 check "nothing of ours in the ledger"     "$(ledger_count windows-games)" "0"
 check "still nothing reached KDE"         "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
 
+# Snap layouts are a KWin script of ours, switched through the same table.
+# On renders the whole package -- the QML and the layouts beside it -- and
+# sets KWin's plugin switch through the ledger; off takes both away again.
+# How the panel opens is a key in the script's own group, which stays as
+# chosen when the script is turned off and goes back with a revert.
+echo "== snap layouts =="
+SNAP_DIR="$XDG_DATA_HOME/kwin/scripts/$SLUG-snap"
+snap_status() { behave status --json | jq -r ".settings[] | select(.id==\"$1\") | .value"; }
+snap_refresh() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "$REPO_ROOT/scripts/windows.sh" snap refresh 2>&1; }
+
+check "off until it is set"               "$(snap_status snapLayouts)" "false"
+check "opens near the top by default"     "$(snap_status snapReveal)" "top"
+behave set snapLayouts true >/dev/null
+check "on: the package is installed" \
+    "$([ -f "$SNAP_DIR/contents/ui/main.qml" ] && [ -f "$SNAP_DIR/contents/ui/layouts.js" ] && echo yes)" "yes"
+check "its metadata names a QML script"   "$(jq -r '.KPlugin.Id + " " + ."X-Plasma-API"' "$SNAP_DIR/metadata.json")" \
+    "$SLUG-snap declarativescript"
+check "no placeholder left in it"         "$(grep -rlE '@[A-Z_]+@' "$SNAP_DIR" | wc -l)" "0"
+check "KWin loads it at login"            "$(kread kwinrc Plugins "$SLUG-snapEnabled")" "true"
+check "status reads it back"              "$(snap_status snapLayouts)" "true"
+check "a current package is left alone"   "$(snap_refresh)" ""
+printf '// changed\n' >> "$SNAP_DIR/contents/ui/Flyout.qml"
+snap_refresh >/dev/null
+check "a stale one is installed again" \
+    "$(cmp -s "$SNAP_DIR/contents/ui/Flyout.qml" "$REPO_ROOT/kwin/snap/contents/ui/Flyout.qml" && echo same)" "same"
+
+check "a reveal it does not have is refused" "$(behave set snapReveal sideways >/dev/null 2>&1; echo $?)" "1"
+behave set snapReveal drag >/dev/null
+check "reveal written to its own group"   "$(kread kwinrc "Script-$SLUG-snap" Reveal)" "drag"
+
+check "24 px from the top until it is set" "$(snap_status snapApproach)" "24"
+check "and a wait of 250 ms"              "$(snap_status snapDelay)" "250"
+check "no nearer than 4 px"               "$(behave set snapApproach 2 >/dev/null 2>&1; echo $?)" "1"
+check "no wait over a second"             "$(behave set snapDelay 1500 >/dev/null 2>&1; echo $?)" "1"
+behave set snapApproach 60 >/dev/null
+behave set snapDelay 0 >/dev/null
+check "the distance in the script's group" "$(kread kwinrc "Script-$SLUG-snap" Approach)" "60"
+check "and the wait"                      "$(kread kwinrc "Script-$SLUG-snap" Delay)" "0"
+check "status reads both back"            "$(snap_status snapApproach) $(snap_status snapDelay)" "60 0"
+
+check "Snap Assist on until it is set"    "$(snap_status snapAssist)" "true"
+check "and takes only true or false"      "$(behave set snapAssist maybe >/dev/null 2>&1; echo $?)" "1"
+behave set snapAssist false >/dev/null
+check "off, in the script's own group"    "$(kread kwinrc "Script-$SLUG-snap" Assist)" "false"
+check "status reads Snap Assist back"     "$(snap_status snapAssist)" "false"
+
+check "the gap is KWin's 4 until it is set" "$(snap_status tileGap)" "4"
+check "and takes only 0..64"              "$(behave set tileGap 65 >/dev/null 2>&1; echo $?)" "1"
+check "and no word"                       "$(behave set tileGap wide >/dev/null 2>&1; echo $?)" "1"
+behave set tileGap 0 >/dev/null
+check "a gap, in the script's own group"  "$(kread kwinrc "Script-$SLUG-snap" Gap)" "0"
+check "status reads the gap back"         "$(snap_status tileGap)" "0"
+
+# Meta+Z is a key of this project's, not a kwinrc key: the switch binds the
+# key the defaults ship, or unbinds it, in the profile and in KDE's file, as
+# `shortcuts set` and `clear` do.
+SNAP_PROFILE="$XDG_CONFIG_HOME/$SLUG/profiles/default/shell.json"
+check "Meta+Z on by default"              "$(snap_status snapKey)" "true"
+behave set snapKey false >/dev/null
+check "off: none in the profile"          "$(jq -r '.shortcuts.snap' "$SNAP_PROFILE")" "none"
+check "status reads the key back"         "$(snap_status snapKey)" "false"
+behave set snapKey true >/dev/null
+check "on: the shipped key again"         "$(jq -r '.shortcuts.snap' "$SNAP_PROFILE")" "Meta+Z"
+check "and in KDE's file, as ours"        "$(kread kglobalshortcutsrc "$SLUG" snap | cut -d, -f1)" "Meta+Z"
+check "the key's command needs a session" \
+    "$(env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "$REPO_ROOT/scripts/windows.sh" snap pick >/dev/null 2>&1; echo $?)" "1"
+# The command reaches the script by the name of a KWin action the script
+# registers: the two must agree, or the key does nothing and says nothing.
+check "the CLI and the script name the same action" \
+    "$(grep -oP '^SNAP_PICK_ACTION="\K[^"]+' "$REPO_ROOT/scripts/lib/windows/snap.sh")" \
+    "$(grep -oP 'property string pickAction: "\K[^"]+' "$REPO_ROOT/kwin/snap/contents/ui/Picker.qml")"
+behave set snapLayouts false >/dev/null
+check "off: the package is gone"          "$([ -d "$SNAP_DIR" ] && echo there || echo gone)" "gone"
+check "and KWin's switch is as it was"    "$(kread kwinrc Plugins "$SLUG-snapEnabled")" "<unset>"
+check "the reveal stays as chosen"        "$(snap_status snapReveal)" "drag"
+check "a refresh of nothing installed"    "$(snap_refresh; [ -d "$SNAP_DIR" ] && echo there || echo gone)" "gone"
+
+# Layouts of the user's own: a JSON list in the script's group, through the
+# ledger. layouts.js reads the same list and checks each tree as the CLI
+# does; tests/fixtures/snap-trees.json holds both to the same answers
+# (tst_SnapLayouts.qml reads it too).
+echo "== snap layouts of the user's own =="
+LAYOUTS=("$REPO_ROOT/scripts/windows.sh" snap layouts)
+layouts() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "${LAYOUTS[@]}" "$@" 2>&1; }
+refused() { layouts "$@" >/dev/null 2>&1; echo $?; }
+MAIN='{"dir":"h","parts":[0.6,{"size":0.4,"dir":"v","parts":[0.5,0.5]}]}'
+
+before=$(ledger_count windows-behaviour)
+check "none until one is saved"           "$(layouts status --json | jq -c .layouts)" "[]"
+check "and the limits are said"           "$(layouts status --json | jq -c '[.max, .minZone]')" "[6,0.15]"
+layouts save "Main and two" "$MAIN" >/dev/null
+check "saved, in the script's own group" \
+    "$(kread kwinrc "Script-$SLUG-snap" Layouts | jq -c '.[0] | [.name, .screen, .tree.parts[0]]')" '["Main and two","any",0.6]'
+check "listed with its zones"             "$(layouts status)" "$(printf 'Main and two\tany\t3 zones')"
+check "through the ledger"                "$(ledger_count windows-behaviour)" "$((before + 1))"
+layouts save "Main and two" '{"dir":"v","parts":[0.5,0.5]}' tall >/dev/null
+check "a name saved again is replaced"    "$(layouts status --json | jq -c '[.layouts[] | [.name, .screen, .tree.dir]]')" '[["Main and two","tall","v"]]'
+
+fixture_ok() { jq -c '.[] | select(.ok == '"$1"') | .tree' "$REPO_ROOT/tests/fixtures/snap-trees.json"; }
+while read -r tree; do
+    check "the CLI takes $tree" "$(refused save probe "$tree")" "0"
+done < <(fixture_ok true)
+while read -r tree; do
+    check "the CLI refuses $tree" "$(refused save refused "$tree")" "1"
+done < <(fixture_ok false)
+check "a refused layout is not saved"     "$(layouts status --json | jq -r '[.layouts[].name] | index("refused")')" "null"
+check "and says why"                      "$(layouts save small '{"dir":"h","parts":[0.9,0.1]}' | grep -c 'no more than 0.15')" "1"
+check "not JSON is refused"               "$(refused save broken '{dir:h')" "1"
+check "nor a screen it does not know"     "$(refused save sideways "$MAIN" sideways)" "1"
+check "nor an empty name"                 "$(refused save "" "$MAIN")" "1"
+check "nor one with a space at the end"   "$(refused save "trailing " "$MAIN")" "1"
+for n in 3 4 5 6; do layouts save "L$n" "$MAIN" >/dev/null; done
+check "six is the most"                   "$(layouts status --json | jq '.layouts | length')" "6"
+check "a seventh is refused"              "$(refused save L7 "$MAIN")" "1"
+check "but one saved again still is not"  "$(refused save L6 "$MAIN" wide)" "0"
+check "renamed in its place"              "$(layouts save L6b "$MAIN" any L6 >/dev/null; layouts status --json | jq -r '.layouts[5].name')" "L6b"
+check "but not to another's name"         "$(refused save L5 "$MAIN" any L6b)" "1"
+layouts remove L6b >/dev/null
+check "removed"                           "$(layouts status --json | jq -r '[.layouts[].name] | join(",")')" "Main and two,probe,L3,L4,L5"
+check "a name it does not have"           "$(refused remove nosuch)" "1"
+check "an unreadable list reads as none"  "$(kwriteconfig6 --file kwinrc --group "Script-$SLUG-snap" --key Layouts 'oops'; layouts status --json | jq -c .layouts)" "[]"
+layouts save "Main and two" "$MAIN" >/dev/null
+
+behave set snapLayouts true >/dev/null
+behave revert >/dev/null
+check "revert turns it off" \
+    "$([ -d "$SNAP_DIR" ] && echo there || echo gone):$(kread kwinrc Plugins "$SLUG-snapEnabled")" "gone:<unset>"
+check "and puts the reveal back"          "$(kread kwinrc "Script-$SLUG-snap" Reveal)" "<unset>"
+check "and Snap Assist"                   "$(kread kwinrc "Script-$SLUG-snap" Assist)" "<unset>"
+check "and how near and how long"         "$(kread kwinrc "Script-$SLUG-snap" Approach),$(kread kwinrc "Script-$SLUG-snap" Delay)" "<unset>,<unset>"
+check "and the gap"                       "$(kread kwinrc "Script-$SLUG-snap" Gap)" "<unset>"
+check "and the layouts of the user's own" "$(kread kwinrc "Script-$SLUG-snap" Layouts)" "<unset>"
+check "nothing of it in the ledger"       "$(ledger_count windows-snap)" "0"
+check "and still nothing reached KDE"     "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
+
+# Auto-tiling: kwin/tile. Off by default, and refused while another tiling
+# script is enabled. On, it ledgers three keys in a scope of its own -- its
+# plugin switch, its copy of the gap, and the snap layouts' AutoTile -- and
+# binds its keys where the profile leaves them unbound; off takes all of it
+# away again, and so does a revert.
+echo "== auto-tiling =="
+TILE_DIR="$XDG_DATA_HOME/kwin/scripts/$SLUG-tile"
+TILE_GROUP="Script-$SLUG-tile"
+tile_cli() { env "$NO_SESSION_VAR=1" PATH="$FAKES:$PATH" "$REPO_ROOT/scripts/windows.sh" tile "$@" 2>&1; }
+
+check "off until it is set"               "$(snap_status autoTile)" "false"
+check "and off by default"                "$(behave status --json | jq -r '.settings[] | select(.id=="autoTile") | .default')" "false"
+kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
+out=$(behave set autoTile true); status=$?
+check "refused while krohnkite is on"     "$status:$(printf '%s' "$out" | grep -c 'krohnkite is enabled')" "1:1"
+check "and nothing installed"             "$([ -d "$TILE_DIR" ] && echo there || echo gone):$(kread kwinrc Plugins "$SLUG-tileEnabled")" "gone:<unset>"
+kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled false
+
+behave set tileGap 6 >/dev/null
+behave set autoTile true >/dev/null
+check "on: the package is installed" \
+    "$([ -f "$TILE_DIR/contents/ui/main.qml" ] && [ -f "$TILE_DIR/contents/ui/dwindle.js" ] && echo yes)" "yes"
+check "the snap layouts' file, as a file" \
+    "$([ -f "$TILE_DIR/contents/ui/layouts.js" ] && [ ! -L "$TILE_DIR/contents/ui/layouts.js" ] \
+       && cmp -s "$TILE_DIR/contents/ui/layouts.js" "$REPO_ROOT/kwin/snap/contents/ui/layouts.js" && echo yes)" "yes"
+check "its metadata names a QML script"   "$(jq -r '.KPlugin.Id + " " + ."X-Plasma-API"' "$TILE_DIR/metadata.json")" \
+    "$SLUG-tile declarativescript"
+check "no placeholder left in it"         "$(grep -rlE '@[A-Z_]+@' "$TILE_DIR" | wc -l)" "0"
+check "KWin loads it at login"            "$(kread kwinrc Plugins "$SLUG-tileEnabled")" "true"
+check "status reads it back"              "$(snap_status autoTile)" "true"
+check "the gap, copied to its group"      "$(kread kwinrc "$TILE_GROUP" Gap)" "6"
+check "the snap layouts are told"         "$(kread kwinrc "Script-$SLUG-snap" AutoTile)" "true"
+behave set tileGap 2 >/dev/null
+check "and the gap follows a change"      "$(kread kwinrc "$TILE_GROUP" Gap)" "2"
+
+check "dwindle until another is chosen"   "$(snap_status autoTileLayout)" "dwindle"
+check "a layout it does not have"         "$(behave set autoTileLayout spiral >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileLayout master >/dev/null
+check "master, in the script's group"     "$(kread kwinrc "$TILE_GROUP" Layout)" "master"
+check "as many as fit until a most"       "$(snap_status autoTileMax)" "0"
+check "no more than sixteen"              "$(behave set autoTileMax 17 >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileMax 4 >/dev/null
+check "a most, in the script's group"     "$(kread kwinrc "$TILE_GROUP" Max)" "4"
+check "a share of 50% until set"          "$(snap_status autoTileRatio)" "50"
+check "no share under 20%"                "$(behave set autoTileRatio 10 >/dev/null 2>&1; echo $?)" "1"
+behave set autoTileRatio 60 >/dev/null
+check "status reads the share back"       "$(snap_status autoTileRatio)" "60"
+check "a key bound to each action" \
+    "$(jq -r '[.shortcuts | to_entries[] | select(.key | startswith("tile-")) | .value] | map(select(. != "" and . != "none")) | length' "$SNAP_PROFILE")" "14"
+check "focus left is Meta+Alt+Left, as ours" \
+    "$(kread kglobalshortcutsrc "$SLUG" tile-focus-left | cut -d, -f1)" "Meta+Alt+Left"
+check "a current package is left alone"   "$(tile_cli refresh)" ""
+printf '// changed\n' >> "$TILE_DIR/contents/ui/main.qml"
+tile_cli refresh >/dev/null
+check "a stale one is installed again" \
+    "$(cmp -s "$TILE_DIR/contents/ui/main.qml" "$REPO_ROOT/kwin/tile/contents/ui/main.qml" && echo same)" "same"
+check "a key's command needs a session"   "$(tile_cli focus left >/dev/null; echo $?)" "1"
+check "and a verb it has"                 "$(tile_cli spin left | grep -c 'not an auto-tiling action')" "1"
+
+# The keys reach the script by the names of KWin actions it registers: every
+# one the CLI knows must be one the script makes, or a key does nothing and
+# says nothing.
+cli_actions=$(grep -oP '\]="\KAuto Tile: [^"]+' "$REPO_ROOT/scripts/lib/windows/tile.sh" | sort)
+qml_actions=$(grep -oP 'name: "\KAuto Tile: [^"]+' "$REPO_ROOT/kwin/tile/contents/ui/main.qml" | sort)
+check "the CLI and the script name the same actions" "$cli_actions" "$qml_actions"
+check "fourteen of them"                  "$(printf '%s\n' "$cli_actions" | wc -l)" "14"
+check "each one a row of the action list" \
+    "$(grep -c $'^tile-[a-z-]*\t' "$REPO_ROOT/scripts/lib/shortcut-actions.tsv")" "14"
+
+behave set autoTile false >/dev/null
+check "off: the package is gone"          "$([ -d "$TILE_DIR" ] && echo there || echo gone)" "gone"
+check "and KWin's switch is as it was"    "$(kread kwinrc Plugins "$SLUG-tileEnabled")" "<unset>"
+check "the snap layouts snap again"       "$(kread kwinrc "Script-$SLUG-snap" AutoTile)" "<unset>"
+check "its copy of the gap goes too"      "$(kread kwinrc "$TILE_GROUP" Gap)" "<unset>"
+check "and the keys are unbound" \
+    "$(jq -r '[.shortcuts | to_entries[] | select(.key | startswith("tile-")) | .value] | unique | join(" ")' "$SNAP_PROFILE")" "none"
+
+behave set autoTile true >/dev/null
+behave revert >/dev/null
+check "revert turns it off" \
+    "$([ -d "$TILE_DIR" ] && echo there || echo gone):$(kread kwinrc Plugins "$SLUG-tileEnabled")" "gone:<unset>"
+check "nothing of it in the ledger"       "$(ledger_count windows-tile)" "0"
+check "and still nothing reached KDE"     "$([ -f "$SANDBOX/reached-kde.txt" ] && cat "$SANDBOX/reached-kde.txt" || echo none)" "none"
+
 # Closing a window writes the id into a KWin script's source, so anything
 # that is not exactly a uuid must be refused before it gets that far -- and
 # with no session, nothing may reach KWin at all.

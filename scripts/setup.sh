@@ -334,6 +334,7 @@ plan=$(
     printf '%s\n' "keys:       $(printf '%s ' $keys_chosen | sed 's/ $//'; [ -n "$keys_chosen" ] || printf none)"
     printf '%s\n' "windows:    $([ $windowlist = 0 ] && echo 'listed on the taskbar' || echo 'not listed')"
     printf '%s\n' "games:      placed like other windows (a KWin rule; Settings > Windows)"
+    printf '%s\n' "snapping:   layouts at the top of the screen while dragging (Settings > Windows)"
     printf '%s\n' "previews:   $([ $plugin = 0 ] && echo 'built' || echo 'not built')"
     printf '%s\n' "Alt+Tab:    $alttab"
     printf '%s\n' "theme:      $([ $theme = 0 ] && echo 'apply' || echo 'leave alone')"
@@ -371,6 +372,12 @@ esac
 # one they ask for is an edge. Not a question -- the settings page turns it
 # off, and an uninstall takes it out with the rest of KWin's behaviour.
 step "Steam games placed by KWin" "$REPO_ROOT/scripts/windows.sh" behaviour set placeGames true
+
+# On by default, as this project's own choice: Windows 11's snap layouts, a
+# panel at the top of the screen while a window is dragged. The zones are
+# KWin's tiles, so nothing of KWin's is replaced -- and the settings page
+# turns it off, as an uninstall does.
+step "snap layouts" "$REPO_ROOT/scripts/windows.sh" behaviour set snapLayouts true
 
 # --yes: the plan that said "built" was the question. deps.sh returns at once
 # when everything is there.

@@ -261,6 +261,31 @@ kwin_script_reload() {   # <id> <main.js>
     kwin_scripting start >/dev/null
 }
 
+# The same for a declarative (QML) script, which KWin loads by another call --
+# and from a copy of its own. KWin compiles a QML file once per path and keeps
+# it for as long as it runs: a script unloaded and loaded again from the same
+# path runs the code it had before (measured in the rig, KWin 6.8), so an
+# update reached nothing until the next login, and the snap layouts reloaded
+# by `make link` were the ones KWin had compiled at login. The copy is named
+# by what is in it, so new code is a new path. The installed package is still
+# what KWin loads at login, compiled afresh then; copies of older versions go
+# once the new one is loaded.
+KWIN_LOAD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/$SLUG/kwin"
+
+kwin_declarative_reload() {   # <id> <main.qml, inside the installed package>
+    local id=$1 pkg="$KWIN_SCRIPTS_DIR/$1" sum copy
+    sum=$(cd "$pkg" && find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -c1-12) || return 1
+    copy="$KWIN_LOAD_DIR/$id-$sum"
+    if [ ! -d "$copy" ]; then
+        mkdir -p "$KWIN_LOAD_DIR" && rm -rf "$copy.tmp" && cp -r "$pkg" "$copy.tmp" && mv "$copy.tmp" "$copy" \
+            || { log_error "could not copy $pkg to load it"; return 1; }
+    fi
+    kwin_scripting unloadScript "$id" >/dev/null
+    kwin_scripting loadDeclarativeScript "$copy/${2#"$pkg"/}" "$id" >/dev/null
+    kwin_scripting start >/dev/null
+    find "$KWIN_LOAD_DIR" -mindepth 1 -maxdepth 1 -name "$id-*" ! -path "$copy" -exec rm -rf {} +
+}
+
 # Whether KWin says the script is loaded, and when it does not, what that
 # means and where to look -- said the same way for every script.
 kwin_script_check_loaded() {   # <id> <what, e.g. "the edge script">
@@ -282,6 +307,45 @@ kwin_script_render() {   # <source dir> <destination dir> <what>
     render_template "$src/contents/code/main.js.in" "$dest/contents/code/main.js" \
         || { log_error "could not render $what"; return 1; }
     chmod 644 "$dest/metadata.json" "$dest/contents/code/main.js"
+}
+
+# Renders a whole package, for a script of more than one file: the metadata,
+# and everything under contents/ as it is, a *.in template rendered and named
+# without its .in, and a link copied as the file it points at -- auto-tiling
+# shares the snap layouts' layouts.js that way. Made beside the destination and moved into place, so KWin
+# never loads a package half copied.
+kwin_package_render() {   # <source dir> <destination dir> <what>
+    local src=$1 dest=$2 what=$3 tmp f rel
+    mkdir -p "$(dirname "$dest")"
+    tmp=$(mktemp -d "$(dirname "$dest")/.render.XXXXXX") \
+        || { log_error "could not render $what"; return 1; }
+    render_template "$src/metadata.json.in" "$tmp/metadata.json" \
+        || { log_error "could not render $what metadata"; rm -rf "$tmp"; return 1; }
+    while IFS= read -r -d '' f; do
+        rel=${f#"$src"/}
+        mkdir -p "$tmp/$(dirname "$rel")"
+        case "$f" in
+            *.in) render_template "$f" "$tmp/${rel%.in}" \
+                      || { log_error "could not render $what: $rel"; rm -rf "$tmp"; return 1; } ;;
+            *)    cp -L "$f" "$tmp/$rel" ;;
+        esac
+    done < <(find "$src/contents" \( -type f -o -type l \) -print0)
+    find "$tmp" -type f -exec chmod 644 {} +
+    rm -rf "$dest"
+    mv "$tmp" "$dest"
+}
+
+# Whether an installed package is what this checkout renders now: an update
+# that changes a script reaches KWin only if something installs it again.
+kwin_package_current() {   # <source dir> <installed dir>
+    local tmp rc=1
+    [ -d "$2" ] || return 1
+    tmp=$(mktemp -d) || return 1
+    if kwin_package_render "$1" "$tmp/pkg" "$(basename "$2")" 2>/dev/null; then
+        diff -rq "$tmp/pkg" "$2" >/dev/null 2>&1 && rc=0
+    fi
+    rm -rf "$tmp"
+    return "$rc"
 }
 
 # Runs a script once, from stdin, and takes it away again. For what only KWin

@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "@KWIN_SNAP_SCRIPT_ID@",
+        "Name": "@DISPLAY_NAME@ snap layouts",
+        "Description": "Drag a window to the top of a screen to pick a layout and a zone for it.",
+        "Icon": "view-split-left-right",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

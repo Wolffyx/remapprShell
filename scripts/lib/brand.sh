@@ -70,6 +70,13 @@ KWIN_SCRIPT_ID="$SLUG-windows"
 # read and says so in its own header, while an edge trigger acts. Separate
 # packages also mean enabling one does not enable the other.
 KWIN_EDGES_SCRIPT_ID="$SLUG-edges"
+# A third, and again its own package: snap layouts draw and move windows,
+# which neither of the others does, and are switched on and off by
+# themselves. Declarative (QML) where the other two are JS, since it draws.
+KWIN_SNAP_SCRIPT_ID="$SLUG-snap"
+# A fourth: automatic tiling, which arranges every window and is switched
+# on by itself -- never by setup -- so it is its own package too.
+KWIN_TILE_SCRIPT_ID="$SLUG-tile"
 SYSTEMD_UNIT="$SLUG.service"
 # Two look-and-feel packages, light and dark, because Plasma's own day/night
 # switch (kdeglobals [KDE] AutomaticLookAndFeel) swaps the *whole global theme*
@@ -195,6 +202,6 @@ export SLUG ALIAS DISPLAY_NAME APP_ID DBUS_NAME ENV_PREFIX SHELL_PACKAGE_ID \
        PLASMA_SHELLS_DIR PLASMA_LNF_DIR PLASMA_DESKTOPTHEME_DIR \
        KWIN_SWITCHER_DIR KWIN_SCRIPTS_DIR DBUS_SERVICES_DIR \
        COLORS_DIR APPLICATIONS_DIR \
-       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID KWIN_EDGES_SCRIPT_ID SYSTEMD_UNIT \
+       SESSION_BIN CTL_BIN WINDOWSD_BIN KWIN_SCRIPT_ID KWIN_EDGES_SCRIPT_ID KWIN_SNAP_SCRIPT_ID KWIN_TILE_SCRIPT_ID SYSTEMD_UNIT \
        LNF_PACKAGE_ID LNF_DARK_PACKAGE_ID PLASMA_SHELL_PACKAGE_ID \
        SAFE_MODE_VAR DEBUG_VAR NO_SESSION_VAR

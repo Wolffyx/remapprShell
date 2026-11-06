@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "@KWIN_TILE_SCRIPT_ID@",
+        "Name": "@DISPLAY_NAME@ auto-tiling",
+        "Description": "Tiles every window as it opens, each new one splitting the focused one, as Hyprland's dwindle layout does.",
+        "Icon": "view-grid",
+        "License": "GPL-3.0-or-later",
+        "Version": "@VERSION@",
+        "Website": "@REPO_FETCH@",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

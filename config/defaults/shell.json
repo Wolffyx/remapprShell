@@ -2,6 +2,9 @@
     "schemaVersion": 2,
     "theme": {
         "mode": "auto",
+        "daylight": {
+            "source": "kde"
+        },
         "accent": "plasma",
         "translucent": true,
         "shadows": false,
@@ -248,6 +251,21 @@
         "overview-reverse": "",
         "screenshot": "",
         "screenshot-screen": "",
-        "screenshot-window": ""
+        "screenshot-window": "",
+        "snap": "Meta+Z",
+        "tile-focus-left": "",
+        "tile-focus-right": "",
+        "tile-focus-up": "",
+        "tile-focus-down": "",
+        "tile-move-left": "",
+        "tile-move-right": "",
+        "tile-move-up": "",
+        "tile-move-down": "",
+        "tile-swap-left": "",
+        "tile-swap-right": "",
+        "tile-swap-up": "",
+        "tile-swap-down": "",
+        "tile-float": "",
+        "tile-desktop": ""
     }
 }

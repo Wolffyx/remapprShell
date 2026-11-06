@@ -38,7 +38,8 @@ How the shell itself looks -- light or dark, its accent, its corners -- and the 
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto is light by day and dark by night, on KWin's Night Light schedule -- the same sunset that warms your screen, set in System Settings under Display and Monitor. Plasma has no light/dark switching of its own (its sunset switching is for wallpapers), so with Night Light turned off there is no schedule to follow and auto instead turns dark whenever the Plasma colour scheme is dark, following it the moment it changes. light and dark hold it where they say. |
+| `theme.mode` | `auto`, `light`, `dark` | `auto` | auto is light by day and dark by night, on KDE's night time schedule -- the same sunset that warms your screen -- or the sun at your own place when KDE has none (see Day and night from). With no schedule and no place to work one out from, auto instead turns dark whenever the Plasma colour scheme is dark, following it the moment it changes. light and dark hold it where they say. |
+| `theme.daylight.source` | `kde`, `shell` | `kde` | Whose sunset auto follows. kde is KDE's own night time schedule -- the one Night Light and Plasma's dark-at-night switch use -- and the shell works out the sun itself only when KDE has none: night time uninstalled or not running, or stuck on its fallback 18:00 and 06:00 because it could not find your location at login. shell always works it out itself, from the sun at the place GeoClue gives (the last place it gave, when it is slow to answer), or weather.coordinates. Nothing is looked up on the internet for this. |
 | `theme.accent` | `plasma`, `blue`, `teal`, `magenta`, `orange` | `plasma` | plasma is Plasma's own accent colour, which System Settings can also take from the wallpaper. Every other colour the shell uses is worked out from this one, in Material Design's roles. A colour written as #rrggbb is accepted too. |
 | `theme.translucent` | `true` or `false` | `true` | The panel and its popouts let a little of what is behind them through. Off draws them solid. |
 | `theme.shadows` | `true` or `false` | `false` | A soft shadow under the panel, its popouts, the start menu and the on-screen display. Off by default: a shadow is a band of dimmed wallpaper around a surface whose own background is blurred, and on a dark desktop the join between the two reads as a second panel behind the first. |
@@ -125,19 +126,26 @@ What this shell draws on the desktop itself: a rounded frame over the screen's c
 
 ### Weather
 
-Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key), and a place you have not named is looked up once from this machine's IP address.
+Where the weather comes from. Off until you turn it on, because it is the one part of this shell that talks to the internet: forecasts come from Open-Meteo (no account, no key). A place you have not named is asked of the OS first -- GeoClue, the location service KDE's night time uses -- and only when the OS cannot say is it looked up once from this machine's IP address.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `weather.enabled` | `true` or `false` | `false` | Fetches a forecast for your place. Nothing is sent but the coordinates being asked about; nothing is stored but the answer, in memory. |
-| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the place is worked out once from this machine's IP address, which is a guess a network can get wrong; naming it is exact and asks nobody. |
+| `weather.place` | text | `` | A town or city to look up -- "Cluj-Napoca", "Lisbon". Left empty, the OS's own location service (GeoClue) says where you are, and only without one is the place guessed once from this machine's IP address -- a guess a network can get wrong. Naming it is exact and asks nobody. |
 | `weather.coordinates` | text | `` | "46.77,23.60" -- latitude, longitude. Set, this wins over the place and no lookup of any kind is made. |
 | `weather.units` | `metric`, `imperial` | `metric` | Celsius and km/h, or Fahrenheit and mph. |
 | `weather.refresh` | a number, 10 to 360 | `30` | Minutes between forecasts. The forecast itself changes hourly at best. |
 
 ### Windows
 
-What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's own settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Window gaps, rounded window corners and tiling layouts are not KWin's to give, and are not offered here.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Tiling has a page of its own. Rounded window corners are not KWin's to give, and are not offered here.
+
+No individual settings: this is a page in the settings window rather than a
+list of values.
+
+### Tiling
+
+Windows in KWin's own tiles, the ones Meta+T edits: auto-tiling -- off unless turned on -- which tiles every window as it opens in Hyprland's dwindle layout; snap layouts, a panel at the top of the screen while a window is dragged or on Meta+Z, and Snap Assist after a snap; layouts of your own for that panel, drawn here; and the gap around a tiled window. Written through the ledger by `rmpr windows behaviour` and `rmpr windows snap layouts`, so every change can be undone.
 
 No individual settings: this is a page in the settings window rather than a
 list of values.
@@ -214,7 +222,7 @@ list of values.
 
 ### Shortcuts
 
-Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu and Meta+Space the search by default.
+Every global shortcut this shell can take, and what each is bound to. The keys are part of this shell's configuration, so a preset or profile carries them, and the session daemon applies them at every login -- taking a configured key back from anything that grabbed it meanwhile, as KRunner does with Meta+Space. An empty value leaves that action to KDE's own shortcut settings; 'none' keeps it unbound. Meta opens the menu, Meta+Space the search and Meta+Z the snap layouts by default; auto-tiling's keys are bound when it is turned on.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
@@ -232,6 +240,21 @@ Every global shortcut this shell can take, and what each is bound to. The keys a
 | `shortcuts.screenshot` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 | `shortcuts.screenshot-screen` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
 | `shortcuts.screenshot-window` | text | `` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it. |
+| `shortcuts.snap` | text | `Meta+Z` | The key, as KDE writes it ("Meta+Space", "Meta+/"). Empty leaves it to KDE's shortcut settings; "none" keeps it unbound. `rmpr shortcuts set` and the Shortcuts page write it, and so does Settings > Tiling, which binds Meta+Z or unbinds it. It does nothing while snap layouts are off. |
+| `shortcuts.tile-focus-left` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Left, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-focus-right` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Right, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-focus-up` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Up, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-focus-down` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Down, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-move-left` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Left, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-move-right` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Right, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-move-up` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Up, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-move-down` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Shift+Down, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-swap-left` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Left, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-swap-right` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Right, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-swap-up` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Up, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-swap-down` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Ctrl+Alt+Down, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-float` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+Space, and turning it off unbinds it. It does nothing while auto-tiling is off. |
+| `shortcuts.tile-desktop` | text | `` | The key, as KDE writes it. Turning auto-tiling on (Settings > Tiling) binds it, when nothing is, to Meta+Alt+T, and turning it off unbinds it. It does nothing while auto-tiling is off. |
 
 ### Lock & session
 

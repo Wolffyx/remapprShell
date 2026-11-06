@@ -1,0 +1,20 @@
+[
+  {"why": "halves", "ok": true, "tree": {"dir": "h", "parts": [0.5, 0.5]}},
+  {"why": "thirds, as written by hand", "ok": true, "tree": {"dir": "h", "parts": [0.3333, 0.3333, 0.3334]}},
+  {"why": "a stack beside a column", "ok": true, "tree": {"dir": "h", "parts": [0.6, {"size": 0.4, "dir": "v", "parts": [0.5, 0.5]}]}},
+  {"why": "three deep", "ok": true, "tree": {"dir": "v", "parts": [0.5, {"size": 0.5, "dir": "h", "parts": [0.5, {"size": 0.5, "dir": "v", "parts": [0.4, 0.6]}]}]}},
+  {"why": "narrow zones, as narrow as the editor draws them", "ok": true, "tree": {"dir": "h", "parts": [0.155, 0.69, 0.155]}},
+  {"why": "a hair over KWin's smallest", "ok": true, "tree": {"dir": "v", "parts": [0.1501, 0.8499]}},
+  {"why": "exactly KWin's smallest, which it does not make", "ok": false, "tree": {"dir": "h", "parts": [0.15, 0.7, 0.15]}},
+  {"why": "six across", "ok": false, "tree": {"dir": "h", "parts": [0.1, 0.18, 0.18, 0.18, 0.18, 0.18]}},
+  {"why": "a zone too short, deep inside", "ok": false, "tree": {"dir": "h", "parts": [0.5, {"size": 0.5, "dir": "v", "parts": [0.9, 0.1]}]}},
+  {"why": "a zone too narrow by the product of its shares", "ok": false, "tree": {"dir": "h", "parts": [0.3, {"size": 0.7, "dir": "v", "parts": [0.5, {"size": 0.5, "dir": "h", "parts": [0.8, 0.2]}]}]}},
+  {"why": "one zone is no layout", "ok": false, "tree": {"dir": "h", "parts": [1]}},
+  {"why": "parts that do not add up", "ok": false, "tree": {"dir": "h", "parts": [0.5, 0.4]}},
+  {"why": "a split the same way as its parent", "ok": false, "tree": {"dir": "h", "parts": [0.5, {"size": 0.5, "dir": "h", "parts": [0.5, 0.5]}]}},
+  {"why": "no direction", "ok": false, "tree": {"dir": "x", "parts": [0.5, 0.5]}},
+  {"why": "a part with no size", "ok": false, "tree": {"dir": "h", "parts": [0.5, {"dir": "v", "parts": [0.5, 0.5]}]}},
+  {"why": "a negative part", "ok": false, "tree": {"dir": "h", "parts": [1.5, -0.5]}},
+  {"why": "a string for a part", "ok": false, "tree": {"dir": "h", "parts": [0.5, "0.5"]}},
+  {"why": "not a tree", "ok": false, "tree": [0.5, 0.5]}
+]

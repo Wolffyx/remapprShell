@@ -360,6 +360,27 @@ TestCase {
         compare(WindowEvents.reachesEdge([at("span", 0, 0, 4000, 2560, { output: "DP-2" })], "d1", dp2, "bottom", 66), true);
     }
 
+    // The report: a window tiled into the bottom half left the panel
+    // floating. KWin keeps it its 4 px of tile padding short of the tile, so
+    // short of the reserved space; its tile is what reaches the edge.
+    function test_a_window_tiled_against_the_panel_reaches_the_edge() {
+        const tile = { x: 0, y: 1727, width: 2560, height: 687 };
+        compare(WindowEvents.reachesEdge([at("bottom", 4, 1731, 2552, 679)], "d1", dp2, "bottom", 66), false);
+        compare(WindowEvents.reachesEdge([at("bottom", 4, 1731, 2552, 679, { tile: tile })], "d1", dp2, "bottom", 66), true);
+        // Tiled into the top half, it is clear of the panel however it is
+        // counted.
+        compare(WindowEvents.reachesEdge([at("top", 4, 1044, 2552, 679, { tile: { x: 0, y: 1040, width: 2560, height: 687 } })],
+                                         "d1", dp2, "bottom", 66), false);
+    }
+
+    function test_the_tile_is_read() {
+        const tiled = WindowEvents.parseList(JSON.stringify([windowJson({ tile: { x: 0, y: 540, width: 1920, height: 540 } })]))[0];
+        compare(tiled.tile, { x: 0, y: 540, width: 1920, height: 540 });
+        compare(WindowEvents.parseList(JSON.stringify([windowJson()]))[0].tile, null);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson({ tile: { x: 0, y: 540, width: 0, height: 540 } })]))[0].tile, null);
+        compare(WindowEvents.parseList(JSON.stringify([windowJson({ tile: "left" })]))[0].tile, null);
+    }
+
     // A window from a script too old to say which monitor it is on is on
     // none of them.
     function test_a_window_on_no_monitor_reaches_no_edge() {

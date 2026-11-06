@@ -5,9 +5,65 @@
 # Sourced by theme.sh, never executed. Requires brand.sh, log.sh, kconfig.sh,
 # config.sh and kwin.sh -- and the other files beside this one.
 
-# `night_light_daylight`, `night_light_wait` and the rest of KWin's Night
-# Light live in kwin.sh: doctor asks the same question, and one copy of it is
-# one answer.
+# Whether the sun is up is daylight.py's: KDE's night time schedule first --
+# KNightTime, or KWin's Night Light on a Plasma without it -- and the sun at
+# this machine's own place when KDE has none or has lost its location. One
+# copy of that chain is one answer: the shell asks it through `theme
+# daylight` too, so the panel and the applications cannot disagree about
+# when night is.
+
+DAYLIGHT_HELPER="$REPO_ROOT/scripts/lib/daylight.py"
+
+# The helper's answer, as JSON. `theme.daylight.source` decides whether KDE
+# is asked first; `weather.coordinates` is the place of last resort, and the
+# place GeoClue gave last is kept in the state directory for a login it is
+# too slow for -- which is the login KDE loses its location at.
+daylight_json() {   # [seconds]
+    local bus=()
+    session_available || bus=(--no-bus)
+    python3 "$DAYLIGHT_HELPER" "${bus[@]+"${bus[@]}"}" \
+        --prefer "$(config_get '.theme.daylight.source' 'kde')" \
+        --coordinates "$(config_get '.weather.coordinates' '')" \
+        --cache "$STATE_DIR/daylight-place.json" \
+        --desktop-id "$SLUG" \
+        --timeout "${1:-5}"
+}
+
+# "true", "false", or nothing when nothing knows.
+daylight_now() {   # [seconds]
+    daylight_json "${1:-5}" 2>/dev/null | jq -r 'if .known then (.daylight | tostring) else "" end' 2>/dev/null
+}
+
+# `theme daylight --where`: where this machine is, from GeoClue or the place
+# it gave last, as JSON -- the weather's first question, before it asks the
+# internet. Exits 3 when the OS cannot say.
+theme_where() {
+    local bus=()
+    session_available || bus=(--no-bus)
+    python3 "$DAYLIGHT_HELPER" --locate "${bus[@]+"${bus[@]}"}" \
+        --cache "$STATE_DIR/daylight-place.json" \
+        --desktop-id "$SLUG" \
+        --timeout 10
+}
+
+# `theme daylight [--json]`: whether it is day, who said so, and when that
+# changes. The shell runs this; a person reads the plain form.
+theme_daylight() {
+    local out rc
+    [ "$WITH_WHERE" = 1 ] && { theme_where; exit $?; }
+    out=$(daylight_json 5); rc=$?
+    [ -n "$out" ] || die "the daylight helper gave no answer (exit $rc)"
+    if [ "$WITH_JSON" = 1 ]; then
+        printf '%s\n' "$out"
+        return 0
+    fi
+    jq -r '
+        (if .known then (if .daylight then "day" else "night" end) else "unknown" end) as $now
+        | "now:      \($now)",
+          "said by:  \(if .source == "" then "nobody" else .source end)\(if .location != "" and .location != "kde" then " (place: \(.location))" else "" end)",
+          "changes:  \(if .next > 0 then (.next / 1000 | strflocaltime("%a %H:%M")) else "-" end)",
+          "why:      \(.why)"' <<< "$out"
+}
 
 # Whether the colour scheme on the desktop right now is a dark one, by the
 # luminance of the window background -- the same question `Scheme.resolveMode`
@@ -28,7 +84,7 @@ scheme_darkness() {
 # Scheme.resolveMode; this is the same question for the applications.
 #
 # `theme.mode` is the user's, and light and dark are answers in themselves.
-# `auto` follows Night Light. With nothing to follow it answers whatever the
+# `auto` follows the daylight chain above. With nothing to follow it answers whatever the
 # desktop is already wearing -- which the caller's own "already in x" check
 # then turns into doing nothing at all.
 #
@@ -42,7 +98,7 @@ resolve_variant() {
     case "$mode" in
         light|dark) printf '%s' "$mode"; return 0 ;;
     esac
-    case "$(night_light_wait)" in
+    case "$(daylight_now 5)" in
         true)  printf 'light' ;;
         false) printf 'dark' ;;
         *)     scheme_darkness ;;
@@ -64,9 +120,10 @@ theme_variant() {   # [light|dark|auto], and --if-following in $IF_FOLLOWING
 
     case "${1:-}" in
         "")
-            nl=$(night_light_daylight)
+            nl=$(daylight_json 5 2>/dev/null)
+            [ -n "$nl" ] || nl='{"known":false}'
             printf 'theme.mode:   %s\n' "$(config_get '.theme.mode' 'auto')"
-            printf 'night light:  %s\n' "$([ -n "$nl" ] && printf '%s' "$([ "$nl" = true ] && echo daylight || echo night)" || printf 'off or unavailable')"
+            printf 'daylight:     %s\n' "$(jq -r 'if .known then "\(if .daylight then "day" else "night" end), from \(.source)" else "nobody knows" end' <<< "$nl" 2>/dev/null)"
             printf 'resolved:     %s\n' "$(resolve_variant)"
             case "$(lnf_pair_state)" in
                 ours)   printf 'switched by:  Plasma, between our two packages\n' ;;

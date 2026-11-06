@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs qmllint over the project's QML.
 #
-# With no arguments it covers shell/ and theme/. The theme QML is drawn by
+# With no arguments it covers shell/, theme/ and kwin/. The theme QML is drawn by
 # Plasma rather than by us -- the OSD, the window switcher -- which makes it
 # more important to lint, not less: a syntax error there means Alt+Tab silently
 # does nothing, with nothing in our own journal to say why.
@@ -81,7 +81,7 @@ render_templates() {
             log_error "$src: unresolved placeholders"
             failed=$((failed + 1))
         fi
-    done < <(find shell theme -name '*.qml.in' -type f | sort)
+    done < <(find shell theme kwin -name '*.qml.in' -type f | sort)
 }
 
 failed=0
@@ -148,7 +148,7 @@ lint_batch() {
 mapfile -t files < <(if [ $# -gt 0 ]; then
                          printf '%s\n' "$@"
                      else
-                         find shell theme share -name '*.qml' -type f | sort
+                         find shell theme share kwin -name '*.qml' -type f | sort
                          render_templates
                      fi)
 lint_batch

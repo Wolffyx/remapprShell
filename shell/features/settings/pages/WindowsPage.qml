@@ -8,9 +8,10 @@ pragma ComponentBehavior: Bound
 // through `rmpr windows behaviour`, so every change is ledgered and
 // `revert` puts the desktop back.
 //
-// What the mockup showed and KWin does not have -- window gaps, rounded
-// window corners, a tiling layout of its own -- is not offered. Saying so is
-// more use than a control that writes a key nothing reads.
+// What the mockup showed and KWin does not have -- rounded window corners --
+// is not offered. Saying so is more use than a control that writes a key
+// nothing reads. Tiling -- auto-tiling, snap layouts, the gap -- is a page
+// of its own, TilingPage.
 
 import QtQuick
 import qs.platform.kde
@@ -31,7 +32,6 @@ Column {
     }
 
     readonly property var settings: root.ctl.state?.settings ?? []
-    readonly property var tilingScripts: root.ctl.state?.tilingScripts ?? []
 
     function valueOf(id, fallback) {
         return (root.settings.find(s => s.id === id)?.value) ?? fallback;
@@ -155,25 +155,6 @@ Column {
             iconName: "preferences-system-windows"
             text: "Window decorations…"
             onActivated: PlasmaApplets.openSettings("kcm_kwindecoration")
-        }
-    }
-
-    Card {
-        width: root.width
-
-        SectionLabel { text: "Tiling" }
-
-        Hint {
-            text: root.tilingScripts.length > 0
-                ? `A tiling script is running: ${root.tilingScripts.join(", ")}. It arranges windows itself, and a window dragged to an edge may go to it rather than to KWin's snapping.`
-                : "KWin has no tiling layouts of its own: it has snapping at the edges, and custom tiles under Meta+T. Gaps between windows and rounded window corners come from a tiling script, not from a shell, so nothing here pretends to set them."
-        }
-
-        TextButton {
-            glyph: "tune"
-            iconName: "preferences-system-windows-actions"
-            text: "Plasma's window behaviour…"
-            onActivated: PlasmaApplets.openSettings("kcm_kwinoptions")
         }
     }
 

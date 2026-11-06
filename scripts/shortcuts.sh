@@ -2,17 +2,23 @@
 # Global shortcuts.
 #
 #   status              what is bound, and what would conflict
-#   set <action> <key>  bind a key   (launcher, search, settings, ask, clipboard,
+#   set <action> <key> [<action> <key>...]
+#                       bind keys    (launcher, search, settings, ask, clipboard,
 #                                     sidebar, keys, switcher, switcher-reverse,
 #                                     overview, overview-reverse, screenshot,
-#                                     screenshot-screen, screenshot-window)
-#   clear <action>      unbind one
+#                                     screenshot-screen, screenshot-window,
+#                                     snap, and auto-tiling's: tile-focus-*,
+#                                     tile-move-*, tile-swap-* -- each with
+#                                     left, right, up or down -- tile-float,
+#                                     tile-desktop)
+#   clear <action>...   unbind them
 #   sync [--quiet]      make KDE's shortcuts match the shell's configuration
 #   migrate             move keys off the old desktop-file entries
 #   revert              undo everything this project bound
 #
 # The keys are the shell's configuration: `shortcuts.<action>` in the profile,
-# with Meta for the menu and Meta+Space for search shipped as the defaults. A
+# with Meta for the menu, Meta+Space for search and Meta+Z for the snap layouts
+# shipped as the defaults. A
 # key there is enforced -- `sync` takes it from whoever holds it, and the
 # session daemon runs `sync` whenever it starts, so a key another program
 # took back while the shell was not looking (KRunner and Meta+Space) is ours
@@ -153,38 +159,54 @@ case "$cmd" in
         kconfig_ledger_summary shortcuts
         ;;
 
+    # One pair or several: auto-tiling binds fourteen keys at once, and a
+    # process, a reload of the keys and a write of the profile a key took
+    # seconds -- the shell re-read its configuration fourteen times.
     set)
-        action=${1:?usage: $ALIAS shortcuts set <action> <key>}
-        key=${2:?usage: $ALIAS shortcuts set <action> <key>}
-        valid_action "$action" || die "unknown action '$action' (one of: ${ACTIONS[*]})"
-
-        # A key this machine cannot convert to kglobalaccel's integer is
-        # refused here rather than written. The write itself always succeeds
-        # -- it is a line in a file -- so binding an unconvertible key used to
-        # report success and grab nothing, which is indistinguishable from a
-        # key another component is holding.
-        accel_keycode "$key" >/dev/null \
-            || die "'$key' is not a key this can bind -- write it as kglobalaccel does (Meta+Shift+S, Meta+/, Meta+Print)"
+        [ $# -ge 2 ] && [ $(( $# % 2 )) -eq 0 ] \
+            || die "usage: $ALIAS shortcuts set <action> <key> [<action> <key>...]"
+        pairs=("$@")
+        for (( i = 0; i < ${#pairs[@]}; i += 2 )); do
+            action=${pairs[i]} key=${pairs[i + 1]}
+            valid_action "$action" || die "unknown action '$action' (one of: ${ACTIONS[*]})"
+            # A key this machine cannot convert to kglobalaccel's integer is
+            # refused here rather than written. The write itself always
+            # succeeds -- it is a line in a file -- so binding an
+            # unconvertible key used to report success and grab nothing,
+            # which is indistinguishable from a key another component is
+            # holding.
+            accel_keycode "$key" >/dev/null \
+                || die "'$key' is not a key this can bind -- write it as kglobalaccel does (Meta+Shift+S, Meta+/, Meta+Print)"
+        done
 
         # Taken from whoever holds it, each named as it goes (accel_take), so
         # the key does not end up claimed twice with the winner left to chance.
         # The old desktop-file entry is one of those holders, so binding a key
         # that used to live there takes it back without a separate step.
-        ACCEL_FRIENDLY_HINT=$(action_label "$action")
-        accel_take shortcuts "$key" "$COMPONENT" "$action" replace
+        for (( i = 0; i < ${#pairs[@]}; i += 2 )); do
+            action=${pairs[i]} key=${pairs[i + 1]}
+            ACCEL_FRIENDLY_HINT=$(action_label "$action")
+            accel_take shortcuts "$key" "$COMPONENT" "$action" replace
+            log_step "$action ($ACCEL_FRIENDLY_HINT) -> $key"
+        done
         accel_reload
-        configure_key "$action" "$key"
-        log_step "$action ($(action_label "$action")) -> $key"
+        configure_keys "$(jq -n -c '$ARGS.positional as $p
+                                    | [range(0; $p | length; 2) as $i | {($p[$i]): $p[$i + 1]}] | add' \
+                                --args "${pairs[@]}")"
         ;;
 
     clear)
-        action=${1:?usage: $ALIAS shortcuts clear <action>}
-        valid_action "$action" || die "unknown action '$action'"
-        ACCEL_FRIENDLY_HINT=$(action_label "$action")
-        accel_clear shortcuts "$COMPONENT" "$action"
+        [ $# -ge 1 ] || die "usage: $ALIAS shortcuts clear <action> [<action>...]"
+        for action in "$@"; do
+            valid_action "$action" || die "unknown action '$action'"
+        done
+        for action in "$@"; do
+            ACCEL_FRIENDLY_HINT=$(action_label "$action")
+            accel_clear shortcuts "$COMPONENT" "$action"
+            log_step "$action unbound"
+        done
         accel_reload
-        configure_key "$action" none
-        log_step "$action unbound"
+        configure_keys "$(jq -n -c '[$ARGS.positional[] | {(.): "none"}] | add' --args "$@")"
         ;;
 
     # KDE made to match the configuration. Only what differs is touched, and

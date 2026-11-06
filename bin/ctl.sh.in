@@ -18,7 +18,7 @@ usage: @ALIAS@ <command> [options]
   uninstall [--purge|--dry-run]     take the shell off, and give Plasma back its own
   reinstall [--fresh|--yes|--dry-run]  take it off and set it up again, running at the end
   renderer status|list|set|revert   choose what draws the panel
-  theme apply|revert|variant|osd|style|status  the look and feel, light or dark, which OSD draws
+  theme apply|revert|variant|daylight|osd|style|status  the look and feel, light or dark, day or night, which OSD draws
   report create|list|show|remove    write a local diagnostic report
   ask [--last-notification|--crash] hand a redacted report to an assistant (opt-in)
   crash list|show|remove            crashes quickshell caught and systemd did not
