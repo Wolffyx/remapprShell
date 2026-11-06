@@ -78,7 +78,13 @@ check "and says so"                       "$(jq -c '[.known, .source]' <<< "$out
 out=$(python3 "$HELPER" --now "$NOON" --coordinates "38.72,-9.14" 2>/dev/null); rc=$?
 check "typed coordinates answer"          "$rc" "0"
 check "with the sun's answer"             "$(jq -c '[.known, .daylight, .source, .location]' <<< "$out")" '[true,true,"shell","coordinates"]'
-contains "and why KDE was passed over"    "$(jq -r .why <<< "$out")" "night time service"
+# Without python-gobject the helper cannot reach a bus to find KDE missing,
+# and says that first -- which is what CI's container, with no GObject, sees.
+if python3 -c "import gi" 2>/dev/null; then
+    contains "and why KDE was passed over" "$(jq -r .why <<< "$out")" "night time service"
+else
+    contains "and why KDE was passed over" "$(jq -r .why <<< "$out")" "python-gobject is not installed"
+fi
 
 CACHE="$SANDBOX/state/daylight-place.json"
 mkdir -p "$(dirname "$CACHE")"

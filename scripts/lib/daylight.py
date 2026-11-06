@@ -121,17 +121,21 @@ def next_change(lat, lon, now):
     step = 5 * 60000
     before = now
     for after in range(now + step, now + 2 * DAY_MS, step):
-        if is_up(lat, lon, after) == up:
-            before = after
-            continue
-        while after - before > 1000:
-            middle = (before + after) // 2
-            if is_up(lat, lon, middle) == up:
-                before = middle
-            else:
-                after = middle
-        return after
+        if is_up(lat, lon, after) != up:
+            return narrow(lambda ms: is_up(lat, lon, ms) == up, before, after)
+        before = after
     return 0
+
+
+def narrow(unchanged, before, after):
+    """The first second after `before` where `unchanged` stops being true."""
+    while after - before > 1000:
+        middle = (before + after) // 2
+        if unchanged(middle):
+            before = middle
+        else:
+            after = middle
+    return after
 
 
 def sun_answer(lat, lon, now, location, why):
