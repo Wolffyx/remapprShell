@@ -55,31 +55,55 @@ QtObject {
         return root._monitors[0] ?? null;
     }
 
-    // The rows someone has added, normalised: a label, a command, and an icon.
+    // The rows someone has added, normalised: a label, an icon, and what to
+    // do -- an installed application to open (`app`, a desktop entry id), or
+    // a command line to run.
     //
-    // An entry with no label or no command is dropped rather than drawn, since
-    // a nameless row and a row that runs nothing are both a menu that looks
-    // broken. Hand-editing the profile is a supported way to set these, so
-    // this has to survive whatever is in the file.
+    // An application row may leave its label out: it is called what the
+    // application calls itself, and drawn with its icon. One that is no
+    // longer installed is dropped, as is an entry with no label or nothing to
+    // run, since a nameless row and a row that does nothing are both a menu
+    // that looks broken. Hand-editing the profile is a supported way to set
+    // these, so this has to survive whatever is in the file.
     readonly property var entries: {
         const raw = ConfigStore.value("panel.menu.entries", []);
         if (!Array.isArray(raw))
             return [];
-        const out = [];
-        for (const item of raw) {
-            if (!item || typeof item !== "object")
-                continue;
-            const label = String(item.label ?? "").trim();
-            const command = String(item.command ?? "").trim();
-            if (label.length === 0 || command.length === 0)
-                continue;
-            out.push({
-                label: label,
-                command: command,
-                glyph: String(item.glyph ?? "").trim() || "terminal"
-            });
+        return raw.map(item => root._normalise(item)).filter(e => e !== null);
+    }
+
+    function _normalise(item) {
+        if (!item || typeof item !== "object")
+            return null;
+        const appId = String(item.app ?? "").trim();
+        if (appId.length > 0)
+            return root._appRow(item, appId);
+        const label = String(item.label ?? "").trim();
+        const command = String(item.command ?? "").trim();
+        if (label.length === 0 || command.length === 0)
+            return null;
+        return { label: label, command: command, app: "", icon: "",
+                 glyph: String(item.glyph ?? "").trim() || "terminal" };
+    }
+
+    function _appRow(item, appId) {
+        const entry = WindowsService.entryById(appId);
+        if (!entry)
+            return null;
+        return { label: String(item.label ?? "").trim() || entry.name || appId, command: "",
+                 app: String(entry.id), icon: String(entry.icon ?? ""),
+                 glyph: String(item.glyph ?? "").trim() };
+    }
+
+    // What a row does when chosen: open its application, or run its line.
+    function activate(row): void {
+        if (!row)
+            return;
+        if (row.app) {
+            WindowsService.launch(row.app, null);
+            return;
         }
-        return out;
+        root.runEntry(row.command);
     }
 
     // Run one of them. Detached, so a script that keeps running is not tied to

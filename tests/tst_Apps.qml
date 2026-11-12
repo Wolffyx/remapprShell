@@ -132,4 +132,23 @@ google-chrome.desktop
         compare(Apps.parseQueriedDefaults("").length, 0);
         compare(Apps.parseQueriedDefaults(undefined).length, 0);
     }
+
+    // ---- choosing one -------------------------------------------------------
+
+    // Nothing typed: what is preferred first, then A to Z; hidden entries
+    // are never offered.
+    function test_search_with_nothing_typed() {
+        const list = apps.concat([{ id: "hidden", name: "Aaa", noDisplay: true }]);
+        const found = Apps.search(list, "", ["steam", "firefox"]);
+        compare(found.map(a => a.id).slice(0, 4), ["steam", "firefox", "7zip", "org.kde.dolphin"]);
+        compare(found.length, apps.length);
+    }
+
+    function test_search_finds_and_orders() {
+        compare(Apps.search(apps, "kate", []).map(a => a.id)[0], "org.kde.kate");
+        // A word in the middle of a name.
+        compare(Apps.search(apps, "code", []).map(a => a.id)[0], "code");
+        compare(Apps.search(apps, "settings", []).map(a => a.id)[0], "systemsettings");
+        compare(Apps.search(apps, "zzzz", []), []);
+    }
 }

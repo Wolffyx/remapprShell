@@ -99,19 +99,22 @@ EdgeWindow {
                 visible: menu.customEntries.length > 0
             }
 
-            // Whatever has been added in Settings -> Taskbar. These run a
-            // command line rather than reaching into the shell, so they go
-            // through PanelMenuModel rather than through `rmpr`.
+            // Whatever has been added in Settings -> Taskbar. These open an
+            // application or run a command line rather than reaching into the
+            // shell, so they go through PanelMenuModel rather than `rmpr`.
             Repeater {
                 model: menu.customEntries
 
+                // An application's row carries its own icon, unless a glyph
+                // was asked for; a command's has a glyph.
                 MenuRow {
                     required property var modelData
                     width: rows.width
                     text: modelData.label
-                    glyph: modelData.glyph
+                    glyph: modelData.app && !modelData.glyph ? "" : (modelData.glyph || "terminal")
+                    iconName: modelData.app && !modelData.glyph ? modelData.icon : ""
                     onActivated: {
-                        PanelMenuModel.runEntry(modelData.command);
+                        PanelMenuModel.activate(modelData);
                         menu.chosen();
                     }
                 }

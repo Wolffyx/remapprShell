@@ -6151,3 +6151,22 @@ like the rest of the history: gone when the shell stops.
 `widgets.clipboard.shown` is gone: the list scrolls. `escape` is not a legal
 QML method name -- qmllint passed it and the engine refused the file; the
 offscreen preview (`dev/preview/clipboard.qml`) is what caught it.
+
+## The panel menu's settings, fixed (2026-11-11)
+
+**The System monitor row in Settings -> Taskbar was drawn at width zero.**
+`SettingRow` is an Item and takes its width from whoever places it; the menu
+card never gave it one, so the label, the description and the dropdown were
+all there and none of them showed -- "it does not let me pick" was literally
+true. It is the only unsized SettingRow in the shell (checked by a scan of
+every `SettingRow {` for a width or anchors).
+
+The row now offers the installed monitors first and **any application**
+after them ("Other application…"), through `ui/controls/AppPicker.qml`: a
+search over the installed desktop entries, scored the way the launcher scores
+(`Apps.search`, tested), drawn in place under the setting, with arrow keys,
+Return and Escape. Custom entries can be an application as well as a command:
+`{ "app": "<desktop id>", "label": "" }` opens it through `WindowsService.launch`,
+is called by the application's name unless labelled, and carries its icon on
+the menu. One no longer installed is left off the menu and said to be missing
+in Settings.

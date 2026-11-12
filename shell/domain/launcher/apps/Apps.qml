@@ -104,6 +104,26 @@ QtObject {
         return first.concat(rest);
     }
 
+    // Installed applications for somebody choosing one: `preferred` ids
+    // first and then the rest A to Z while nothing is typed, and the
+    // launcher's own scoring once something is -- so a name, a word of its
+    // description, its keywords and its binary all find it, best first.
+    // Entries that hide themselves (NoDisplay) are not choices.
+    function search(apps, query, preferred) {
+        const shown = (apps ?? []).filter(a => a && !a.noDisplay);
+        const q = String(query ?? "").trim();
+        if (q.length === 0) {
+            const first = root.resolvePinned(shown, preferred ?? []);
+            return first.concat(root.sorted(shown.filter(a => first.indexOf(a) < 0)));
+        }
+        return shown
+            .map(a => ({ app: a, score: Rank.score(q, { name: a.name, generic: a.genericName || a.comment,
+                                                       keywords: a.keywords, exec: a.execString, id: a.id }) }))
+            .filter(r => r.score !== Rank.none)
+            .sort((x, y) => (y.score - x.score) || String(x.app.name).localeCompare(String(y.app.name)))
+            .map(r => r.app);
+    }
+
     // [{ letter, apps }], A to Z, anything not starting with a letter under
     // "#" at the end.
     function byLetter(apps) {

@@ -243,13 +243,13 @@
                     "type": "string",
                     "default": "auto",
                     "label": "System monitor",
-                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. A monitor that is not installed is not offered, and the row is hidden rather than shown and refusing."
+                    "description": "Which application the right-click menu's System monitor row opens, as a desktop entry id -- any installed application, not only a monitor. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. Settings offers the installed monitors first and any other application through a search. One that is not installed any more hides the row rather than showing it and refusing."
                 },
                 "panel.menu.entries": {
                     "type": "list",
                     "default": [],
                     "label": "Custom menu entries",
-                    "description": "Extra rows on the panel's right-click menu, in this order. Each is an object: `label` is the words on the row, `command` is a shell command line run when it is chosen, and `glyph` is an optional Material Symbols name for its icon (`terminal` when left out). The command is run detached, so a script that keeps running does not end when the menu closes."
+                    "description": "Extra rows on the panel's right-click menu, in this order. Each is an object that either opens an application -- `app`, a desktop entry id, drawn with the application's icon and called by its name unless `label` says otherwise -- or runs a command: `label` is the words on the row and `command` a shell command line, run detached, so a script that keeps running does not end when the menu closes. `glyph` is an optional Material Symbols name for the row's icon (`terminal` for a command when left out). An application that is not installed any more is left off the menu."
                 }
             }
         },
