@@ -48,10 +48,13 @@ Scope {
     }
 
     // The dock, a second panel of application tiles, on every screen that
-    // has `dock.enabled` -- drawn by this shell's renderer only, as the panel
-    // is: under Plasma's, Plasma's own panels are the place for one.
+    // has `dock.enabled` -- whatever draws the panel. It is a surface of its
+    // own and never the panel, so unlike the panel it cannot be drawn twice
+    // at one edge: under Plasma's renderer Plasma draws the panel and this
+    // shell the dock, and KWin keeps the two clear of each other as it does
+    // two panels. Its start tile asks whichever start menu is in use.
     Variants {
-        model: ConfigStore.profileLoaded && PanelModel.renderer === "quickshell"
+        model: ConfigStore.profileLoaded
             ? Quickshell.screens.filter(s => ConfigStore.valueFor(s.name, "dock.enabled", false) === true) : []
 
         Dock {}

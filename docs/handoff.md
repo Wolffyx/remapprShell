@@ -6279,7 +6279,7 @@ draws the body and the menu with a stand-in for the layer surface -- the
 PanelWindow itself was only linted, never rendered, so the first real look at
 it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 
-Not built: a dock under Plasma's renderer.
+Under Plasma's renderer too since 2026-11-12 (see the section of that name).
 
 ## The macOS mode: a global menu and Launchpad (2026-11-12)
 
@@ -6459,3 +6459,19 @@ image file(s) an earlier run left" and the folder was empty.
 
 This machine still has `clipboard.history: own`, so while Klipper runs both
 keep a copy of a picture until it is switched to `auto`.
+
+## The dock under Plasma's renderer (2026-11-12)
+
+The dock is drawn wherever `dock.enabled` is on, whatever draws the panel:
+ShellScreens no longer gates it on `panel.renderer === "quickshell"`. It is a
+layer surface of its own, so unlike the panel it cannot be drawn twice at one
+edge; under Plasma's renderer Plasma draws the panel and this shell the dock,
+and KWin keeps the two clear of each other as it does two panels. The start
+tile asks whichever start menu is in use (LauncherService.toggle for Kickoff).
+Plasma's own dock -- a second Plasma panel with the Icons-only Task Manager,
+written by appletsrc_generate -- was the other way, and is not built; it
+would be a choice beside this one (`dock.drawnBy`), ours the default.
+
+Not seen on screen: the renderer here is quickshell. The first look is
+`rmpr renderer set plasma` with the dock on. Note: a ShellScreens.qml swapped
+in by rename did not hot-reload by itself; `rmpr reload` did.

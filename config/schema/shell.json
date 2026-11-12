@@ -265,7 +265,7 @@
                     "type": "bool",
                     "default": false,
                     "label": "Show the dock",
-                    "description": "Draws the dock on every screen. It can be turned off for one monitor in that monitor's own settings file."
+                    "description": "Draws the dock on every screen, whatever draws the panel -- under Plasma's renderer too, beside Plasma's panel. It can be turned off for one monitor in that monitor's own settings file."
                 },
                 "dock.position": {
                     "type": "enum",

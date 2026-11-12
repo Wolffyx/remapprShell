@@ -83,7 +83,7 @@ A second panel of large application tiles floating clear of the screen's edge, a
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
-| `dock.enabled` | `true` or `false` | `false` | Draws the dock on every screen. It can be turned off for one monitor in that monitor's own settings file. |
+| `dock.enabled` | `true` or `false` | `false` | Draws the dock on every screen, whatever draws the panel -- under Plasma's renderer too, beside Plasma's panel. It can be turned off for one monitor in that monitor's own settings file. |
 | `dock.position` | `bottom`, `left`, `right` | `bottom` | Which edge the dock floats along. On the same edge as the panel it sits beside the panel, never under it. |
 | `dock.iconSize` | a number, 32 to 80 | `48` | How big each tile is, in pixels. The dock grows and shrinks with it. |
 | `dock.magnify` | `true` or `false` | `false` | The tile under the pointer grows, and the ones beside it grow less, as on macOS. The dock's own glass stays the same height; the tiles grow out of it, away from the edge. |
