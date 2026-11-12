@@ -287,6 +287,25 @@ QtObject {
 
     function closeClipboard() { root.clipboard = false; }
 
+    // "Copied", for a moment, after an entry is chosen from the clipboard
+    // history: a shell cannot paste into another window on Wayland, so this
+    // says where the entry went. Null while nothing is shown. Either
+    //   { label, screen, x, y }                 at the pointer, as Meta+V
+    //   { label, screen, edge, along, offset }  beside a panel button
+    // -- see Place.atPointer and Place.atEdge. `serial` changes with every
+    // one, so a second copy shows for its own full time.
+    property var copied: null
+    property int _copiedSerial: 0
+
+    function showCopied(note) {
+        if (!note)
+            return;
+        root._copiedSerial += 1;
+        root.copied = Object.assign({}, note, { serial: root._copiedSerial });
+    }
+
+    function hideCopied() { root.copied = null; }
+
     function closeAll() {
         root.clipboard = false;
         root._only("");

@@ -221,6 +221,41 @@ TestCase {
         compare(ClipboardHistory.clipboardFind(sample, "links", "windows"), []);
     }
 
+    // ---- pins across a restart ----------------------------------------------
+
+    // Only pinned entries are written down, and only what describes them.
+    function test_pins_to_keep() {
+        const kept = ClipboardHistory.clipboardPinsToKeep([
+            { text: "a", pinned: true, time: 5, extra: "x" },
+            { text: "b" },
+            { image: true, path: "/s/1.png", width: 2, height: 3, pinned: true }
+        ]);
+        compare(kept.length, 2);
+        compare(kept[0], { image: false, text: "a", time: 5, pinned: true });
+        compare(kept[1].path, "/s/1.png");
+        compare(kept[1].pinned, true);
+    }
+
+    // Read back first; a pin already in the history is not listed twice.
+    function test_restore_pins() {
+        const h = ClipboardHistory.clipboardRestorePins([{ text: "b" }, { text: "a" }],
+                                                        [{ text: "a", pinned: true }, { text: "c" }]);
+        compare(texts(h), ["a", "c", "b"]);
+        verify(h[0].pinned && h[1].pinned);
+        verify(!h[2].pinned);
+    }
+
+    // The file is read from disk: anything not the shape of an entry is
+    // dropped, and a picture must be an absolute path to a .png.
+    function test_restore_ignores_junk() {
+        const h = ClipboardHistory.clipboardRestorePins([], [null, 3, "x", { text: "  " }, { text: 5 },
+            { image: true, path: "relative.png" }, { image: true, path: "/etc/passwd" },
+            { image: true, path: "/s/2.png" }]);
+        compare(h.length, 1);
+        compare(h[0].path, "/s/2.png");
+        compare(ClipboardHistory.clipboardRestorePins([{ text: "a" }], { not: "a list" }).length, 1);
+    }
+
     function test_counts() {
         compare(ClipboardHistory.clipboardCounts(sample),
                 { all: 5, pinned: 1, text: 3, links: 1, images: 1 });

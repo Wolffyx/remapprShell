@@ -41,6 +41,23 @@ TestCase {
         compare(huge.y, 0);
     }
 
+    // Beside a panel: centred on the button, clear of the panel by the gap.
+    function test_beside_a_panel() {
+        compare(Place.atEdge("bottom", 1000, 40, wide, 200, 60, 8), { x: 900, y: 1440 - 40 - 8 - 60 });
+        compare(Place.atEdge("top", 1000, 26, wide, 200, 60, 8), { x: 900, y: 34 });
+        compare(Place.atEdge("left", 700, 48, wide, 200, 60, 8), { x: 56, y: 670 });
+        compare(Place.atEdge("right", 700, 48, wide, 200, 60, 8), { x: 2560 - 56 - 200, y: 670 });
+    }
+
+    // A button at the very end of the edge does not push it off the screen,
+    // and an edge nobody knows is the bottom.
+    function test_beside_a_panel_stays_on_the_screen() {
+        compare(Place.atEdge("bottom", 2550, 40, wide, 200, 60, 8).x, 2360);
+        compare(Place.atEdge("top", 10, 26, wide, 200, 60, 8).x, 0);
+        compare(Place.atEdge("sideways", 1000, 40, wide, 200, 60, 8),
+                Place.atEdge("bottom", 1000, 40, wide, 200, 60, 8));
+    }
+
     function test_which_screen_the_pointer_is_on() {
         compare(Place.contains(wide, 400, 300), true);
         compare(Place.contains(wide, 2600, 300), false);

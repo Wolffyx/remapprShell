@@ -30,6 +30,11 @@ pragma Singleton
 // the same file. Opening Plasma's clipboard applet with plasmawindowed does
 // the same thing in another process.
 //
+// Pinned entries of ours are written down too while `clipboard.keepPins` is
+// on (the default), to Paths.clipboardPinsFile, private to the user, so a pin
+// outlives a restart; turning the setting off removes the file. Nothing
+// unpinned is ever written.
+//
 // Choosing an entry puts it on the clipboard with wl-copy, through stdin, in
 // both cases: Klipper sees the change and moves the entry to the top, and the
 // text is never in a process's arguments, where any local user could read it
@@ -190,7 +195,12 @@ QtObject {
         history.running = true;
     }
 
-    Component.onCompleted: root._checkKlipper()
+    Component.onCompleted: {
+        root._checkKlipper();
+        // Off at start: there is nothing to read back, and nothing to wait for.
+        if (!root.keepPins)
+            root._pinsRead = true;
+    }
 
     onKlipperChanged: root._refresh()
     onWantedChanged: root._refresh()
@@ -305,4 +315,86 @@ QtObject {
     }
 
     readonly property Process _remove: Process { id: remover }
+
+    // ---- pins across a restart ----------------------------------------------
+
+    // Whether pinned entries are written down and read back at start.
+    readonly property bool keepPins: ConfigStore.value("clipboard.keepPins", true) !== false
+
+    // What was last written, so the file is touched only when the pins
+    // change, not on every copy. Empty until the file has been read: nothing
+    // is written over the pins before they are back.
+    property string _pinsWritten: ""
+    property bool _pinsRead: false
+
+    onOwnEntriesChanged: root._savePins()
+    onKeepPinsChanged: root.keepPins ? root._savePins() : root._dropPins()
+
+    function _savePins() {
+        if (!root.keepPins || !root._pinsRead)
+            return;
+        const json = JSON.stringify(ClipboardHistory.clipboardPinsToKeep(root.ownEntries));
+        if (json === root._pinsWritten)
+            return;
+        root._pinsWritten = json;
+        root._pinsPending = json;
+        pinWriter.running = false;
+        pinWriter.stdinEnabled = true;
+        pinWriter.running = true;
+    }
+
+    // Off: the file goes, and nothing is left on disk to say what was pinned.
+    // The pins themselves stay for as long as the shell runs.
+    function _dropPins() {
+        root._pinsWritten = "";
+        pinRemover.running = false;
+        pinRemover.running = true;
+    }
+
+    property string _pinsPending: ""
+
+    // Written through a shell rather than FileView: umask 077 makes the file
+    // the user's alone, and the rename means a half-written file is never
+    // what is read back.
+    readonly property Process _pinWriter: Process {
+        id: pinWriter
+        command: ["sh", "-c", 'umask 077; mkdir -p "$(dirname "$1")" && cat > "$1.tmp" && mv -f "$1.tmp" "$1"',
+                  "--", Paths.clipboardPinsFile]
+        stdinEnabled: true
+        onStarted: {
+            pinWriter.write(root._pinsPending);
+            root._pinsPending = "";
+            pinWriter.stdinEnabled = false;
+        }
+    }
+
+    readonly property Process _pinRemover: Process {
+        id: pinRemover
+        command: ["rm", "-f", "--", Paths.clipboardPinsFile]
+    }
+
+    readonly property FileView _pinsFile: FileView {
+        path: root.keepPins ? Paths.clipboardPinsFile : ""
+        printErrors: false
+
+        onLoaded: {
+            if (root._pinsRead)
+                return;
+            let saved = [];
+            try {
+                saved = JSON.parse(text());
+            } catch (e) {
+                Log.debug("clipboard", `pins unreadable: ${e}`);
+            }
+            root.ownEntries = ClipboardHistory.clipboardRestorePins(root.ownEntries, saved);
+            root._pinsWritten = JSON.stringify(ClipboardHistory.clipboardPinsToKeep(root.ownEntries));
+            root._pinsRead = true;
+        }
+
+        // No file: nothing was pinned yet. Saving may begin.
+        onLoadFailed: {
+            root._pinsRead = true;
+            root._savePins();
+        }
+    }
 }

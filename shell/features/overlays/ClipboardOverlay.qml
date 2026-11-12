@@ -24,6 +24,7 @@ import Quickshell.Wayland
 import qs.core
 import qs.domain.surfaces
 import qs.domain.surfaces.place
+import qs.domain.status.icons
 import qs.domain.theme
 import qs.ui.clipboard
 
@@ -79,6 +80,12 @@ PanelWindow {
             anchors.fill: parent
             anchors.margins: win.padding
             onCloseRequested: Surfaces.closeClipboard()
+            onChosen: entry => Surfaces.showCopied({
+                label: ClipboardHistory.clipboardLabel(entry, 40),
+                screen: win.screen?.name ?? "",
+                x: Surfaces.clipboardX,
+                y: Surfaces.clipboardY
+            })
         }
     }
 

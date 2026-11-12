@@ -100,6 +100,17 @@ Scope {
         ClipboardOverlay {}
     }
 
+    // "Copied", after an entry is chosen from it, on the screen it was
+    // chosen on -- unless `clipboard.confirm` is off.
+    Variants {
+        model: Surfaces.copied && ConfigStore.value("clipboard.confirm", true) !== false
+            ? Quickshell.screens.filter(s => (Surfaces.copied.screen ?? "").length > 0
+                                             ? s.name === Surfaces.copied.screen
+                                             : Place.contains(s, Surfaces.copied.x, Surfaces.copied.y)).slice(0, 1)
+            : []
+        CopiedToast {}
+    }
+
     Variants {
         model: Surfaces.session ? Quickshell.screens.filter(s => s.name === Surfaces.screenName) : []
         SessionOverlay {}

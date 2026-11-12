@@ -1148,6 +1148,18 @@
                     "default": true,
                     "label": "Show the selected entry beside the list",
                     "description": "The clipboard history -- Meta+V and the panel's clipboard button -- shows the selected entry whole beside the list: all of a text, a link's address, a colour, a picture. Off, the card is the list alone and about half as wide."
+                },
+                "clipboard.confirm": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Say \"Copied\" after choosing an entry",
+                    "description": "Choosing an entry from the clipboard history copies it and closes; a shell cannot paste into another window on Wayland. This shows \"Copied\" and what was copied for a second and a half where it was chosen -- at the pointer for Meta+V, beside the button for the panel's clipboard -- so you know it is ready for Ctrl+V. Off, nothing is shown."
+                },
+                "clipboard.keepPins": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Keep pinned entries after a restart",
+                    "description": "Pinned entries of this shell's own history are written down -- in the state directory, readable by you alone -- and are back after the shell or the machine restarts. Nothing unpinned is ever written. Off, pins last as long as the shell does, and the file is removed. Klipper keeps its own."
                 }
             }
         },

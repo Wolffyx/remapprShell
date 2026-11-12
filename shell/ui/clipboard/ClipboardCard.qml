@@ -39,6 +39,10 @@ Item {
 
     signal closeRequested
 
+    // An entry was put on the clipboard. The host says "Copied" where it
+    // stands: the overlay at the pointer, the widget beside its button.
+    signal chosen(var entry)
+
     readonly property int listWidth: 372
     readonly property int rowHeight: 48
     readonly property int rowGap: 4
@@ -94,6 +98,7 @@ Item {
         if (!entry || !ClipboardStatus.pickable(entry))
             return;
         ClipboardStatus.pick(entry);
+        card.chosen(entry);
         card.closeRequested();
     }
 

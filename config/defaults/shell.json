@@ -237,7 +237,9 @@
     },
     "clipboard": {
         "history": "own",
-        "preview": true
+        "preview": true,
+        "confirm": true,
+        "keepPins": true
     },
     "update": {
         "channel": "main",

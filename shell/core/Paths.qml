@@ -68,6 +68,11 @@ QtObject {
     // entirely when the history is cleared.
     readonly property string clipboardDir: `${root.stateDir}/clipboard`
 
+    // The pinned clipboard entries, written down so they outlive a restart
+    // (`clipboard.keepPins`). Written private -- a pin can be anything that
+    // was copied -- and removed when that setting is turned off.
+    readonly property string clipboardPinsFile: `${root.stateDir}/clipboard-pins.json`
+
     // Written once the first-run wizard has been through. It lives in state
     // rather than in the profile because "have you seen this window" is ours to
     // remember, not a setting the user would ever want to type.

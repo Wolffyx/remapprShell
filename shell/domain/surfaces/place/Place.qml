@@ -50,6 +50,29 @@ QtObject {
         return { x: Math.round(x), y: Math.round(y) };
     }
 
+    // { x, y } for a `width` x `height` surface beside a panel on `edge`
+    // ("top", "bottom", "left", "right"): `along` is where on that edge it is
+    // centred, in the screen's own coordinates, and `offset` how far in from
+    // the edge the panel reaches. It sits `gap` clear of the panel, kept on
+    // the screen like everything here.
+    readonly property var _edges: ({
+        top:    (a, o, sw, sh, w, h) => ({ x: a - w / 2, y: o }),
+        bottom: (a, o, sw, sh, w, h) => ({ x: a - w / 2, y: sh - o - h }),
+        left:   (a, o, sw, sh, w, h) => ({ x: o, y: a - h / 2 }),
+        right:  (a, o, sw, sh, w, h) => ({ x: sw - o - w, y: a - h / 2 })
+    })
+
+    function atEdge(edge, along, offset, screen, width, height, gap) {
+        const sw = Number(screen?.width) || 0;
+        const sh = Number(screen?.height) || 0;
+        const w = Number(width) || 0;
+        const h = Number(height) || 0;
+        const place = root._edges[edge] ?? root._edges.bottom;
+        const p = place(Number(along) || 0, (Number(offset) || 0) + (Number(gap) || 0), sw, sh, w, h);
+        return { x: Math.round(Math.max(0, Math.min(p.x, Math.max(0, sw - w)))),
+                 y: Math.round(Math.max(0, Math.min(p.y, Math.max(0, sh - h)))) };
+    }
+
     // Whether a point is on a screen, both given in the compositor's
     // coordinates. Used to pick which screen a surface opens on when the
     // output the pointer was over is not known by name.

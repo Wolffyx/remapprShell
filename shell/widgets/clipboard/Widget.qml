@@ -12,6 +12,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.status
+import qs.domain.status.icons
+import qs.domain.surfaces
 import qs.ui.clipboard
 import qs.ui.primitives
 
@@ -43,9 +45,23 @@ BarWidget {
         glyphSize: root.panelIconSize
     }
 
+    // "Copied" beside the button, clear of the panel: the panel spans its
+    // edge, so where the button sits in it is where it sits on the screen.
+    function sayCopied(entry) {
+        const centre = button.mapToItem(null, button.width / 2, button.height / 2);
+        Surfaces.showCopied({
+            label: ClipboardHistory.clipboardLabel(entry, 40),
+            screen: root.screenName,
+            edge: root.bar?.position ?? "bottom",
+            along: root.barVertical ? centre.y : centre.x,
+            offset: root.bar?.extent ?? root.barThickness
+        });
+    }
+
     popout: Component {
         ClipboardCard {
             onCloseRequested: root.closePopout()
+            onChosen: entry => root.sayCopied(entry)
         }
     }
 }

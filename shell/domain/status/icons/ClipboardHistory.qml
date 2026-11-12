@@ -279,6 +279,51 @@ QtObject {
                  images: count("images") };
     }
 
+    // ---- pins across a restart ----------------------------------------------
+
+    // How many pins are written down. A list of a few is what pinning is
+    // for; the cap is there so a file that grew by mistake stays small.
+    readonly property int pinsKept: 100
+
+    // What is written down so the pins outlive the shell: the pinned entries
+    // and only the fields that describe them, in the order they are listed.
+    function clipboardPinsToKeep(list) {
+        return (list ?? [])
+            .filter(e => e && e.pinned)
+            .slice(0, root.pinsKept)
+            .map(e => e.image
+                ? { image: true, text: "", path: String(e.path ?? ""), width: Number(e.width) || 0,
+                    height: Number(e.height) || 0, time: Number(e.time) || 0, pinned: true }
+                : { image: false, text: String(e.text ?? ""), time: Number(e.time) || 0, pinned: true });
+    }
+
+    // One entry read back from the file, or null when it is not one: a
+    // picture needs an absolute path to a .png, text needs words. Read from
+    // disk, so nothing in it is trusted to be the shape it should be.
+    function _restored(e) {
+        if (!e || typeof e !== "object")
+            return null;
+        if (e.image === true) {
+            const path = String(e.path ?? "");
+            if (!path.startsWith("/") || !path.endsWith(".png"))
+                return null;
+            return { image: true, text: "", path: path, width: Number(e.width) || 0,
+                     height: Number(e.height) || 0, time: Number(e.time) || 0, pinned: true };
+        }
+        const text = typeof e.text === "string" ? e.text : "";
+        return text.trim().length > 0 ? { image: false, text: text, time: Number(e.time) || 0, pinned: true } : null;
+    }
+
+    // The history with the pins read back put first. Anything already in the
+    // history is not listed twice: the pinned copy stands for it.
+    function clipboardRestorePins(list, saved) {
+        const pins = (Array.isArray(saved) ? saved : []).slice(0, root.pinsKept)
+            .map(e => root._restored(e)).filter(e => e !== null);
+        const keys = new Set(pins.map(e => root.clipboardKey(e)));
+        const rest = (list ?? []).filter(e => e && !keys.has(root.clipboardKey(e)));
+        return pins.concat(rest);
+    }
+
     // ---- one line -----------------------------------------------------------
 
     // What an entry says on one line, whether it is text or a picture.
