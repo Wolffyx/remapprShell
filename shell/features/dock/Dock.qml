@@ -186,7 +186,7 @@ PanelWindow {
     // ---- what the tiles do ---------------------------------------------------
 
     readonly property var _kinds: ({
-        launcher: (item, button) => LauncherService.toggle("apps"),
+        launcher: (item, button) => root.toggleLauncher(),
         divider: (item, button) => {},
         place: (item, button) => Launch.open(item.uri),
         app: (item, button) => root.activateApp(item, button)
@@ -201,6 +201,20 @@ PanelWindow {
         }
         root.menuItem = null;
         (root._kinds[item.kind] ?? root._kinds.divider)(item, button);
+    }
+
+    // The start menu -- or Launchpad -- on this screen, as the panel's start
+    // button does: another provider (Kickoff, KRunner) is asked to toggle.
+    function toggleLauncher() {
+        const builtin = LauncherService.builtin;
+        if (LauncherService.active !== builtin) {
+            LauncherService.toggle("apps");
+            return;
+        }
+        if (builtin.visible && builtin.mode === "apps" && builtin.shownOn === root.screenName)
+            builtin.close();
+        else
+            builtin.openOn(root.screenName, "apps");
     }
 
     // What the taskbar's buttons do (see the tasks widget).

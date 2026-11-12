@@ -112,6 +112,7 @@
         ]
     },
     "launcher": {
+        "launchpadBackdrop": 85,
         "provider": "builtin",
         "searchProvider": "builtin",
         "kickoffMode": "menu",

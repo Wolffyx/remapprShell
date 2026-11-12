@@ -177,7 +177,8 @@ What opens when you press the start button, and what opens when you search.
 | --- | --- | --- | --- |
 | `launcher.provider` | `auto`, `kickoff`, `builtin`, `krunner`, `custom` | `builtin` | Kickoff is Plasma's own menu, but it opens at whichever panel holds plasmashell's launcher applet rather than at this one. |
 | `launcher.searchProvider` | `auto`, `krunner`, `builtin`, `kickoff`, `custom` | `builtin` | KRunner is Plasma's own search. |
-| `launcher.layout` | `twopane`, `grid`, `list` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu. |
+| `launcher.layout` | `twopane`, `grid`, `list`, `launchpad` | `twopane` | How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. launchpad: every application over the whole screen, a page at a time, as macOS has it -- type to filter, arrows and Return to start one. Only when the built-in launcher is the application menu. |
+| `launcher.launchpadBackdrop` | a number, 40 to 100 | `85` | How much Launchpad covers the screen behind it, in percent: the theme's own surface at this opacity, blurred where KWin blurs. 100 hides the windows behind entirely. |
 | `launcher.actionPrefix` | `>`, `:`, `/` | `>` | Typed first in the built-in search, it offers the shell's actions -- the colour scheme, the wallpaper, the session, a calculator -- instead of applications. |
 | `launcher.dense` | `true` or `false` | `false` | Shorter rows in the built-in search, so more fit. |
 | `launcher.hints` | `true` or `false` | `true` | The keys the built-in search answers to, under its results. |

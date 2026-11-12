@@ -49,7 +49,7 @@ Provider {
 
     readonly property string layout: {
         const l = ConfigStore.value("launcher.layout", "twopane");
-        return l === "grid" || l === "list" ? l : "twopane";
+        return ["grid", "list", "launchpad"].indexOf(l) >= 0 ? l : "twopane";
     }
     readonly property string prefix: ConfigStore.value("launcher.actionPrefix", ">") ?? ">"
     readonly property bool dense: ConfigStore.value("launcher.dense", false) === true

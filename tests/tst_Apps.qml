@@ -151,4 +151,19 @@ google-chrome.desktop
         compare(Apps.search(apps, "settings", []).map(a => a.id)[0], "systemsettings");
         compare(Apps.search(apps, "zzzz", []), []);
     }
+
+    // ---- Launchpad -----------------------------------------------------------
+
+    // 2560x1440: the most columns and rows; a small screen still a grid.
+    function test_launchpad_grid() {
+        compare(Apps.launchpadGrid(2560, 1440), { columns: 8, rows: 5 });
+        compare(Apps.launchpadGrid(1280, 720), { columns: 7, rows: 3 });
+        compare(Apps.launchpadGrid(400, 300), { columns: 4, rows: 3 });
+    }
+
+    function test_pages() {
+        compare(Apps.pages([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+        compare(Apps.pages([], 35), [[]]);
+        compare(Apps.pages([1], 0), [[1]]);
+    }
 }

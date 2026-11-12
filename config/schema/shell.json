@@ -703,11 +703,21 @@
                     "values": [
                         "twopane",
                         "grid",
-                        "list"
+                        "list",
+                        "launchpad"
                     ],
                     "default": "twopane",
                     "label": "Start menu",
-                    "description": "How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. Only when the built-in launcher is the application menu."
+                    "description": "How the built-in launcher's start menu is laid out. twopane: categories, pinned apps and recent files, with you, what is playing and the machine beside them. grid: pinned apps and recent files. list: every application A to Z. launchpad: every application over the whole screen, a page at a time, as macOS has it -- type to filter, arrows and Return to start one. Only when the built-in launcher is the application menu."
+                },
+                "launcher.launchpadBackdrop": {
+                    "type": "int",
+                    "min": 40,
+                    "max": 100,
+                    "step": 5,
+                    "default": 85,
+                    "label": "Launchpad backdrop",
+                    "description": "How much Launchpad covers the screen behind it, in percent: the theme's own surface at this opacity, blurred where KWin blurs. 100 hides the windows behind entirely."
                 },
                 "launcher.actionPrefix": {
                     "type": "enum",

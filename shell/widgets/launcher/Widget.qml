@@ -30,8 +30,9 @@ BarWidget {
         StartMenu { provider: LauncherService.builtin }
     }
 
-    // The start menu, not the search: that one is drawn over the screen.
-    popoutVisible: root.openHere
+    // The start menu, not the search: that one is drawn over the screen --
+    // as Launchpad is, when that is the layout (LaunchpadOverlay).
+    popoutVisible: root.openHere && LauncherService.builtin.layout !== "launchpad"
 
     // From the button, not around it: the menu is many times wider than the
     // start button, so centring it on the button and then pushing it back on

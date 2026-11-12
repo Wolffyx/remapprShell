@@ -28,7 +28,7 @@ cp "$HERE/harness.qml" "$root/preview.qml"
 sed -i -E "/WlrLayershell\.keyboardFocus:/,/WlrKeyboardFocus\.None/d; /BackgroundEffect\.blurRegion:/d" "$root/features/panel/SlotPopout.qml"
 # Full-screen layer surfaces become plain Items (PanelWindow has no offscreen
 # backend); the drawing inside them is untouched.
-for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root"/features/desktop/*.qml "$root"/features/switchers/*.qml; do
+for f in "$root"/features/overlays/*.qml "$root/features/osd/OsdOverlay.qml" "$root/features/notifications/NotificationPopups.qml" "$root/features/launcher/LaunchpadOverlay.qml" "$root"/features/desktop/*.qml "$root"/features/switchers/*.qml; do
     # The anchors block goes, written either way: the switchers put all four
     # on one line, and a range delete from there ran to the next `    }` in the
     # file -- taking most of the file with it and reporting the syntax error

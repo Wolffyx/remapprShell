@@ -67,6 +67,17 @@ Scope {
         SearchOverlay {}
     }
 
+    // Launchpad: the start menu over the whole screen, when that is the
+    // layout (`launcher.layout: launchpad`).
+    Variants {
+        model: LauncherService.builtin.visible && LauncherService.builtin.mode === "apps"
+               && LauncherService.builtin.layout === "launchpad"
+            ? Quickshell.screens.filter(s => s.name === (LauncherService.builtin.shownOn || (Quickshell.screens[0]?.name ?? "")))
+            : []
+
+        LaunchpadOverlay {}
+    }
+
     // The grip the sidebar is pulled out by, on each screen -- so it comes
     // out of the monitor it was dragged on. `sidebar.trigger` chooses between
     // this, the edge opening it outright, and neither. Every screen has one:

@@ -118,10 +118,21 @@ Column {
 
         ConfigSegmented {
             width: parent.width
-            values: ["twopane", "grid", "list"]
-            labels: ["Two-pane", "Pinned grid", "A–Z list"]
-            glyphs: ["vertical_split", "grid_view", "sort_by_alpha"]
+            values: ["twopane", "grid", "list", "launchpad"]
+            labels: ["Two-pane", "Pinned grid", "A–Z list", "Launchpad"]
+            glyphs: ["vertical_split", "grid_view", "sort_by_alpha", "apps"]
             path: "launcher.layout"
+        }
+
+        ConfigSliderRow {
+            width: parent.width
+            visible: ConfigStore.value("launcher.layout", "twopane") === "launchpad"
+            label: "Launchpad backdrop"
+            unit: "%"
+            from: 40
+            to: 100
+            stepSize: 5
+            path: "launcher.launchpadBackdrop"
         }
 
         Hint {

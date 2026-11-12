@@ -124,6 +124,32 @@ QtObject {
             .map(r => r.app);
     }
 
+    // ---- Launchpad -----------------------------------------------------------
+
+    // How many tiles a Launchpad page holds on a screen this size: columns
+    // of 140 px across four fifths of the width, rows of 150 px under the
+    // search field, kept between what reads as a grid and what reads as a
+    // wall -- macOS's own is 7 by 5.
+    function launchpadGrid(width, height) {
+        const w = Number(width) || 0;
+        const h = Number(height) || 0;
+        return {
+            columns: Math.max(4, Math.min(8, Math.floor(w * 0.8 / 140))),
+            rows: Math.max(3, Math.min(5, Math.floor((h - 260) / 150)))
+        };
+    }
+
+    // `list` cut into pages of `perPage`, the last one short. Never empty:
+    // no applications is one empty page, which is what is drawn.
+    function pages(list, perPage) {
+        const n = Math.max(1, Math.floor(Number(perPage) || 1));
+        const all = list ?? [];
+        const out = [];
+        for (let i = 0; i < all.length; i += n)
+            out.push(all.slice(i, i + n));
+        return out.length > 0 ? out : [[]];
+    }
+
     // [{ letter, apps }], A to Z, anything not starting with a letter under
     // "#" at the end.
     function byLetter(apps) {
