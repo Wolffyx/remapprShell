@@ -6170,3 +6170,62 @@ Return and Escape. Custom entries can be an application as well as a command:
 is called by the application's name unless labelled, and carries its icon on
 the menu. One no longer installed is left off the menu and said to be missing
 in Settings.
+
+## Layouts of your own (2026-11-11)
+
+Settings -> Layouts has **Your layouts** beside the shipped ones, and
+`rmpr preset` grew `save <name>`, `delete <name>` and `list --json`. A saved
+layout is an ordinary preset file in `~/.config/remappr-shell/presets/` --
+the active profile without its version stamp -- so it applies the way a
+shipped one does, and `preset list` shows it.
+
+`list --json` says which layout is in use (the profile is exactly its
+`config`) and the profile's state: `defaults`, `saved`, `custom` or
+`unreadable`. The page offers to save only for `custom`, which is the
+"only when the default layout was changed" the user asked for. **Applying a
+layout saves a `custom` profile to the list first** ("My layout, 11 Nov
+21:07"), then keeps the profile as before (`keep_profile`), so nothing a
+person built is lost to a click on Apply; a profile that is already a layout,
+the defaults, or one that does not parse is not saved twice. Deleting asks for
+a second click: a deleted layout is the one thing here nothing keeps.
+Tested in `tests/test-presets.sh`, in a throwaway HOME.
+
+## Title-bar buttons (2026-11-11)
+
+Settings -> Windows has a **Title-bar buttons** card: where KWin draws
+minimise, maximise and close on every window. Four choices in
+`windows.titleButtons` -- `plasma` (the default: nothing written), `right`
+(`ButtonsOnLeft=` empty, `ButtonsOnRight=IAX`), `left` (`XIA` and empty, the
+macOS-like layout's) and `custom`, which is `windows.titleButtonsLeft` and
+`windows.titleButtonsRight` in KWin's own letters. The custom editor is all
+clicks: choose a chip, move it with ‹ › (crossing to the other side at the
+end of a row), Other side, Hide, or add a hidden one on the right. Its moves
+are `domain/windows/titlebar/TitleButtons.qml`, tested in
+`tests/tst_TitleButtons.qml`; a run of clicks is written once they stop.
+
+**Everything goes through `rmpr windows titlebar`** (`scripts/lib/windows/titlebar.sh`):
+`set` writes the profile and then kwinrc `[org.kde.kdecoration2]` through the
+kconfig ledger, in a scope of its own (`windows-titlebar`), and asks KWin to
+reconfigure. The ledger records the keys as they were before the first write
+-- unset, which is Breeze's `MS` / `HIAX`, included -- so `plasma`,
+`behaviour revert`, `titlebar revert` (a step of the uninstall) all put them
+back exactly, an unset key deleted rather than written empty. Restoring a
+snapshot puts kwinrc back whole, as before; the setting in the profile is not
+re-applied until it is next changed. `titlebar apply` makes kwinrc match the
+profile and is what `preset apply` and `profile use` now run.
+
+**Layouts.** `config/presets/macos.json` sets `left`. A layout that sets the
+buttons keeps what was there in `$STATE_DIR/titlebar-before-layout.json`; the
+next layout that says nothing about them puts that back, and any choice made
+in Settings or `titlebar set` lets go of it. With
+`windows.titleButtonsFromLayouts` off, `preset apply` carries the buttons
+across untouched. The switch itself is never a layout's: it is carried across
+every apply and left out of saved layouts. In `preset list --json` the
+buttons are left out of the comparison with a layout that does not set them
+(and of every comparison while the switch is off), so carried buttons never
+make a layout read as `custom` and get saved twice, and a profile that changes
+only them is still `defaults`. Tested in `tests/test-titlebar.sh`, which
+records every kwriteconfig6 call and stands in for qdbus6, busctl and gdbus.
+
+One manual check that no test can make: pick Left, watch a window's buttons
+move, then Plasma's and watch them come back.

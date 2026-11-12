@@ -8,6 +8,9 @@ pragma ComponentBehavior: Bound
 // through `rmpr windows behaviour`, so every change is ledgered and
 // `revert` puts the desktop back.
 //
+// The title-bar buttons are the one setting here the profile holds too, so a
+// layout can carry it: see WindowsTitleButtonsCard.
+//
 // What the mockup showed and KWin does not have -- rounded window corners --
 // is not offered. Saying so is more use than a control that writes a key
 // nothing reads. Tiling -- auto-tiling, snap layouts, the gap -- is a page
@@ -147,7 +150,7 @@ Column {
         }
 
         Hint {
-            text: "Title bars, their buttons and the corner radius belong to the window decoration, which is Plasma's own page and applies to every application."
+            text: "What title bars look like and their corner radius belong to the window decoration, which is Plasma's own page and applies to every application. Which side their buttons sit on is below."
         }
 
         TextButton {
@@ -156,6 +159,13 @@ Column {
             text: "Window decorations…"
             onActivated: PlasmaApplets.openSettings("kcm_kwindecoration")
         }
+    }
+
+    // Where the title-bar buttons sit: a setting of the profile's that
+    // KWin is told about, through `rmpr windows titlebar`. A card of its own,
+    // in its own file.
+    WindowsTitleButtonsCard {
+        width: root.width
     }
 
     Card {

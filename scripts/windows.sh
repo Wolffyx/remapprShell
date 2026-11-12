@@ -45,6 +45,18 @@
 #                                 swap with left|right|up|down, float, or
 #                                 desktop (tiling off or on for the desktop
 #                                 in front) -- what the keys run
+#   titlebar status [--json]      where KWin draws minimise, maximise and
+#                                 close, and what windows.titleButtons asks
+#   titlebar set plasma|right|left
+#   titlebar set custom <left> <right>
+#                                 the setting, then kwinrc to match: KWin's
+#                                 letters (M S H I A X F B L), each once
+#   titlebar layouts true|false   whether a layout may change them
+#   titlebar apply                kwinrc made to match the profile -- what a
+#                                 layout or a profile switch runs
+#   titlebar revert               KWin's own order back, the setting left
+#                                 as it is -- what an uninstall runs
+#                                 (see lib/windows/titlebar.sh)
 #
 # Four of them are a KWin script of this project's: snapLayouts, Windows 11's
 # snap layouts -- drag a window to the top of a screen and pick a zone for it
@@ -95,6 +107,7 @@ source "$REPO_ROOT/scripts/lib/kwin.sh"
 source "$REPO_ROOT/scripts/lib/config.sh"
 source "$REPO_ROOT/scripts/lib/windows/snap.sh"
 source "$REPO_ROOT/scripts/lib/windows/tile.sh"
+source "$REPO_ROOT/scripts/lib/windows/titlebar.sh"
 
 SCRIPT_SRC="$REPO_ROOT/kwin/windows"
 
@@ -389,6 +402,7 @@ JS
                 # the ledger putting the key back is not enough.
                 [ "$(snap_gap)" = "$gap" ] || snap_gap_apply "$(snap_gap)"
                 games_rule false
+                titlebar_release
                 kwin_reconfigure
                 log_step "KWin's window behaviour is back as it was"
                 ;;
@@ -406,6 +420,8 @@ JS
         esac
         ;;
 
+    titlebar) titlebar_cmd "$@" ;;
+
     tile)
         case "${1:-}" in
             refresh) tile_refresh ;;
@@ -415,5 +431,5 @@ JS
         esac
         ;;
 
-    *) die "unknown command: $cmd (expected enable, disable, status, show, close, behaviour or snap)" ;;
+    *) die "unknown command: $cmd (expected enable, disable, status, show, close, behaviour, snap, tile or titlebar)" ;;
 esac

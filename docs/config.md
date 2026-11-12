@@ -138,10 +138,14 @@ Where the weather comes from. Off until you turn it on, because it is the one pa
 
 ### Windows
 
-What KWin does with windows: how focus is given, when one is raised, where a new one lands, and whether a maximised window keeps its border. These are KWin's settings, written through the ledger by `rmpr windows behaviour`, so every change can be undone. Tiling has a page of its own. Rounded window corners are not KWin's to give, and are not offered here.
+What KWin does with windows: how focus is given, when one is raised, where a new one lands, whether a maximised window keeps its border, and which side of the title bar its buttons sit on. These are KWin's settings, written through the ledger by `rmpr windows behaviour` and `rmpr windows titlebar`, so every change can be undone. Tiling has a page of its own. Rounded window corners are not KWin's to give, and are not offered here.
 
-No individual settings: this is a page in the settings window rather than a
-list of values.
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `windows.titleButtons` | `plasma`, `right`, `left`, `custom` | `plasma` | Where KWin draws minimise, maximise and close on every window's title bar. plasma writes nothing and leaves KWin's order to Plasma's Window Decorations page. right is minimise, maximise and close at the right; left is close, minimise and maximise at the left, as the macOS-like layout has them; custom is the two strings below. Anything but plasma is written to kwinrc ([org.kde.kdecoration2] ButtonsOnLeft and ButtonsOnRight) through the ledger by `rmpr windows titlebar set`, and what was there before is put back by choosing plasma again, by restoring KDE and by an uninstall. KDE applications follow it, and GTK applications that draw their own title bar when Plasma passes the order on; an application with a title bar entirely its own, such as VS Code or Discord, keeps its own. |
+| `windows.titleButtonsLeft` | text | `MS` | For custom: KWin's button letters, in order from the left edge. M window menu, S on all desktops, H help, I minimise, A maximise, X close, F keep above, B keep below, L shade. Each letter once, across both sides. |
+| `windows.titleButtonsRight` | text | `HIAX` | For custom: the same letters, in order towards the right edge. The default, with the one on the left, is Breeze's own. |
+| `windows.titleButtonsFromLayouts` | `true` or `false` | `true` | Whether applying a layout may set the title-bar buttons: the macOS-like layout puts them on the left, and the next layout that says nothing about them puts back what you had. Off, `rmpr preset apply` leaves them as they are. This switch is yours, never a layout's: no layout carries it, and saving a layout leaves it out. |
 
 ### Tiling
 

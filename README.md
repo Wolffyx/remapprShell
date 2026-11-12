@@ -249,7 +249,8 @@ rmpr renderer set plasma --dry-run   # the applet layout it would install
 rmpr renderer set plasma             # switch, with a restore point and a rollback
 rmpr wizard             # re-run the first-run wizard (it keeps the profile it replaces)
 rmpr profile list       # configuration profiles, and which is active
-rmpr preset apply <n>   # a whole panel layout, keeping what it replaces
+rmpr preset apply <n>   # a whole panel layout, saving yours to the list first
+rmpr preset save <name> # keep the current configuration as a layout of your own
 rmpr windows enable     # the open-window list (opt-in; see below)
 rmpr settings [page]    # the settings window
 rmpr doctor             # check everything and report fixes

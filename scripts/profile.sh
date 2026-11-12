@@ -89,6 +89,10 @@ case "$cmd" in
             || { rm -f "$tmp_state"; die "could not write $state_file"; }
         mv -f "$tmp_state" "$state_file" || { rm -f "$tmp_state"; die "could not write $state_file"; }
         log_step "active profile: $name"
+        # The one setting of a profile's that lives in KDE: KWin's title
+        # bars follow the profile now in use.
+        "$REPO_ROOT/scripts/windows.sh" titlebar apply \
+            || log_warn "the title-bar buttons could not be set; $ALIAS windows titlebar status says why"
         log_info "the shell switches immediately; no restart needed"
         ;;
 

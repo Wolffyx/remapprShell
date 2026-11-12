@@ -100,6 +100,7 @@ step "Alt+Tab"                    "$REPO_ROOT/scripts/switcher.sh" revert
 step "the keys"                   "$REPO_ROOT/scripts/shortcuts.sh" revert
 step "the screen edges"           "$REPO_ROOT/scripts/edges.sh" revert
 step "KWin's window behaviour"    "$REPO_ROOT/scripts/windows.sh" behaviour revert
+step "the title-bar buttons"      "$REPO_ROOT/scripts/windows.sh" titlebar revert
 step "the window list"            "$REPO_ROOT/scripts/windows.sh" disable
 step "window previews and the key module" \
     make -C "$REPO_ROOT" --no-print-directory plugin-clean

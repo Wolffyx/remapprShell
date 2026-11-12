@@ -24,6 +24,7 @@ usage: @ALIAS@ <command> [options]
   crash list|show|remove            crashes quickshell caught and systemd did not
   rescue [--print]                  the window that says the shell could not start
   windows enable|disable|status|restart  the open-window list (needs a KWin script)
+  windows titlebar status|set|layouts  where KWin draws minimise, maximise and close
   edges status|set|shell|snap|disable-all  the screen's corners and edges
   switcher status|layout|give|show  Alt+Tab's look, who holds the keys, and ours on screen
   lockscreen status|check|try|enable|disable|set  our lock screen (opt-in; try it first)

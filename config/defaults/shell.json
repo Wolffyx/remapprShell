@@ -167,6 +167,12 @@
         "overviewStrip": true,
         "overviewCardWidth": 560
     },
+    "windows": {
+        "titleButtons": "plasma",
+        "titleButtonsLeft": "MS",
+        "titleButtonsRight": "HIAX",
+        "titleButtonsFromLayouts": true
+    },
     "snapshots": {
         "keep": 0
     },

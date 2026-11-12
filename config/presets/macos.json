@@ -1,6 +1,6 @@
 {
     "name": "macOS-like",
-    "description": "A slim menu bar across the top: launcher on the left, clock centred, status on the right.",
+    "description": "A slim menu bar across the top: launcher on the left, clock centred, status on the right. Window buttons on the left.",
     "config": {
         "panel": { "position": "top", "thickness": 26 },
         "bar": {
@@ -25,6 +25,7 @@
         "widgets": {
             "clock": { "format": "ddd d MMM  HH:mm" },
             "launcher": { "icon": "start-here-kde" }
-        }
+        },
+        "windows": { "titleButtons": "left" }
     }
 }
