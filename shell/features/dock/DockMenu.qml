@@ -28,12 +28,13 @@ Rectangle {
     border.width: 1
     border.color: Theme.out
 
-    // Over the tile, clear of the dock, inside the window.
+    // Over the tile -- clear of it as it has grown, while the dock magnifies
+    // -- clear of the dock, inside the window.
     readonly property real along: menu.body.hoveredCentre
+    readonly property real clear: menu.dock.margin + menu.dock.thickness + 8 + (menu.body.hoveredLift ?? 0)
     readonly property real _x: menu.dock.horizontal ? menu.along - menu.width / 2
-        : (menu.dock.position === "left" ? menu.dock.margin + menu.dock.thickness + 8
-                                         : menu.dock.width - menu.dock.margin - menu.dock.thickness - 8 - menu.width)
-    readonly property real _y: menu.dock.horizontal ? menu.dock.height - menu.dock.margin - menu.dock.thickness - 8 - menu.height
+        : (menu.dock.position === "left" ? menu.clear : menu.dock.width - menu.clear - menu.width)
+    readonly property real _y: menu.dock.horizontal ? menu.dock.height - menu.clear - menu.height
                                                     : menu.along - menu.height / 2
     x: Math.max(4, Math.min(menu.dock.width - menu.width - 4, menu._x))
     y: Math.max(4, Math.min(menu.dock.height - menu.height - 4, menu._y))

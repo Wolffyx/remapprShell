@@ -56,6 +56,60 @@ QtObject {
         return list.indexOf(key) >= 0 ? list.filter(p => p !== key) : list.concat([key]);
     }
 
+    // Where each tile's centre sits along the dock at rest, from the start of
+    // the first tile: `lengths` are the tiles' lengths along the dock, `gap`
+    // the space between two.
+    function restCentres(lengths, gap) {
+        let at = 0;
+        return (lengths ?? []).map(len => {
+            const centre = at + len / 2;
+            at += len + gap;
+            return centre;
+        });
+    }
+
+    // How much bigger each tile is drawn, for `dock.magnify`: the one under
+    // the pointer `peak` times its size, the ones within `reach` of it less,
+    // falling away on a cosine, and the rest at 1. `centres` and `pointer`
+    // are measured along the dock at rest (restCentres), so a tile growing
+    // does not move what the pointer is measured against; a pointer that is
+    // not a number is nowhere, and nothing grows.
+    function magnify(centres, pointer, peak, reach) {
+        const list = centres ?? [];
+        const extra = Math.max(0, Number(peak) - 1);
+        if (!Number.isFinite(pointer) || !(extra > 0) || !(reach > 0))
+            return list.map(c => 1);
+        return list.map(c => {
+            const t = Math.abs(c - pointer) / reach;
+            return t >= 1 ? 1 : 1 + extra * (1 + Math.cos(Math.PI * t)) / 2;
+        });
+    }
+
+    // Where a point `at` along the dock at rest is drawn once the tiles are
+    // grown by `scales`: inside a tile it stretches with the tile, in a gap
+    // it keeps its distance from the tile before it, and before the first
+    // tile or past the last it keeps its distance from that one. The dock
+    // puts the pointer's point under the pointer, so the tile it is on stays
+    // under it as the tiles round it grow.
+    function stretched(lengths, scales, gap, at) {
+        const lens = lengths ?? [];
+        const grows = scales ?? [];
+        if (!(at > 0))
+            return Number(at) || 0;
+        let rest = 0;
+        let shown = 0;
+        for (let i = 0; i < lens.length; i++) {
+            const grow = grows[i] ?? 1;
+            if (at <= rest + lens[i])
+                return shown + (at - rest) * grow;
+            rest += lens[i] + gap;
+            shown += lens[i] * grow + gap;
+            if (at <= rest)
+                return shown - (rest - at);
+        }
+        return shown + (at - rest);
+    }
+
     // Whether the dock is out of the way right now, for `dock.visibility`:
     //   always  never hidden, and windows stop above it
     //   autohide hidden until the pointer reaches its edge

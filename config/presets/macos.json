@@ -27,7 +27,7 @@
             "launcher": { "icon": "start-here-kde" }
         },
         "launcher": { "layout": "launchpad" },
-        "dock": { "enabled": true },
+        "dock": { "enabled": true, "magnify": true },
         "windows": { "titleButtons": "left" }
     }
 }

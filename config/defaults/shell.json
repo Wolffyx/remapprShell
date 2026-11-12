@@ -172,6 +172,8 @@
         "enabled": false,
         "position": "bottom",
         "iconSize": 48,
+        "magnify": false,
+        "magnifiedSize": 96,
         "visibility": "always",
         "pinned": [],
         "launcher": true,

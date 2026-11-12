@@ -6279,7 +6279,7 @@ draws the body and the menu with a stand-in for the layer surface -- the
 PanelWindow itself was only linted, never rendered, so the first real look at
 it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 
-Not built: magnification, dragging tiles to reorder, the start-menu-style
+Not built: dragging tiles to reorder, the start-menu-style
 application actions in the dock menu, Downloads read from xdg-user-dirs
 (`~/Downloads` is assumed), and a dock under Plasma's renderer.
 
@@ -6355,3 +6355,27 @@ the widget added on the Widgets page, after `make plugin` and `rmpr reload`.
 every application's menu bar away from the desktop it runs on). A property
 named `top` on a Column clashes with Item's FINAL anchor line of that name;
 qmllint passed it and the preview caught it.
+
+## Dock magnification (2026-11-12)
+
+`dock.magnify` (off; macOS-like turns it on) and `dock.magnifiedSize` (96 px,
+48-128): while the pointer is on the dock and no menu is open, the tile under
+it grows to that size and the ones within two and a half tiles of it less, on
+a cosine (`DockItems.magnify`). The pointer is measured along the dock as it
+would be at rest, so the growing never moves what it is measured against, and
+the dock is drawn with that point under the pointer (`DockItems.stretched`):
+the tile the pointer is on stays under it and the dock spreads to both sides,
+as on macOS. Both are tested (tst_DockItems), with `restCentres`. The glass
+keeps its height; each tile's face -- icon, hover, clicks -- grows out of it
+away from the edge, and while it does the window's input mask takes in that
+room (`zone` in Dock.qml, `lift` px) and the body's HoverHandler has the same
+`margin`, so the pointer can stay on a grown icon. The name over a tile clears
+the grown tile (`hoveredLift`); `hoveredCentre` is now a binding on the tile,
+so it follows the tile as it moves. Growing in and settling back take
+`Theme.durationFast`, the tiles settling round the last place the pointer was.
+
+Preview: `PREVIEW_MAGNIFY=1 dev/preview/dock.qml` (with `PREVIEW_DOCK=left` or
+`right` for the sides) draws it magnified round Firefox. The PanelWindow part
+-- the pointer tracking, the placement round the pointer, the mask -- was only
+linted: the first real look is on a desktop with the dock on and Settings ->
+Dock -> Magnify under the pointer.

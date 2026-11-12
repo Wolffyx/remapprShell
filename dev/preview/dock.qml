@@ -4,7 +4,8 @@
 //
 //   dev/preview/preview.sh dev/preview/dock.qml out.png 1280 720 dark
 //
-// PREVIEW_DOCK=left|right puts the dock on a side.
+// PREVIEW_DOCK=left|right puts the dock on a side. PREVIEW_MAGNIFY=1 draws it
+// magnified round Firefox, with its name over it, and no menu.
 
 import QtQuick
 import Quickshell
@@ -19,6 +20,7 @@ Rectangle {
     color: Theme.dark ? "#0c0e15" : "#d8dae1"
 
     readonly property string side: Quickshell.env("PREVIEW_DOCK") || "bottom"
+    readonly property bool magnified: Quickshell.env("PREVIEW_MAGNIFY") === "1"
 
     // What Dock.qml is, without the layer surface: the numbers and the
     // answers the body and the menu ask it for.
@@ -35,6 +37,7 @@ Rectangle {
         readonly property real width: stage.width
         readonly property real height: stage.height
         readonly property bool hidden: false
+        readonly property int dividerLength: 9
         property var menuItem: null
 
         readonly property var items: DockItems.items([
@@ -47,6 +50,14 @@ Rectangle {
             { key: "class:steam", appKey: "", appName: "Steam", iconName: "steam", windows: [{ uuid: "d" }],
               attention: true }
         ], { pinned: ["org.kde.dolphin", "firefox", "org.kde.kate"], places: true, downloads: "/home/u/Downloads" })
+
+        // Magnified round Firefox's tile, at twice its size.
+        readonly property var lengths: fake.items.map(i => i.kind === "divider" ? fake.dividerLength : fake.size)
+        readonly property var scales: stage.magnified
+            ? DockItems.magnify(DockItems.restCentres(fake.lengths, fake.gap), DockItems.restCentres(fake.lengths, fake.gap)[3] + 10,
+                                2, 2.5 * (fake.size + fake.gap))
+            : []
+        readonly property int lift: stage.magnified ? fake.size : 0
 
         function pointerMoved(inside) {}
         function activate(item, button) {}
@@ -61,6 +72,11 @@ Rectangle {
         x: fake.horizontal ? (stage.width - width) / 2 : (stage.side === "left" ? fake.margin : stage.width - fake.margin - width)
         y: fake.horizontal ? stage.height - fake.margin - height : (stage.height - height) / 2
         Component.onCompleted: {
+            if (stage.magnified) {
+                const grid = body.children[0];
+                body.hover(grid.children.find(c => c.modelData === fake.items[3].key), fake.items[3]);
+                return;
+            }
             body.hoveredItem = fake.items[2];
             body.hoveredCentre = fake.horizontal ? body.x + 200 : body.y + 200;
         }
@@ -69,7 +85,7 @@ Rectangle {
     DockMenu {
         dock: fake
         body: body
-        Component.onCompleted: fake.menuItem = fake.items[2]
+        Component.onCompleted: fake.menuItem = stage.magnified ? null : fake.items[2]
     }
 
     // The toast, as it is drawn at a pointer.

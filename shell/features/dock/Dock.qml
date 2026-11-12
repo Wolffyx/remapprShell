@@ -53,6 +53,9 @@ PanelWindow {
     readonly property bool horizontal: root.position === "bottom"
     readonly property int size: Math.max(32, Math.min(80, Number(root.setting("dock.iconSize", 48)) || 48))
     readonly property string visibility: root.setting("dock.visibility", "always")
+    readonly property bool magnify: root.setting("dock.magnify", false) === true
+    // How many times its size the tile under the pointer grows to.
+    readonly property real peak: Math.max(1, Math.min(128, Number(root.setting("dock.magnifiedSize", 96)) || 96) / root.size)
 
     // What is pinned, or -- with nothing pinned yet -- the start menu's own
     // pins, so a first dock is not empty.
@@ -82,6 +85,58 @@ PanelWindow {
     readonly property int margin: 8
     readonly property int thickness: root.size + 2 * root.pad
     readonly property int room: 280
+    readonly property int dividerLength: 9
+
+    // ---- magnifying ------------------------------------------------------------
+    //
+    // While the pointer is on the dock (and no menu is open) the tile under it
+    // grows to `peak` times its size and the ones near it less (DockItems.
+    // magnify). Where the pointer is gets measured along the dock as it would
+    // be at rest, so growing tiles never move what it is measured against,
+    // and the dock is then drawn with that point under the pointer
+    // (DockItems.stretched): the tile the pointer is on stays under it, and
+    // the dock spreads to both sides of it. The tiles grow out of the glass,
+    // away from the edge, by up to `lift`, and that room takes the pointer
+    // too while they do.
+
+    readonly property var restLengths: root.items.map(i => i.kind === "divider" ? root.dividerLength : root.size)
+    readonly property real restLength: root.restLengths.reduce((sum, len) => sum + len, 0)
+        + root.gap * Math.max(0, root.restLengths.length - 1)
+    readonly property var restCentres: DockItems.restCentres(root.restLengths, root.gap)
+    readonly property real centreAlong: root.horizontal ? root.width / 2 : root.height / 2
+    // Where the first tile starts at rest, along the window.
+    readonly property real restStart: root.centreAlong - root.restLength / 2
+    // How far either side of the pointer tiles still grow: two and a half.
+    readonly property real reachLength: 2.5 * (root.size + root.gap)
+
+    readonly property bool magnifying: root.magnify && root.peak > 1 && body.pointerOn
+        && root.menuItem === null && !root.hidden
+    readonly property int lift: root.magnifying ? Math.ceil((root.peak - 1) * root.size) : 0
+    readonly property real pointerAlong: root.horizontal ? body.pointer.x : body.pointer.y
+
+    // The last place the pointer was on the dock, along the window and at
+    // rest -- kept while the tiles settle back after it leaves.
+    property real lastAlong: 0
+    property real lastRest: 0
+    function track() {
+        if (!root.magnifying || !Number.isFinite(root.pointerAlong))
+            return;
+        root.lastAlong = root.pointerAlong;
+        root.lastRest = root.pointerAlong - root.restStart;
+    }
+    onPointerAlongChanged: root.track()
+    onMagnifyingChanged: root.track()
+
+    // 0 to 1: how far the tiles have grown, so they grow and settle smoothly.
+    property real level: root.magnifying ? 1 : 0
+    Behavior on level { NumberAnimation { duration: Theme.durationFast; easing.type: Easing.OutCubic } }
+
+    readonly property var scales: DockItems.magnify(root.restCentres, root.lastRest,
+                                                    1 + (root.peak - 1) * root.level, root.reachLength)
+    // Where the first tile starts, along the window.
+    readonly property real tilesStart: root.level > 0
+        ? root.lastAlong - DockItems.stretched(root.restLengths, root.scales, root.gap, root.lastRest)
+        : root.restStart
 
     // ---- showing and hiding ----------------------------------------------------
 
@@ -145,19 +200,31 @@ PanelWindow {
         regions: [root._bodyRegion].concat(root.hidden ? [root._stripRegion] : [])
                                    .concat(root.menuItem !== null ? [root._menuRegion] : [])
     }
-    readonly property Region _bodyRegion: Region { item: body }
+    readonly property Region _bodyRegion: Region { item: zone }
     readonly property Region _stripRegion: Region { item: strip }
     readonly property Region _menuRegion: Region { item: menu }
 
-    // Where the dock sits: centred along its edge, `margin` in from it, and
-    // slid past the edge by `away`.
+    // Where the dock sits: centred along its edge (or spread round the
+    // pointer while it magnifies), `margin` in from the edge, and slid past
+    // it by `away`.
     readonly property real slide: root.away * (root.thickness + root.margin + 2)
+    readonly property real bodyStart: root.tilesStart - root.pad
     readonly property var _placeBody: ({
-        bottom: () => Qt.point((root.width - body.width) / 2, root.height - root.margin - root.thickness + root.slide),
-        left: () => Qt.point(root.margin - root.slide, (root.height - body.height) / 2),
-        right: () => Qt.point(root.width - root.margin - root.thickness + root.slide, (root.height - body.height) / 2)
+        bottom: () => Qt.point(root.bodyStart, root.height - root.margin - root.thickness + root.slide),
+        left: () => Qt.point(root.margin - root.slide, root.bodyStart),
+        right: () => Qt.point(root.width - root.margin - root.thickness + root.slide, root.bodyStart)
     })
     readonly property point bodyAt: root._placeBody[root.position]()
+
+    // What takes the pointer for the dock: the glass, and the room the tiles
+    // grow into while they do.
+    Item {
+        id: zone
+        x: root.position === "right" ? body.x - root.lift : body.x
+        y: root.horizontal ? body.y - root.lift : body.y
+        width: body.width + (root.horizontal ? 0 : root.lift)
+        height: body.height + (root.horizontal ? root.lift : 0)
+    }
 
     // The edge the hidden dock comes back from.
     Item {

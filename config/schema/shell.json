@@ -284,6 +284,21 @@
                     "label": "Tile size",
                     "description": "How big each tile is, in pixels. The dock grows and shrinks with it."
                 },
+                "dock.magnify": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Magnify under the pointer",
+                    "description": "The tile under the pointer grows, and the ones beside it grow less, as on macOS. The dock's own glass stays the same height; the tiles grow out of it, away from the edge."
+                },
+                "dock.magnifiedSize": {
+                    "type": "int",
+                    "min": 48,
+                    "max": 128,
+                    "step": 8,
+                    "default": 96,
+                    "label": "Magnified size",
+                    "description": "How big the tile under the pointer grows, in pixels. No larger than the tile size, nothing grows."
+                },
                 "dock.visibility": {
                     "type": "enum",
                     "values": ["always", "autohide", "dodge"],

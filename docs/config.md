@@ -86,6 +86,8 @@ A second panel of large application tiles floating clear of the screen's edge, a
 | `dock.enabled` | `true` or `false` | `false` | Draws the dock on every screen. It can be turned off for one monitor in that monitor's own settings file. |
 | `dock.position` | `bottom`, `left`, `right` | `bottom` | Which edge the dock floats along. On the same edge as the panel it sits beside the panel, never under it. |
 | `dock.iconSize` | a number, 32 to 80 | `48` | How big each tile is, in pixels. The dock grows and shrinks with it. |
+| `dock.magnify` | `true` or `false` | `false` | The tile under the pointer grows, and the ones beside it grow less, as on macOS. The dock's own glass stays the same height; the tiles grow out of it, away from the edge. |
+| `dock.magnifiedSize` | a number, 48 to 128 | `96` | How big the tile under the pointer grows, in pixels. No larger than the tile size, nothing grows. |
 | `dock.visibility` | `always`, `autohide`, `dodge` | `always` | always keeps the dock on screen and keeps windows clear of it, as a maximised window is kept clear of the panel. autohide slides it away until the pointer reaches its edge. dodge keeps it on screen until a window on this monitor reaches into its space -- a maximised one always does -- and brings it back when the pointer reaches the edge. It never hides while the pointer or its menu is on it. |
 | `dock.pinned` | a list | `[]` | Desktop entry ids, in the order they sit in the dock. Empty shows the start menu's pinned applications until one is kept or taken out with a right click, which writes the list. |
 | `dock.launcher` | `true` or `false` | `true` | The start menu, as the dock's first tile. |
