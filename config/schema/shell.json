@@ -1115,6 +1115,12 @@
                         "Klipper's while it runs",
                         "Always Klipper's"
                     ]
+                },
+                "clipboard.preview": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Show the selected entry beside the list",
+                    "description": "The clipboard history -- Meta+V and the panel's clipboard button -- shows the selected entry whole beside the list: all of a text, a link's address, a colour, a picture. Off, the card is the list alone and about half as wide."
                 }
             }
         },

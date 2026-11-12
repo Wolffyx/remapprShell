@@ -272,6 +272,7 @@ Plasma's notifications, its clipboard history and its device notifier live insid
 | --- | --- | --- | --- |
 | `services.hostPlasma` | `true` or `false` | `true` | Off, under the quickshell renderer nothing receives notifications at all -- they are dropped, not queued -- and the clipboard widget keeps a history of its own instead of Plasma's. |
 | `clipboard.history` | `own`, `auto`, `plasma` | `own` | Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other. |
+| `clipboard.preview` | `true` or `false` | `true` | The clipboard history -- Meta+V and the panel's clipboard button -- shows the selected entry whole beside the list: all of a text, a link's address, a colour, a picture. Off, the card is the list alone and about half as wide. |
 
 ### Drawn by
 
@@ -461,12 +462,6 @@ without `tray` it stands on the panel alone.
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
 | `step` | a number, 1 to 20 | `5` | Percent per notch of the wheel. |
-
-### `widgets.clipboard`
-
-| Setting | Accepts | Default | Meaning |
-| --- | --- | --- | --- |
-| `shown` | a number, 5 to 50 | `15` | How many of the most recent entries the popout lists. |
 
 ### `widgets.clock`
 

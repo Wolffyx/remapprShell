@@ -5,18 +5,18 @@ pragma ComponentBehavior: Bound
 // Under our renderer Plasma's Klipper is not running at all -- see
 // ClipboardStatus for why -- so without this there is no history. With
 // Klipper running, this is a view of Klipper's and changes nothing.
+//
+// The popout is the same card Meta+V opens at the pointer (ClipboardCard),
+// so it searches, filters, pins and answers to the same keys: it takes the
+// keyboard while it is open, which is what makes typing into it work.
 
 import QtQuick
 import qs.domain.status
-import qs.domain.status.icons
-import qs.domain.theme
-import qs.ui.controls
+import qs.ui.clipboard
 import qs.ui.primitives
 
 BarWidget {
     id: root
-
-    readonly property int shown: root.widgetConfig?.shown ?? 15
 
     tooltip: ClipboardStatus.entries.length === 0 ? "Clipboard history is empty"
            : ClipboardStatus.entries.length === 1 ? "Clipboard: 1 entry"
@@ -24,6 +24,9 @@ BarWidget {
 
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
+
+    popoutGrabsFocus: true
+    popoutPadding: 16
 
     function handleActivate(button) {
         root.popoutVisible = !root.popoutVisible;
@@ -41,88 +44,8 @@ BarWidget {
     }
 
     popout: Component {
-        PopoutColumn {
-            id: body
-            implicitWidth: 340
-            spacing: 6
-
-            PopoutHeader {
-                title: "Clipboard"
-
-                IconButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: ClipboardStatus.entries.length > 0
-                    iconName: "edit-clear-history"
-                    onActivated: ClipboardStatus.clear()
-                }
-            }
-
-            PanelText {
-                visible: ClipboardStatus.source === "own"
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.foregroundInactive
-                font.pixelSize: 10
-                text: "Plasma's clipboard manager is not running, so this shell keeps the history: text only, in memory, gone when the shell stops. Nothing a password manager marks secret is kept."
-            }
-
-            Repeater {
-                model: ClipboardStatus.entries.slice(0, root.shown)
-
-                Rectangle {
-                    id: row
-
-                    required property var modelData
-
-                    width: body.width
-                    height: 26
-                    radius: Theme.radiusOf(5)
-                    color: rowHover.hovered && !row.modelData.image ? Theme.hoverBackground : "transparent"
-                    opacity: row.modelData.image ? 0.5 : 1
-
-                    PanelIcon {
-                        x: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitSize: 14
-                        iconName: row.modelData.image ? "image-x-generic" : "edit-paste"
-                    }
-
-                    PanelText {
-                        x: 28
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 34
-                        elide: Text.ElideRight
-                        font.pixelSize: 11
-                        text: row.modelData.image ? "An image -- choose it from Plasma's clipboard (Meta+V)"
-                                                  : StatusIcons.clipboardPreview(row.modelData.text, 80)
-                    }
-
-                    HoverHandler { id: rowHover }
-                    TapHandler {
-                        enabled: !row.modelData.image
-                        onTapped: {
-                            ClipboardStatus.pick(row.modelData);
-                            root.popoutVisible = false;
-                        }
-                    }
-                }
-            }
-
-            PanelText {
-                visible: ClipboardStatus.entries.length === 0
-                width: parent.width
-                color: Theme.foregroundInactive
-                font.pixelSize: 11
-                text: "Nothing copied yet."
-            }
-
-            PanelText {
-                visible: ClipboardStatus.entries.length > root.shown
-                width: parent.width
-                color: Theme.foregroundInactive
-                font.pixelSize: 10
-                text: `and ${ClipboardStatus.entries.length - root.shown} older`
-            }
+        ClipboardCard {
+            onCloseRequested: root.closePopout()
         }
     }
 }

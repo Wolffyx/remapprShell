@@ -230,7 +230,8 @@
         "refresh": 30
     },
     "clipboard": {
-        "history": "own"
+        "history": "own",
+        "preview": true
     },
     "update": {
         "channel": "main",

@@ -82,7 +82,8 @@ QtObject {
     property var klipperEntries: []
     property var ownEntries: []
 
-    // [{ text, image }], newest first.
+    // [{ text, image, path?, width?, height?, pinned?, time? }]: the pinned
+    // first, then newest first. See ClipboardHistory.
     readonly property var entries: root.klipper ? root.klipperEntries : root.ownEntries
 
     // Put an entry back on the clipboard. Text goes through stdin, so it is
@@ -95,6 +96,8 @@ QtObject {
         if (entry.image) {
             if (!entry.path || root.klipper)
                 return;
+            root._picked = entry.path;
+            root._pickedAt = Date.now();
             Clipboard.copyFile(entry.path, "image/png");
             return;
         }
@@ -103,6 +106,12 @@ QtObject {
         Clipboard.copyText(entry.text);
     }
 
+    // The picture last put back on the clipboard from the history, and when.
+    // It comes back through the image watcher as a new file, which replaces
+    // it rather than standing beside it as a second copy of the same thing.
+    property string _picked: ""
+    property real _pickedAt: 0
+
     // Whether choosing this entry would do anything. An image in Klipper's
     // history is Klipper's file, not ours, and its DBus interface offers no
     // way to select one -- so it is shown and said to be Plasma's.
@@ -110,13 +119,34 @@ QtObject {
         return !!entry && (entry.image ? (!root.klipper && !!entry.path) : String(entry.text ?? "").length > 0);
     }
 
+    // Whether entries can be pinned and removed one at a time. Ours can;
+    // Klipper's DBus interface offers neither, so in its history the
+    // controls are not shown rather than shown and doing nothing.
+    readonly property bool editable: !root.klipper
+
+    // Clears the history. Ours keeps what is pinned -- it is pinned so that
+    // it stays -- and Klipper's is Klipper's to clear, all of it.
     function clear() {
         if (root.klipper) {
             Dbus.send("org.kde.klipper", "/klipper", "org.kde.klipper.klipper", "clearClipboardHistory");
-        } else {
-            root._forget(StatusIcons.clipboardOrphans(root.ownEntries, []));
-            root.ownEntries = [];
+            return;
         }
+        root._keep(ClipboardHistory.clipboardClear(root.ownEntries));
+    }
+
+    // Pins an entry of ours, or unpins it: a pinned entry stays at the top,
+    // is never pushed off the end, and survives clearing.
+    function togglePin(entry) {
+        if (!root.editable || !entry)
+            return;
+        root.ownEntries = ClipboardHistory.clipboardTogglePin(root.ownEntries, entry);
+    }
+
+    // Takes one entry of ours out of the history, and its file with it.
+    function remove(entry) {
+        if (!root.editable || !entry)
+            return;
+        root._keep(ClipboardHistory.clipboardRemove(root.ownEntries, entry));
     }
 
     // The files of entries that have fallen out of the history. Deleted with
@@ -125,13 +155,13 @@ QtObject {
     function _forget(paths) {
         if (!paths || paths.length === 0)
             return;
-        remove.command = ["rm", "-f"].concat(paths.map(p => String(p)));
-        remove.running = false;
-        remove.running = true;
+        remover.command = ["rm", "-f"].concat(paths.map(p => String(p)));
+        remover.running = false;
+        remover.running = true;
     }
 
     function _keep(next) {
-        root._forget(StatusIcons.clipboardOrphans(root.ownEntries, next));
+        root._forget(ClipboardHistory.clipboardOrphans(root.ownEntries, next));
         root.ownEntries = next;
     }
 
@@ -143,7 +173,8 @@ QtObject {
             wanted: root.wanted,
             klipperRunning: root.klipperPresent,
             count: root.entries.length,
-            images: root.entries.filter(e => e.image).length
+            images: root.entries.filter(e => e.image).length,
+            pinned: root.entries.filter(e => e.pinned).length
         };
     }
 
@@ -199,7 +230,7 @@ QtObject {
         stdout: StdioCollector {
             onStreamFinished: {
                 const reply = Dbus.unwrap(this.text, "getClipboardHistoryMenu");
-                root.klipperEntries = StatusIcons.klipperEntries(Array.isArray(reply?.[0]) ? reply[0] : []);
+                root.klipperEntries = ClipboardHistory.klipperEntries(Array.isArray(reply?.[0]) ? reply[0] : []);
             }
         }
     }
@@ -224,7 +255,7 @@ QtObject {
                     return;
                 }
                 if (text.trim().length > 0)
-                    root._keep(StatusIcons.clipboardAdd(root.ownEntries, text, root.limit));
+                    root._keep(ClipboardHistory.clipboardAdd(root.ownEntries, text, root.limit, Date.now()));
             }
         }
     }
@@ -260,11 +291,18 @@ QtObject {
                 }
                 if (!entry?.path)
                     return;
-                root._keep(StatusIcons.clipboardAddImage(root.ownEntries, entry.path,
-                                                         entry.width, entry.height, root.limit));
+                const now = Date.now();
+                const repick = root._picked.length > 0 && now - root._pickedAt < 5000;
+                const old = root._picked;
+                root._picked = "";
+                root._keep(repick
+                    ? ClipboardHistory.clipboardReplaceImage(root.ownEntries, old, entry.path, entry.width,
+                                                             entry.height, root.limit, now)
+                    : ClipboardHistory.clipboardAddImage(root.ownEntries, entry.path, entry.width,
+                                                         entry.height, root.limit, now));
             }
         }
     }
 
-    readonly property Process _remove: Process { id: remove }
+    readonly property Process _remove: Process { id: remover }
 }

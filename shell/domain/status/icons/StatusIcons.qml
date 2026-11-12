@@ -65,9 +65,9 @@ QtObject {
 
     // ---- clipboard: ClipboardHistory ---------------------------------------
 
-    function clipboardAdd(list, text, limit) { return ClipboardHistory.clipboardAdd(list, text, limit); }
-    function clipboardAddImage(list, path, width, height, limit) {
-        return ClipboardHistory.clipboardAddImage(list, path, width, height, limit);
+    function clipboardAdd(list, text, limit, now) { return ClipboardHistory.clipboardAdd(list, text, limit, now); }
+    function clipboardAddImage(list, path, width, height, limit, now) {
+        return ClipboardHistory.clipboardAddImage(list, path, width, height, limit, now);
     }
     function clipboardOrphans(before, after) { return ClipboardHistory.clipboardOrphans(before, after); }
     function clipboardLabel(entry, max) { return ClipboardHistory.clipboardLabel(entry, max); }

@@ -2,22 +2,48 @@ pragma Singleton
 
 // The clipboard history, as pure functions of the list it is: what copying
 // something does to it, which image files fall out of it, what an entry says
-// on one line, and Klipper's history read into the same shape.
+// on one line, what kind of thing it is, what a search finds in it, and
+// Klipper's history read into the same shape.
 //
 // Pure, and apart from the watcher that owns the list, because one of these
-// decides which files are deleted. StatusIcons forwards to every function
-// here, so a widget that asks it keeps working.
+// decides which files are deleted. StatusIcons forwards to the older
+// functions here, so a widget that asks it keeps working.
+//
+// An entry is { text, image, path?, width?, height?, pinned?, time? }. A
+// pinned entry stays at the top, is never pushed off the end by newer ones,
+// and survives clearing the history; `time` is when it was copied, in ms,
+// and 0 when nobody knows (Klipper's).
 
 import QtQuick
 
 QtObject {
     id: root
 
+    // What an entry is, one key per distinct thing: two copies of the same
+    // text are one entry, and every picture is its own file.
+    function clipboardKey(entry) {
+        if (!entry)
+            return "";
+        return entry.image ? `image:${entry.path ?? entry.text ?? ""}` : `text:${entry.text ?? ""}`;
+    }
+
+    // `fresh` at the top of `list`, with whatever it replaces taken out. The
+    // pin goes with it: copying a pinned thing again does not unpin it. Past
+    // `limit`, the oldest unpinned entries fall off; pinned ones never do.
+    function _push(list, fresh, limit) {
+        const key = root.clipboardKey(fresh);
+        const old = (list ?? []).find(e => e && root.clipboardKey(e) === key);
+        const top = (old && old.pinned) ? Object.assign({}, fresh, { pinned: true }) : fresh;
+        const rest = (list ?? []).filter(e => e && root.clipboardKey(e) !== key);
+        const cap = Math.max(1, limit);
+        let kept = 0;
+        return [top].concat(rest).filter(e => e.pinned || ++kept <= cap);
+    }
+
     // A history with `text` at the top: an entry already in it moves up
     // rather than appearing twice, and the oldest fall off past `limit`.
-    function clipboardAdd(list, text, limit) {
-        const rest = (list ?? []).filter(e => e && e.text !== text);
-        return [{ text: text, image: false }].concat(rest).slice(0, Math.max(1, limit));
+    function clipboardAdd(list, text, limit, now) {
+        return root._push(list, { text: text, image: false, time: Number(now) || 0 }, limit);
     }
 
     // An image that was copied. The file is ours -- written by the watcher
@@ -26,11 +52,40 @@ QtObject {
     // other. The path is carried rather than the pixels: a clipboard image is
     // megabytes, and QML holding several of them as data is a shell that grows
     // all day.
-    function clipboardAddImage(list, path, width, height, limit) {
-        const rest = (list ?? []).filter(e => e && e.path !== path);
-        return [{ text: "", image: true, path: String(path), width: Number(width) || 0,
-                  height: Number(height) || 0 }]
-            .concat(rest).slice(0, Math.max(1, limit));
+    function clipboardAddImage(list, path, width, height, limit, now) {
+        return root._push(list, { text: "", image: true, path: String(path), width: Number(width) || 0,
+                                  height: Number(height) || 0, time: Number(now) || 0 }, limit);
+    }
+
+    // A picture chosen from the history comes back through the watcher as a
+    // new file of the same pixels. That is the entry that was chosen, not a
+    // new one: it replaces the old entry at the top, keeping its pin, and
+    // the old file falls out to be deleted.
+    function clipboardReplaceImage(list, oldPath, path, width, height, limit, now) {
+        const old = (list ?? []).find(e => e && e.image && e.path === oldPath);
+        const next = root.clipboardAddImage(root.clipboardRemove(list, old), path, width, height, limit, now);
+        if (!old || !old.pinned)
+            return next;
+        return root.clipboardTogglePin(next, next[0]);
+    }
+
+    // The history without `entry`.
+    function clipboardRemove(list, entry) {
+        const key = root.clipboardKey(entry);
+        return (list ?? []).filter(e => e && root.clipboardKey(e) !== key);
+    }
+
+    // The history with `entry` pinned, or unpinned if it was.
+    function clipboardTogglePin(list, entry) {
+        const key = root.clipboardKey(entry);
+        return (list ?? []).map(e => (e && root.clipboardKey(e) === key)
+                                     ? Object.assign({}, e, { pinned: !e.pinned }) : e);
+    }
+
+    // What clearing leaves: the pinned entries, which are there because
+    // somebody asked for them to stay.
+    function clipboardClear(list) {
+        return (list ?? []).filter(e => e && e.pinned);
     }
 
     // The image files an old list has that a new one does not: what the
@@ -38,9 +93,193 @@ QtObject {
     // without bound. Pure, because getting it wrong deletes a file.
     function clipboardOrphans(before, after) {
         const kept = new Set((after ?? []).filter(e => e && e.image).map(e => String(e.path)));
-        return (before ?? []).filter(e => e && e.image && !kept.has(String(e.path)))
+        return (before ?? []).filter(e => e && e.image && e.path && !kept.has(String(e.path)))
                              .map(e => String(e.path));
     }
+
+    // ---- what an entry is ---------------------------------------------------
+
+    // Program names a copied line is a command for, when it carries no
+    // option to say so itself.
+    readonly property var _commands: ["sudo", "git", "make", "cd", "ls", "cp", "mv", "rm", "mkdir", "cat",
+        "grep", "rg", "find", "systemctl", "journalctl", "pacman", "paru", "yay", "flatpak", "npm", "pnpm",
+        "yarn", "cargo", "python", "python3", "pip", "ssh", "scp", "curl", "wget", "docker", "podman",
+        "kubectl", "qdbus", "gdbus", "kwriteconfig6", "kreadconfig6", "quickshell", "qs", "wl-copy",
+        "wl-paste", "nix", "apt", "dnf", "zypper"]
+
+    // In order: the first that matches names the entry. Each sees the text
+    // trimmed, and how many lines it has.
+    readonly property var _kinds: [
+        { kind: "colour", test: (t, lines) => lines === 1
+            && /^(#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\))$/i.test(t) },
+        { kind: "link", test: (t, lines) => lines === 1 && /^(https?|ftp|file):\/\/\S+$/i.test(t) },
+        { kind: "path", test: (t, lines) => lines === 1 && t.length > 1 && /^(~|\.{1,2})?\/[^\s]*$/.test(t) },
+        // Braces, semicolons, assignments, indentation, or a call: name(
+        // with nothing between -- which prose with a remark in brackets
+        // does not have.
+        { kind: "code", test: (t, lines) => lines > 1 && /[{};=]|^\s{2,}\S|\w\(/m.test(t) },
+        { kind: "command", test: (t, lines) => lines === 1 && t.length <= 300 && root._isCommand(t) }
+    ]
+
+    function _isCommand(t) {
+        const first = t.replace(/^\$\s+/, "").split(/\s+/)[0];
+        if (t.startsWith("$ ") || root._commands.indexOf(first) >= 0)
+            return true;
+        // A word and then an option or a pipe, and nothing that reads as prose.
+        return /^[a-z0-9_.-]+\s(.*\s)?(--?[a-z]|[|&>])/i.test(t) && !/[.?!]$/.test(t);
+    }
+
+    // "text", "code", "command", "path", "colour", "link" or "image".
+    function clipboardKind(entry) {
+        if (!entry)
+            return "text";
+        if (entry.image)
+            return "image";
+        const t = String(entry.text ?? "").trim();
+        const lines = t.split("\n").length;
+        const hit = root._kinds.find(k => k.test(t, lines));
+        return hit ? hit.kind : "text";
+    }
+
+    // Which filter a kind is found under, besides "all" and "pinned".
+    readonly property var _groups: ({ text: "text", code: "text", command: "text", path: "text",
+                                      colour: "text", link: "links", image: "images" })
+
+    readonly property var _labels: ({ text: "Text", code: "Code", command: "Command", path: "File path",
+                                      colour: "Colour", link: "Link", image: "Image" })
+
+    readonly property var _glyphs: ({ text: "notes", code: "code", command: "terminal", path: "description",
+                                      colour: "palette", link: "link", image: "image" })
+
+    // Monospaced in the preview: the kinds where a character's place matters.
+    readonly property var _mono: ({ code: true, command: true, path: true, colour: true })
+
+    function clipboardKindLabel(kind) { return root._labels[kind] ?? "Text"; }
+    function clipboardKindGlyph(kind) { return root._glyphs[kind] ?? "notes"; }
+    function clipboardKindMono(kind) { return root._mono[kind] === true; }
+
+    // The address without its scheme or path: what a link is, at a glance.
+    function clipboardHost(url) {
+        return String(url ?? "").trim().replace(/^[a-z]+:\/\//i, "").split(/[/?#]/)[0];
+    }
+
+    // "#466fbd" as "rgb(70, 111, 189)"; anything else as it is.
+    function clipboardRgb(colour) {
+        const t = String(colour ?? "").trim();
+        const m = /^#([0-9a-f]{6})$/i.exec(t);
+        if (!m)
+            return t;
+        const n = parseInt(m[1], 16);
+        return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+    }
+
+    // A copied colour as one QML can draw: CSS writes alpha last
+    // ("#rrggbbaa"), Qt first ("#aarrggbb"), and Qt reads no rgb() at all.
+    // "transparent" for anything that is not a colour.
+    function clipboardSwatch(colour) {
+        const t = String(colour ?? "").trim().toLowerCase();
+        const hex = /^#([0-9a-f]{3,8})$/.exec(t);
+        if (hex)
+            return root._hexSwatch(hex[1]);
+        const fn = /^(rgb|hsl)a?\(([^)]*)\)$/.exec(t);
+        if (!fn)
+            return "transparent";
+        const n = fn[2].split(/[\s,\/]+/).filter(x => x.length > 0).map(x => parseFloat(x));
+        if (n.length < 3 || n.some(x => isNaN(x)))
+            return "transparent";
+        const a = n.length > 3 ? (fn[2].indexOf("%") >= 0 && n[3] > 1 ? n[3] / 100 : n[3]) : 1;
+        if (fn[1] === "rgb")
+            return Qt.rgba(n[0] / 255, n[1] / 255, n[2] / 255, a);
+        return Qt.hsla(((n[0] % 360) + 360) % 360 / 360, n[1] / 100, n[2] / 100, a);
+    }
+
+    function _hexSwatch(h) {
+        const full = h.length <= 4 ? h.split("").map(c => c + c).join("") : h;
+        if (full.length === 6)
+            return `#${full}`;
+        if (full.length === 8)
+            return `#${full.slice(6)}${full.slice(0, 6)}`;
+        return "transparent";
+    }
+
+    function _imageMeta(e) {
+        if (e.width > 0 && e.height > 0)
+            return `${e.width}×${e.height} · PNG`;
+        // Klipper's: what it wrote after its "▨".
+        const said = String(e.text ?? "").replace(/^▨\s*/, "").trim();
+        return said.length > 0 ? said : "Picture";
+    }
+
+    readonly property var _meta: ({
+        text: e => { const n = String(e.text ?? "").length; return n === 1 ? "1 character" : `${n} characters`; },
+        code: e => `${String(e.text ?? "").trim().split("\n").length} lines`,
+        command: () => "Command",
+        path: () => "File path",
+        colour: e => root.clipboardRgb(e.text),
+        link: e => root.clipboardHost(e.text),
+        image: e => root._imageMeta(e)
+    })
+
+    // The line under an entry's own: what it is, in a few words.
+    function clipboardMeta(entry) {
+        if (!entry)
+            return "";
+        return root._meta[root.clipboardKind(entry)](entry);
+    }
+
+    // How long ago, shortly: "now", "4 min", "2 h", "yesterday", "3 d". Empty
+    // when nobody knows.
+    function clipboardAge(time, now) {
+        if (!(time > 0))
+            return "";
+        const s = Math.max(0, Math.floor((now - time) / 1000));
+        if (s < 60)
+            return "now";
+        if (s < 3600)
+            return `${Math.floor(s / 60)} min`;
+        if (s < 86400)
+            return `${Math.floor(s / 3600)} h`;
+        return s < 172800 ? "yesterday" : `${Math.floor(s / 86400)} d`;
+    }
+
+    // ---- what a search finds ------------------------------------------------
+
+    function _inFilter(entry, filter) {
+        if (filter === "all")
+            return true;
+        if (filter === "pinned")
+            return !!entry.pinned;
+        return root._groups[root.clipboardKind(entry)] === filter;
+    }
+
+    // Whether `entry` has `query` in its text, what it is or the line under
+    // it -- so "png", "link" and "kde.org" all find something.
+    function clipboardMatches(entry, query) {
+        const q = String(query ?? "").trim().toLowerCase();
+        if (q.length === 0)
+            return true;
+        const kind = root.clipboardKind(entry);
+        const hay = [entry.text ?? "", root.clipboardKindLabel(kind), root.clipboardMeta(entry)].join(" ").toLowerCase();
+        return hay.indexOf(q) >= 0;
+    }
+
+    // What the list shows for a filter ("all", "pinned", "text", "links",
+    // "images") and a search: the pinned first, each part newest first.
+    function clipboardFind(list, filter, query) {
+        const hits = (list ?? []).filter(e => e && root._inFilter(e, filter ?? "all")
+                                              && root.clipboardMatches(e, query));
+        return hits.filter(e => e.pinned).concat(hits.filter(e => !e.pinned));
+    }
+
+    // How many each filter would show, before any search.
+    function clipboardCounts(list) {
+        const all = (list ?? []).filter(e => e);
+        const count = f => all.filter(e => root._inFilter(e, f)).length;
+        return { all: all.length, pinned: count("pinned"), text: count("text"), links: count("links"),
+                 images: count("images") };
+    }
+
+    // ---- one line -----------------------------------------------------------
 
     // What an entry says on one line, whether it is text or a picture.
     function clipboardLabel(entry, max) {

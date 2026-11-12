@@ -6126,3 +6126,28 @@ library, and the plugin's RUNPATH is the build directory unless told otherwise:
 a build directory that later goes away leaves a module that silently stops
 loading and a shell drawing icons with nothing to say why. `$ORIGIN` now. A
 crash report is worth reading even when the crash is not the bug.
+
+## The clipboard, one card (2026-11-11)
+
+Meta+V and the panel's clipboard button open **the same card** now,
+`ui/clipboard/ClipboardCard.qml`: the overlay draws the glass round it at the
+pointer, the widget's popout under its button. It lives in `ui/` because a
+widget may not import a feature. It searches as you type, filters by kind
+(All, Pinned, Text, Links, Images), shows the selected entry whole beside the
+list (`clipboard.preview`, on by default), and answers to the keys its header
+comment lists -- Up/Down, PageUp/PageDown, Ctrl+Home/End, Return, Alt+1..9,
+Tab, Ctrl+P, Shift+Delete, Escape. The design is the canvas "Clipboard
+redesign" made from the Remappr Shell design system.
+
+What changed underneath, all in `ClipboardHistory` and tested there: pinned
+entries never fall off the end and survive clearing; one entry can be removed,
+its file with it; every entry knows its kind and when it was copied. A picture
+chosen from the history used to come back through the watcher as a *second*
+entry -- a new file of the same pixels -- and now replaces the one chosen.
+Pins and removal are ours only: Klipper's DBus interface has neither, so with
+`clipboard.history: plasma` those controls are not drawn. Pins are in memory,
+like the rest of the history: gone when the shell stops.
+
+`widgets.clipboard.shown` is gone: the list scrolls. `escape` is not a legal
+QML method name -- qmllint passed it and the engine refused the file; the
+offscreen preview (`dev/preview/clipboard.qml`) is what caught it.
