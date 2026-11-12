@@ -99,6 +99,32 @@ TestCase {
         compare(OsdEvents.progress("x", -20, "").value, 0);
     }
 
+    // A raised volume has a longer bar, and is bounded by that instead.
+    function test_progress_has_a_longer_bar_when_asked() {
+        const e = OsdEvents.progress("audio-volume-high", 120, "", 150);
+        compare(e.value, 120);
+        compare(e.maxValue, 150);
+        compare(OsdEvents.progress("x", 180, "", 150).value, 150);
+        compare(OsdEvents.progress("x", 50, "", 0).maxValue, 100);
+        compare(OsdEvents.progress("x", 50, "", undefined).maxValue, 100);
+    }
+
+    // Plasma's volume bar is redrawn on this shell's scale; anything else is
+    // left as it came.
+    function test_on_scale() {
+        const plasma = { icon: "audio-volume-high", text: "", value: 100, maxValue: 100, showingProgress: true };
+        compare(OsdEvents.onScale(plasma, 150).maxValue, 150);
+        compare(OsdEvents.onScale(plasma, 150).value, 100);
+        const raised = { icon: "audio-volume-high", text: "", value: 120, maxValue: 150, showingProgress: true };
+        compare(OsdEvents.onScale(raised, 120).maxValue, 120);
+        const bright = { icon: "display-brightness", text: "", value: 40, maxValue: 100, showingProgress: true };
+        compare(OsdEvents.onScale(bright, 150), bright);
+        const muted = { icon: "audio-volume-muted", text: "Muted", value: 0, maxValue: 100, showingProgress: false };
+        compare(OsdEvents.onScale(muted, 150), muted);
+        compare(OsdEvents.onScale(plasma, 0), plasma);
+        compare(OsdEvents.onScale(null, 150), null);
+    }
+
     function test_progress_rejects_a_value_that_is_not_one() {
         compare(OsdEvents.progress("x", NaN, ""), null);
         compare(OsdEvents.progress("x", undefined, ""), null);

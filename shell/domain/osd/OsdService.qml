@@ -82,6 +82,13 @@ QtObject {
             root._show(event);
     }
 
+    // Where a volume bar ends, in percent: where this shell's sliders end for
+    // that level -- 100, or 150 with "Raise maximum volume", or the level
+    // itself when something else has set it past either.
+    function volumeEnd(volume) {
+        return Math.round(AudioStatus.ceilingFor(volume) * 100);
+    }
+
     // The last level actually reported, and the sink it belonged to.
     //
     // A volume property that changes is not the same as a volume that changed.
@@ -125,7 +132,7 @@ QtObject {
         root._lastVolume = AudioStatus.volume;
         root._lastMuted = AudioStatus.muted;
         root._raise(OsdEvents.progress(StatusIcons.volumeIcon(AudioStatus.volume, AudioStatus.muted),
-                                       AudioStatus.volume * 100, ""));
+                                       AudioStatus.volume * 100, "", root.volumeEnd(AudioStatus.volume)));
     }
 
     readonly property Connections _audio: Connections {
@@ -199,8 +206,10 @@ QtObject {
     // Still here with the sources above in place, because it is the only way
     // this shell hears about the things it does not read: the keyboard layout,
     // the touchpad, caps lock. Where plasmashell does emit, a volume key
-    // arrives twice -- once here, once from PipeWire -- and both carry the
-    // same number, so the pill is redrawn identically rather than twice over.
+    // arrives twice -- once here, once from PipeWire -- with the same level,
+    // and Plasma's is put on this shell's scale (OsdEvents.onScale): Plasma
+    // ends its bar by its own raise-the-maximum setting, and with the two
+    // apart the bar changed length from one source to the other.
     readonly property BusMonitor _monitor: BusMonitor {
         match: "type='signal',interface='org.kde.osdService'"
         running: root.enabled
@@ -208,7 +217,7 @@ QtObject {
         onRead: line => {
             const event = OsdEvents.parse(line);
             if (event)
-                root._show(event);
+                root._show(OsdEvents.onScale(event, root.volumeEnd(event.value / 100)));
         }
 
         onListeningChanged: {

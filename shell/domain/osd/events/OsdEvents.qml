@@ -90,18 +90,40 @@ QtObject {
     // thresholds, and duplicating them here to keep this module importable by
     // qmltestrunner would put the same rule in two places.
 
-    // A level with a bar: volume, brightness, anything measurable.
-    function progress(icon, percent, text) {
+    // A level with a bar: volume, brightness, anything measurable. `max` is
+    // the end of the bar, 100 unless said -- a volume allowed past 100% (the
+    // shell's "Raise maximum volume") has a longer one, as its sliders do.
+    function progress(icon, percent, text, max) {
         const value = Number(percent);
         if (!isFinite(value))
             return null;
+        const end = Number(max) > 0 ? Math.round(Number(max)) : 100;
         return {
             icon: String(icon ?? ""),
             text: String(text ?? ""),
-            value: Math.max(0, Math.min(100, Math.round(value))),
-            maxValue: 100,
+            value: Math.max(0, Math.min(end, Math.round(value))),
+            maxValue: end,
             showingProgress: true
         };
+    }
+
+    // Whether an event is a volume level: Plasma's and ours both draw one
+    // with an audio-volume-* icon.
+    function isVolume(event) {
+        return event?.showingProgress === true && String(event?.icon ?? "").startsWith("audio-volume");
+    }
+
+    // A volume event from plasmashell, on this shell's scale. Plasma ends its
+    // bar at 100 or 150 by its own setting, and this shell at its own
+    // (`audio.raiseMaxVolume`); the same key press arrives from both, so with
+    // the two settings apart the bar changed length from one press to the
+    // next, and drew 100% as full when this shell said it was two thirds.
+    // `max` is this shell's end for that level; anything but a volume level
+    // passes through untouched.
+    function onScale(event, max) {
+        if (!root.isVolume(event) || !(Number(max) > 0))
+            return event;
+        return root.progress(event.icon, event.value, event.text, max);
     }
 
     // Words with no bar: muted, a layout name, a toggle.

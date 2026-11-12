@@ -6379,3 +6379,14 @@ Preview: `PREVIEW_MAGNIFY=1 dev/preview/dock.qml` (with `PREVIEW_DOCK=left` or
 -- the pointer tracking, the placement round the pointer, the mask -- was only
 linted: the first real look is on a desktop with the dock on and Settings ->
 Dock -> Magnify under the pointer.
+
+## The volume OSD on the shell's scale (2026-11-12)
+
+With "Raise maximum volume" on, the volume OSD drew 100% as a full bar and
+never went past it: `OsdEvents.progress` ended every bar at 100. And with
+plasmashell running, each change arrives twice -- from PipeWire and from
+Plasma's `osdProgress`, which ends its bar by Plasma's own setting -- so the
+bar changed length from one press to the next. `progress` now takes where the
+bar ends, and the volume uses `OsdService.volumeEnd` (AudioStatus.ceilingFor,
+the sliders' own end); Plasma's volume events are redrawn on that scale by
+`OsdEvents.onScale` (tested). Brightness and the rest pass through untouched.
