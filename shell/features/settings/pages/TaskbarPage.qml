@@ -15,6 +15,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.domain.config
+import qs.domain.panel
 import qs.domain.theme
 import qs.ui.primitives
 import qs.ui.controls
@@ -96,6 +97,54 @@ Column {
             enabled: root.floats
             fallback: true
             path: "panel.defloat"
+        }
+    }
+
+    // The network, Bluetooth, brightness, volume and battery glyphs as a
+    // widget each, or as the one quick settings button. Not one key: the
+    // switch rewrites the panel's entries both ways (StatusGroup), so the
+    // Widgets page shows the result and can undo it piece by piece.
+    Card {
+        id: statusCard
+        width: root.width
+
+        readonly property var entries: ConfigStore.value("bar.entries", [])
+        readonly property bool grouped: StatusGroup.grouped(statusCard.entries)
+
+        function pick(value) {
+            if (value === "grouped") {
+                const r = StatusGroup.group(statusCard.entries);
+                const change = { "bar.entries": r.entries };
+                if (r.parts)
+                    change["widgets.status.parts"] = r.parts;
+                ConfigStore.setMany(change);
+                return;
+            }
+            ConfigStore.set("bar.entries", StatusGroup.separate(statusCard.entries,
+                                                                ConfigStore.value("widgets.status.parts", null)));
+        }
+
+        SectionLabel { text: "Status icons" }
+
+        Segmented {
+            width: parent.width
+            values: ["separate", "grouped"]
+            labels: ["A widget each", "One button"]
+            current: statusCard.grouped ? "grouped" : "separate"
+            onPicked: value => statusCard.pick(value)
+        }
+
+        Hint {
+            text: "One button is the quick settings: the glyphs side by side, one click away from Wi-Fi, Bluetooth, sound and the rest. Which glyphs it shows is a setting of the Quick settings widget, on the Widgets page. The microphone-in-use warning stays a widget of its own either way."
+        }
+
+        ConfigToggleRow {
+            label: "Draw the button all the time"
+            description: statusCard.grouped ? "A rounded background behind the glyphs even when the pointer is away, so the group reads as one button."
+                                            : "Only matters for one button."
+            enabled: statusCard.grouped
+            fallback: false
+            path: "widgets.status.capsule"
         }
     }
 

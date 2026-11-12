@@ -40,40 +40,57 @@ BarWidget {
     // that is news rather than state, and it takes no room the rest of the
     // time. Without it, a panel carrying only this widget said nothing at all
     // while a browser tab listened.
+    //
+    // Which of them the panel shows is the widget's `parts` setting; the
+    // brightness is one a layout can add (Windows-like does), and is left out
+    // by default. Hardware still decides: no battery, no battery glyph.
+    readonly property var shownParts: root.widgetConfig?.parts
+        ?? ["privacy", "network", "bluetooth", "volume", "battery"]
+
     readonly property var parts: [
         { id: "privacy", shown: PrivacyStatus.present, alert: true,
           glyph: StatusIcons.privacyGlyph(PrivacyStatus.users, AudioStatus.micMuted),
           icon: StatusIcons.privacyIcon(PrivacyStatus.users, AudioStatus.micMuted) },
         { id: "network", shown: NetworkStatus.available, glyph: NetworkStatus.glyph, icon: NetworkStatus.icon },
         { id: "bluetooth", shown: BluetoothStatus.present, glyph: BluetoothStatus.glyph, icon: BluetoothStatus.icon },
+        { id: "brightness", shown: BrightnessStatus.present, glyph: BrightnessStatus.glyph, icon: BrightnessStatus.icon },
         { id: "volume", shown: true, glyph: AudioStatus.glyph, icon: AudioStatus.icon },
         { id: "battery", shown: PowerStatus.present, glyph: PowerStatus.glyph, icon: PowerStatus.icon }
-    ].filter(p => p.shown)
+    ].filter(p => p.shown && root.shownParts.indexOf(p.id) >= 0)
+
+    // Whether the glyphs sit on a capsule all the time, so the group reads
+    // as one button -- or only while the pointer is over it.
+    readonly property bool capsule: root.widgetConfig?.capsule === true
+
+    function _bluetoothTip() {
+        if (!BluetoothStatus.enabled)
+            return "Bluetooth is off";
+        const on = BluetoothStatus.paired.filter(d => d.connected);
+        return on.length === 0 ? "Bluetooth on\nNothing connected"
+            : `Bluetooth on\n${on.map(d => d.batteryAvailable ? `${BluetoothStatus.nameOf(d)} ${StatusIcons.percent(d.battery)}`
+                                                            : BluetoothStatus.nameOf(d)).join(" · ")}`;
+    }
+
+    // What each glyph says when the pointer rests on it.
+    readonly property var _tips: ({
+        privacy: () => StatusIcons.privacyHint(PrivacyStatus.users, AudioStatus.micMuted),
+        network: () => StatusIcons.networkTooltip(NetworkStatus.connections, NetworkStatus.connectivity),
+        bluetooth: () => root._bluetoothTip(),
+        brightness: () => BrightnessStatus.displays
+            .map(d => `${d.label || d.name}: ${StatusIcons.percent(d.brightness / d.max)}`)
+            .concat(BrightnessStatus.nightState === "unavailable" ? [] : [StatusIcons.nightLightLabel(BrightnessStatus.nightLight)])
+            .join("\n"),
+        volume: () => AudioStatus.sink
+            ? `${AudioStatus.muted ? "Muted" : `Volume ${StatusIcons.percent(AudioStatus.volume)}`}\n${AudioStatus.nameOf(AudioStatus.sink)}`
+            : "No sound output",
+        battery: () => [`Battery ${StatusIcons.percent(PowerStatus.level)}`,
+                        [PowerStatus.timeLabel || PowerStatus.stateLabel, StatusIcons.profileLabel(PowerStatus.profile)]
+                            .filter(s => s).join(" · ")].join("\n")
+    })
 
     function tipFor(id) {
-        switch (id) {
-        case "privacy":
-            return StatusIcons.privacyHint(PrivacyStatus.users, AudioStatus.micMuted);
-        case "network":
-            return StatusIcons.networkTooltip(NetworkStatus.connections, NetworkStatus.connectivity);
-        case "bluetooth": {
-            if (!BluetoothStatus.enabled)
-                return "Bluetooth is off";
-            const on = BluetoothStatus.paired.filter(d => d.connected);
-            return on.length === 0 ? "Bluetooth on\nNothing connected"
-                : `Bluetooth on\n${on.map(d => d.batteryAvailable ? `${BluetoothStatus.nameOf(d)} ${StatusIcons.percent(d.battery)}`
-                                                                : BluetoothStatus.nameOf(d)).join(" · ")}`;
-        }
-        case "volume":
-            return AudioStatus.sink
-                ? `${AudioStatus.muted ? "Muted" : `Volume ${StatusIcons.percent(AudioStatus.volume)}`}\n${AudioStatus.nameOf(AudioStatus.sink)}`
-                : "No sound output";
-        case "battery":
-            return [`Battery ${StatusIcons.percent(PowerStatus.level)}`,
-                    [PowerStatus.timeLabel || PowerStatus.stateLabel, StatusIcons.profileLabel(PowerStatus.profile)]
-                        .filter(s => s).join(" · ")].join("\n");
-        }
-        return "";
+        const tip = root._tips[id];
+        return tip ? tip() : "";
     }
 
     property int hoveredIndex: -1
@@ -131,7 +148,7 @@ BarWidget {
     Rectangle {
         anchors.fill: parent
         radius: Math.round(13 * root.k)
-        color: root.hovered || root.popoutVisible ? Theme.s2 : "transparent"
+        color: root.hovered || root.popoutVisible ? Theme.s2 : (root.capsule ? Theme.hover : "transparent")
         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
     }
 

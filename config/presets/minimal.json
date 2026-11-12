@@ -1,8 +1,8 @@
 {
     "name": "Minimal",
-    "description": "A thin bar with the time and the system tray, volume and network included. Nothing else.",
+    "description": "No bar at all: the time on its own in the middle and the tray, volume and network in one island at the right, floating clear of the top edge.",
     "config": {
-        "panel": { "position": "top", "thickness": 28 },
+        "panel": { "position": "top", "thickness": 30, "style": "islands" },
         "bar": {
             "entries": [
                 { "id": "clock",   "zone": "middle", "enabled": true },

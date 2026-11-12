@@ -10,6 +10,20 @@
         "quickshell": { "entry": "Widget.qml" }
     },
     "config": {
+        "parts": {
+            "type": "set",
+            "values": ["privacy", "network", "bluetooth", "brightness", "volume", "battery"],
+            "labels": ["Microphone and camera in use", "Network", "Bluetooth", "Brightness", "Volume", "Battery"],
+            "default": ["privacy", "network", "bluetooth", "volume", "battery"],
+            "label": "On the panel",
+            "description": "Which glyphs the panel shows in the group, in this order. One for hardware the machine does not have is left out whether or not it is on here. Leave out one that has a widget of its own on the panel, or it shows twice."
+        },
+        "capsule": {
+            "type": "bool",
+            "default": false,
+            "label": "Always draw the group as one button",
+            "description": "The glyphs sit on a rounded background all the time, so the group reads as one button, as Windows draws its quick settings. Off, the background shows only while the pointer is over it."
+        },
         "tiles": {
             "type": "set",
             "values": ["wifi", "ethernet", "bluetooth", "microphone", "dnd", "night", "game", "vpn"],

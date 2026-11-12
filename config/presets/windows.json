@@ -1,6 +1,6 @@
 {
     "name": "Windows-like",
-    "description": "Windows-style: start button, the windows you have open, then the tray, the clock and a show-desktop strip at the far end.",
+    "description": "Windows-style: start button, the windows you have open, then the tray, the quick settings as one button, the clock and a show-desktop strip at the far end.",
     "config": {
         "panel": {
             "position": "bottom",
@@ -44,27 +44,7 @@
                     "enabled": true
                 },
                 {
-                    "id": "bluetooth",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "network",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "brightness",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "volume",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "battery",
+                    "id": "status",
                     "zone": "right",
                     "enabled": true
                 },
@@ -89,6 +69,16 @@
             },
             "launcher": {
                 "icon": "start-here-kde"
+            },
+            "status": {
+                "parts": [
+                    "bluetooth",
+                    "network",
+                    "brightness",
+                    "volume",
+                    "battery"
+                ],
+                "capsule": true
             }
         }
     }

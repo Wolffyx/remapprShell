@@ -1,6 +1,6 @@
 {
     "name": "Workspace-focused",
-    "description": "Virtual desktops and open windows on the left, a centred clock, status on the right.",
+    "description": "Virtual desktops and open windows on the left, a centred clock, the quick settings as one button on the right.",
     "config": {
         "panel": {
             "position": "bottom",
@@ -54,27 +54,7 @@
                     "enabled": true
                 },
                 {
-                    "id": "bluetooth",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "network",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "brightness",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "volume",
-                    "zone": "right",
-                    "enabled": true
-                },
-                {
-                    "id": "battery",
+                    "id": "status",
                     "zone": "right",
                     "enabled": true
                 },
@@ -94,6 +74,16 @@
                 "hour12": false,
                 "showSeconds": false,
                 "showDate": true
+            },
+            "status": {
+                "parts": [
+                    "bluetooth",
+                    "network",
+                    "brightness",
+                    "volume",
+                    "battery"
+                ],
+                "capsule": true
             }
         }
     }

@@ -524,6 +524,8 @@ without `tray` it stands on the panel alone.
 
 | Setting | Accepts | Default | Meaning |
 | --- | --- | --- | --- |
+| `parts` | `privacy`, `network`, `bluetooth`, `brightness`, `volume`, `battery` | `["privacy","network","bluetooth","volume","battery"]` | Which glyphs the panel shows in the group, in this order. One for hardware the machine does not have is left out whether or not it is on here. Leave out one that has a widget of its own on the panel, or it shows twice. |
+| `capsule` | `true` or `false` | `false` | The glyphs sit on a rounded background all the time, so the group reads as one button, as Windows draws its quick settings. Off, the background shows only while the pointer is over it. |
 | `tiles` | `wifi`, `ethernet`, `bluetooth`, `microphone`, `dnd`, `night`, `game`, `vpn` | `["wifi","ethernet","bluetooth","microphone","dnd","night","game","vpn"]` | Which switches the grid draws, in this order. A tile for hardware the machine does not have is left out whether or not it is on here -- no Bluetooth adapter, no Bluetooth tile. |
 | `density` | `roomy`, `dense` | `roomy` | roomy: a grid of tiles. dense: a list of rows, each with its switch. |
 | `step` | a number, 1 to 25 | `5` | Percent per notch of the wheel. |
