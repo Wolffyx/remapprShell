@@ -83,14 +83,14 @@ lint-nesting: ## Warn about statements nested three deep, and ladders of tests o
 lint-qml: brand ## Run qmllint over the shell
 	@scripts/lint-qml.sh
 
-plugin: ## Build and install the compiled modules: window previews, held and lock keys (needs Qt6 dev + cmake)
+plugin: ## Build and install the compiled modules: window previews, held and lock keys, the global menu (needs Qt6 dev + cmake)
 	@cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release
 	@cmake --build build/plugin
 	@cmake --install build/plugin
-	@printf '\033[32m==>\033[0m window previews and the input module installed; restart the shell to pick them up\n'
+	@printf '\033[32m==>\033[0m window previews, the input module and the global menu installed; restart the shell to pick them up\n'
 
-plugin-clean: ## Remove the plugin's build directory and both installed modules
-	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast" "$(HOME)/.local/lib/qt6/qml/ShellInput"
+plugin-clean: ## Remove the plugin's build directory and the installed modules
+	@rm -rf build/plugin "$(HOME)/.local/lib/qt6/qml/KWinScreencast" "$(HOME)/.local/lib/qt6/qml/ShellInput" "$(HOME)/.local/lib/qt6/qml/KdeAppMenu"
 	@printf '\033[32m==>\033[0m window previews and the input module removed\n'
 
 clean: ## Remove generated files

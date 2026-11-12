@@ -47,6 +47,38 @@
       "builtin": true
     },
     {
+      "id": "appmenu",
+      "apiVersion": 1,
+      "name": "Global menu",
+      "description": "The menus of the window in front -- File, Edit, View -- on the panel after the application's name, as a macOS menu bar has them. While it is on the panel, KDE applications move their menu bar out of their window and into it, and put it back when it is taken off. An application that keeps a menu of its own, as most browsers and Electron applications do, shows its name only. Needs the compiled module: make plugin.",
+      "icon": "application-menu",
+      "zones": [
+        "left",
+        "middle",
+        "right"
+      ],
+      "orientation": [
+        "horizontal"
+      ],
+      "renderers": {
+        "quickshell": {
+          "entry": "Widget.qml"
+        },
+        "plasma": {
+          "applet": "org.kde.plasma.appmenu"
+        }
+      },
+      "config": {
+        "showAppName": {
+          "type": "bool",
+          "default": true,
+          "label": "The application's name first, in bold",
+          "description": "As macOS draws it. Off, the menus alone."
+        }
+      },
+      "builtin": true
+    },
+    {
       "id": "battery",
       "apiVersion": 1,
       "name": "Battery",

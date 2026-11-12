@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.24)
 # undefined symbol -- which looks like the plugin not being installed.
 project(shell-screencast VERSION 0.1 LANGUAGES CXX C)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Qml WaylandClient)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Qml WaylandClient DBus)
 
 # KGuiAddons, for KModifierKeyInfo: the lock keys. On Wayland it binds KWin's
 # own org_kde_kwin_keystate global, which is how a client with no keyboard
@@ -114,4 +114,25 @@ qt_add_library(shellinput SHARED)
 shell_qml_module(shellinput ShellInput
     SOURCES src/modifiers.cpp src/modifiers.h src/lockkeys.cpp src/lockkeys.h
     LIBS KF6::GuiAddons
+)
+
+# A third, for a global menu: which application menu belongs to the window in
+# front (KWin's window-management protocol, which is restricted and which
+# share/applications/wayland-interfaces.desktop.in asks for), and that menu
+# read over DBus. Named for what it reads -- KDE's application menus -- not
+# for this shell. The protocol is vendored, as the screencast one is, and
+# plasma-wayland-protocols' own copy is preferred where it is installed.
+qt_add_library(shellappmenu SHARED)
+
+set(WINDOW_MANAGEMENT_XML "${CMAKE_CURRENT_SOURCE_DIR}/protocols/plasma-window-management.xml")
+if(EXISTS "/usr/share/plasma-wayland-protocols/plasma-window-management.xml")
+    set(WINDOW_MANAGEMENT_XML "/usr/share/plasma-wayland-protocols/plasma-window-management.xml")
+endif()
+
+qt6_generate_wayland_protocol_client_sources(shellappmenu FILES "${WINDOW_MANAGEMENT_XML}")
+
+shell_qml_module(shellappmenu KdeAppMenu
+    SOURCES src/appmenu.cpp src/appmenu.h src/dbusmenu.cpp src/dbusmenu.h
+    LIBS Qt6::WaylandClient Qt6::DBus
+    INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
 )

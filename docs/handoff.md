@@ -6282,3 +6282,76 @@ it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 Not built: magnification, dragging tiles to reorder, the start-menu-style
 application actions in the dock menu, Downloads read from xdg-user-dirs
 (`~/Downloads` is assumed), and a dock under Plasma's renderer.
+
+## The macOS mode: a global menu and Launchpad (2026-11-12)
+
+**Launchpad** is a fourth start menu layout, `launcher.layout: launchpad`
+(Settings -> Launcher, "Launchpad"): every application over the whole screen,
+A to Z, a page at a time (`features/launcher/LaunchpadOverlay.qml`). Pages are
+sized to the screen (`Apps.launchpadGrid`, 4-8 columns by 3-5 rows) and cut by
+`Apps.pages`, both tested; typing filters with the launcher's own scoring
+(`Apps.search`). Arrows, PageUp/PageDown, the wheel and the dots move; Return
+starts; Escape clears and then closes. It is drawn where the panel's start
+button, the dock's start tile, a key or IPC opens the start menu: the launcher
+widget's popout stays shut while it is the layout, and the dock's start tile
+now opens the menu on the dock's own screen. Its backdrop is the theme's own
+surface at `launcher.launchpadBackdrop` percent (85), blurred where KWin
+blurs -- a 55% black dim let the windows behind read straight through, which
+was the first thing noticed on screen. Preview: `dev/preview/launchpad.qml`
+(preview.sh turns this overlay into an Item like the others).
+
+**The global menu** is the `appmenu` widget ("Global menu"): the application in
+front named in bold, then its menus, opened from the panel, a submenu in place
+with the way back at its top. It needs the compiled module, `KdeAppMenu`
+(`plugin/src/appmenu.*`, `plugin/src/dbusmenu.*`; `make plugin`); without it
+the widget draws the name alone, loaded by name from
+`platform/appmenu/MenuSource.qml` as window previews are.
+
+How it is found, because none of it was obvious:
+
+- **Whose menu.** KWin's scripting API does not carry the menu's address. KWin
+  hands it on per window through `org_kde_plasma_window_management`'s
+  `application_menu` event, which is the restricted protocol this shell's
+  desktop file already asks for (window previews needed it). `ActiveWindowMenu`
+  binds it at version 16 and keeps the last window KWin called active --
+  clicking the panel focuses a layer surface, which is no window, and the menu
+  must not vanish under the click. Probed against the live session: it named
+  the window in front (Remmina, "Work") correctly.
+- **The switch.** Applications export a menu only while
+  `com.canonical.AppMenu.Registrar` is on the bus, and Plasma's kded appmenu
+  module starts that only while somebody owns `org.kde.kappmenuview` -- which
+  is how Plasma's global menu applet says it exists. `ActiveWindowMenu`
+  holds that name while any global menu widget does (acquire/release, one per
+  screen). While held, KDE applications move their menu bar out of the window
+  into the panel; released, the registrar goes. Measured before building: with
+  the name not held, Dolphin, Konsole and Kate exported no `/MenuBar` at all.
+- **The menu.** Quickshell reads com.canonical.dbusmenu for tray icons, but its
+  handle cannot be made from QML for an address of ours; `DBusMenuModel` reads
+  `GetLayout` whole, re-reads on `LayoutUpdated` / `ItemsPropertiesUpdated`
+  (settled for 60 ms), calls `AboutToShow` before a menu or submenu is drawn,
+  and sends `Event(id, "clicked")`.
+
+**It crashed the shell on the first hot reload (2026-11-12, 17:34).** A reload
+destroys the QML engine's singletons, and `ActiveWindowMenu` owned the
+window-management global. `org_kde_plasma_window_management` has no destructor
+request, so the proxy stayed subscribed with its listener pointing at freed
+memory, and the next window event -- 14 seconds later -- jumped into it
+(segfault in `wl_display_dispatch_queue_pending`, through libffi). The Wayland
+side is now `WindowTracker`, made once and never deleted, exactly as
+`ScreencastGlobal::instance()` always was for the same reason; each engine's
+`ActiveWindowMenu` only reads it, and gives back whatever it held of the bus
+name when it goes. Note that `rmpr reload` keeps the old plugin library loaded:
+a new build of a module takes effect only on `rmpr restart`.
+
+**Not yet seen on screen:** the name was never held during this work, so no
+application has handed its menu to the widget yet, and whether every running
+application puts its own menu bar back when the widget goes (rather than at
+its next start) is unmeasured. The first look is `rmpr preset apply macos`, or
+the widget added on the Widgets page, after `make plugin` and `rmpr reload`.
+
+**macOS-like** now has the global menu where the window title was, and
+`launcher.layout: launchpad`. Preview of the menu card with a made-up File menu:
+`dev/preview/appmenu.qml` (the widget itself is not previewed: it would take
+every application's menu bar away from the desktop it runs on). A property
+named `top` on a Column clashes with Item's FINAL anchor line of that name;
+qmllint passed it and the preview caught it.

@@ -434,6 +434,7 @@ when two copies of a widget should differ.
 | Widget | id | Zones | Plasma renderer |
 | --- | --- | --- | --- |
 | Active window | `activewindow` | left, middle, right | `org.kde.plasma.windowlist` |
+| Global menu | `appmenu` | left, middle, right | `org.kde.plasma.appmenu` |
 | Battery | `battery` | left, middle, right | `org.kde.plasma.battery` (in the tray) |
 | Bluetooth | `bluetooth` | left, middle, right | `org.kde.plasma.bluetooth` (in the tray) |
 | Brightness and Night Light | `brightness` | left, middle, right | `org.kde.plasma.brightness` (in the tray) |
@@ -472,6 +473,12 @@ without `tray` it stands on the panel alone.
 | `maxWidth` | a number, 80 to 800 | `320` | It is elided past this. |
 | `showIcon` | `true` or `false` | `true` | Show the application's icon |
 | `showAppName` | `true` or `false` | `false` | "Dolphin" rather than the folder it has open, as a macOS menu bar does. |
+
+### `widgets.appmenu`
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `showAppName` | `true` or `false` | `true` | As macOS draws it. Off, the menus alone. |
 
 ### `widgets.battery`
 

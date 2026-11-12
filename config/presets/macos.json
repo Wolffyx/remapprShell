@@ -1,13 +1,13 @@
 {
     "name": "macOS-like",
-    "description": "A slim menu bar across the top -- launcher on the left, clock centred, status on the right -- and a dock of applications floating at the bottom. Window buttons on the left.",
+    "description": "A slim menu bar across the top -- the application in front and its menus on the left, clock centred, status on the right -- a dock of applications floating at the bottom, and every application over the whole screen from its start button. Window buttons on the left.",
     "config": {
         "panel": { "position": "top", "thickness": 26 },
         "bar": {
             "entries": [
                 { "id": "launcher",   "zone": "left",   "enabled": true },
                 { "id": "workspaces", "zone": "left",   "enabled": true },
-                { "id": "activewindow", "zone": "left", "enabled": true },
+                { "id": "appmenu",    "zone": "left",   "enabled": true },
                 { "id": "clock",      "zone": "middle", "enabled": true },
                 { "id": "media",      "zone": "right",  "enabled": true },
                 { "id": "clipboard",  "zone": "right",  "enabled": true },
@@ -26,6 +26,7 @@
             "clock": { "format": "ddd d MMM  HH:mm" },
             "launcher": { "icon": "start-here-kde" }
         },
+        "launcher": { "layout": "launchpad" },
         "dock": { "enabled": true },
         "windows": { "titleButtons": "left" }
     }
