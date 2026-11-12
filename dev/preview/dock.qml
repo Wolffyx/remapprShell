@@ -64,6 +64,14 @@ Rectangle {
 
         function pointerMoved(inside) {}
         function activate(item, button) {}
+        // Konsole's entry, with actions of its own as Konsole declares them.
+        function entryOf(item) {
+            return item?.appKey === "org.kde.konsole"
+                ? { actions: [{ name: "Open a new window", icon: "window-new" },
+                              { name: "Open a new tab", icon: "tab-new" }] }
+                : null;
+        }
+        function launchAction(item, action) {}
         function isPinned(item) { return ["org.kde.dolphin", "firefox"].indexOf(item?.appKey) >= 0; }
         function togglePin(item) {}
         function closeWindows(item) {}

@@ -1,9 +1,12 @@
 pragma ComponentBehavior: Bound
 
 // Over the dock: the name of the tile under the pointer, or -- after a right
-// click on an application -- its menu: keep it in the dock or take it out,
-// start another, close its windows. Placed over the tile, on the side away
-// from the screen's edge, and kept inside the dock's window.
+// click on an application -- its menu: the application's own actions first,
+// as its desktop entry declares them (Firefox's "New private window",
+// Konsole's "Open new tab"), as the taskbar's menu has them, then keep it in
+// the dock or take it out, start another, close its windows. Placed over the
+// tile, on the side away from the screen's edge, and kept inside the dock's
+// window.
 
 import QtQuick
 import qs.domain.theme
@@ -19,6 +22,11 @@ Rectangle {
     readonly property bool asMenu: menu.item !== null
     readonly property var named: menu.asMenu ? menu.item : menu.body.hoveredItem
     readonly property int count: (menu.item?.windows ?? []).length
+    // The application's own actions -- the first `maxActions`, so a long
+    // list still leaves the menu inside the dock's window.
+    readonly property int maxActions: 6
+    readonly property var actions: menu.asMenu
+        ? Array.from(menu.dock.entryOf(menu.item)?.actions ?? []).slice(0, menu.maxActions) : []
 
     visible: menu.asMenu || (menu.named !== null && !menu.dock.hidden && menu.body.dragging !== true)
     width: menu.asMenu ? 240 : label.implicitWidth + 24
@@ -64,6 +72,23 @@ Rectangle {
         MenuTitle {
             width: parent.width
             text: menu.item?.appName ?? ""
+        }
+
+        Repeater {
+            model: menu.actions
+
+            MenuRow {
+                required property var modelData
+                width: rows.width
+                text: modelData.name
+                iconName: modelData.icon || (menu.item?.iconName ?? "")
+                onActivated: menu.dock.launchAction(menu.item, modelData)
+            }
+        }
+
+        MenuSeparator {
+            visible: menu.actions.length > 0
+            width: parent.width
         }
 
         MenuRow {

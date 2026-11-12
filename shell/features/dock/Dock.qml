@@ -85,7 +85,9 @@ PanelWindow {
     readonly property int gap: Math.round(root.size * 0.125)
     readonly property int margin: 8
     readonly property int thickness: root.size + 2 * root.pad
-    readonly property int room: 280
+    // Over the tiles: the name, or the menu with an application's actions in
+    // it (at most six of them, DockMenu.maxActions).
+    readonly property int room: 400
     readonly property int dividerLength: 9
 
     // ---- magnifying ------------------------------------------------------------
@@ -296,6 +298,21 @@ PanelWindow {
             return;
         }
         WindowsService.activateGroup(item);
+    }
+
+    // The application's desktop entry, for its own actions; null for a
+    // window no installed application matched.
+    function entryOf(item) {
+        if (item?.kind !== "app")
+            return null;
+        return WindowsService.entryById(WindowEvents.appIdOf(item));
+    }
+
+    // One of those actions -- "New private window" -- started as the
+    // taskbar's menu starts it.
+    function launchAction(item, action) {
+        WindowsService.launch(WindowEvents.appIdOf(item), action);
+        root.menuItem = null;
     }
 
     function isPinned(item) {

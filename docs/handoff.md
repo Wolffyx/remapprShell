@@ -6279,8 +6279,7 @@ draws the body and the menu with a stand-in for the layer surface -- the
 PanelWindow itself was only linted, never rendered, so the first real look at
 it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 
-Not built: the start-menu-style
-application actions in the dock menu, Downloads read from xdg-user-dirs
+Not built: Downloads read from xdg-user-dirs
 (`~/Downloads` is assumed), and a dock under Plasma's renderer.
 
 ## The macOS mode: a global menu and Launchpad (2026-11-12)
@@ -6410,3 +6409,15 @@ The drag itself was not run: the first real one is on a desktop.
 
 Not built: dragging a tile off the dock to take it out (the right-click menu
 does that), and dragging an application in from the start menu.
+
+## Dock: an application's own actions in its menu (2026-11-12)
+
+A right click on a dock tile now lists the application's desktop actions
+first -- Firefox's "New private window", Konsole's "Open a new tab" -- as the
+taskbar's TaskMenu does, from `WindowsService.entryById(WindowEvents.appIdOf
+(item))`, started by `WindowsService.launch(appId, action)` (Dock.entryOf,
+Dock.launchAction). At most six (DockMenu.maxActions), and the dock window's
+room over the tiles went from 280 to 400 px so the longer menu stays inside
+it; that room is transparent and outside the input mask. Preview: the default
+`dev/preview/dock.qml` gives Konsole two actions. No setting: the taskbar's
+menu has none either.
