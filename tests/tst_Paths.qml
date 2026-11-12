@@ -51,7 +51,8 @@ TestCase {
     // in file: URLs, and one of those handed to a FileView is no file at all.
     function test_where_things_are_is_a_plain_absolute_path() {
         const dirs = [Paths.home, Paths.xdgConfigHome, Paths.xdgDataHome, Paths.xdgStateHome,
-                      Paths.configDir, Paths.dataDir, Paths.stateDir, Paths.qsConfigDir, Paths.ctlBin];
+                      Paths.configDir, Paths.dataDir, Paths.stateDir, Paths.qsConfigDir, Paths.ctlBin,
+                      Paths.downloads];
         for (const d of dirs) {
             verify(d.startsWith("/"), d);
             verify(!d.includes("file:"), d);
@@ -66,5 +67,12 @@ TestCase {
         compare(Paths.stateDir, `${Paths.xdgStateHome}/${Branding.slug}`);
         compare(Paths.qsConfigDir, `${Paths.xdgConfigHome}/quickshell/${Branding.slug}`);
         compare(Paths.ctlBin, `${Paths.home}/.local/bin/${Branding.ctlName}`);
+    }
+
+    // Downloads is a folder under home, as xdg-user-dirs names it, and never
+    // home itself (which is what xdg-user-dirs means by an unset one).
+    function test_downloads_is_a_folder_in_home() {
+        verify(Paths.downloads.startsWith(`${Paths.home}/`), Paths.downloads);
+        console.log(`downloads: ${Paths.downloads}`);
     }
 }

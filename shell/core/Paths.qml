@@ -26,6 +26,10 @@ QtObject {
     readonly property string xdgConfigHome: root._localPath(StandardPaths.GenericConfigLocation)
     readonly property string xdgDataHome: root._localPath(StandardPaths.GenericDataLocation)
     readonly property string xdgStateHome: root._localPath(StandardPaths.GenericStateLocation)
+    // The Downloads folder as xdg-user-dirs names it (XDG_DOWNLOAD_DIR in
+    // user-dirs.dirs, so a translated or moved one is found), ~/Downloads
+    // where nothing names it. Qt reads that file itself.
+    readonly property string downloads: root._localPath(StandardPaths.DownloadLocation)
 
     // User-authored configuration. Never written by the installer.
     readonly property string configDir: `${root.xdgConfigHome}/${Branding.slug}`

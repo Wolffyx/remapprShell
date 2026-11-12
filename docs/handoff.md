@@ -6279,8 +6279,7 @@ draws the body and the menu with a stand-in for the layer surface -- the
 PanelWindow itself was only linted, never rendered, so the first real look at
 it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 
-Not built: Downloads read from xdg-user-dirs
-(`~/Downloads` is assumed), and a dock under Plasma's renderer.
+Not built: a dock under Plasma's renderer.
 
 ## The macOS mode: a global menu and Launchpad (2026-11-12)
 
@@ -6421,3 +6420,11 @@ room over the tiles went from 280 to 400 px so the longer menu stays inside
 it; that room is transparent and outside the input mask. Preview: the default
 `dev/preview/dock.qml` gives Konsole two actions. No setting: the taskbar's
 menu has none either.
+
+## Dock: Downloads from xdg-user-dirs (2026-11-12)
+
+The dock's Downloads tile opens `Paths.downloads`, which is QtCore's
+`StandardPaths.DownloadLocation`: Qt reads XDG_DOWNLOAD_DIR from
+user-dirs.dirs itself and falls back to ~/Downloads. Checked headless with a
+scratch XDG_CONFIG_HOME naming `$HOME/Telechargements`, which Qt returned;
+tst_Paths checks it is a plain path under home.

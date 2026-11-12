@@ -77,7 +77,7 @@ PanelWindow {
           running: root.setting("dock.running", true) !== false,
           pinned: root.pinned,
           places: root.setting("dock.places", true) !== false,
-          downloads: `${Paths.home}/Downloads` })
+          downloads: Paths.downloads })
 
     // ---- size ----------------------------------------------------------------
 
