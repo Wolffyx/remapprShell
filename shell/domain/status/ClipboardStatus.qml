@@ -35,6 +35,12 @@ pragma Singleton
 // outlives a restart; turning the setting off removes the file. Nothing
 // unpinned is ever written.
 //
+// So the image file of an unpinned entry outlives its entry when the shell
+// stops or reloads, and nothing could show it again. Once the pins are back
+// at start, the files an earlier run left are deleted: the watcher's own
+// names only, older than this start, and not a pin's
+// (ClipboardHistory.clipboardStale).
+//
 // Choosing an entry puts it on the clipboard with wl-copy, through stdin, in
 // both cases: Klipper sees the change and moves the entry to the top, and the
 // text is never in a process's arguments, where any local user could read it
@@ -61,8 +67,13 @@ QtObject {
 
     // Which history to show. Plasma's Klipper keeps one whenever a clipboard
     // applet is loaded anywhere -- including in a Plasma panel running beside
-    // this shell -- and Klipper's DBus interface can hand out its text and
-    // nothing else: an image in its history can be seen and never chosen.
+    // this shell. Its DBus interface hands out text and nothing else, so its
+    // history is read from its own database instead where that is the one
+    // this reads (Plasma 6's history3.sqlite, version 3): its images are
+    // files there, and choosing one copies Klipper's own file back -- one copy
+    // of each picture on the machine, not two. Where the database is not
+    // that one, its DBus text list is shown, and an image in it can be seen
+    // and not chosen.
     //
     // So this is a setting rather than a rule, and ours is the default. Both
     // histories can exist at once without fighting: neither writes to the
@@ -99,9 +110,9 @@ QtObject {
         if (!entry)
             return;
         if (entry.image) {
-            if (!entry.path || root.klipper)
+            if (!entry.path)
                 return;
-            root._picked = entry.path;
+            root._picked = root.klipper ? "" : entry.path;
             root._pickedAt = Date.now();
             Clipboard.copyFile(entry.path, "image/png");
             return;
@@ -117,11 +128,11 @@ QtObject {
     property string _picked: ""
     property real _pickedAt: 0
 
-    // Whether choosing this entry would do anything. An image in Klipper's
-    // history is Klipper's file, not ours, and its DBus interface offers no
-    // way to select one -- so it is shown and said to be Plasma's.
+    // Whether choosing this entry would do anything. An image has a file to
+    // copy -- ours, or Klipper's when its database was read -- or it is only
+    // shown: Klipper's DBus list names a picture and offers no way to get it.
     function pickable(entry) {
-        return !!entry && (entry.image ? (!root.klipper && !!entry.path) : String(entry.text ?? "").length > 0);
+        return !!entry && (entry.image ? !!entry.path : String(entry.text ?? "").length > 0);
     }
 
     // Whether entries can be pinned and removed one at a time. Ours can;
@@ -188,18 +199,45 @@ QtObject {
         owner.running = true;
     }
 
+    // Klipper's database first; its DBus list when that cannot be read.
     function _refresh() {
         if (!root.klipper)
             return;
+        store.running = false;
+        store.running = true;
+    }
+
+    function _refreshOverDbus() {
         history.running = false;
         history.running = true;
+    }
+
+    // What the database reader printed: "store" and then the rows as JSON
+    // (nothing at all for an empty history), or nothing when it could not
+    // read a database it knows.
+    function _storeRead(output) {
+        const text = String(output ?? "");
+        if (!text.startsWith("store\n")) {
+            root._refreshOverDbus();
+            return;
+        }
+        let rows = [];
+        try {
+            const body = text.slice(6).trim();
+            rows = body.length > 0 ? JSON.parse(body) : [];
+        } catch (e) {
+            Log.debug("clipboard", `Klipper's history unreadable: ${e}`);
+            root._refreshOverDbus();
+            return;
+        }
+        root.klipperEntries = ClipboardHistory.klipperStoreEntries(rows, `${Paths.klipperDir}/data`);
     }
 
     Component.onCompleted: {
         root._checkKlipper();
         // Off at start: there is nothing to read back, and nothing to wait for.
         if (!root.keepPins)
-            root._pinsRead = true;
+            root._pinsReadBack();
     }
 
     onKlipperChanged: root._refresh()
@@ -232,6 +270,27 @@ QtObject {
         filter: "clipboardHistoryUpdated"
         running: root.klipper
         onChanged: root._refresh()
+    }
+
+    // Klipper's history, read from its database without writing to it:
+    // sqlite3 opens it read-only, and only a database that says it is
+    // version 3 -- the one whose layout this knows -- is read at all. Text is
+    // cut at 8 KB a row, as ours is.
+    readonly property Process _store: Process {
+        id: store
+        command: ["sh", "-c",
+                  'db="$1/history3.sqlite"; '
+                  + '[ -r "$db" ] && command -v sqlite3 >/dev/null 2>&1 || exit 0; '
+                  + '[ "$(sqlite3 -readonly "$db" "select db_version from version" 2>/dev/null)" = 3 ] || exit 0; '
+                  + 'rows=$(sqlite3 -readonly -json "$db" "select m.uuid as uuid, substr(m.text, 1, 8192) as text, '
+                  + 'm.starred as starred, coalesce(m.last_used_time, m.added_time) as used, a.data_uuid as image '
+                  + 'from main m left join aux a on a.uuid = m.uuid and a.mimetype = \'image/png\' '
+                  + 'order by used desc limit 200" 2>/dev/null) || exit 0; '
+                  + 'printf "store\\n%s\\n" "$rows"',
+                  "--", Paths.klipperDir]
+        stdout: StdioCollector {
+            onStreamFinished: root._storeRead(this.text)
+        }
     }
 
     readonly property Process _history: Process {
@@ -353,6 +412,50 @@ QtObject {
 
     property string _pinsPending: ""
 
+    // The pins are back (or there were none to read): saving may begin, and
+    // what an earlier run left can be told apart from what is kept.
+    function _pinsReadBack() {
+        root._pinsRead = true;
+        root._sweep();
+    }
+
+    // ---- what an earlier run left -------------------------------------------
+
+    // When this run began, in nanoseconds as the watcher names its files.
+    readonly property string _startedAt: `${Date.now()}000000`
+    property bool _swept: false
+
+    // Once a run: list the folder, then delete what is stale in it.
+    function _sweep() {
+        if (root._swept)
+            return;
+        root._swept = true;
+        sweepList.running = true;
+    }
+
+    function _sweepFound(names) {
+        const stale = ClipboardHistory.clipboardStale(names, root.imageDir, root.ownEntries, root._startedAt);
+        if (stale.length === 0)
+            return;
+        Log.info("clipboard", `deleting ${stale.length} image file(s) an earlier run left`);
+        sweeper.command = ["rm", "-f", "--"].concat(stale);
+        sweeper.running = true;
+    }
+
+    // The file names alone, of the folder's own files: no subfolders, and a
+    // link is not followed. A folder that is not there yet lists nothing.
+    readonly property Process _sweepList: Process {
+        id: sweepList
+        command: ["find", root.imageDir, "-maxdepth", "1", "-type", "f", "-name", "*.png", "-printf", "%f\n"]
+        stdout: StdioCollector {
+            onStreamFinished: root._sweepFound(this.text.split("\n").filter(n => n.length > 0))
+        }
+    }
+
+    // Its own process: the remover is restarted on every trim of the
+    // history, which would cut a long sweep short.
+    readonly property Process _sweeper: Process { id: sweeper }
+
     // Written through a shell rather than FileView: umask 077 makes the file
     // the user's alone, and the rename means a half-written file is never
     // what is read back.
@@ -388,12 +491,12 @@ QtObject {
             }
             root.ownEntries = ClipboardHistory.clipboardRestorePins(root.ownEntries, saved);
             root._pinsWritten = JSON.stringify(ClipboardHistory.clipboardPinsToKeep(root.ownEntries));
-            root._pinsRead = true;
+            root._pinsReadBack();
         }
 
         // No file: nothing was pinned yet. Saving may begin.
         onLoadFailed: {
-            root._pinsRead = true;
+            root._pinsReadBack();
             root._savePins();
         }
     }

@@ -260,4 +260,56 @@ TestCase {
         compare(ClipboardHistory.clipboardCounts(sample),
                 { all: 5, pinned: 1, text: 3, links: 1, images: 1 });
     }
+
+    // What an earlier run left: its files, older than this start and not a
+    // pin. This run's files, a pin's file and anything not named as the
+    // watcher names its files stay.
+    function test_stale_files() {
+        const dir = "/s/clipboard";
+        const names = ["1789573221204362735.png", "1789580551085237453.png", "1899999999999999999.png",
+                       "notes.txt", "x.png", "123.png.tmp", "1789580792996470804.png"];
+        const kept = [{ image: true, path: `${dir}/1789580551085237453.png`, pinned: true },
+                      { text: "a" }];
+        compare(ClipboardHistory.clipboardStale(names, dir, kept, "1800000000000000000"),
+                [`${dir}/1789573221204362735.png`, `${dir}/1789580792996470804.png`]);
+    }
+
+    // A file from the very moment the run began is the run's own.
+    function test_stale_is_strictly_earlier() {
+        compare(ClipboardHistory.clipboardStale(["1800000000000000000.png", "999.png"], "/d", [],
+                                                "1800000000000000000"), ["/d/999.png"]);
+    }
+
+    // No start time to compare against: nothing is stale.
+    function test_stale_needs_a_start() {
+        compare(ClipboardHistory.clipboardStale(["1.png"], "/d", [], ""), []);
+        compare(ClipboardHistory.clipboardStale(["1.png"], "/d", [], undefined), []);
+        compare(ClipboardHistory.clipboardStale(["1.png"], "/d", [], "12ab"), []);
+        compare(ClipboardHistory.clipboardStale(undefined, "/d", [], "5"), []);
+    }
+
+    // Klipper's own rows: images point at Klipper's file, starred ones come
+    // first, and ids that are not Klipper's are never made into a path.
+    function test_klipper_store_entries() {
+        const a = "a".repeat(40), b = "b".repeat(40), c = "c".repeat(40), d = "d".repeat(40);
+        const rows = [
+            { uuid: a, text: "hello", starred: 0, used: 1794510156.017, image: null },
+            { uuid: b, text: null, starred: 0, used: 1794506551.5, image: d },
+            { uuid: c, text: "kept", starred: 1, used: 1700000000, image: null },
+            { uuid: "../../etc", text: "x", starred: 0, used: 1, image: null },
+            { uuid: d, text: null, starred: 0, used: 2, image: "../passwd" },
+            { uuid: d, text: "", starred: 0, used: 3, image: null },
+            null
+        ];
+        const e = ClipboardHistory.klipperStoreEntries(rows, "/k/data");
+        compare(e.length, 3);
+        compare(e[0].text, "kept");
+        compare(e[0].pinned, true);
+        compare(e[1].text, "hello");
+        compare(e[1].time, 1794510156017);
+        compare(e[2].image, true);
+        compare(e[2].path, `/k/data/${b}/${d}`);
+        compare(ClipboardHistory.klipperStoreEntries(undefined, "/k"), []);
+        compare(ClipboardHistory.klipperStoreEntries({}, "/k"), []);
+    }
 }

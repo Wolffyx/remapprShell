@@ -30,6 +30,9 @@ QtObject {
     // user-dirs.dirs, so a translated or moved one is found), ~/Downloads
     // where nothing names it. Qt reads that file itself.
     readonly property string downloads: root._localPath(StandardPaths.DownloadLocation)
+    // Plasma's clipboard history, Klipper's: its database and the folder of
+    // what it copied, images included. Read, never written.
+    readonly property string klipperDir: `${root.xdgDataHome}/klipper`
 
     // User-authored configuration. Never written by the installer.
     readonly property string configDir: `${root.xdgConfigHome}/${Branding.slug}`

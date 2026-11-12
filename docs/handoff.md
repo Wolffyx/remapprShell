@@ -6428,3 +6428,34 @@ The dock's Downloads tile opens `Paths.downloads`, which is QtCore's
 user-dirs.dirs itself and falls back to ~/Downloads. Checked headless with a
 scratch XDG_CONFIG_HOME naming `$HOME/Telechargements`, which Qt returned;
 tst_Paths checks it is a plain path under home.
+
+## Clipboard: Klipper's own images, and no files left behind (2026-11-12)
+
+**Klipper's history is read from its database.** Plasma 6's Klipper keeps
+its history in `~/.local/share/klipper/history3.sqlite` (table `version`
+says 3) with every copied thing as a file, a PNG at
+`data/<entry uuid>/<aux.data_uuid>`. In Klipper mode (`clipboard.history`
+`plasma`, or `auto` while it runs) `ClipboardStatus` reads it with
+`sqlite3 -readonly` (`_store`, joined to `aux` for `image/png`, text cut at
+8 KB) and `ClipboardHistory.klipperStoreEntries` (tested; ids must be 40 hex
+digits before they go into a path) turns the rows into entries: an image is
+Klipper's own file, so it can be chosen -- wl-copy reads it -- and no second
+copy is made. Starred rows are pinned. Anything else -- no sqlite3, another
+version, unreadable JSON -- falls back to the DBus text list, where a picture
+is seen and not chosen, as before. Read-only probe on this machine: 50 rows,
+49 entries, 24 images, every file present. Our own image watcher already ran
+only in own mode, so with `auto` or `plasma` each picture exists once.
+
+**The leak.** An unpinned entry lives in memory and its image file on disk, so
+every restart and every hot reload orphaned files, and the watcher saved the
+current clipboard again at each start: 1657 files (390 MB, 970 distinct) from
+2026-09-16 on. Now, once the pins are read back at start, `_sweep` lists the
+folder (`find -maxdepth 1 -type f -name '*.png'`) and deletes what
+`ClipboardHistory.clipboardStale` (tested) picks: the watcher's own names
+(`<ns>.png`) only, older than this start (compared as digit strings, past a
+JS number's precision), and not a restored pin's. Its own Process, because
+the remover restarts on every trim. On going live it logged "deleting 1657
+image file(s) an earlier run left" and the folder was empty.
+
+This machine still has `clipboard.history: own`, so while Klipper runs both
+keep a copy of a picture until it is switched to `auto`.

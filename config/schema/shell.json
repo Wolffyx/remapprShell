@@ -1232,7 +1232,7 @@
                     ],
                     "default": "own",
                     "label": "Clipboard history",
-                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files, and an image in it can be chosen -- Klipper's DBus hands out text only, so a picture in Plasma's history can be seen and never picked. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. Both can exist at once: neither writes to the other.",
+                    "description": "Which history Meta+V shows. Ours keeps text in memory and copied images as files of its own. Klipper's is read from Plasma's own clipboard database, never written to, so its pictures can be chosen too and each is kept once, by Klipper; on a Plasma whose database this shell does not know, Klipper's text is shown and a picture in it can be seen but not chosen. 'auto' is Klipper's whenever it is running, ours when it is not; 'plasma' is always Klipper's. While ours is shown and Klipper runs as well, both keep a copy of every picture.",
                     "labels": [
                         "This shell's own",
                         "Klipper's while it runs",

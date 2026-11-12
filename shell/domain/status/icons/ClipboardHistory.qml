@@ -97,6 +97,37 @@ QtObject {
                              .map(e => String(e.path));
     }
 
+    // The image files in the clipboard folder that nothing can show again:
+    // files the watcher wrote in an earlier run (or before a reload) whose
+    // entries lived only in memory. `names` are the folder's file names,
+    // `dir` the folder, `kept` the entries now in the history -- the pins
+    // read back -- whose files stay, and `before` when this run started, in
+    // nanoseconds since the epoch as a string of digits.
+    //
+    // Only the watcher's own names count: digits, the time it was written in
+    // nanoseconds, then ".png". Anything else in the folder is not ours to
+    // touch, and a file written at or after `before` belongs to this run --
+    // a picture copied while the shell was starting. Pure, because getting it
+    // wrong deletes a file. The times are compared as digit strings: they
+    // are past what a JavaScript number holds exactly.
+    function clipboardStale(names, dir, kept, before) {
+        const cut = String(before ?? "");
+        if (!/^\d+$/.test(cut))
+            return [];
+        const keep = new Set((kept ?? []).filter(e => e && e.image && e.path).map(e => String(e.path)));
+        return (names ?? []).map(n => String(n))
+            .filter(n => /^\d+\.png$/.test(n) && root._earlier(n.slice(0, -4), cut))
+            .map(n => `${dir}/${n}`)
+            .filter(p => !keep.has(p));
+    }
+
+    // Whether one string of digits is a smaller number than another.
+    function _earlier(a, b) {
+        if (a.length !== b.length)
+            return a.length < b.length;
+        return a < b;
+    }
+
     // ---- what an entry is ---------------------------------------------------
 
     // Program names a copied line is a command for, when it carries no
@@ -342,6 +373,37 @@ QtObject {
     function clipboardPreview(text, max) {
         const one = String(text ?? "").replace(/\s+/g, " ").trim();
         return one.length > max ? `${one.slice(0, Math.max(1, max - 1))}…` : one;
+    }
+
+    // Klipper's history as it keeps it on disk (Plasma 6, history3.sqlite,
+    // database version 3): one row per entry, `uuid` naming it, `text`, the
+    // `starred` flag, `used` -- when it was last used or else added, in
+    // seconds -- and `image`, the id of its PNG where it has one. The PNG is
+    // the file `<dataDir>/<uuid>/<image>`, Klipper's own copy, which is what
+    // makes an image in Klipper's history something that can be chosen:
+    // wl-copy reads it as it reads ours, and no second copy is made.
+    //
+    // Both ids are 40 hex digits as Klipper writes them, and anything else is
+    // dropped rather than put into a path. Starred entries first, as pinned
+    // ones are in ours, then newest first. Pure: rows are read off disk and
+    // not trusted to be the shape of a row.
+    function klipperStoreEntries(rows, dataDir) {
+        const id = /^[0-9a-f]{40}$/;
+        const entries = (Array.isArray(rows) ? rows : [])
+            .filter(r => r && id.test(String(r.uuid ?? "")))
+            .map(r => root._klipperRow(r, dataDir, id))
+            .filter(e => e !== null);
+        return entries.filter(e => e.pinned).concat(entries.filter(e => !e.pinned));
+    }
+
+    function _klipperRow(r, dataDir, id) {
+        const time = Math.round((Number(r.used) || 0) * 1000);
+        const pinned = Number(r.starred) === 1;
+        const image = String(r.image ?? "");
+        if (id.test(image))
+            return { text: "", image: true, path: `${dataDir}/${r.uuid}/${image}`, pinned: pinned, time: time };
+        const text = typeof r.text === "string" ? r.text : "";
+        return text.length > 0 ? { text: text, image: false, pinned: pinned, time: time } : null;
     }
 
     // Klipper's history, as its DBus interface gives it: a list of strings,
