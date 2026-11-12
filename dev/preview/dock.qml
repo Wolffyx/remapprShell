@@ -6,6 +6,8 @@
 //
 // PREVIEW_DOCK=left|right puts the dock on a side. PREVIEW_MAGNIFY=1 draws it
 // magnified round Firefox, with its name over it, and no menu.
+// PREVIEW_DRAG=1 holds Dolphin as if dragged two tiles on: the two it has
+// passed step back to open its place.
 
 import QtQuick
 import Quickshell
@@ -21,6 +23,7 @@ Rectangle {
 
     readonly property string side: Quickshell.env("PREVIEW_DOCK") || "bottom"
     readonly property bool magnified: Quickshell.env("PREVIEW_MAGNIFY") === "1"
+    readonly property bool dragged: Quickshell.env("PREVIEW_DRAG") === "1"
 
     // What Dock.qml is, without the layer surface: the numbers and the
     // answers the body and the menu ask it for.
@@ -72,6 +75,11 @@ Rectangle {
         x: fake.horizontal ? (stage.width - width) / 2 : (stage.side === "left" ? fake.margin : stage.width - fake.margin - width)
         y: fake.horizontal ? stage.height - fake.margin - height : (stage.height - height) / 2
         Component.onCompleted: {
+            if (stage.dragged) {
+                body.reorder.begin(1);
+                body.reorder.track(1, 2 * (fake.size + fake.gap));
+                return;
+            }
             if (stage.magnified) {
                 const grid = body.children[0];
                 body.hover(grid.children.find(c => c.modelData === fake.items[3].key), fake.items[3]);
@@ -85,7 +93,7 @@ Rectangle {
     DockMenu {
         dock: fake
         body: body
-        Component.onCompleted: fake.menuItem = stage.magnified ? null : fake.items[2]
+        Component.onCompleted: fake.menuItem = stage.magnified || stage.dragged ? null : fake.items[2]
     }
 
     // The toast, as it is drawn at a pointer.

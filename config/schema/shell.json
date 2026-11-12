@@ -299,6 +299,12 @@
                     "label": "Magnified size",
                     "description": "How big the tile under the pointer grows, in pixels. No larger than the tile size, nothing grows."
                 },
+                "dock.rearrange": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Drag to rearrange",
+                    "description": "Drag an application's tile along the dock to move it; the ones it passes step aside. A running application dropped among the ones kept in the dock, or just after them, is kept from then on. The start button, the divider and the places stay where they are."
+                },
                 "dock.visibility": {
                     "type": "enum",
                     "values": ["always", "autohide", "dodge"],

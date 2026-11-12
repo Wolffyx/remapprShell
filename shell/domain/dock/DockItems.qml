@@ -56,6 +56,48 @@ QtObject {
         return list.indexOf(key) >= 0 ? list.filter(p => p !== key) : list.concat([key]);
     }
 
+    // The tiles that can be dragged: applications that have a desktop entry
+    // to keep. The start button, the divider and the places stay put, and so
+    // does a window with no application behind it -- there is nothing to
+    // write down for it.
+    function draggable(item) {
+        return item?.kind === "app" && String(item?.appKey ?? "").length > 0;
+    }
+
+    // The first and last index in `items` a dragged tile may land on: the
+    // run of applications. [-1, -1] with none.
+    function dropRange(items) {
+        const list = items ?? [];
+        const first = list.findIndex(i => i?.kind === "app");
+        const last = list.length - 1 - [...list].reverse().findIndex(i => i?.kind === "app");
+        return first < 0 ? [-1, -1] : [first, last];
+    }
+
+    // What `pinned` becomes when the tile at `from` in `items` is dragged to
+    // `to`, or null when nothing changes. The applications kept in the dock
+    // take the order they now have on it. A running one that is not kept
+    // joins them when it is dropped among them or straight after the last of
+    // them; a kept one stays kept wherever it lands, after the others if it
+    // is dropped among the running ones. Kept ids the dock is not showing (an
+    // application since removed) stay in the list, after the rest.
+    function reorder(items, pinned, from, to) {
+        const list = items ?? [];
+        if (from === to || !root.draggable(list[from]) || list[to]?.kind !== "app")
+            return null;
+        const key = String(list[from].appKey);
+        const apps = list.filter(i => i?.kind === "app").map(i => String(i.appKey ?? ""));
+        const pins = (pinned ?? []).map(p => String(p)).filter(p => p.length > 0);
+        const kept = new Set(pins);
+        const keptShown = apps.filter(k => kept.has(k)).length;
+        const at = apps.indexOf(key) + (to - from);
+        const order = apps.filter(k => k !== key);
+        order.splice(at, 0, key);
+        const joins = kept.has(key) || at <= keptShown;
+        const next = order.filter(k => k.length > 0 && (kept.has(k) || (k === key && joins)))
+            .concat(pins.filter(p => apps.indexOf(p) < 0));
+        return next.join("\n") === pins.join("\n") ? null : next;
+    }
+
     // Where each tile's centre sits along the dock at rest, from the start of
     // the first tile: `lengths` are the tiles' lengths along the dock, `gap`
     // the space between two.

@@ -44,6 +44,65 @@ TestCase {
         compare(DockItems.togglePin(["a"], ""), ["a"]);
     }
 
+    // launcher, a b c (kept), x y (running), the places.
+    function dock() {
+        return DockItems.items([
+            { key: "a", appKey: "a", windows: [] },
+            { key: "b", appKey: "b", windows: [] },
+            { key: "c", appKey: "c", windows: [] },
+            { key: "x", appKey: "x", windows: [{ uuid: "1" }] },
+            { key: "y", appKey: "y", windows: [{ uuid: "2" }] },
+            { key: "class:z", appKey: "", windows: [{ uuid: "3" }] }
+        ], { pinned: ["a", "b", "c"], places: true, downloads: "/d" });
+    }
+
+    function test_drop_range_is_the_applications() {
+        compare(DockItems.dropRange(dock()), [1, 6]);
+        compare(DockItems.dropRange(DockItems.places("/d")), [-1, -1]);
+        compare(DockItems.dropRange([]), [-1, -1]);
+    }
+
+    function test_draggable() {
+        const d = dock();
+        verify(!DockItems.draggable(d[0]));
+        verify(DockItems.draggable(d[1]));
+        verify(!DockItems.draggable(d[6]));
+        verify(!DockItems.draggable(d[7]));
+        verify(!DockItems.draggable(null));
+    }
+
+    // Kept applications take their new order.
+    function test_reorder_kept() {
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 1, 3), ["b", "c", "a"]);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 3, 1), ["c", "a", "b"]);
+    }
+
+    // A running application dropped among the kept ones, or just after
+    // them, is kept from then on; one moved among the running is not.
+    function test_reorder_running_joins() {
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 4, 2), ["a", "x", "b", "c"]);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 5, 4), ["a", "b", "c", "y"]);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 4, 5), null);
+    }
+
+    // A kept one dropped among the running stays kept, last.
+    function test_reorder_kept_into_running() {
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 1, 5), ["b", "c", "a"]);
+    }
+
+    // Kept ids not on the dock are not lost.
+    function test_reorder_keeps_what_is_not_shown() {
+        compare(DockItems.reorder(dock(), ["gone", "a", "b", "c"], 1, 2), ["b", "a", "c", "gone"]);
+    }
+
+    function test_reorder_refuses() {
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 1, 1), null);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 0, 2), null);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 6, 2), null);
+        compare(DockItems.reorder(dock(), ["a", "b", "c"], 1, 7), null);
+        compare(DockItems.reorder(undefined, [], 1, 2), null);
+    }
+
     function test_when_it_hides() {
         verify(!DockItems.hidden("always", { windowNear: true }));
         verify(DockItems.hidden("autohide", {}));

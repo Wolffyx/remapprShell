@@ -6279,7 +6279,7 @@ draws the body and the menu with a stand-in for the layer surface -- the
 PanelWindow itself was only linted, never rendered, so the first real look at
 it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
 
-Not built: dragging tiles to reorder, the start-menu-style
+Not built: the start-menu-style
 application actions in the dock menu, Downloads read from xdg-user-dirs
 (`~/Downloads` is assumed), and a dock under Plasma's renderer.
 
@@ -6390,3 +6390,23 @@ bar changed length from one press to the next. `progress` now takes where the
 bar ends, and the volume uses `OsdService.volumeEnd` (AudioStatus.ceilingFor,
 the sliders' own end); Plasma's volume events are redrawn on that scale by
 `OsdEvents.onScale` (tested). Brightness and the rest pass through untouched.
+
+## Dock: drag to rearrange (2026-11-12)
+
+`dock.rearrange` (on): an application's tile is dragged along the dock with a
+DragHandler on its face, and the tiles it passes step aside -- the settings
+pages' `ReorderState`, one step being a tile and its gap, bounded to the run
+of applications (`DockItems.dropRange`). Nothing is written until release;
+then `Dock.moveTile` writes `dock.pinned` from `DockItems.reorder` (tested):
+the kept applications take their new order; a running one that is not kept
+joins them when dropped among them or straight after the last; a kept one
+dropped among the running stays kept, last; kept ids the dock is not showing
+stay, at the end. The start button, the divider, the places and windows with
+no desktop entry do not drag. Magnifying stops while a tile is held, the name
+label hides, and the dock does not hide under autohide or dodge.
+
+Preview: `PREVIEW_DRAG=1 dev/preview/dock.qml` holds Dolphin two tiles on.
+The drag itself was not run: the first real one is on a desktop.
+
+Not built: dragging a tile off the dock to take it out (the right-click menu
+does that), and dragging an application in from the start menu.

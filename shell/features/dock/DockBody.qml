@@ -11,10 +11,17 @@ pragma ComponentBehavior: Bound
 // While the dock magnifies, each tile is `dock.scales[i]` times as long along
 // the dock and its face -- the icon and what takes the pointer -- grows out
 // of the glass, away from the edge; the glass keeps its height.
+//
+// With `dock.rearrange`, an application's tile can be dragged along the
+// dock: the tiles it passes step aside, and on release the dock writes the
+// new order (Dock.moveTile, DockItems.reorder). Only the run of applications
+// moves; the start button, the divider and the places stay where they are.
 
 import QtQuick
 import Quickshell
+import qs.domain.dock
 import qs.domain.theme
+import qs.ui.controls
 import qs.ui.primitives
 
 Rectangle {
@@ -38,6 +45,17 @@ Rectangle {
     readonly property int size: body.dock.size
     readonly property var scales: body.dock.scales ?? []
     readonly property int dividerLength: body.dock.dividerLength ?? 9
+
+    // A tile held and dragged, and where it would land: the applications are
+    // one size, so the drop is a whole number of steps along the dock.
+    readonly property bool dragging: reorder.dragIndex >= 0
+    readonly property var dropRange: DockItems.dropRange(body.dock.items)
+    readonly property ReorderState reorder: ReorderState {
+        rowHeight: body.size + body.dock.gap
+        minIndex: body.dropRange[0]
+        maxIndex: body.dropRange[1]
+        onDropped: (from, to) => body.dock.moveTile(from, to)
+    }
 
     width: body.dock.horizontal ? tiles.implicitWidth + 2 * body.dock.pad : body.dock.thickness
     height: body.dock.horizontal ? body.dock.thickness : tiles.implicitHeight + 2 * body.dock.pad
@@ -96,9 +114,17 @@ Rectangle {
                 readonly property real grow: body.scales[tile.index] ?? 1
                 // Along the dock at rest, and grown.
                 readonly property real span: (tile.divider ? body.dividerLength : body.size) * tile.grow
+                // Held: follows the pointer. Passed by the held one: a step aside.
+                readonly property bool held: body.reorder.dragIndex === tile.index
+                readonly property real offset: tile.held ? drag.along : body.reorder.shift(tile.index)
 
                 width: body.dock.horizontal ? tile.span : body.size
                 height: body.dock.horizontal ? body.size : tile.span
+                z: tile.held ? 1 : 0
+                transform: Translate {
+                    x: body.dock.horizontal ? tile.offset : 0
+                    y: body.dock.horizontal ? 0 : tile.offset
+                }
 
                 Rectangle {
                     visible: tile.divider
@@ -137,6 +163,29 @@ Rectangle {
                         onHoveredChanged: {
                             if (hovered)
                                 body.hover(tile, tile.item);
+                        }
+                    }
+
+                    DragHandler {
+                        id: drag
+                        readonly property real along: body.dock.horizontal ? drag.activeTranslation.x : drag.activeTranslation.y
+                        enabled: body.dock.rearrange === true && DockItems.draggable(tile.item)
+                        target: null
+                        acceptedButtons: Qt.LeftButton
+                        xAxis.enabled: body.dock.horizontal
+                        yAxis.enabled: !body.dock.horizontal
+                        cursorShape: Qt.ClosedHandCursor
+
+                        onActiveChanged: {
+                            if (drag.active)
+                                body.reorder.begin(tile.index);
+                            else
+                                body.reorder.end();
+                        }
+
+                        onAlongChanged: {
+                            if (drag.active)
+                                body.reorder.track(tile.index, drag.along);
                         }
                     }
 

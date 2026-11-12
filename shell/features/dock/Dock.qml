@@ -54,6 +54,7 @@ PanelWindow {
     readonly property int size: Math.max(32, Math.min(80, Number(root.setting("dock.iconSize", 48)) || 48))
     readonly property string visibility: root.setting("dock.visibility", "always")
     readonly property bool magnify: root.setting("dock.magnify", false) === true
+    readonly property bool rearrange: root.setting("dock.rearrange", true) !== false
     // How many times its size the tile under the pointer grows to.
     readonly property real peak: Math.max(1, Math.min(128, Number(root.setting("dock.magnifiedSize", 96)) || 96) / root.size)
 
@@ -110,7 +111,7 @@ PanelWindow {
     readonly property real reachLength: 2.5 * (root.size + root.gap)
 
     readonly property bool magnifying: root.magnify && root.peak > 1 && body.pointerOn
-        && root.menuItem === null && !root.hidden
+        && root.menuItem === null && !root.hidden && !body.dragging
     readonly property int lift: root.magnifying ? Math.ceil((root.peak - 1) * root.size) : 0
     readonly property real pointerAlong: root.horizontal ? body.pointer.x : body.pointer.y
 
@@ -150,7 +151,7 @@ PanelWindow {
                                     root.position, root.thickness + root.margin)
 
     readonly property bool hidden: DockItems.hidden(root.visibility, {
-        pointerInside: root.pointerInside || leaveDelay.running,
+        pointerInside: root.pointerInside || leaveDelay.running || body.dragging,
         menuOpen: root.menuItem !== null,
         windowNear: root.windowNear
     })
@@ -306,6 +307,15 @@ PanelWindow {
     function togglePin(item) {
         ConfigStore.set("dock.pinned", DockItems.togglePin(root.pinned, item?.appKey));
         root.menuItem = null;
+    }
+
+    // A tile dragged from `from` to `to` (DockBody): the new order is written
+    // the way keeping one is, start menu pins included when those were what
+    // the dock showed.
+    function moveTile(from, to) {
+        const next = DockItems.reorder(root.items, root.pinned, from, to);
+        if (next !== null)
+            ConfigStore.set("dock.pinned", next);
     }
 
     function closeWindows(item) {

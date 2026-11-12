@@ -20,7 +20,7 @@ Rectangle {
     readonly property var named: menu.asMenu ? menu.item : menu.body.hoveredItem
     readonly property int count: (menu.item?.windows ?? []).length
 
-    visible: menu.asMenu || (menu.named !== null && !menu.dock.hidden)
+    visible: menu.asMenu || (menu.named !== null && !menu.dock.hidden && menu.body.dragging !== true)
     width: menu.asMenu ? 240 : label.implicitWidth + 24
     height: menu.asMenu ? rows.implicitHeight + 12 : label.implicitHeight + 12
     radius: menu.asMenu ? Theme.radius : height / 2
