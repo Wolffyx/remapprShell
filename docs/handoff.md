@@ -6229,3 +6229,56 @@ records every kwriteconfig6 call and stands in for qdbus6, busctl and gdbus.
 
 One manual check that no test can make: pick Left, watch a window's buttons
 move, then Plasma's and watch them come back.
+
+## The layouts drawn, and the clipboard finished (2026-11-12)
+
+The four layouts on the canvas "Panel layouts", and what was left of the
+clipboard design. Every piece is a setting, shown in the settings window.
+
+**Clipboard.** Choosing an entry now says so: "Copied · <what>", for a second
+and a half, at the pointer for Meta+V and beside the button for the panel's
+popout (`features/overlays/CopiedToast.qml`, placed by `Place.atPointer` or the
+new `Place.atEdge`, asked for through `Surfaces.showCopied`).
+`clipboard.confirm` turns it off. Pins outlive a restart while
+`clipboard.keepPins` is on: the pinned entries, and only those, are written to
+`Paths.clipboardPinsFile` through `umask 077` and a rename, and read back at
+start (`ClipboardHistory.clipboardPinsToKeep` / `clipboardRestorePins`, tested
+-- a file read from disk is not trusted to be the shape of an entry). Turning
+it off removes the file. Unpinned image files from an earlier run are still
+left in `clipboard/`, as before: nothing sweeps that directory at start.
+
+**Minimal** is islands now (`panel.style: islands`, thickness 30): the islands
+existed already, so it is the preset alone.
+
+**Status icons as one button.** The quick settings widget (`status`) was the
+grouped glyphs all along. It gained `parts` (which glyphs, brightness now among
+them) and `capsule` (the background drawn all the time, as Windows draws its
+quick settings). Settings -> Taskbar has a **Status icons** card that switches
+between a widget each and one button: `domain/panel/StatusGroup.qml` rewrites
+`bar.entries` both ways, keeping the place and remembering which glyphs in
+`widgets.status.parts` (tested). Windows-like and Workspace-focused use the
+button. A layout must set a widget's settings under `widgets.<id>`, never in a
+bar entry's `config`: the Widgets page writes `widgets.<id>`, and an entry's
+own config wins over it, so the setting would look broken.
+
+**The dock** (`features/dock/`, `domain/dock/DockItems.qml`): a second panel,
+off until `dock.enabled`, which macOS-like turns on. One per screen, drawn by
+this shell's renderer only. Tiles for the start button, the pinned
+applications (`dock.pinned`, or the start menu's pins while that is empty) and
+the running ones (`dock.running`), a dot under each with windows, then
+Downloads and the Trash (`dock.places`). The clicks are the taskbar's, through
+WindowsService; a right click is keep/remove, a new window, close. Position
+bottom/left/right, `dock.iconSize`, and `dock.visibility`: always (reserves its
+space, so on the panel's edge KWin stacks it above the panel), autohide, dodge
+(hides while a window reaches its edge -- the whole edge, as the panel's
+defloat measures, not only the dock's width). The window is a strip with room
+over the tiles for the name and the menu; its mask is the dock, the menu while
+open and a 3 px reveal strip while hidden. Settings -> Dock is the schema
+section, rendered by SchemaRenderer. Preview: `dev/preview/dock.qml`, which
+draws the body and the menu with a stand-in for the layer surface -- the
+PanelWindow itself was only linted, never rendered, so the first real look at
+it is on a desktop: `rmpr preset apply macos`, or turn on Settings -> Dock.
+
+Not built: magnification, dragging tiles to reorder, the start-menu-style
+application actions in the dock menu, Downloads read from xdg-user-dirs
+(`~/Downloads` is assumed), and a dock under Plasma's renderer.

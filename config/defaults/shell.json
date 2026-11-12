@@ -167,6 +167,16 @@
         "overviewStrip": true,
         "overviewCardWidth": 560
     },
+    "dock": {
+        "enabled": false,
+        "position": "bottom",
+        "iconSize": 48,
+        "visibility": "always",
+        "pinned": [],
+        "launcher": true,
+        "running": true,
+        "places": true
+    },
     "windows": {
         "titleButtons": "plasma",
         "titleButtonsLeft": "MS",

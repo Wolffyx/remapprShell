@@ -254,6 +254,71 @@
             }
         },
         {
+            "id": "dock",
+            "label": "Dock",
+            "group": "Look",
+            "icon": "preferences-desktop-icons",
+            "glyph": "dock_to_bottom",
+            "description": "A second panel of large application tiles floating clear of the screen's edge, as on macOS: the start button, the applications kept in it and the ones running, each with a dot under it while it has windows, and Downloads and the Trash at the end. A click starts an application or raises it, a middle click starts another, and a right click keeps it in the dock or takes it out. Off by default; the macOS-like layout turns it on. Running applications need the open-window list (`rmpr windows enable`); without it the dock shows what is kept in it.",
+            "keys": {
+                "dock.enabled": {
+                    "type": "bool",
+                    "default": false,
+                    "label": "Show the dock",
+                    "description": "Draws the dock on every screen. It can be turned off for one monitor in that monitor's own settings file."
+                },
+                "dock.position": {
+                    "type": "enum",
+                    "values": ["bottom", "left", "right"],
+                    "labels": ["Bottom", "Left", "Right"],
+                    "default": "bottom",
+                    "label": "Position",
+                    "description": "Which edge the dock floats along. On the same edge as the panel it sits beside the panel, never under it."
+                },
+                "dock.iconSize": {
+                    "type": "int",
+                    "min": 32,
+                    "max": 80,
+                    "step": 4,
+                    "default": 48,
+                    "label": "Tile size",
+                    "description": "How big each tile is, in pixels. The dock grows and shrinks with it."
+                },
+                "dock.visibility": {
+                    "type": "enum",
+                    "values": ["always", "autohide", "dodge"],
+                    "labels": ["Always, windows stop above it", "Hide until pointed at", "Hide when a window reaches it"],
+                    "default": "always",
+                    "label": "Visibility",
+                    "description": "always keeps the dock on screen and keeps windows clear of it, as a maximised window is kept clear of the panel. autohide slides it away until the pointer reaches its edge. dodge keeps it on screen until a window on this monitor reaches into its space -- a maximised one always does -- and brings it back when the pointer reaches the edge. It never hides while the pointer or its menu is on it."
+                },
+                "dock.pinned": {
+                    "type": "list",
+                    "default": [],
+                    "label": "Applications kept in the dock",
+                    "description": "Desktop entry ids, in the order they sit in the dock. Empty shows the start menu's pinned applications until one is kept or taken out with a right click, which writes the list."
+                },
+                "dock.launcher": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Start button first",
+                    "description": "The start menu, as the dock's first tile."
+                },
+                "dock.running": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Show running applications",
+                    "description": "Applications with windows open that are not kept in the dock appear after those that are, and go when their last window closes. Off, the dock holds only what is kept in it, and those still carry their dots."
+                },
+                "dock.places": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Downloads and the Trash",
+                    "description": "Past a divider at the end of the dock: the Downloads folder and the Trash, opened with whatever the desktop opens them with."
+                }
+            }
+        },
+        {
             "id": "widgets",
             "label": "Widgets",
             "group": "Look",

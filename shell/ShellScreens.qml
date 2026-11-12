@@ -23,6 +23,7 @@ import qs.features.switchers
 import qs.domain.notifications
 import qs.features.launcher
 import qs.features.desktop
+import qs.features.dock
 import qs.features.overlays
 import qs.domain.surfaces
 import qs.domain.surfaces.place
@@ -44,6 +45,16 @@ Scope {
             ? Quickshell.screens : []
 
         Panel {}
+    }
+
+    // The dock, a second panel of application tiles, on every screen that
+    // has `dock.enabled` -- drawn by this shell's renderer only, as the panel
+    // is: under Plasma's, Plasma's own panels are the place for one.
+    Variants {
+        model: ConfigStore.profileLoaded && PanelModel.renderer === "quickshell"
+            ? Quickshell.screens.filter(s => ConfigStore.valueFor(s.name, "dock.enabled", false) === true) : []
+
+        Dock {}
     }
 
     // The built-in search, over the screen it was opened on -- the first one

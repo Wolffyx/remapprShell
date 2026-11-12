@@ -77,6 +77,21 @@ The panel: where it sits, how big it is, and the widgets that are parts of it --
 | `panel.menu.systemMonitor` | text | `auto` | Which application the right-click menu's System monitor row opens, as a desktop entry id -- any installed application, not only a monitor. `auto` picks Plasma's System Monitor where it is installed, and otherwise the first application whose desktop entry says it is a system monitor (the `Monitor` category), one that opens a window before one that runs in a terminal; `none` leaves the row off. Settings offers the installed monitors first and any other application through a search. One that is not installed any more hides the row rather than showing it and refusing. |
 | `panel.menu.entries` | a list | `[]` | Extra rows on the panel's right-click menu, in this order. Each is an object that either opens an application -- `app`, a desktop entry id, drawn with the application's icon and called by its name unless `label` says otherwise -- or runs a command: `label` is the words on the row and `command` a shell command line, run detached, so a script that keeps running does not end when the menu closes. `glyph` is an optional Material Symbols name for the row's icon (`terminal` for a command when left out). An application that is not installed any more is left off the menu. |
 
+### Dock
+
+A second panel of large application tiles floating clear of the screen's edge, as on macOS: the start button, the applications kept in it and the ones running, each with a dot under it while it has windows, and Downloads and the Trash at the end. A click starts an application or raises it, a middle click starts another, and a right click keeps it in the dock or takes it out. Off by default; the macOS-like layout turns it on. Running applications need the open-window list (`rmpr windows enable`); without it the dock shows what is kept in it.
+
+| Setting | Accepts | Default | Meaning |
+| --- | --- | --- | --- |
+| `dock.enabled` | `true` or `false` | `false` | Draws the dock on every screen. It can be turned off for one monitor in that monitor's own settings file. |
+| `dock.position` | `bottom`, `left`, `right` | `bottom` | Which edge the dock floats along. On the same edge as the panel it sits beside the panel, never under it. |
+| `dock.iconSize` | a number, 32 to 80 | `48` | How big each tile is, in pixels. The dock grows and shrinks with it. |
+| `dock.visibility` | `always`, `autohide`, `dodge` | `always` | always keeps the dock on screen and keeps windows clear of it, as a maximised window is kept clear of the panel. autohide slides it away until the pointer reaches its edge. dodge keeps it on screen until a window on this monitor reaches into its space -- a maximised one always does -- and brings it back when the pointer reaches the edge. It never hides while the pointer or its menu is on it. |
+| `dock.pinned` | a list | `[]` | Desktop entry ids, in the order they sit in the dock. Empty shows the start menu's pinned applications until one is kept or taken out with a right click, which writes the list. |
+| `dock.launcher` | `true` or `false` | `true` | The start menu, as the dock's first tile. |
+| `dock.running` | `true` or `false` | `true` | Applications with windows open that are not kept in the dock appear after those that are, and go when their last window closes. Off, the dock holds only what is kept in it, and those still carry their dots. |
+| `dock.places` | `true` or `false` | `true` | Past a divider at the end of the dock: the Downloads folder and the Trash, opened with whatever the desktop opens them with. |
+
 ### Widgets
 
 What appears on the panel, and in which zone.
