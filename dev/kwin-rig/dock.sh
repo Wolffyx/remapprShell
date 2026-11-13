@@ -6,12 +6,14 @@
 #                                 the real Dock.qml on every screen and
 #                                 nothing else of the shell
 #   dock_said <what>              the dock's last word on <what>: "hidden"
-#                                 (true or false) or "pinned" (the list kept
-#                                 in it, as JSON)
+#                                 (true or false), "pinned" (the list kept
+#                                 in it, as JSON) or "menu" (the application
+#                                 whose menu is open, empty for none)
 #   dock_count <what>             how many times it has spoken of <what>
 #
 # The copy speaks into $RUN/qs.log -- "DOCK hidden=..." whenever it hides or
-# shows, "DOCK pinned=..." whenever the list it keeps changes. The schema and
+# shows, "DOCK pinned=..." whenever the list it keeps changes, "DOCK menu=..."
+# whenever its menu opens or closes. The schema and
 # the defaults are this tree's, not the installed ones.
 #
 # DOCK_FROM=<rev> runs the dock's files as they were at that commit instead,
@@ -30,7 +32,8 @@ dock_start() {
     sed -i '0,/^    id: root$/s//    id: root\
     Component.onCompleted: console.warn(`DOCK hidden=${root.hidden}`)\
     onHiddenChanged: console.warn(`DOCK hidden=${root.hidden}`)\
-    onConfiguredPinsChanged: console.warn(`DOCK pinned=${JSON.stringify(root.configuredPins)}`)/' \
+    onConfiguredPinsChanged: console.warn(`DOCK pinned=${JSON.stringify(root.configuredPins)}`)\
+    onMenuItemChanged: console.warn(`DOCK menu=${root.menuItem ? root.menuItem.appKey : ""}`)/' \
         "$qs/features/dock/Dock.qml"
     cat > "$qs/shell.qml" <<'QML'
 import QtQuick

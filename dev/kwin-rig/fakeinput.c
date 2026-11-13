@@ -1,5 +1,6 @@
 /* Drives a nested KWin's pointer through org_kde_kwin_fake_input.
-   stdin lines: "move X Y" (absolute), "down", "up", "glide X1 Y1 X2 Y2 STEPS MS",
+   stdin lines: "move X Y" (absolute), "down", "up" (the left button), "rdown",
+   "rup" (the right), "glide X1 Y1 X2 Y2 STEPS MS",
    "sleep MS", "key CODE" (pressed and let go), "press CODE", "release CODE"
    (held, for a modifier). Only ever pointed at a --virtual KWin's socket. */
 #include <stdio.h>
@@ -37,6 +38,8 @@ int main(void) {
     while (fgets(line, sizeof line, stdin)) {
         double a, b, c, e; int steps, ms;
         if (sscanf(line, "move %lf %lf", &a, &b) == 2) moveto(dpy, a, b);
+        else if (strncmp(line, "rdown", 5) == 0) { org_kde_kwin_fake_input_button(fi, 0x111, 1); wl_display_flush(dpy); }
+        else if (strncmp(line, "rup", 3) == 0) { org_kde_kwin_fake_input_button(fi, 0x111, 0); wl_display_flush(dpy); }
         else if (strncmp(line, "down", 4) == 0) { org_kde_kwin_fake_input_button(fi, 0x110, 1); wl_display_flush(dpy); }
         else if (strncmp(line, "up", 2) == 0) { org_kde_kwin_fake_input_button(fi, 0x110, 0); wl_display_flush(dpy); }
         else if (sscanf(line, "glide %lf %lf %lf %lf %d %d", &a, &b, &c, &e, &steps, &ms) == 6) {

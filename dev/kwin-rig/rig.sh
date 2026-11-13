@@ -16,7 +16,8 @@
 #                                     kwinrc group, and load it
 #   input_start / send <cmd>... / input_stop
 #                                     one fake pointer for the scenario:
-#                                     "move X Y", "down", "up", "sleep MS",
+#                                     "move X Y", "down", "up", "rdown" and
+#                                     "rup" (the right button), "sleep MS",
 #                                     "glide X1 Y1 X2 Y2 STEPS MS", "key CODE",
 #                                     "press CODE", "release CODE" (Linux
 #                                     key codes: Escape 1, Enter 28, Meta 125)

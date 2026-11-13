@@ -6538,3 +6538,24 @@ removal check fails with `DOCK_FROM=facf592`. Preview: `PREVIEW_PULL=1`.
 As before, taking out the last kept application leaves `dock.pinned` empty,
 which shows the start menu's pins again (documented on `dock.pinned`).
 Not tried by hand on the desktop.
+
+## The dock's dodge and menu, seen headless (2026-11-13)
+
+Two rig scenarios for what had not been seen; both passed as the dock is, so
+nothing in shell/ changed.
+
+- scenarios/dock-dodge.sh: one window moved by a KWin script. Clear of the
+  dock it stays; down into its space it hides; the pointer at the edge brings
+  it back over the window; away, it hides; the window up, it comes back;
+  minimised in its space, it comes back. 7 pass.
+- scenarios/dock-menu.sh, on `autohide`: right click opens Konsole's menu,
+  the pointer crosses the 8 px gap to the menu and rests, goes back to the
+  glass -- menu open and dock up throughout -- then leaves and both go;
+  "Remove from the dock" clicked takes it out. 11 pass; with
+  `DOCK_FROM=3108504` (before the autohide fix) 7 fail.
+
+What the rig gained for them: the stand-in window daemon signals `Changed`
+on every update, as the real one does, so a shell in the rig follows windows
+as they move (windows-tile and snap still pass); fakeinput has `rdown`/`rup`
+for the right button; dev/kwin-rig/dock.sh logs `DOCK menu=` as the menu
+opens and closes.

@@ -2,7 +2,8 @@
 
 kwin/windows pushes the window list to the daemon; this takes each list and
 writes it to <out> as one line of JSON, so a scenario can read what the
-taskbar would have been shown.
+taskbar would have been shown -- and, as the real daemon does, says so in a
+Changed signal, so a shell started in the rig follows windows as they move.
 """
 import sys
 
@@ -17,6 +18,7 @@ XML = f"""
   <interface name="{NAME}.Windows">
     <method name="Update"><arg type="s" name="windows" direction="in"/></method>
     <method name="List"><arg type="s" name="windows" direction="out"/></method>
+    <signal name="Changed"><arg type="s" name="windows"/></signal>
   </interface>
 </node>
 """
@@ -29,6 +31,7 @@ def call(connection, sender, path, interface, method, params, invocation):
         with open(OUT, "a", encoding="utf-8") as f:
             f.write(last[0] + "\n")
         invocation.return_value(None)
+        connection.emit_signal(None, path, interface, "Changed", GLib.Variant("(s)", (last[0],)))
         return
     invocation.return_value(GLib.Variant("(s)", (last[0],)))
 
