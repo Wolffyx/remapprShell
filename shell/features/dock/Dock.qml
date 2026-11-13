@@ -14,9 +14,9 @@ pragma ComponentBehavior: Bound
 //
 // One per screen, like the panel; `dock.enabled` can be set per monitor. The
 // window is a strip along its edge with room above the tiles for the menu and
-// the name of the tile under the pointer; only the dock itself -- and the
-// menu, while it is open -- takes the pointer, so the rest of the strip lets
-// clicks through. `dock.visibility` decides whether windows stop above it,
+// the name of the tile under the pointer; only the dock itself -- the menu,
+// while it is open, and on a dock that hides the edge below it -- takes the
+// pointer, so the rest of the strip lets clicks through. `dock.visibility` decides whether windows stop above it,
 // whether it hides until the pointer reaches the edge, or whether it hides
 // while a window reaches into its space (DockItems.hidden). On the same edge
 // as the panel, KWin puts it above the panel: both reserve their space.
@@ -143,7 +143,13 @@ PanelWindow {
 
     // ---- showing and hiding ----------------------------------------------------
 
-    property bool pointerInside: false
+    // Whether the pointer is on anything of the dock's: the glass, the strip
+    // along the edge, the open menu. Read off their own HoverHandlers rather
+    // than kept from their events: going from the strip to the glass, the
+    // strip's "left" can come after the glass's "entered", and a flag set by
+    // the last event to arrive then says the pointer is off the dock while
+    // it is on it -- and the dock hid under it.
+    readonly property bool pointerInside: body.pointerOn || stripHover.hovered || menu.pointerOn
     property var menuItem: null
 
     readonly property bool windowNear: root.visibility === "dodge"
@@ -163,7 +169,7 @@ PanelWindow {
     Behavior on away { NumberAnimation { duration: Theme.durationMedium; easing.type: Easing.OutCubic } }
 
     // Leaving starts a short countdown, so crossing the gap between the dock
-    // and its menu does not put it away.
+    // and its menu does not put it away; coming back calls it off.
     Timer {
         id: leaveDelay
         interval: 500
@@ -173,9 +179,10 @@ PanelWindow {
         }
     }
 
-    function pointerMoved(inside) {
-        root.pointerInside = inside;
-        if (!inside)
+    onPointerInsideChanged: {
+        if (root.pointerInside)
+            leaveDelay.stop();
+        else
             leaveDelay.restart();
     }
 
@@ -197,10 +204,11 @@ PanelWindow {
     WlrLayershell.namespace: Layers.chrome
     color: "transparent"
 
-    // Only the dock takes the pointer -- and the strip at the edge while it
-    // is hidden, and the menu while it is open.
+    // Only the dock takes the pointer -- and, on a dock that hides, the strip
+    // along the edge (DockItems.edgeDepth), and the menu while it is open.
+    readonly property int edgeDepth: DockItems.edgeDepth(root.visibility, root.hidden, root.margin)
     mask: Region {
-        regions: [root._bodyRegion].concat(root.hidden ? [root._stripRegion] : [])
+        regions: [root._bodyRegion].concat(root.edgeDepth > 0 ? [root._stripRegion] : [])
                                    .concat(root.menuItem !== null ? [root._menuRegion] : [])
     }
     readonly property Region _bodyRegion: Region { item: zone }
@@ -229,14 +237,17 @@ PanelWindow {
         height: body.height + (root.horizontal ? root.lift : 0)
     }
 
-    // The edge the hidden dock comes back from.
+    // The edge the hidden dock comes back from -- and, while it is shown,
+    // the gap between the edge and the glass, so the pointer can rest at
+    // the edge.
     Item {
         id: strip
-        x: root.position === "right" ? root.width - 3 : 0
-        y: root.horizontal ? root.height - 3 : 0
-        width: root.horizontal ? root.width : 3
-        height: root.horizontal ? 3 : root.height
-        HoverHandler { onHoveredChanged: root.pointerMoved(hovered) }
+        readonly property int depth: Math.max(1, root.edgeDepth)
+        x: root.position === "right" ? root.width - strip.depth : 0
+        y: root.horizontal ? root.height - strip.depth : 0
+        width: root.horizontal ? root.width : strip.depth
+        height: root.horizontal ? strip.depth : root.height
+        HoverHandler { id: stripHover }
     }
 
     DockBody {

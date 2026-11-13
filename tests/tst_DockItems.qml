@@ -113,6 +113,20 @@ TestCase {
         verify(!DockItems.hidden("nonsense", { windowNear: true }));
     }
 
+    // The strip at the edge: none for a dock that stays, a sliver while
+    // hidden, the whole gap to the glass while shown.
+    function test_edge_depth() {
+        compare(DockItems.edgeDepth("always", false, 8), 0);
+        compare(DockItems.edgeDepth("always", true, 8), 0);
+        compare(DockItems.edgeDepth("nonsense", true, 8), 0);
+        compare(DockItems.edgeDepth("autohide", true, 8), 3);
+        compare(DockItems.edgeDepth("autohide", false, 8), 8);
+        compare(DockItems.edgeDepth("dodge", true, 8), 3);
+        compare(DockItems.edgeDepth("dodge", false, 8), 8);
+        compare(DockItems.edgeDepth("autohide", false, 1), 3);
+        compare(DockItems.edgeDepth("autohide", false, undefined), 3);
+    }
+
     function test_rest_centres() {
         compare(DockItems.restCentres([48, 9, 48], 6), [24, 58.5, 93]);
         compare(DockItems.restCentres([], 6), []);

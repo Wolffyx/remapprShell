@@ -47,12 +47,10 @@ Rectangle {
     x: Math.max(4, Math.min(menu.dock.width - menu.width - 4, menu._x))
     y: Math.max(4, Math.min(menu.dock.height - menu.height - 4, menu._y))
 
-    HoverHandler {
-        onHoveredChanged: {
-            if (menu.asMenu)
-                menu.dock.pointerMoved(hovered);
-        }
-    }
+    // Whether the pointer is on the open menu, which keeps the dock up.
+    readonly property bool pointerOn: menu.asMenu && menuHover.hovered
+
+    HoverHandler { id: menuHover }
 
     PanelText {
         id: label

@@ -6475,3 +6475,38 @@ would be a choice beside this one (`dock.drawnBy`), ours the default.
 Not seen on screen: the renderer here is quickshell. The first look is
 `rmpr renderer set plasma` with the dock on. Note: a ShellScreens.qml swapped
 in by rename did not hot-reload by itself; `rmpr reload` did.
+
+## The dock's autohide (2026-11-13)
+
+Reported misbehaving; two faults, both in Dock.qml.
+
+**Hidden under the pointer.** `pointerInside` was one flag set by whichever
+HoverHandler spoke last -- the strip at the edge, the glass, the open menu --
+so going from the strip to the glass, the strip's "left" could land after the
+glass's "entered" and the dock hid with the pointer on it. It is now read off
+the handlers themselves (`body.pointerOn || stripHover.hovered ||
+menu.pointerOn`), `leaveDelay` restarts when it turns false and stops when it
+turns true, and `pointerMoved` is gone (DockBody, DockMenu, the preview's
+stand-in).
+
+**Flicker at the edge.** The strip was in the mask only while hidden, and the
+glass sits `margin` (8 px) clear of the edge, so a pointer resting at the
+edge was over nothing of ours once the dock showed: it hid, the strip came
+back, it showed, again and again. Now a dock that can hide (`autohide`,
+`dodge`) keeps the strip in the mask all along the edge -- a 3 px sliver
+while hidden, the whole gap to the glass while shown (`DockItems.edgeDepth`,
+tested). The whole edge rather than the dock's width: a strip only under the
+dock would let a pointer resting at the edge to one side hide it and bring
+it straight back. The cost is the 8 px along the edge taking the pointer
+while the dock is up.
+
+**Seen working, headless.** `dev/kwin-rig/run.sh scenarios/dock-autohide.sh`
+runs the real Dock.qml in a quickshell inside the rig's KWin (a profile of
+the run's own, nothing else of the shell) and drives the fake pointer to the
+edge, a trembling hand there, onto the glass, along the edge past the dock,
+away and back: 8 checks pass. With `DOCK_FROM=3108504` (the dock before the
+fix) four fail -- nine hides and shows for a pointer trembling at the edge,
+which is the report.
+
+Tried on the real desktop on 2026-11-13: autohide behaves. Not tried yet:
+`dodge`, and the menu kept open across the gap from the glass.

@@ -68,7 +68,6 @@ Rectangle {
         id: pointerHover
         margin: body.dock.lift ?? 0
         onHoveredChanged: {
-            body.dock.pointerMoved(hovered);
             if (!hovered)
                 body.hoveredItem = null;
         }

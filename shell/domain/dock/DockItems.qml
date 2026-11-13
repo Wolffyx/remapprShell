@@ -170,4 +170,20 @@ QtObject {
         const rule = root._hides[visibility] ?? root._hides.always;
         return rule(s);
     }
+
+    // How deep the strip along the screen's edge is that takes the pointer
+    // for a dock that can hide, in pixels; 0 for one that never does. Hidden,
+    // a sliver to come back from. Shown, the gap between the edge and the
+    // glass (`margin`), all along the edge: a pointer resting at the edge is
+    // then still on the dock, so it neither hides under the pointer nor
+    // comes straight back, again and again.
+    readonly property int edgeSliver: 3
+
+    function edgeDepth(visibility, hidden, margin) {
+        if (!root._hides[visibility] || visibility === "always")
+            return 0;
+        if (hidden)
+            return root.edgeSliver;
+        return Math.max(root.edgeSliver, Number(margin) || 0);
+    }
 }

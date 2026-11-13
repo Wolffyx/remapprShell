@@ -62,7 +62,6 @@ Rectangle {
             : []
         readonly property int lift: stage.magnified ? fake.size : 0
 
-        function pointerMoved(inside) {}
         function activate(item, button) {}
         // Konsole's entry, with actions of its own as Konsole declares them.
         function entryOf(item) {
