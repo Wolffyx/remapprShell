@@ -44,6 +44,37 @@ TestCase {
         compare(DockItems.togglePin(["a"], ""), ["a"]);
     }
 
+    // Dragged off: what was kept goes, in the order the rest had; what was
+    // not kept changes nothing.
+    function test_unpin() {
+        compare(DockItems.unpin(["a", "b", "c"], "b"), ["a", "c"]);
+        compare(DockItems.unpin(["a"], "a"), []);
+        compare(DockItems.unpin(["a", "b"], "x"), null);
+        compare(DockItems.unpin(["a", "b"], ""), null);
+        compare(DockItems.unpin(undefined, "a"), null);
+    }
+
+    // Away from the edge is up from the bottom, right from the left, left
+    // from the right.
+    function test_away_from_edge() {
+        compare(DockItems.awayFromEdge("bottom", { x: 30, y: -80 }), 80);
+        compare(DockItems.awayFromEdge("bottom", { x: 0, y: 20 }), -20);
+        compare(DockItems.awayFromEdge("left", { x: 70, y: -5 }), 70);
+        compare(DockItems.awayFromEdge("right", { x: -70, y: 5 }), 70);
+        compare(DockItems.awayFromEdge("nonsense", { x: 0, y: -10 }), 10);
+        compare(DockItems.awayFromEdge("bottom", undefined), 0);
+    }
+
+    // Off past the tile's size and a quarter again.
+    function test_pulled_off() {
+        verify(!DockItems.pulledOff(59, 48));
+        verify(DockItems.pulledOff(60, 48));
+        verify(DockItems.pulledOff(200, 48));
+        verify(!DockItems.pulledOff(-100, 48));
+        verify(!DockItems.pulledOff(100, 0));
+        verify(!DockItems.pulledOff(undefined, 48));
+    }
+
     // launcher, a b c (kept), x y (running), the places.
     function dock() {
         return DockItems.items([

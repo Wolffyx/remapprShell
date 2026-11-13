@@ -6510,3 +6510,31 @@ which is the report.
 
 Tried on the real desktop on 2026-11-13: autohide behaves. Not tried yet:
 `dodge`, and the menu kept open across the gap from the glass.
+
+## Drag a tile off the dock (2026-11-13)
+
+`dock.dragToRemove` (on): a tile kept in the dock can be carried off it, away
+from the edge -- up from the bottom, out from a side -- and let go to take it
+out, as "Remove from the dock" does. Past `DockItems.pullOff` (1.25) times the
+tile size it is far enough: the icon fades and a minus shows on its corner.
+Brought back first, it is a drag along the dock again. A running application
+taken out stays, as one not kept; a tile that is not kept never leaves the
+row. Off, the drag is along the dock only, as before.
+
+DockBody owns the drag: `track` and `release` sit between the DragHandler and
+the ReorderState (left unchanged, the settings pages share it). While pulled
+off, the drop index is held at the tile's own, so letting go reorders
+nothing, and `Dock.removeTile` writes `dock.pinned` from `DockItems.unpin`.
+`awayFromEdge`, `pulledOff` and `unpin` are tested. The across axis is only
+enabled for a tile that can go, so other tiles drag as before; with
+`dock.rearrange` off a kept tile can still be pulled off.
+
+**Rig.** The quickshell-in-the-rig setup moved into dev/kwin-rig/dock.sh, which
+both dock scenarios source. scenarios/dock-drag.sh drags real tiles: a little
+way up (nothing), off and back (nothing), along by one (reordered), off (taken
+out), then with the setting off (stays, still reorders): 8 pass, and the
+removal check fails with `DOCK_FROM=facf592`. Preview: `PREVIEW_PULL=1`.
+
+As before, taking out the last kept application leaves `dock.pinned` empty,
+which shows the start menu's pins again (documented on `dock.pinned`).
+Not tried by hand on the desktop.

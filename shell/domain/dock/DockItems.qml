@@ -56,6 +56,41 @@ QtObject {
         return list.indexOf(key) >= 0 ? list.filter(p => p !== key) : list.concat([key]);
     }
 
+    // `pinned` with `id` taken out, or null when it was not kept: a tile
+    // dragged off the dock (`dock.dragToRemove`).
+    function unpin(pinned, id) {
+        const key = String(id ?? "");
+        const list = (pinned ?? []).map(p => String(p)).filter(p => p.length > 0);
+        if (key.length === 0 || list.indexOf(key) < 0)
+            return null;
+        return list.filter(p => p !== key);
+    }
+
+    // How far a drag's `translation` ({x, y}) has carried a tile away from
+    // the screen's edge, for a dock on `position`; negative towards it.
+    readonly property var _awayFrom: ({
+        bottom: t => -t.y,
+        left: t => t.x,
+        right: t => -t.x
+    })
+
+    function awayFromEdge(position, translation) {
+        const away = root._awayFrom[position] ?? root._awayFrom.bottom;
+        return Number(away(translation ?? {})) || 0;
+    }
+
+    // Whether a tile carried `away` pixels off a dock of `size` tiles is far
+    // enough out to be taken out on release: past its own size and a quarter
+    // again, so a drag along the dock that wanders never takes one out.
+    readonly property real pullOff: 1.25
+
+    function pulledOff(away, size) {
+        const s = Number(size) || 0;
+        if (s <= 0)
+            return false;
+        return (Number(away) || 0) >= root.pullOff * s;
+    }
+
     // The tiles that can be dragged: applications that have a desktop entry
     // to keep. The start button, the divider and the places stay put, and so
     // does a window with no application behind it -- there is nothing to

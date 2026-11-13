@@ -16,6 +16,11 @@ pragma ComponentBehavior: Bound
 // dock: the tiles it passes step aside, and on release the dock writes the
 // new order (Dock.moveTile, DockItems.reorder). Only the run of applications
 // moves; the start button, the divider and the places stay where they are.
+//
+// With `dock.dragToRemove`, a tile kept in the dock can be carried off it,
+// away from the edge: past its own size and a quarter it fades and shows a
+// minus, and let go there it is taken out (Dock.removeTile). Brought back
+// before that, it is a drag along the dock again.
 
 import QtQuick
 import Quickshell
@@ -55,6 +60,40 @@ Rectangle {
         minIndex: body.dropRange[0]
         maxIndex: body.dropRange[1]
         onDropped: (from, to) => body.dock.moveTile(from, to)
+    }
+
+    // How far the held tile has been carried away from the edge, and whether
+    // that is far enough for it to go when it is let go.
+    property real away: 0
+    readonly property bool pullingOff: body.dragging && DockItems.pulledOff(body.away, body.size)
+
+    function canRearrange() {
+        return body.dock.rearrange === true;
+    }
+
+    function canRemove(item) {
+        return body.dock.dragToRemove === true && body.dock.isPinned(item) === true;
+    }
+
+    // The held tile has moved `along` the dock and `away` from the edge.
+    // Pulled off, it keeps its place in the row and passes no one.
+    function track(item, index, along, away) {
+        body.away = body.canRemove(item) ? Math.max(0, away) : 0;
+        if (body.pullingOff || !body.canRearrange()) {
+            body.reorder.dropIndex = body.reorder.dragIndex;
+            return;
+        }
+        body.reorder.track(index, along);
+    }
+
+    function release(item) {
+        const off = body.pullingOff;
+        if (off)
+            body.reorder.dropIndex = body.reorder.dragIndex;
+        body.reorder.end();
+        body.away = 0;
+        if (off)
+            body.dock.removeTile(item);
     }
 
     width: body.dock.horizontal ? tiles.implicitWidth + 2 * body.dock.pad : body.dock.thickness
@@ -115,14 +154,18 @@ Rectangle {
                 readonly property real span: (tile.divider ? body.dividerLength : body.size) * tile.grow
                 // Held: follows the pointer. Passed by the held one: a step aside.
                 readonly property bool held: body.reorder.dragIndex === tile.index
-                readonly property real offset: tile.held ? drag.along : body.reorder.shift(tile.index)
+                readonly property real offset: tile.held ? (body.canRearrange() ? drag.along : 0)
+                                                         : body.reorder.shift(tile.index)
+                // Carried away from the edge: up, or out from a side.
+                readonly property real lifted: tile.held ? body.away : 0
+                readonly property bool leaving: tile.held && body.pullingOff
 
                 width: body.dock.horizontal ? tile.span : body.size
                 height: body.dock.horizontal ? body.size : tile.span
                 z: tile.held ? 1 : 0
                 transform: Translate {
-                    x: body.dock.horizontal ? tile.offset : 0
-                    y: body.dock.horizontal ? 0 : tile.offset
+                    x: body.dock.horizontal ? tile.offset : (body.dock.position === "left" ? tile.lifted : -tile.lifted)
+                    y: body.dock.horizontal ? -tile.lifted : tile.offset
                 }
 
                 Rectangle {
@@ -138,6 +181,7 @@ Rectangle {
                 Item {
                     id: face
                     visible: !tile.divider
+                    opacity: tile.leaving ? 0.55 : 1
                     width: body.size * tile.grow
                     height: width
                     x: body.dock.position === "right" ? body.size - face.width : 0
@@ -167,24 +211,28 @@ Rectangle {
 
                     DragHandler {
                         id: drag
+                        readonly property bool removable: body.canRemove(tile.item)
                         readonly property real along: body.dock.horizontal ? drag.activeTranslation.x : drag.activeTranslation.y
-                        enabled: body.dock.rearrange === true && DockItems.draggable(tile.item)
+                        readonly property real away: DockItems.awayFromEdge(body.dock.position, drag.activeTranslation)
+                        enabled: DockItems.draggable(tile.item) && (body.canRearrange() || drag.removable)
                         target: null
                         acceptedButtons: Qt.LeftButton
-                        xAxis.enabled: body.dock.horizontal
-                        yAxis.enabled: !body.dock.horizontal
+                        // Along the dock always; across it only for a tile
+                        // that can be carried off.
+                        xAxis.enabled: body.dock.horizontal || drag.removable
+                        yAxis.enabled: !body.dock.horizontal || drag.removable
                         cursorShape: Qt.ClosedHandCursor
 
                         onActiveChanged: {
                             if (drag.active)
                                 body.reorder.begin(tile.index);
                             else
-                                body.reorder.end();
+                                body.release(tile.item);
                         }
 
-                        onAlongChanged: {
+                        onActiveTranslationChanged: {
                             if (drag.active)
-                                body.reorder.track(tile.index, drag.along);
+                                body.track(tile.item, tile.index, drag.along, drag.away);
                         }
                     }
 
@@ -195,6 +243,25 @@ Rectangle {
                             body.hover(tile, tile.item);
                             body.dock.activate(tile.item, button);
                         }
+                    }
+                }
+
+                // Pulled far enough off to go: a minus on its corner.
+                Rectangle {
+                    visible: tile.leaving
+                    width: 20
+                    height: 20
+                    radius: 10
+                    x: tile.width - width / 2 - 4
+                    y: -height / 2 + 4
+                    color: Theme.error
+
+                    Glyph {
+                        anchors.centerIn: parent
+                        name: "remove"
+                        fallback: "list-remove"
+                        size: 16
+                        color: Theme.errorFg
                     }
                 }
 

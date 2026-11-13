@@ -9,51 +9,22 @@
 # fake pointer goes where a hand would: to the edge, onto the dock, along
 # the edge past it, and away.
 #
-# DOCK_FROM=<rev> runs the dock's files as they were at that commit instead,
-# to see a fault before the fix that cured it.
+# DOCK_FROM=<rev> runs the dock as it was at that commit (dev/kwin-rig/dock.sh).
 
-QS=$RUN/qs
-cp -r "$REPO_ROOT/shell/." "$QS/"
-if [ -n "${DOCK_FROM:-}" ]; then
-    for f in features/dock/Dock.qml features/dock/DockBody.qml features/dock/DockMenu.qml domain/dock/DockItems.qml; do
-        git -C "$REPO_ROOT" show "$DOCK_FROM:shell/$f" > "$QS/$f"
-    done
-fi
-# The schema and the defaults from this tree, not the installed ones.
-sed -i "s|\${Paths.dataDir}/config/schema|$REPO_ROOT/config/schema|" "$QS/domain/config/Schema.qml"
-sed -i "s|\${root.dataDir}/config/defaults|$REPO_ROOT/config/defaults|" "$QS/core/Paths.qml"
-sed -i '0,/^    id: root$/s//    id: root\
-    Component.onCompleted: console.warn(`DOCK hidden=${root.hidden}`)\
-    onHiddenChanged: console.warn(`DOCK hidden=${root.hidden}`)/' "$QS/features/dock/Dock.qml"
-cat > "$QS/shell.qml" <<'QML'
-import QtQuick
-import Quickshell
-import qs.features.dock
-
-ShellRoot {
-    Variants {
-        model: Quickshell.screens
-        Dock {}
-    }
-}
-QML
-profile=$XDG_CONFIG_HOME/$SLUG/profiles/default
-mkdir -p "$profile"
-printf '{ "dock": { "enabled": true, "position": "bottom", "visibility": "autohide", "magnify": false } }\n' > "$profile/shell.json"
-
+source "$RIG/dock.sh"
 input_start
 send "move 960 400" "sleep 100"
-QT_QUICK_BACKEND=software quickshell -p "$QS" > "$RUN/qs.log" 2>&1 &
+dock_start '{ "dock": { "enabled": true, "position": "bottom", "visibility": "autohide", "magnify": false } }'
 # The dock first speaks before the profile is read, as `always` (hidden=false);
 # hidden=true is the profile's autohide. Then a moment for the surface to
 # settle before the pointer moves.
-for _ in $(seq 75); do grep -qa "DOCK hidden=true" "$RUN/qs.log" && break; sleep 0.2; done
+dock_wait hidden=true 15
 sleep 1.5
 
 # The dock's last word, and how many times it has spoken since `mark`.
-state() { grep -a "DOCK hidden=" "$RUN/qs.log" | tail -1 | sed 's/.*DOCK hidden=//'; }
-mark() { MARK=$(grep -ac "DOCK hidden=" "$RUN/qs.log"); }
-flips() { echo $(( $(grep -ac "DOCK hidden=" "$RUN/qs.log") - MARK )); }
+state() { dock_said hidden; }
+mark() { MARK=$(dock_count hidden); }
+flips() { echo $(( $(dock_count hidden) - MARK )); }
 
 # At 1920x1080 and the default 48 px tiles the glass runs from y 1006 to
 # 1072, 8 px clear of the edge, centred along it.
@@ -100,9 +71,4 @@ sleep 2.4
 check "the edge anywhere along it brings it back, once" "$(flips)$(state)" "1false"
 
 input_stop
-if grep -a -E 'TypeError|ReferenceError|is not a function|failed to load' "$RUN/qs.log" >/dev/null; then
-    echo "  quickshell's log has errors:"
-    grep -a -E 'TypeError|ReferenceError|is not a function|failed to load' "$RUN/qs.log" | head -5 | sed 's/^/    /'
-    failed=$((failed + 1))
-fi
-echo "  quickshell's log: ${RUN#"$REPO_ROOT"/}/qs.log"
+dock_errors

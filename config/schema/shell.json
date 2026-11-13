@@ -305,6 +305,12 @@
                     "label": "Drag to rearrange",
                     "description": "Drag an application's tile along the dock to move it; the ones it passes step aside. A running application dropped among the ones kept in the dock, or just after them, is kept from then on. The start button, the divider and the places stay where they are."
                 },
+                "dock.dragToRemove": {
+                    "type": "bool",
+                    "default": true,
+                    "label": "Drag off to remove",
+                    "description": "Carry a tile kept in the dock off it, away from the edge, and let go to take it out, as on macOS: once it is far enough out it fades and shows a minus. Brought back first, it stays. A running application stays on the dock as one not kept. Off, a tile is only dragged along the dock."
+                },
                 "dock.visibility": {
                     "type": "enum",
                     "values": ["always", "autohide", "dodge"],

@@ -175,6 +175,7 @@
         "magnify": false,
         "magnifiedSize": 96,
         "rearrange": true,
+        "dragToRemove": true,
         "visibility": "always",
         "pinned": [],
         "launcher": true,

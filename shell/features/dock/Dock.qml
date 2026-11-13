@@ -55,6 +55,7 @@ PanelWindow {
     readonly property string visibility: root.setting("dock.visibility", "always")
     readonly property bool magnify: root.setting("dock.magnify", false) === true
     readonly property bool rearrange: root.setting("dock.rearrange", true) !== false
+    readonly property bool dragToRemove: root.setting("dock.dragToRemove", true) !== false
     // How many times its size the tile under the pointer grows to.
     readonly property real peak: Math.max(1, Math.min(128, Number(root.setting("dock.magnifiedSize", 96)) || 96) / root.size)
 
@@ -342,6 +343,15 @@ PanelWindow {
     // the dock showed.
     function moveTile(from, to) {
         const next = DockItems.reorder(root.items, root.pinned, from, to);
+        if (next !== null)
+            ConfigStore.set("dock.pinned", next);
+    }
+
+    // A kept tile carried off the dock (DockBody) is taken out of it, as
+    // "Remove from the dock" does; a running application stays, as one not
+    // kept.
+    function removeTile(item) {
+        const next = DockItems.unpin(root.pinned, item?.appKey);
         if (next !== null)
             ConfigStore.set("dock.pinned", next);
     }
