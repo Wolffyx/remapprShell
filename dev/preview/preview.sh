@@ -71,6 +71,20 @@ grep -qF "configDir: \"$root/profile\"" "$paths" && grep -qF "stateDir: \"$root/
 sed -i "s|\${Paths.dataDir}/config/schema|$WT/config/schema|" "$root/domain/config/Schema.qml"
 sed -i "s|\${root.dataDir}/config/defaults|$WT/config/defaults|" "$paths"
 sed -i -E 's/^FloatingWindow \{/Item {/; /^    title: /d; /^    color: Theme\.s1$/d' "$root/features/settings/SettingsWindow.qml"
+# The session bus is the user's too, and a preview must not act on it. With
+# notifications.server "shell" (the shipped default) a preview's
+# ShellNotifications queued for org.freedesktop.Notifications, and would have
+# taken the user's notifications had the live shell been down or restarting;
+# PlasmaServices beside it kills a plasmawindowed holding that name and hosts
+# applets whose names are free (2026-11-25). In the copy, Plasma serves and
+# nothing is hosted, so neither runs. Only PlasmaServices' own view changes:
+# the settings pages still read the real notifications.server.
+services="$root/domain/backend/PlasmaServices.qml"
+sed -i -E 's|^( *readonly property bool enabled: ).*$|\1false|
+           s|^( *readonly property string notificationServer: ).*$|\1"plasma"|' "$services"
+grep -qE '^ *readonly property bool enabled: false$' "$services" \
+    && grep -qE '^ *readonly property string notificationServer: "plasma"$' "$services" \
+    || { echo "preview: could not keep PlasmaServices off the session bus; not rendering" >&2; exit 1; }
 
 # PREVIEW_DEMO=1: a picture fit to publish.
 #
@@ -115,8 +129,22 @@ PYEOF
     # back over the value above.
     demo "$root/domain/session/Session.qml" \
         'onLoaded: root.hostName = text().trim()' 'onLoaded: {}'
+    # How long this machine has been up, read every minute: a fixed answer.
+    demo "$root/domain/session/Session.qml" \
+        'onLoaded: root.uptimeSeconds = parseFloat(text().split(" ")[0]) || 0' \
+        'onLoaded: root.uptimeSeconds = 3 * 3600 + 12 * 60'
+    # When night comes is worked out from where GeoClue puts the machine, so
+    # a sunset time, with the date beside it, says roughly where somebody
+    # lives. KDE's schedule and a round hour instead.
+    demo "$root/domain/theme/Daylight.qml" \
+        'root.answer = parsed;' \
+        'root.answer = { known: true, daylight: true, source: "kde", next: new Date().setHours(19, 0, 0, 0), why: "demo" };'
+    # Every name the network pages show -- the one joined, the ones in reach,
+    # the saved ones -- comes out of one nmcli read, so the read is handed an
+    # invented one and the real parser makes the state from it.
     demo "$root/domain/status/NetworkStatus.qml" \
-        'name: joined?.name ?? ""' 'name: "Home Wi-Fi"'
+        'const s = NmcliState.parse(text);' \
+        'const s = NmcliState.parse("@connectivity\nfull\n@radio\nenabled:enabled\n@devices\nwlan0:wifi:connected:Home Wi-Fi\n@wifi\n*:Home Wi-Fi:82:WPA2\n:Corner Cafe:54:\n:Neighbours 5G:31:WPA2 WPA3\n@saved\nHome Wi-Fi:802-11-wireless\n@speed\n");'
     demo "$root/domain/status/AudioStatus.qml" \
         'return node?.description || node?.nickname || node?.name || "";' \
         'return node ? (node.isSink ? "Desk speakers" : "Desk microphone") : "";'
@@ -215,6 +243,13 @@ XBEL
     demo "$root/domain/status/MediaStatus.qml" \
         'readonly property var current: root.picked.current >= 0 ? root.all[root.picked.current] : null' \
         'readonly property var current: null'
+
+    # The notification history is filled by an eavesdrop on the real session
+    # bus, so a notification arriving during the render lands in the picture
+    # above the target's samples -- a real one did, in the README's own shot
+    # (2026-11-25). In a demo only the samples are shown.
+    demo "$root/domain/notifications/NotificationWatch.qml" \
+        'running: root.enabled' 'running: false'
 
     # The tray is the last thing that says whose desktop this is: it is a row
     # of the applications somebody chose to run. Four generic ones instead,

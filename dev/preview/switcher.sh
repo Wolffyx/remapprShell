@@ -129,9 +129,12 @@ source "$WT/scripts/lib/render.sh"
 
 for layout in ${1:-row grid icons}; do
     echo "== $layout =="
-    SWITCHER_LAYOUT=$layout SWITCHER_SUFFIX="" SWITCHER_LABEL="" \
-        render_template "$WT/theme/windowswitcher/contents/ui/main.qml.in" "$root/main.qml" \
-        || { echo "switcher: could not render $layout"; exit 1; }
+    # main.qml finds the header and footer beside it, so they are rendered too.
+    for t in "$WT"/theme/windowswitcher/contents/ui/*.qml.in; do
+        SWITCHER_LAYOUT=$layout SWITCHER_SUFFIX="" SWITCHER_LABEL="" \
+            render_template "$t" "$root/$(basename "$t" .in)" \
+            || { echo "switcher: could not render $layout"; exit 1; }
+    done
 
     # For a picture only: the switcher's contents live in a PlasmaCore.Dialog,
     # which is a window of its own, and a window is not part of any grab taken
